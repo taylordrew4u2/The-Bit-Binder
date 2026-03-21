@@ -44,6 +44,11 @@ final class Joke: Identifiable {
     // The Hits - perfected jokes that work every time
     var isHit: Bool = false
     
+    // Import source tracking
+    var importSource: String?  // Source file name if imported
+    var importConfidence: String?  // high/medium/low
+    var importTimestamp: Date?  // When imported
+    
     // Computed property for tags
     var tags: [String] {
         get {

@@ -10,6 +10,7 @@ final class AppStartupCoordinator: ObservableObject {
     private let dataProtection = DataProtectionService.shared
     private let dataValidation = DataValidationService.shared
     private let dataMigration = DataMigrationService.shared
+    private let schemaDeployment = SchemaDeploymentService.shared
     
     func start() async {
         guard !isReady else { return }
@@ -63,6 +64,10 @@ final class AppStartupCoordinator: ObservableObject {
         
         // Handle schema changes
         await dataMigration.handleSchemaChanges(context: context)
+        
+        // Verify CloudKit schema deployment
+        schemaDeployment.logSchemaFields()
+        await schemaDeployment.ensureSchemaDeployed(context: context)
         
         // Perform any needed migrations
         let migrationResult = await dataMigration.performSafeMigration(context: context)
