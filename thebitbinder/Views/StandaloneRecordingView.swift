@@ -222,10 +222,9 @@ struct StandaloneRecordingView: View {
         let fileName = fileURL.lastPathComponent
         
         let recording = Recording(
-            name: recordingName.isEmpty ? "Recording \(Date())" : recordingName,
+            title: recordingName.isEmpty ? "Recording \(Date())" : recordingName,
             fileURL: fileName,
-            duration: recordingDuration,
-            setListID: nil  // No set list for standalone recordings
+            duration: recordingDuration
         )
         
         print("✅ Saving standalone recording: \(fileName) with duration: \(recordingDuration)s")

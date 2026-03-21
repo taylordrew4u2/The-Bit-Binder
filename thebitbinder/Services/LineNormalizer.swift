@@ -298,7 +298,7 @@ extension LineNormalizer {
         
         // Don't merge if there's a large gap between lines
         let verticalGap = abs(line1.yPosition - line2.yPosition)
-        if verticalGap > line1.boundingBox.height * 2 { return false }
+        if verticalGap > Float(line1.boundingBox.height) * 2 { return false }
         
         // Don't merge if indentation changes significantly
         let indentDiff = abs(line1.indentationLevel - line2.indentationLevel)
@@ -310,8 +310,8 @@ extension LineNormalizer {
         let text2 = line2.normalizedText
         
         let endsWithTerminal = hasTerminalPunctuation(text1[text1.startIndex..<text1.endIndex])
-        let startsLikeNewSentence = text2.first?.isUppercase == true || 
-                                  text2.hasPrefix("•") || 
+        let startsLikeNewSentence = text2.first?.isUppercase == true ||
+                                  text2.hasPrefix("•") ||
                                   text2.hasPrefix("-") ||
                                   text2.range(of: "^\\d+[.)]", options: .regularExpression) != nil
         

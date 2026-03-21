@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import SwiftData
 
 /// Coordinates the entire import pipeline from file input to final joke objects
 final class ImportPipelineCoordinator {
@@ -104,8 +105,7 @@ final class ImportPipelineCoordinator {
                         orderInPage: joke.sourceMetadata.orderInPage,
                         orderInFile: index,
                         boundingBox: joke.sourceMetadata.boundingBox,
-                        importTimestamp: joke.sourceMetadata.importTimestamp,
-                        pipelineVersion: joke.sourceMetadata.pipelineVersion
+                        importTimestamp: joke.sourceMetadata.importTimestamp
                     ),
                     validationResult: joke.validationResult,
                     extractionMethod: joke.extractionMethod
@@ -149,13 +149,8 @@ final class ImportPipelineCoordinator {
             confidenceCalculations: validations.map { "Block: \($0.confidence), Issues: \($0.issues.count)" }
         )
         
-        // Log the import operation
-        DataOperationLogger.shared.logBulkOperation(
-            "IMPORT",
-            entityType: "Joke",
-            count: autoSavedJokes.count + reviewQueueJokes.count,
-            context: ModelContext() // This would be injected in real usage
-        )
+        // Log the import operation (basic logging without context)
+        print("📊 IMPORT: \(autoSavedJokes.count + reviewQueueJokes.count) jokes processed from \(url.lastPathComponent)")
         
         return ImportPipelineResult(
             sourceFile: url.lastPathComponent,
@@ -230,7 +225,7 @@ final class ImportPipelineCoordinator {
                 normalizedText: trimmed,
                 pageNumber: 1,
                 lineNumber: index + 1,
-                boundingBox: CGRect(x: 0, y: Float(index) * 20, width: 500, height: 20), // Estimated
+                boundingBox: CGRect(x: 0, y: CGFloat(index) * 20, width: 500, height: 20), // Estimated
                 confidence: 1.0,
                 estimatedFontSize: 12.0,
                 indentationLevel: calculateIndentationLevel(line),

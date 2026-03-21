@@ -1259,9 +1259,15 @@ struct JokesView: View {
     }
     
     private func checkPendingVoiceMemoImports() {
-        let sharedDefaults = UserDefaults(suiteName: "group.com.taylordrew.thebitbinder")
-        guard let pendingImports = sharedDefaults?.array(forKey: "pendingVoiceMemoImports") as? [[String: String]],
+        // Use App Group shared defaults for extension communication
+        guard let sharedDefaults = UserDefaults(suiteName: "group.R44WG942GS.thebitbinder") else {
+            print("⚠️ [VoiceMemo] App Group not available")
+            return
+        }
+        guard let pendingImports = sharedDefaults.array(forKey: "pendingVoiceMemoImports") as? [[String: String]],
               !pendingImports.isEmpty else { return }
+        
+        print("📥 [VoiceMemo] Found \(pendingImports.count) pending voice memo imports")
         
         var importedCount = 0
         for importData in pendingImports {
@@ -1280,13 +1286,14 @@ struct JokesView: View {
         }
         
         // Clear pending imports
-        sharedDefaults?.removeObject(forKey: "pendingVoiceMemoImports")
-        sharedDefaults?.synchronize()
+        sharedDefaults.removeObject(forKey: "pendingVoiceMemoImports")
+        sharedDefaults.synchronize()
         
         if importedCount > 0 {
             try? modelContext.save()
             importSummary = (importedCount, 0)
             showingImportSummary = true
+            print("✅ [VoiceMemo] Imported \(importedCount) voice memos")
         }
     }
     

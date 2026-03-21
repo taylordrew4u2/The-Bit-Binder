@@ -90,7 +90,6 @@ struct EditBrainstormIdeaSheet: View {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         idea.content = trimmed
-        idea.dateModified = Date()
         try? modelContext.save()
         dismiss()
     }

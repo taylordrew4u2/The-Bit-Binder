@@ -148,7 +148,7 @@ final class JokeBlockValidator {
             let currentLine = lines[i]
             
             let verticalGap = abs(currentLine.yPosition - prevLine.yPosition)
-            let normalGap = currentLine.boundingBox.height * 1.5
+            let normalGap = Float(currentLine.boundingBox.height) * 1.5
             
             if verticalGap > normalGap * 2.0 {
                 largeGaps += 1
@@ -285,7 +285,7 @@ final class JokeBlockValidator {
             let currentLine = lines[i]
             
             let verticalGap = abs(currentLine.yPosition - prevLine.yPosition)
-            let normalGap = currentLine.boundingBox.height * 1.5
+            let normalGap = Float(currentLine.boundingBox.height) * 1.5
             
             if verticalGap > normalGap * 2.0 {
                 gaps += 1
@@ -399,7 +399,7 @@ final class JokeBlockValidator {
             let currentLine = block.lines[i]
             
             let verticalGap = abs(currentLine.yPosition - prevLine.yPosition)
-            let normalGap = currentLine.boundingBox.height * 1.5
+            let normalGap = Float(currentLine.boundingBox.height) * 1.5
             
             if verticalGap > normalGap * 2.5 { // Even larger threshold for split suggestions
                 splitPoints.append(i)

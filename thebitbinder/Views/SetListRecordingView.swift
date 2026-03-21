@@ -209,10 +209,9 @@ struct SetListRecordingView: View {
         let fileName = fileURL.lastPathComponent
         
         let recording = Recording(
-            name: recordingName.isEmpty ? "Recording \(Date())" : recordingName,
+            title: recordingName.isEmpty ? "Recording \(Date())" : recordingName,
             fileURL: fileName,
-            duration: recordingDuration,
-            setListID: setList.id
+            duration: recordingDuration
         )
         
         print("✅ Saving recording: \(fileName) with duration: \(recordingDuration)s")

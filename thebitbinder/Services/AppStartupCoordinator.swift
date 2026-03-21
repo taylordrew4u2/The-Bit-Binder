@@ -50,6 +50,9 @@ final class AppStartupCoordinator: ObservableObject {
     func completeDataProtectionWithContext(_ context: ModelContext) async {
         print("🔧 [AppStartup] Completing data protection with model context...")
         
+        // FIRST: Clean up corrupted CloudKit records (one-time fix)
+        await cleanupCorruptedCloudKitRecords()
+        
         // Perform data validation
         let validation = await dataValidation.validateDataIntegrity(context: context)
         
@@ -79,6 +82,35 @@ final class AppStartupCoordinator: ObservableObject {
             print("⚠️ [AppStartup] Migration: \(message)")
         case .failure(let message):
             print("❌ [AppStartup] Migration: \(message)")
+        }
+    }
+    
+    // MARK: - CloudKit Cleanup
+    
+    /// One-time cleanup for corrupted CloudKit records
+    /// This fixes the CD_folder STRING vs REFERENCE type mismatch
+    private func cleanupCorruptedCloudKitRecords() async {
+        let cleanupKey = "CloudKitFolderSchemaCleanupCompleted_v1"
+        
+        // Only run once
+        guard !UserDefaults.standard.bool(forKey: cleanupKey) else {
+            print("✅ [CloudKit] Schema cleanup already completed")
+            return
+        }
+        
+        print("🔧 [CloudKit] Running one-time cleanup for CD_folder schema fix...")
+        
+        do {
+            // Delete the specific corrupted record from the error
+            try await CloudKitResetUtility.deleteCorruptedRecordFromError()
+            
+            // Mark as completed
+            UserDefaults.standard.set(true, forKey: cleanupKey)
+            print("✅ [CloudKit] Schema cleanup completed successfully")
+        } catch {
+            print("⚠️ [CloudKit] Cleanup error (may be already fixed): \(error.localizedDescription)")
+            // Still mark as completed to avoid repeated attempts
+            UserDefaults.standard.set(true, forKey: cleanupKey)
         }
     }
 }

@@ -15,7 +15,7 @@ final class Joke: Identifiable {
     var title: String = ""
     var dateCreated: Date = Date()
     var dateModified: Date = Date()
-    var folder: JokeFolder?
+    @Relationship var folder: JokeFolder?
     
     // Soft-delete (trash) support
     var isDeleted: Bool = false

@@ -12,18 +12,12 @@ import Combine
 
 struct RecordingDetailView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var setLists: [SetList]
     
     @Bindable var recording: Recording
     @StateObject private var audioPlayer = AudioPlayerService()
     @State private var isTranscribing = false
     @State private var transcriptionError: String?
     @State private var showingTranscriptionError = false
-    
-    var setList: SetList? {
-        guard let setListID = recording.setListID else { return nil }
-        return setLists.first { $0.id == setListID }
-    }
     
     var body: some View {
         ScrollView {
@@ -179,28 +173,9 @@ struct RecordingDetailView: View {
                 
                 // Recording info
                 VStack(alignment: .leading, spacing: 16) {
-                    InfoRow(label: "Name", value: recording.name)
+                    InfoRow(label: "Name", value: recording.title)
                     InfoRow(label: "Duration", value: timeString(from: recording.duration))
                     InfoRow(label: "Date", value: recording.dateCreated.formatted(date: .long, time: .shortened))
-                    
-                    if let setList = setList {
-                        NavigationLink(destination: SetListDetailView(setList: setList)) {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text("Set List")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text(setList.name)
-                                        .font(.body)
-                                        .foregroundColor(.blue)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
                 }
                 .padding()
                 .background(Color(UIColor.systemGray6))
@@ -224,7 +199,10 @@ struct RecordingDetailView: View {
         .navigationTitle("Recording")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            audioPlayer.loadAudio(from: recording.fileURL)
+            // Small delay to ensure audio session is ready
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                audioPlayer.loadAudio(from: recording.fileURL)
+            }
         }
         .onDisappear {
             audioPlayer.stop()
@@ -437,7 +415,12 @@ class AudioPlayerService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     
     func play() {
-        audioPlayer?.play()
+        guard let player = audioPlayer else {
+            print("⚠️ Cannot play - audio player is nil")
+            loadError = "Audio not loaded"
+            return
+        }
+        player.play()
         isPlaying = true
         startTimer()
     }
@@ -457,18 +440,22 @@ class AudioPlayerService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     
     func seek(to time: TimeInterval) {
-        audioPlayer?.currentTime = time
-        currentTime = time
+        guard let player = audioPlayer else { return }
+        player.currentTime = max(0, min(time, player.duration))
+        currentTime = player.currentTime
     }
     
     private func startTimer() {
+        stopTimer() // Ensure no duplicate timers
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self, let player = self.audioPlayer else { return }
-            self.currentTime = player.currentTime
-            
-            if !player.isPlaying && self.isPlaying {
-                self.isPlaying = false
-                self.stopTimer()
+            DispatchQueue.main.async {
+                guard let self = self, let player = self.audioPlayer else { return }
+                self.currentTime = player.currentTime
+                
+                if !player.isPlaying && self.isPlaying {
+                    self.isPlaying = false
+                    self.stopTimer()
+                }
             }
         }
     }
@@ -480,7 +467,11 @@ class AudioPlayerService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     private func cleanup() {
         stopTimer()
-        audioPlayer?.stop()
+        if let player = audioPlayer {
+            if player.isPlaying {
+                player.stop()
+            }
+        }
         audioPlayer = nil
         isPlaying = false
         currentTime = 0

@@ -21,7 +21,7 @@ struct RecordingsView: View {
         if searchText.isEmpty {
             return recordings
         } else {
-            return recordings.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+            return recordings.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
         }
     }
     
@@ -132,7 +132,7 @@ struct RecordingRowView: View {
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(recording.name)
+                Text(recording.title)
                     .font(.system(size: 16, weight: .semibold, design: .serif))
                     .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
                     .lineLimit(1)

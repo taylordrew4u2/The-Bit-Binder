@@ -276,10 +276,9 @@ struct RecordingView: View {
             let name = recordingName.isEmpty ? "Recording - \(setList.name)" : recordingName
             // Save only the filename, not the full path (sandbox paths change between installs)
             let recording = Recording(
-                name: name,
+                title: name,
                 fileURL: url.lastPathComponent,
-                duration: result.duration,
-                setListID: setList.id
+                duration: result.duration
             )
             modelContext.insert(recording)
             dismiss()

@@ -98,8 +98,10 @@ class AudioRecordingService: NSObject, ObservableObject {
             
             // Start timer to update recording time
             recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                guard let self = self, let startTime = self.recordingStartTime else { return }
-                self.recordingTime = Date().timeIntervalSince(startTime) - self.pausedDuration
+                DispatchQueue.main.async {
+                    guard let self = self, let startTime = self.recordingStartTime else { return }
+                    self.recordingTime = Date().timeIntervalSince(startTime) - self.pausedDuration
+                }
             }
             
             return true
@@ -124,8 +126,10 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         // Restart timer
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self, let startTime = self.recordingStartTime else { return }
-            self.recordingTime = Date().timeIntervalSince(startTime) - self.pausedDuration
+            DispatchQueue.main.async {
+                guard let self = self, let startTime = self.recordingStartTime else { return }
+                self.recordingTime = Date().timeIntervalSince(startTime) - self.pausedDuration
+            }
         }
     }
     

@@ -21,10 +21,7 @@ struct NotebookView: View {
     @State private var cameraImage: UIImage?
     
     private func delete(_ photo: NotebookPhotoRecord) {
-        // Remove file from disk if it exists
-        let url = FileManager.documentsDirectory.appendingPathComponent(photo.fileURL)
-        try? FileManager.default.removeItem(at: url)
-        // Remove from SwiftData
+        // Remove from SwiftData (imageData is stored directly, no file to delete)
         modelContext.delete(photo)
         try? modelContext.save()
     }
@@ -73,17 +70,28 @@ struct NotebookView: View {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(photos, id: \.id) { photo in
-                                let imageURL = FileManager.documentsDirectory.appendingPathComponent(photo.fileURL)
-                                CachedImageView(fileURL: imageURL,
-                                                placeholder: AnyView(Color.gray.frame(minWidth: 100, minHeight: 100).overlay(Text("Loading").foregroundColor(.white))),
-                                                contentMode: .fill,
-                                                cornerRadius: 8)
-                                    .frame(minWidth: 100, minHeight: 100)
-                                    .clipped()
-                                    .onTapGesture { showingDetail = photo }
-                                    .contextMenu {
-                                        Button(role: .destructive) { delete(photo) } label: { Label("Delete", systemImage: "trash") }
-                                    }
+                                // Load image from stored imageData
+                                if let imageData = photo.imageData, let uiImage = UIImage(data: imageData) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(minWidth: 100, minHeight: 100)
+                                        .clipped()
+                                        .cornerRadius(8)
+                                        .onTapGesture { showingDetail = photo }
+                                        .contextMenu {
+                                            Button(role: .destructive) { delete(photo) } label: { Label("Delete", systemImage: "trash") }
+                                        }
+                                } else {
+                                    Color.gray
+                                        .frame(minWidth: 100, minHeight: 100)
+                                        .cornerRadius(8)
+                                        .overlay(Text("No Image").foregroundColor(.white))
+                                        .onTapGesture { showingDetail = photo }
+                                        .contextMenu {
+                                            Button(role: .destructive) { delete(photo) } label: { Label("Delete", systemImage: "trash") }
+                                        }
+                                }
                             }
                         }
                         .padding()
@@ -146,11 +154,9 @@ struct NotebookView: View {
             guard let data = try await item.loadTransferable(type: Data.self) else { return }
             guard let uiImage = UIImage(data: data) else { return }
             
-            let filename = uniqueFilename() + ".jpg"
-            let url = FileManager.documentsDirectory.appendingPathComponent(filename)
+            // Compress and store as imageData directly
             if let jpegData = uiImage.jpegData(compressionQuality: 0.8) {
-                try jpegData.write(to: url, options: .atomic)
-                let newPhoto = NotebookPhotoRecord(caption: "", fileURL: filename)
+                let newPhoto = NotebookPhotoRecord(notes: "", imageData: jpegData)
                 await MainActor.run {
                     modelContext.insert(newPhoto)
                     try? modelContext.save()
@@ -162,25 +168,16 @@ struct NotebookView: View {
     }
     
     private func saveCameraImage(_ image: UIImage) async {
-        let filename = uniqueFilename() + ".jpg"
-        let url = FileManager.documentsDirectory.appendingPathComponent(filename)
+        // Compress and store as imageData directly
         if let jpegData = image.jpegData(compressionQuality: 0.8) {
-            do {
-                try jpegData.write(to: url, options: .atomic)
-                let newPhoto = NotebookPhotoRecord(caption: "", fileURL: filename)
-                await MainActor.run {
-                    modelContext.insert(newPhoto)
-                    try? modelContext.save()
-                }
-            } catch {
-                // ignore errors silently for now
+            let newPhoto = NotebookPhotoRecord(notes: "", imageData: jpegData)
+            await MainActor.run {
+                modelContext.insert(newPhoto)
+                try? modelContext.save()
             }
         }
     }
     
-    private func uniqueFilename() -> String {
-        UUID().uuidString
-    }
 }
 
 struct NotebookDetailView: View {
@@ -189,10 +186,7 @@ struct NotebookDetailView: View {
     @Environment(\.modelContext) private var modelContext
     
     private func deleteCurrent() {
-        // Remove file
-        let url = FileManager.documentsDirectory.appendingPathComponent(photo.fileURL)
-        try? FileManager.default.removeItem(at: url)
-        // Delete model and dismiss
+        // Delete model and dismiss (imageData stored directly, no file to remove)
         modelContext.delete(photo)
         try? modelContext.save()
         dismiss()
@@ -201,8 +195,8 @@ struct NotebookDetailView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                let imageURL = FileManager.documentsDirectory.appendingPathComponent(photo.fileURL)
-                if let uiImage = UIImage(contentsOfFile: imageURL.path) {
+                // Load image from stored imageData
+                if let imageData = photo.imageData, let uiImage = UIImage(data: imageData) {
                     Image(uiImage: uiImage)
                         .resizable()
                         .scaledToFit()
@@ -215,7 +209,7 @@ struct NotebookDetailView: View {
                         .overlay(Text("Image not found").foregroundColor(.white))
                         .padding()
                 }
-                TextField("Caption", text: $photo.caption)
+                TextField("Notes", text: $photo.notes)
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal)
                 

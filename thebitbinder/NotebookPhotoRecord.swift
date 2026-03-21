@@ -1,17 +1,24 @@
+//
+//  NotebookPhotoRecord.swift
+//  thebitbinder
+//
+//  Model for storing notebook page photos
+//
+
 import Foundation
 import SwiftData
 
 @Model
 final class NotebookPhotoRecord: Identifiable {
     var id: UUID = UUID()
-    var caption: String = ""
-    var fileURL: String = ""
-    var createdAt: Date = Date()
+    var notes: String = ""  // Renamed from 'caption' per CD_NotebookPhotoRecord schema
+    @Attribute(.externalStorage) var imageData: Data?  // Changed from fileURL to imageData (BYTES) per schema
+    var dateAdded: Date = Date()  // Renamed from 'createdAt' per CD_NotebookPhotoRecord schema
 
-    init(caption: String, fileURL: String) {
+    init(notes: String, imageData: Data? = nil) {
         self.id = UUID()
-        self.caption = caption
-        self.fileURL = fileURL
-        self.createdAt = Date()
+        self.notes = notes
+        self.imageData = imageData
+        self.dateAdded = Date()
     }
 }

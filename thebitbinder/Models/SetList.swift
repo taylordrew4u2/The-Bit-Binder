@@ -14,6 +14,7 @@ final class SetList: Identifiable {
     var name: String = ""
     var dateCreated: Date = Date()
     var dateModified: Date = Date()
+    var notes: String = ""  // Added per CD_SetList schema
     
     // Store UUIDs as a comma-separated string to avoid SwiftData Array<UUID> issues
     private var jokeIDsString: String = ""
@@ -46,11 +47,12 @@ final class SetList: Identifiable {
         jokeIDs.count + roastJokeIDs.count
     }
     
-    init(name: String, jokeIDs: [UUID] = [], roastJokeIDs: [UUID] = []) {
+    init(name: String, jokeIDs: [UUID] = [], roastJokeIDs: [UUID] = [], notes: String = "") {
         self.id = UUID()
         self.name = name
         self.dateCreated = Date()
         self.dateModified = Date()
+        self.notes = notes
         self.jokeIDsString = jokeIDs.map { $0.uuidString }.joined(separator: ",")
         self.roastJokeIDsString = roastJokeIDs.map { $0.uuidString }.joined(separator: ",")
     }

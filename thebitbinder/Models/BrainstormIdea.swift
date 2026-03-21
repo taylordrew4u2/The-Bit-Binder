@@ -13,7 +13,6 @@ final class BrainstormIdea: Identifiable {
     var id: UUID = UUID()
     var content: String = ""
     var dateCreated: Date = Date()
-    var dateModified: Date = Date()
     var colorHex: String = "F5E6D3"  // Store color as hex for variety in grid
     var isVoiceNote: Bool = false  // Track if it was created via voice
     
@@ -21,7 +20,6 @@ final class BrainstormIdea: Identifiable {
         self.id = UUID()
         self.content = content
         self.dateCreated = Date()
-        self.dateModified = Date()
         self.colorHex = colorHex
         self.isVoiceNote = isVoiceNote
     }

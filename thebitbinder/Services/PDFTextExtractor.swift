@@ -145,12 +145,12 @@ final class PDFTextExtractor {
         
         // Mark pages with identified headers/footers
         return pages.map { page in
-            let hasHeader = repeatingHeader != nil && 
-                           (page.lines.first?.normalizedText == repeatingHeader || 
+            let hasHeader = repeatingHeader != nil &&
+                           (page.lines.first?.normalizedText == repeatingHeader ||
                             page.lines.dropFirst().first?.normalizedText == repeatingHeader)
             
-            let hasFooter = repeatingFooter != nil && 
-                           (page.lines.last?.normalizedText == repeatingFooter || 
+            let hasFooter = repeatingFooter != nil &&
+                           (page.lines.last?.normalizedText == repeatingFooter ||
                             page.lines.dropLast().last?.normalizedText == repeatingFooter)
             
             return NormalizedPage(
@@ -167,6 +167,7 @@ final class PDFTextExtractor {
 
 enum ExtractionError: Error {
     case invalidDocument
+    case invalidImage
     case noTextFound
     case processingFailed
 }

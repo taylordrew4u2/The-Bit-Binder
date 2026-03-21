@@ -230,17 +230,16 @@ struct SetListDetailView: View {
             return
         }
         let recording = Recording(
-            name: recordingName.isEmpty ? "Recording \(Date())" : recordingName,
+            title: recordingName.isEmpty ? "Recording \(Date())" : recordingName,
             fileURL: fileURL.path,
-            duration: recordingDuration,
-            setListID: setList.id
+            duration: recordingDuration
         )
         modelContext.insert(recording)
         
         // Try to save the context
         do {
             try modelContext.save()
-            print("✅ Recording saved successfully: \(recording.name)")
+            print("✅ Recording saved successfully: \(recording.title)")
         } catch {
             print("❌ Failed to save recording: \(error)")
         }

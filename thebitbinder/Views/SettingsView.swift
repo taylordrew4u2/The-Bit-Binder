@@ -489,7 +489,7 @@ struct SettingsView: View {
                 let sourceURL = URL(fileURLWithPath: recording.fileURL)
                 guard fm.fileExists(atPath: sourceURL.path) else { continue }
                 
-                let safeName = recording.name
+                let safeName = recording.title
                     .replacingOccurrences(of: "/", with: "-")
                     .replacingOccurrences(of: ":", with: "-")
                 let ext = sourceURL.pathExtension.isEmpty ? "m4a" : sourceURL.pathExtension

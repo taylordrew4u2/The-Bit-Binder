@@ -9,6 +9,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ = MemoryManager.shared
         _ = iCloudKeyValueStore.shared
         
+        // Configure audio session app-wide for both playback and recording
+        configureAudioSession()
+        
         UNUserNotificationCenter.current().delegate = NotificationManager.shared
         NotificationManager.shared.scheduleIfNeeded()
         
@@ -82,5 +85,28 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
         MemoryManager.shared.handleMemoryWarning()
+    }
+    
+    // MARK: - Audio Session Configuration
+    
+    private func configureAudioSession() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [
+                    .defaultToSpeaker,
+                    .allowBluetooth,
+                    .allowBluetoothA2DP,
+                    .allowAirPlay,
+                    .mixWithOthers
+                ]
+            )
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            print("✅ [Audio] Audio session configured for playback and recording")
+        } catch {
+            print("❌ [Audio] Failed to configure audio session: \(error.localizedDescription)")
+        }
     }
 }

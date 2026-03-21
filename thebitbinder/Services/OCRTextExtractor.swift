@@ -11,6 +11,8 @@ import VisionKit
 import UIKit
 import PDFKit
 
+// ExtractionError is defined in PDFTextExtractor.swift
+
 /// Enhanced OCR text extraction that preserves layout, positioning, and confidence information
 final class OCRTextExtractor {
     
@@ -164,7 +166,7 @@ final class OCRTextExtractor {
             throw ExtractionError.noTextFound
         }
         
-        let extractedLines = processVisionResults(observations, image: UIImage(cgImage: cgImage)!, pageNumber: pageNumber)
+        let extractedLines = processVisionResults(observations, image: UIImage(cgImage: cgImage), pageNumber: pageNumber)
         
         return NormalizedPage(
             pageNumber: pageNumber,
@@ -249,8 +251,11 @@ final class OCRTextExtractor {
             if let firstLine = page.lines.first?.normalizedText, !firstLine.isEmpty {
                 potentialHeaders.append(firstLine)
             }
-            if page.lines.count > 1, let secondLine = page.lines[1].normalizedText, !secondLine.isEmpty {
-                potentialHeaders.append(secondLine)
+            if page.lines.count > 1 {
+                let secondLine = page.lines[1].normalizedText
+                if !secondLine.isEmpty {
+                    potentialHeaders.append(secondLine)
+                }
             }
             
             // Check bottom 2 lines for footers
@@ -272,12 +277,12 @@ final class OCRTextExtractor {
         let repeatingFooter = footerCounts.first { $0.value >= pages.count / 2 }?.key
         
         return pages.map { page in
-            let hasHeader = repeatingHeader != nil && 
-                           (page.lines.first?.normalizedText == repeatingHeader || 
+            let hasHeader = repeatingHeader != nil &&
+                           (page.lines.first?.normalizedText == repeatingHeader ||
                             (page.lines.count > 1 && page.lines[1].normalizedText == repeatingHeader))
             
-            let hasFooter = repeatingFooter != nil && 
-                           (page.lines.last?.normalizedText == repeatingFooter || 
+            let hasFooter = repeatingFooter != nil &&
+                           (page.lines.last?.normalizedText == repeatingFooter ||
                             (page.lines.count > 1 && page.lines[page.lines.count - 2].normalizedText == repeatingFooter))
             
             return NormalizedPage(

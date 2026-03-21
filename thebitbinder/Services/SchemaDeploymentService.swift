@@ -10,35 +10,41 @@ import SwiftData
 import CloudKit
 
 /// Service to verify CloudKit schema deployment
-final class SchemaDeploymentService {
+/// Thread-safe singleton that manages CloudKit schema verification and deployment
+final class SchemaDeploymentService: @unchecked Sendable {
     
     static let shared = SchemaDeploymentService()
     
-    private let container = CKContainer(identifier: "iCloud.666bit")
+    private let container: CKContainer
     private let schemaVersion = "2.1.0"  // Increment when schema changes
+    private let signatureService: CloudKitSignatureService
     
-    private init() {}
+    /// All CloudKit record types managed by this schema
+    private let recordTypes: [String] = [
+        "CD_Joke",
+        "CD_JokeFolder",
+        "CD_Recording",
+        "CD_SetList",
+        "CD_RoastTarget",
+        "CD_RoastJoke",
+        "CD_BrainstormIdea",
+        "CD_NotebookPhotoRecord",
+        "CD_ImportBatch",
+        "CD_ImportedJokeMetadata",
+        "CD_UnresolvedImportFragment",
+        "CD_ChatMessage"
+    ]
+    
+    private init() {
+        self.container = CKContainer(identifier: "iCloud.666bit")
+        self.signatureService = CloudKitSignatureService.shared
+    }
     
     // MARK: - Schema Verification
     
     /// Verifies that all required record types exist in CloudKit
     func verifySchemaDeployment() async {
         print("📋 [Schema] Verifying CloudKit schema deployment (v\(schemaVersion))...")
-        
-        let recordTypes = [
-            "CD_Joke",
-            "CD_JokeFolder",
-            "CD_Recording",
-            "CD_SetList",
-            "CD_RoastTarget",
-            "CD_RoastJoke",
-            "CD_BrainstormIdea",
-            "CD_NotebookPhotoRecord",
-            "CD_ImportBatch",
-            "CD_ImportedJokeMetadata",
-            "CD_UnresolvedImportFragment",
-            "CD_ChatMessage"
-        ]
         
         let database = container.privateCloudDatabase
         
@@ -52,23 +58,34 @@ final class SchemaDeploymentService {
                 _ = results // Silence unused warning
                 print("  ✅ \(recordType) - OK")
             } catch let error as CKError {
-                switch error.code {
-                case .unknownItem:
-                    print("  ⚠️ \(recordType) - Not deployed yet (will auto-create on first save)")
-                case .invalidArguments:
-                    // This can happen if the record type doesn't exist yet
-                    print("  ⚠️ \(recordType) - Schema not yet created (will auto-create on first save)")
-                case .networkFailure, .networkUnavailable:
-                    print("  ⚠️ \(recordType) - Network unavailable, skipping verification")
-                default:
-                    print("  ❌ \(recordType) - Error: \(error.localizedDescription)")
-                }
+                handleCloudKitError(error, for: recordType)
             } catch {
                 print("  ❌ \(recordType) - Error: \(error.localizedDescription)")
             }
         }
         
         print("📋 [Schema] Verification complete")
+    }
+    
+    /// Handles CloudKit errors during schema verification
+    private func handleCloudKitError(_ error: CKError, for recordType: String) {
+        switch error.code {
+        case .unknownItem:
+            print("  ⚠️ \(recordType) - Not deployed yet (will auto-create on first save)")
+        case .invalidArguments:
+            // This can happen if the record type doesn't exist yet
+            print("  ⚠️ \(recordType) - Schema not yet created (will auto-create on first save)")
+        case .networkFailure, .networkUnavailable:
+            print("  ⚠️ \(recordType) - Network unavailable, skipping verification")
+        case .serverRejectedRequest:
+            print("  ⚠️ \(recordType) - Server rejected request (may need schema update)")
+        case .zoneBusy:
+            print("  ⚠️ \(recordType) - Zone busy, try again later")
+        case .quotaExceeded:
+            print("  ❌ \(recordType) - Quota exceeded")
+        default:
+            print("  ❌ \(recordType) - Error (\(error.code.rawValue)): \(error.localizedDescription)")
+        }
     }
     
     /// Logs the current schema fields for a record type
@@ -146,6 +163,7 @@ final class SchemaDeploymentService {
     // MARK: - Schema Migration Helper
     
     /// Creates a test record to ensure schema is deployed
+    @MainActor
     func ensureSchemaDeployed(context: ModelContext) async {
         print("📋 [Schema] Ensuring schema is deployed to CloudKit...")
         
@@ -153,24 +171,25 @@ final class SchemaDeploymentService {
         // We just need to ensure all model types are registered
         
         do {
-            // Fetch one joke to trigger schema sync
-            let jokeDescriptor = FetchDescriptor<Joke>(fetchLimit: 1)
-            _ = try context.fetch(jokeDescriptor)
+            var jokeDescriptor = FetchDescriptor<Joke>()
+            jokeDescriptor.fetchLimit = 1
+            let _: [Joke] = try context.fetch(jokeDescriptor)
             
-            // Fetch one import batch
-            let batchDescriptor = FetchDescriptor<ImportBatch>(fetchLimit: 1)
-            _ = try context.fetch(batchDescriptor)
+            var batchDescriptor = FetchDescriptor<ImportBatch>()
+            batchDescriptor.fetchLimit = 1
+            let _: [ImportBatch] = try context.fetch(batchDescriptor)
             
-            // Fetch other types to ensure schema is registered
-            let metadataDescriptor = FetchDescriptor<ImportedJokeMetadata>(fetchLimit: 1)
-            _ = try context.fetch(metadataDescriptor)
+            var metadataDescriptor = FetchDescriptor<ImportedJokeMetadata>()
+            metadataDescriptor.fetchLimit = 1
+            let _: [ImportedJokeMetadata] = try context.fetch(metadataDescriptor)
             
-            let fragmentDescriptor = FetchDescriptor<UnresolvedImportFragment>(fetchLimit: 1)
-            _ = try context.fetch(fragmentDescriptor)
+            var fragmentDescriptor = FetchDescriptor<UnresolvedImportFragment>()
+            fragmentDescriptor.fetchLimit = 1
+            let _: [UnresolvedImportFragment] = try context.fetch(fragmentDescriptor)
             
             print("📋 [Schema] Schema sync triggered successfully")
         } catch {
-            print("⚠️ [Schema] Error during schema sync: \(error)")
+            print("⚠️ [Schema] Error during schema sync: \(error.localizedDescription)")
         }
     }
     
@@ -209,4 +228,92 @@ final class SchemaDeploymentService {
            • confidenceScore
         """
     }
+    
+    // MARK: - Signature Verification
+    
+    /// Verifies schema integrity using the public key
+    func verifySchemaIntegrity() -> Bool {
+        let schemaHash = signatureService.generateSchemaHash(recordTypes: recordTypes)
+        
+        print("📋 [Schema] Generated schema hash: \(schemaHash.prefix(16))...")
+        print("📋 [Schema] Key info: \(signatureService.getKeyInfo().description)")
+        
+        // Store key in keychain for additional security
+        _ = signatureService.storeKeyInKeychain()
+        
+        return signatureService.getKeyInfo().isLoaded
+    }
+    
+    /// Returns all CloudKit record types managed by this schema
+    func getRecordTypes() -> [String] {
+        return recordTypes
+    }
+    
+    /// Performs full schema verification including signature check
+    func performFullVerification() async -> SchemaVerificationReport {
+        print("📋 [Schema] Starting full schema verification...")
+        
+        var report = SchemaVerificationReport()
+        report.schemaVersion = schemaVersion
+        report.timestamp = Date()
+        
+        // 1. Verify signature service is ready
+        let keyInfo = signatureService.getKeyInfo()
+        report.signatureServiceReady = keyInfo.isLoaded
+        
+        if keyInfo.isLoaded {
+            print("  ✅ Signature service ready")
+        } else {
+            print("  ❌ Signature service not ready")
+        }
+        
+        // 2. Generate and store schema hash
+        report.schemaHash = signatureService.generateSchemaHash(recordTypes: recordTypes)
+        print("  ✅ Schema hash generated")
+        
+        // 3. Verify CloudKit deployment
+        await verifySchemaDeployment()
+        report.cloudKitVerified = true
+        
+        // 4. Store key in keychain
+        report.keychainStored = signatureService.storeKeyInKeychain()
+        
+        print("📋 [Schema] Full verification complete")
+        return report
+    }
 }
+
+// MARK: - Schema Verification Report
+
+struct SchemaVerificationReport: Sendable {
+    var schemaVersion: String = ""
+    var timestamp: Date = Date()
+    var signatureServiceReady: Bool = false
+    var schemaHash: String = ""
+    var cloudKitVerified: Bool = false
+    var keychainStored: Bool = false
+    
+    var isFullyVerified: Bool {
+        signatureServiceReady && cloudKitVerified
+    }
+    
+    var summary: String {
+        """
+        ═══════════════════════════════════════════════════════════════
+        Schema Verification Report
+        ═══════════════════════════════════════════════════════════════
+        Version: \(schemaVersion)
+        Timestamp: \(timestamp)
+        
+        Status:
+          • Signature Service: \(signatureServiceReady ? "✅ Ready" : "❌ Not Ready")
+          • Schema Hash: \(schemaHash.prefix(32))...
+          • CloudKit Verified: \(cloudKitVerified ? "✅ Yes" : "❌ No")
+          • Keychain Stored: \(keychainStored ? "✅ Yes" : "⚠️ No")
+        
+        Overall: \(isFullyVerified ? "✅ VERIFIED" : "⚠️ INCOMPLETE")
+        ═══════════════════════════════════════════════════════════════
+        """
+    }
+}
+

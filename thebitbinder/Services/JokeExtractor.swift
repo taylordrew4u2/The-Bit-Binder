@@ -279,15 +279,17 @@ final class JokeExtractor {
     }
 }
 
+// MARK: - Title Info
+
+struct TitleInfo {
+    let title: String?
+    let lineIndex: Int?
+    let confidence: Float
+}
+
 // MARK: - Title Detector
 
 private class TitleDetector {
-    
-    struct TitleInfo {
-        let title: String?
-        let lineIndex: Int?
-        let confidence: Float
-    }
     
     func extractTitle(from block: LayoutBlock) -> TitleInfo {
         let lines = block.lines

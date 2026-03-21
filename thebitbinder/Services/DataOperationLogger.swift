@@ -281,4 +281,9 @@ extension DataOperationLogger {
     func logInfo(_ message: String) {
         logOperation(.info, message)
     }
+    
+    func logSuccess(_ message: String) {
+        logOperation(.notice, "SUCCESS: \(message)")
+        logger.notice("✅ SUCCESS: \(message)")
+    }
 }

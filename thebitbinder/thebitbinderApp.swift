@@ -62,7 +62,7 @@ struct thebitbinderApp: App {
             print("✅ [ModelContainer] Persistent + CloudKit ready")
             
             // Log successful container creation
-            DataOperationLogger.shared.logCritical("ModelContainer created successfully with CloudKit")
+            DataOperationLogger.shared.logSuccess("ModelContainer created with CloudKit")
             
             return container
         } catch {
@@ -81,7 +81,7 @@ struct thebitbinderApp: App {
             let container = try ModelContainer(for: schema, configurations: [config])
             print("✅ [ModelContainer] Persistent local-only ready")
             
-            DataOperationLogger.shared.logCritical("ModelContainer created successfully (local-only fallback)")
+            DataOperationLogger.shared.logSuccess("ModelContainer created (local-only fallback)")
             
             return container
         } catch {
@@ -167,6 +167,9 @@ struct thebitbinderApp: App {
                 }
             }
             .task {
+                // 🚨 IMMEDIATE: Delete corrupted CloudKit records before sync starts
+                await performAggressiveCloudKitCleanup()
+                
                 // Wire the main context into the sync service so remote change
                 // notifications can call refreshAllObjects() on the right context
                 iCloudSyncService.shared.modelContext = sharedModelContainer.mainContext
@@ -200,6 +203,19 @@ struct thebitbinderApp: App {
                 iCloudKeyValueStore.shared.pullFromCloud()
                 NotificationManager.shared.scheduleIfNeeded()
             }
+        }
+    }
+    
+    /// Aggressive CloudKit cleanup to delete corrupted records
+    private func performAggressiveCloudKitCleanup() async {
+        print("🚨 [CloudKit] Starting aggressive cleanup of corrupted records...")
+        
+        do {
+            // Delete ALL CD_Joke records from CloudKit to fix schema mismatch
+            try await CloudKitResetUtility.deleteCorruptedJokeRecords()
+            print("✅ [CloudKit] Corrupted joke records deleted successfully")
+        } catch {
+            print("⚠️ [CloudKit] Cleanup error: \(error.localizedDescription)")
         }
     }
 }
