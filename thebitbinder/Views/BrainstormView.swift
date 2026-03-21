@@ -411,14 +411,14 @@ struct IdeaCard: View {
             if idea.isVoiceNote {
                 HStack {
                     Image(systemName: "mic.fill")
-                        .font(.system(size: 10))
+                        .font(.system(size: max(8, 9 * scale)))
                         .foregroundColor(roastMode ? .white.opacity(0.5) : .black.opacity(0.4))
                     Spacer()
                 }
             }
             
             Text(idea.content)
-                .font(.system(size: max(12, 14 * scale), weight: .medium))
+                .font(.system(size: max(10, 12 * scale), weight: .medium))
                 .foregroundColor(roastMode ? .white.opacity(0.9) : .black.opacity(0.85))
                 .lineLimit(Int(max(3, 5 * scale)))
                 .multilineTextAlignment(.leading)
@@ -427,7 +427,7 @@ struct IdeaCard: View {
             
             // Timestamp
             Text(idea.dateCreated.formatted(date: .abbreviated, time: .shortened))
-                .font(.system(size: max(8, 10 * scale)))
+                .font(.system(size: max(7, 8 * scale)))
                 .foregroundColor(roastMode ? .white.opacity(0.4) : .black.opacity(0.4))
         }
         .padding(12)

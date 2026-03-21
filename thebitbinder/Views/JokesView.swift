@@ -1447,9 +1447,9 @@ struct JokeCardView: View {
     var scale: CGFloat = 1.0
     @AppStorage("expandAllJokes") private var expandAllJokes = false
 
-    private var titleSize: CGFloat { max(11, 17 * scale) }
-    private var bodySize: CGFloat  { max(9,  15 * scale) }
-    private var metaSize: CGFloat  { max(8,  11 * scale) }
+    private var titleSize: CGFloat { max(9, 14 * scale) }
+    private var bodySize: CGFloat  { max(8,  12 * scale) }
+    private var metaSize: CGFloat  { max(7,  9 * scale) }
     private var cardMinHeight: CGFloat { max(100, 180 * scale) }
 
     var body: some View {
@@ -1475,7 +1475,7 @@ struct JokeCardView: View {
                 if let folder = joke.folder {
                     HStack(spacing: 4) {
                         Image(systemName: "folder.fill")
-                            .font(.system(size: max(7, 9 * scale)))
+                            .font(.system(size: max(6, 7 * scale)))
                         Text(folder.name)
                             .font(.system(size: metaSize, weight: .medium))
                     }
@@ -1505,10 +1505,10 @@ struct RoastTargetGridCard: View {
     private let accentColor = AppTheme.Colors.roastAccent
 
     private var avatarSize: CGFloat { max(40, 70 * scale) }
-    private var initialFontSize: CGFloat { max(16, 28 * scale) }
-    private var nameFontSize: CGFloat { max(10, 15 * scale) }
-    private var badgeFontSize: CGFloat { max(8, 12 * scale) }
-    private var iconSize: CGFloat { max(6, 10 * scale) }
+    private var initialFontSize: CGFloat { max(14, 24 * scale) }
+    private var nameFontSize: CGFloat { max(9, 13 * scale) }
+    private var badgeFontSize: CGFloat { max(7, 10 * scale) }
+    private var iconSize: CGFloat { max(6, 8 * scale) }
     private var verticalPadding: CGFloat { max(12, 18 * scale) }
 
     var body: some View {
