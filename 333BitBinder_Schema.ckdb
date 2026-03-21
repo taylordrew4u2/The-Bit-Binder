@@ -21,6 +21,9 @@ RECORD TYPE: CD_Joke
   CD_humorRating INT64
   CD_isHit       INT64  (bool)
   CD_folder      REFERENCE  → CD_JokeFolder
+  CD_importSource STRING  (file name if imported)
+  CD_importConfidence STRING  (high/medium/low)
+  CD_importTimestamp DATE
 
 RECORD TYPE: CD_JokeFolder
   CD_id          STRING
@@ -85,6 +88,13 @@ RECORD TYPE: CD_ImportBatch
   CD_highConfidenceBoundaries INT64
   CD_mediumConfidenceBoundaries INT64
   CD_lowConfidenceBoundaries INT64
+  -- New pipeline fields --
+  CD_extractionMethod STRING  (PDFKit Text/Vision OCR/Document Text/Image OCR)
+  CD_pipelineVersion STRING  (e.g. "2.0")
+  CD_processingTimeSeconds DOUBLE
+  CD_autoSavedCount INT64
+  CD_reviewQueueCount INT64
+  CD_rejectedCount INT64
 
 RECORD TYPE: CD_ImportedJokeMetadata
   CD_id          STRING
@@ -92,7 +102,7 @@ RECORD TYPE: CD_ImportedJokeMetadata
   CD_title       STRING
   CD_rawSourceText STRING
   CD_notes       STRING
-  CD_confidence  STRING
+  CD_confidence  STRING  (high/medium/low)
   CD_sourceOrder INT64
   CD_sourcePage  INT64
   CD_tagsString  STRING
@@ -100,6 +110,16 @@ RECORD TYPE: CD_ImportedJokeMetadata
   CD_sourceFilename STRING
   CD_importTimestamp DATE
   CD_batch       REFERENCE  → CD_ImportBatch
+  -- New pipeline confidence factors --
+  CD_extractionMethod STRING
+  CD_confidenceScore DOUBLE  (0.0-1.0 overall score)
+  CD_extractionQuality DOUBLE
+  CD_structuralCleanliness DOUBLE
+  CD_titleDetectionScore DOUBLE
+  CD_boundaryClarity DOUBLE
+  CD_ocrConfidence DOUBLE
+  CD_validationResult STRING  (singleJoke/multipleJokes/requiresReview/notAJoke)
+  CD_needsReview INT64  (bool)
 
 RECORD TYPE: CD_UnresolvedImportFragment
   CD_id          STRING
@@ -116,6 +136,10 @@ RECORD TYPE: CD_UnresolvedImportFragment
   CD_createdAt   DATE
   CD_isResolved  INT64  (bool)
   CD_batch       REFERENCE  → CD_ImportBatch
+  -- New pipeline fields --
+  CD_validationResult STRING
+  CD_issuesJSON  STRING  (JSON array of validation issues)
+  CD_confidenceScore DOUBLE
 
 RECORD TYPE: CD_ChatMessage
   CD_id          STRING
