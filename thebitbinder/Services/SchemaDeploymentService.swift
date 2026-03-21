@@ -45,13 +45,22 @@ final class SchemaDeploymentService {
         for recordType in recordTypes {
             do {
                 // Try to fetch schema by querying for records (will create schema if needed)
-                let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: false))
-                let (_, _) = try await database.records(matching: query, resultsLimit: 1)
+                let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
+                query.sortDescriptors = [NSSortDescriptor(key: "___createTime", ascending: false)]
+                
+                let (results, _) = try await database.records(matching: query, resultsLimit: 1)
+                _ = results // Silence unused warning
                 print("  ✅ \(recordType) - OK")
             } catch let error as CKError {
-                if error.code == .unknownItem {
+                switch error.code {
+                case .unknownItem:
                     print("  ⚠️ \(recordType) - Not deployed yet (will auto-create on first save)")
-                } else {
+                case .invalidArguments:
+                    // This can happen if the record type doesn't exist yet
+                    print("  ⚠️ \(recordType) - Schema not yet created (will auto-create on first save)")
+                case .networkFailure, .networkUnavailable:
+                    print("  ⚠️ \(recordType) - Network unavailable, skipping verification")
+                default:
                     print("  ❌ \(recordType) - Error: \(error.localizedDescription)")
                 }
             } catch {
@@ -145,12 +154,19 @@ final class SchemaDeploymentService {
         
         do {
             // Fetch one joke to trigger schema sync
-            let descriptor = FetchDescriptor<Joke>(fetchLimit: 1)
-            _ = try context.fetch(descriptor)
+            let jokeDescriptor = FetchDescriptor<Joke>(fetchLimit: 1)
+            _ = try context.fetch(jokeDescriptor)
             
             // Fetch one import batch
             let batchDescriptor = FetchDescriptor<ImportBatch>(fetchLimit: 1)
             _ = try context.fetch(batchDescriptor)
+            
+            // Fetch other types to ensure schema is registered
+            let metadataDescriptor = FetchDescriptor<ImportedJokeMetadata>(fetchLimit: 1)
+            _ = try context.fetch(metadataDescriptor)
+            
+            let fragmentDescriptor = FetchDescriptor<UnresolvedImportFragment>(fetchLimit: 1)
+            _ = try context.fetch(fragmentDescriptor)
             
             print("📋 [Schema] Schema sync triggered successfully")
         } catch {
