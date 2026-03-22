@@ -231,6 +231,59 @@ final class DataProtectionService: ObservableObject {
         }
     }
     
+    // MARK: - Emergency Backup Cleanup
+    
+    /// Cleans up emergency_backup_*.store and corrupted_store_backup_*.store files.
+    /// Keeps only the 3 most recent and deletes any older than 7 days.
+    func cleanupEmergencyBackups() {
+        let supportDir = URL.applicationSupportDirectory
+        let maxEmergencyBackups = 3
+        let maxAgeDays: TimeInterval = 7 * 24 * 60 * 60 // 7 days
+        let cutoffDate = Date().addingTimeInterval(-maxAgeDays)
+        
+        do {
+            let allFiles = try fileManager.contentsOfDirectory(
+                at: supportDir,
+                includingPropertiesForKeys: [.creationDateKey, .fileSizeKey]
+            )
+            
+            // Find emergency and corrupted store backups
+            let emergencyFiles = allFiles.filter {
+                $0.lastPathComponent.hasPrefix("emergency_backup_") ||
+                $0.lastPathComponent.hasPrefix("corrupted_store_backup_")
+            }
+            .sorted { url1, url2 in
+                let date1 = (try? url1.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
+                let date2 = (try? url2.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
+                return date1 > date2 // newest first
+            }
+            
+            guard !emergencyFiles.isEmpty else { return }
+            
+            var deletedCount = 0
+            var freedBytes: Int64 = 0
+            
+            for (index, fileURL) in emergencyFiles.enumerated() {
+                let creationDate = (try? fileURL.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
+                let fileSize = Int64((try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+                
+                // Delete if: beyond the max keep count OR older than cutoff date
+                if index >= maxEmergencyBackups || creationDate < cutoffDate {
+                    try fileManager.removeItem(at: fileURL)
+                    deletedCount += 1
+                    freedBytes += fileSize
+                }
+            }
+            
+            if deletedCount > 0 {
+                let freedMB = ByteCountFormatter.string(fromByteCount: freedBytes, countStyle: .file)
+                print("🧹 [DataProtection] Cleaned up \(deletedCount) emergency backup(s), freed \(freedMB)")
+            }
+        } catch {
+            print("⚠️ [DataProtection] Failed to cleanup emergency backups: \(error)")
+        }
+    }
+    
     // MARK: - Data Recovery
     
     /// Lists available backups for recovery

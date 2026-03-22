@@ -2,32 +2,22 @@
 //  GeminiJokeExtractor.swift
 //  thebitbinder
 //
-//  Joke extraction powered by Google Gemini 2.0 Flash.
-//  – Supports text AND image (UIImage) input
-//  – Enforces a 1,000 req/day free-tier cap via UserDefaults
-//  – Returns structured [GeminiExtractedJoke] results that map into
-//    the existing ImportedJoke / ImportPipelineResult pipeline
+//  Joke extraction powered by GagGrabber (Google Gemini 2.0 Flash).
 //
 
 import Foundation
 import UIKit
-import GoogleGenerativeAI   // GoogleGenerativeAI Swift SDK (SPM)
+import SwiftUI
+import GoogleGenerativeAI
 
 // MARK: - Public Model
 
-/// A single joke extracted by Gemini.
 struct GeminiExtractedJoke: Codable {
-    /// The full joke text (setup + punchline, or single-line joke).
     let jokeText: String
-    /// Detected humor mechanism, e.g. "pun", "wordplay", "subversion", "observational".
     let humorMechanism: String?
-    /// 0.0 – 1.0; Gemini's own confidence that this block is a joke.
     let confidence: Double
-    /// Short natural-language explanation of why Gemini thinks this is funny.
     let explanation: String?
-    /// Optional short title / headline for the joke.
     let title: String?
-    /// Thematic topic tags, e.g. ["relationships", "work"].
     let tags: [String]
 }
 
@@ -42,30 +32,29 @@ enum GeminiRateLimitError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .dailyLimitReached(let used, let limit):
-            return "Daily Gemini request limit reached (\(used)/\(limit)). Try again tomorrow."
+            return GeminiRateLimitInfo(used: used, limit: limit, remaining: 0, hoursUntilReset: DailyRequestTracker.hoursUntilReset()).limitReachedMessage
         case .apiError(let msg):
-            return "Gemini API error: \(msg)"
+            return "GagGrabber error: \(msg)"
         case .noJokesFound:
-            return "Gemini found no jokes in the provided content."
+            return "GagGrabber found no jokes in the provided content."
         case .keyNotConfigured:
-            return "Gemini API key is not configured. Add your key to Secrets.plist under 'GEMINI_API_KEY'."
+            return "GagGrabber is not configured. Add your key to Secrets.plist."
         }
     }
 }
 
-// MARK: - Rate-Limit Tracker (UserDefaults)
+// MARK: - Rate-Limit Tracker
 
-private struct DailyRequestTracker {
-    private static let countKey  = "gemini_daily_request_count"
-    private static let dateKey   = "gemini_last_request_date"
-    static let dailyLimit        = 1_000
+struct DailyRequestTracker {
+    private static let countKey = "gemini_daily_request_count"
+    private static let dateKey = "gemini_last_request_date"
+    static let dailyLimit = 1_000
 
     static func canMakeRequest() -> Bool {
         resetIfNewDay()
         return currentCount() < dailyLimit
     }
 
-    /// Increments the counter and returns the new value.
     @discardableResult
     static func increment() -> Int {
         resetIfNewDay()
@@ -75,10 +64,22 @@ private struct DailyRequestTracker {
     }
 
     static func currentCount() -> Int {
-        UserDefaults.standard.integer(forKey: countKey)
+        resetIfNewDay()
+        return UserDefaults.standard.integer(forKey: countKey)
     }
-
-    // MARK: private
+    
+    static func remaining() -> Int {
+        resetIfNewDay()
+        return max(0, dailyLimit - UserDefaults.standard.integer(forKey: countKey))
+    }
+    
+    static func hoursUntilReset() -> Int {
+        let calendar = Calendar.current
+        let now = Date()
+        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) else { return 24 }
+        let seconds = tomorrow.timeIntervalSince(now)
+        return max(1, Int(ceil(seconds / 3600)))
+    }
 
     private static func resetIfNewDay() {
         let defaults = UserDefaults.standard
@@ -97,42 +98,126 @@ private struct DailyRequestTracker {
     }
 }
 
+// MARK: - Rate Limit Info (SF Symbols, no emojis)
+
+struct GeminiRateLimitInfo {
+    let used: Int
+    let limit: Int
+    let remaining: Int
+    let hoursUntilReset: Int
+    
+    static func current() -> GeminiRateLimitInfo {
+        return GeminiRateLimitInfo(
+            used: DailyRequestTracker.currentCount(),
+            limit: DailyRequestTracker.dailyLimit,
+            remaining: DailyRequestTracker.remaining(),
+            hoursUntilReset: DailyRequestTracker.hoursUntilReset()
+        )
+    }
+    
+    // MARK: - SF Symbol Properties
+    
+    var statusIcon: String {
+        if remaining > 900 { return "flame.fill" }
+        if remaining > 500 { return "sparkles" }
+        if remaining > 100 { return "lightbulb.fill" }
+        if remaining > 10  { return "battery.25" }
+        if remaining > 0   { return "battery.0" }
+        return "moon.zzz.fill"
+    }
+    
+    var statusColor: Color {
+        if remaining > 500 { return .green }
+        if remaining > 100 { return .blue }
+        if remaining > 10  { return .orange }
+        if remaining > 0   { return .red }
+        return .gray
+    }
+    
+    // MARK: - Text Properties
+    
+    var shortStatusText: String {
+        if remaining > 0 {
+            return "\(remaining) grabs left"
+        } else {
+            return "Resets in \(hoursUntilReset)h"
+        }
+    }
+    
+    var remainingMessageText: String {
+        if remaining > 900 {
+            return "GagGrabber is FULLY caffeinated! \(remaining) joke extractions left today. Go wild!"
+        } else if remaining > 500 {
+            return "GagGrabber is still sharp! \(remaining) extractions remaining. Keep 'em coming!"
+        } else if remaining > 100 {
+            return "GagGrabber is getting tired... \(remaining) extractions left. Maybe pace yourself?"
+        } else if remaining > 10 {
+            return "GagGrabber is running on fumes! Only \(remaining) extractions left today!"
+        } else if remaining > 0 {
+            return "GagGrabber has \(remaining) brain cells left! Use them wisely!"
+        } else {
+            return limitReachedMessage
+        }
+    }
+    
+    var limitReachedMessage: String {
+        let sillyReasons = [
+            "GagGrabber ran out of juice! We extracted \(limit) jokes today and now we need a nap.",
+            "GagGrabber.exe has stopped responding. Too many jokes processed (\(limit)).",
+            "This is GagGrabber. This is GagGrabber after \(limit) joke extractions. Any questions?",
+            "RIP GagGrabber (1 day - today). Cause of death: \(limit) joke extractions.",
+            "GagGrabber has entered zombie mode after \(limit) extractions. Only wants joooookes now.",
+            "GAGGRABBER OVERLOAD! \(limit) jokes was apparently our limit. Who knew?",
+            "GagGrabber just blue-screened after \(limit) joke extractions. Classic.",
+            "Zzzzz... *snore* ...huh? Oh, GagGrabber did \(limit) extractions and passed out.",
+        ]
+        
+        let refillMessages = [
+            "GagGrabber's Adderall prescription refills in ~\(hoursUntilReset) hours. Check back then!",
+            "The GagGrabber hamster needs ~\(hoursUntilReset) hours of sleep. Try again tomorrow!",
+            "Recharging GagGrabber batteries... ETA: ~\(hoursUntilReset) hours",
+            "GagGrabber went to get coffee. Back in ~\(hoursUntilReset) hours",
+            "Currently in a food coma. GagGrabber will recover in ~\(hoursUntilReset) hours",
+            "GagGrabber is taking a power nap. Wake up call in ~\(hoursUntilReset) hours",
+            "Gone fishing for more jokes. Back in ~\(hoursUntilReset) hours",
+            "GagGrabber.exe will restart in ~\(hoursUntilReset) hours. Please stand by...",
+        ]
+        
+        let randomReason = sillyReasons.randomElement() ?? sillyReasons[0]
+        let randomRefill = refillMessages.randomElement() ?? refillMessages[0]
+        
+        return "\(randomReason)\n\n\(randomRefill)"
+    }
+    
+    // Legacy compatibility
+    var shortStatus: String { shortStatusText }
+    var remainingMessage: String { remainingMessageText }
+    var statusEmoji: String { statusIcon }
+}
+
 // MARK: - API Key Helper
 
 private enum GeminiKeyLoader {
     static func loadKey() -> String? {
-        // 1. Try Secrets.plist in the main bundle
         if let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
            let dict = NSDictionary(contentsOf: url),
            let key = dict["GEMINI_API_KEY"] as? String,
-           !key.isEmpty, key != "AIzaSyBotdXSEvAUh8xb4-Qogar6EshuAaQD-C8" {
+           !key.isEmpty, key != "YOUR_GEMINI_API_KEY_HERE" {
             return key
         }
-        // 2. Fallback: environment variable (CI / local dev)
-        if let key = ProcessInfo.processInfo.environment["GEMINI_API_KEY"],
-           !key.isEmpty {
+        if let key = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !key.isEmpty {
             return key
         }
         return nil
     }
 }
 
-// MARK: - Main Actor
+// MARK: - Main Extractor
 
-/// Thread-safe joke extractor powered by Gemini 2.0 Flash.
 actor GeminiJokeExtractor {
-
-    // MARK: Singleton
-
     static let shared = GeminiJokeExtractor()
     private init() {}
 
-    // MARK: - Text Extraction
-
-    /// Extract jokes from a plain-text string (e.g. from a .txt/.rtf/.docx file).
-    /// - Parameter text: Raw text content to analyse.
-    /// - Returns: Array of extracted jokes (may be empty if none found).
-    /// - Throws: `GeminiRateLimitError` or a Gemini SDK error.
     func extract(from text: String) async throws -> [GeminiExtractedJoke] {
         guard let apiKey = GeminiKeyLoader.loadKey() else {
             throw GeminiRateLimitError.keyNotConfigured
@@ -146,19 +231,12 @@ actor GeminiJokeExtractor {
 
         let model = GenerativeModel(name: "gemini-2.0-flash", apiKey: apiKey)
         let prompt = buildTextPrompt(for: text)
-
         DailyRequestTracker.increment()
 
         let response = try await model.generateContent(prompt)
         return try parseJokes(from: response)
     }
 
-    // MARK: - Image Extraction
-
-    /// Extract jokes from a UIImage (scanned pages, photos of notebooks, etc.).
-    /// - Parameter image: The image to analyse.
-    /// - Returns: Array of extracted jokes (may be empty if none found).
-    /// - Throws: `GeminiRateLimitError` or a Gemini SDK error.
     func extract(from image: UIImage) async throws -> [GeminiExtractedJoke] {
         guard let apiKey = GeminiKeyLoader.loadKey() else {
             throw GeminiRateLimitError.keyNotConfigured
@@ -172,50 +250,40 @@ actor GeminiJokeExtractor {
 
         let model = GenerativeModel(name: "gemini-2.0-flash", apiKey: apiKey)
         let imagePart = ModelContent.Part.jpeg(image.jpegData(compressionQuality: 0.85) ?? Data())
-        let textPart  = ModelContent.Part.text(imagePrompt)
-
+        let textPart = ModelContent.Part.text(imagePrompt)
         DailyRequestTracker.increment()
 
         let response = try await model.generateContent([ModelContent(parts: [imagePart, textPart])])
         return try parseJokes(from: response)
     }
 
-    // MARK: - Request Count (public read-only)
+    nonisolated func todayRequestCount() -> Int { DailyRequestTracker.currentCount() }
+    nonisolated func remainingRequests() -> Int { DailyRequestTracker.remaining() }
+    nonisolated func rateLimitInfo() -> GeminiRateLimitInfo { GeminiRateLimitInfo.current() }
 
-    /// Number of Gemini requests made today.
-    nonisolated func todayRequestCount() -> Int {
-        DailyRequestTracker.currentCount()
-    }
-
-    /// Remaining requests for today.
-    nonisolated func remainingRequests() -> Int {
-        max(0, DailyRequestTracker.dailyLimit - DailyRequestTracker.currentCount())
-    }
-
-    // MARK: - Prompt Construction
+    // MARK: - Prompts
 
     private func buildTextPrompt(for text: String) -> String {
-        // Truncate very long inputs so we stay within token limits
         let maxChars = 12_000
-        let truncated = text.count > maxChars
-            ? String(text.prefix(maxChars)) + "\n...[content truncated]"
-            : text
+        let truncated = text.count > maxChars ? String(text.prefix(maxChars)) + "\n...[truncated]" : text
 
         return """
-        You are a comedy writing assistant. Analyse the text below and extract every stand-up joke, \
-        comedic bit, or humorous passage it contains.
+        You are a comedy writing assistant. Extract every stand-up joke from the text below.
 
-        Return ONLY a valid JSON array (no markdown, no extra text). Each element must match:
-        {
-          "jokeText":        "<full joke text, setup + punchline>",
-          "humorMechanism":  "<pun | wordplay | subversion | observational | self-deprecating | story | one-liner | other | null>",
-          "confidence":      <0.0–1.0>,
-          "explanation":     "<one sentence on why this is funny, or null>",
-          "title":           "<short title if obvious, or null>",
-          "tags":            ["<tag1>", "<tag2>"]
-        }
+        CRITICAL: Each joke MUST be a SEPARATE entry. Split on:
+        - "NEXT JOKE", "NEW JOKE", "NEW BIT", "---", "***", "===", "//"
+        - Numbered items: "1.", "2.", "#1", "Joke 1:"
+        - Blank lines, bullet points
 
-        If no jokes are found, return an empty array: []
+        RULES:
+        1. When in doubt, SPLIT
+        2. One punchline = one entry
+        3. Never combine unrelated material
+
+        Return ONLY a valid JSON array:
+        [{"jokeText":"<ONE joke>","humorMechanism":"<type or null>","confidence":<0.0-1.0>,"explanation":"<or null>","title":"<or null>","tags":["tag1"]}]
+
+        If no jokes: []
 
         --- TEXT ---
         \(truncated)
@@ -224,40 +292,21 @@ actor GeminiJokeExtractor {
 
     private var imagePrompt: String {
         """
-        You are a comedy writing assistant. Look at this image (which may be a scanned page, \
-        photo of notes, or typed document) and extract every stand-up joke, comedic bit, or \
-        humorous passage visible.
-
-        Return ONLY a valid JSON array (no markdown, no extra text). Each element must match:
-        {
-          "jokeText":        "<full joke text, setup + punchline>",
-          "humorMechanism":  "<pun | wordplay | subversion | observational | self-deprecating | story | one-liner | other | null>",
-          "confidence":      <0.0–1.0>,
-          "explanation":     "<one sentence on why this is funny, or null>",
-          "title":           "<short title if obvious, or null>",
-          "tags":            ["<tag1>", "<tag2>"]
-        }
-
-        If no jokes are found, return an empty array: []
+        Extract every stand-up joke from this image. Split on separators like "NEXT JOKE", "---", numbered items, blank lines.
+        RULES: When in doubt, SPLIT. One punchline = one entry.
+        Return ONLY JSON array:
+        [{"jokeText":"<ONE joke>","humorMechanism":"<or null>","confidence":<0.0-1.0>,"explanation":"<or null>","title":"<or null>","tags":["tag1"]}]
+        If no jokes: []
         """
     }
 
-    // MARK: - Response Parsing
-
     private func parseJokes(from response: GenerateContentResponse) throws -> [GeminiExtractedJoke] {
-        // Extract the raw text from the response
-        guard let raw = response.text else {
-            return []
-        }
+        guard let raw = response.text else { return [] }
 
-        // Strip any markdown fences Gemini might wrap around the JSON
-        var jsonString = raw
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var jsonString = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if jsonString.hasPrefix("```") {
-            // Remove ```json ... ``` wrapper
             let lines = jsonString.components(separatedBy: .newlines)
-            let inner = lines.dropFirst().dropLast()
-            jsonString = inner.joined(separator: "\n")
+            jsonString = lines.dropFirst().dropLast().joined(separator: "\n")
         }
 
         guard let data = jsonString.data(using: .utf8) else {
@@ -265,29 +314,22 @@ actor GeminiJokeExtractor {
         }
 
         do {
-            let jokes = try JSONDecoder().decode([GeminiExtractedJoke].self, from: data)
-            return jokes
+            return try JSONDecoder().decode([GeminiExtractedJoke].self, from: data)
         } catch {
-            throw GeminiRateLimitError.apiError("Failed to parse Gemini response JSON: \(error.localizedDescription). Raw: \(jsonString.prefix(300))")
+            throw GeminiRateLimitError.apiError("Failed to parse response: \(error.localizedDescription)")
         }
     }
 }
 
-// MARK: - Convenience: Convert to ImportedJoke
+// MARK: - Convert to ImportedJoke
 
 extension GeminiExtractedJoke {
-    /// Maps a Gemini result into the existing pipeline's `ImportedJoke` model.
-    func toImportedJoke(
-        sourceFile: String,
-        pageNumber: Int = 1,
-        orderInFile: Int = 0,
-        importTimestamp: Date = Date()
-    ) -> ImportedJoke {
+    func toImportedJoke(sourceFile: String, pageNumber: Int = 1, orderInFile: Int = 0, importTimestamp: Date = Date()) -> ImportedJoke {
         let importConfidence: ImportConfidence
         switch confidence {
         case 0.8...: importConfidence = .high
         case 0.5...: importConfidence = .medium
-        default:     importConfidence = .low
+        default: importConfidence = .low
         }
 
         let confidenceFactors = ConfidenceFactors(

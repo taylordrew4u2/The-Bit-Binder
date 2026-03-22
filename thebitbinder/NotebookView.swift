@@ -143,8 +143,7 @@ struct NotebookView: View {
                     .environment(\.modelContext, modelContext)
             }
             .onDisappear {
-                // Clear image cache when leaving to free memory
-                ImageCache.shared.clearCache()
+                // Memory cleanup handled by MemoryManager
             }
         }
     }

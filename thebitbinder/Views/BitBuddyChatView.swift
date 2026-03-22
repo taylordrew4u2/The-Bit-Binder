@@ -12,6 +12,7 @@ import SwiftData
 struct BitBuddyChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var userPreferences: UserPreferences
     @Query(sort: \Joke.dateCreated, order: .reverse) private var jokes: [Joke]
     @StateObject private var bitBuddy = BitBuddyService.shared
     @AppStorage("roastModeEnabled") private var roastMode = false
@@ -83,8 +84,9 @@ struct BitBuddyChatView: View {
         .tint(accentColor)
         .onAppear {
             handleAppear()
+            // Provide larger context for local analysis (200 items)
             bitBuddy.registerJokeDataProvider {
-                jokes.prefix(25).map {
+                jokes.prefix(200).map {
                     BitBuddyJokeSummary(
                         id: $0.id,
                         title: $0.title,
@@ -122,7 +124,7 @@ struct BitBuddyChatView: View {
             }
             
             VStack(spacing: 8) {
-                Text(roastMode ? "Ready to Roast?" : "Hey, Comedian!")
+                Text(roastMode ? "Ready to Roast?" : "Hey, \(userPreferences.userName)!")
                     .font(.system(size: 22, weight: .bold, design: .serif))
                     .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
                 
@@ -135,9 +137,10 @@ struct BitBuddyChatView: View {
             
             // Suggestion chips
             VStack(spacing: 8) {
-                suggestionChip("Help me write a joke about...")
-                suggestionChip("How can I improve my set?")
-                suggestionChip("Organize my jokes by theme")
+                suggestionChip("analyze: Why do programmers prefer dark mode? Because light attracts bugs.")
+                suggestionChip("improve: I’m on a whiskey diet. I’ve lost three days already.")
+                suggestionChip("premise dating")
+                suggestionChip("style")
             }
             .padding(.top, 16)
             
@@ -339,5 +342,6 @@ struct RoundedCorner: Shape {
 #Preview {
     NavigationStack {
         BitBuddyChatView()
+            .environmentObject(UserPreferences())
     }
 }

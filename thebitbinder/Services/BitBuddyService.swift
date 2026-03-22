@@ -58,7 +58,10 @@ final class BitBuddyService: NSObject, ObservableObject {
             conversationId: activeConversationId,
             turns: turnsByConversation[activeConversationId] ?? []
         )
-        let dataContext = BitBuddyDataContext(recentJokes: recentJokeProvider?() ?? [])
+        
+        var dataContext = BitBuddyDataContext()
+        dataContext.userName = UserDefaults.standard.string(forKey: "userName") ?? "Comedian"
+        dataContext.recentJokes = recentJokeProvider?() ?? []
         
         do {
             let rawResponse = try await backend.send(message: message, session: session, dataContext: dataContext)

@@ -44,6 +44,9 @@ final class Joke: Identifiable {
     // The Hits - perfected jokes that work every time
     var isHit: Bool = false
     
+    // Pre-computed word count for fast sorting and filtering
+    var wordCount: Int = 0
+    
     // Import source tracking
     var importSource: String?  // Source file name if imported
     var importConfidence: String?  // high/medium/low
@@ -120,9 +123,15 @@ final class Joke: Identifiable {
         self.folder = folder
         self.comedicTone = nil
         self.structureScore = 0.0
+        self.wordCount = content.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
         // New jokes start active (not in trash)
         self.isDeleted = false
         self.deletedDate = nil
+    }
+    
+    /// Recalculates and stores the word count. Call after editing `content`.
+    func updateWordCount() {
+        wordCount = content.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
     }
     
     // MARK: - Trash Helpers

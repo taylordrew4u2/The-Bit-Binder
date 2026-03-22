@@ -763,6 +763,7 @@ struct JokesView: View {
             // Soft-delete into trash
             snapshot[index].moveToTrash()
         }
+        NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
     }
     
     private func moveJokes(from sourceFolder: JokeFolder, to destinationFolder: JokeFolder?) {

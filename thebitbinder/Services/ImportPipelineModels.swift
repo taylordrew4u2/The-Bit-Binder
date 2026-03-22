@@ -101,53 +101,6 @@ enum ValidationResult {
     case notAJoke(reason: String)
 }
 
-struct BlockValidation {
-    let block: LayoutBlock
-    let result: ValidationResult
-    let confidence: ImportConfidence
-    let issues: [ValidationIssue]
-    
-    var shouldAutoSave: Bool {
-        switch result {
-        case .singleJoke:
-            return confidence == .high
-        default:
-            return false
-        }
-    }
-    
-    var requiresReview: Bool {
-        switch result {
-        case .singleJoke:
-            return confidence == .low
-        case .multipleJokes, .requiresReview:
-            return true
-        case .notAJoke:
-            return false
-        }
-    }
-}
-
-struct ValidationIssue {
-    let type: IssueType
-    let description: String
-    let severity: IssueSeverity
-    
-    enum IssueType {
-        case multipleTitles
-        case multipleBlankGaps
-        case repeatedNumbering
-        case unusualLength
-        case topicShift
-        case structuralAmbiguity
-        case lowOCRConfidence
-    }
-    
-    enum IssueSeverity {
-        case low, medium, high
-    }
-}
-
 // MARK: - Confidence Scoring
 
 enum ImportConfidence: String, Codable, CaseIterable {

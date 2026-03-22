@@ -73,6 +73,9 @@ struct AddJokeView: View {
         let joke = Joke(content: content, title: title.isEmpty ? "Untitled Joke" : title, folder: selectedFolder)
         modelContext.insert(joke)
         try? modelContext.save()
+        
+        NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
+        
         dismiss()
     }
 }

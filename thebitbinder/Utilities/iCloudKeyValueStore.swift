@@ -242,7 +242,24 @@ final class iCloudKeyValueStore {
     @objc private func cloudDidChange(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let reason = userInfo[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int else {
+            print("☁️ [iCloudKV] Remote change received but no reason key — ignoring")
             return
+        }
+        
+        let reasonString: String
+        switch reason {
+        case NSUbiquitousKeyValueStoreServerChange:
+            reasonString = "ServerChange"
+        case NSUbiquitousKeyValueStoreInitialSyncChange:
+            reasonString = "InitialSync"
+        case NSUbiquitousKeyValueStoreQuotaViolationChange:
+            reasonString = "QuotaViolation"
+            print("🚨 [iCloudKV] QUOTA VIOLATION — iCloud KV store quota exceeded! Some keys may not sync.")
+        case NSUbiquitousKeyValueStoreAccountChange:
+            reasonString = "AccountChange"
+            print("⚠️ [iCloudKV] iCloud account changed — user may have signed in/out")
+        default:
+            reasonString = "Unknown(\(reason))"
         }
         
         // Only process server changes and initial syncs
@@ -266,8 +283,49 @@ final class iCloudKeyValueStore {
                 NotificationCenter.default.post(name: .iCloudKVDidChange, object: nil, userInfo: ["keys": changedKeys])
             }
             
-            print("☁️ [iCloudKV] Received remote changes for keys: \(changedKeys)")
+            print("☁️ [iCloudKV] Received \(reasonString) for \(changedKeys.count) key(s): \(changedKeys.joined(separator: ", "))")
+        } else {
+            print("☁️ [iCloudKV] Received \(reasonString) — no action taken")
         }
+    }
+    
+    // MARK: - Debug & Diagnostics
+    
+    /// Forces a full iCloud KV store synchronization cycle (pull + push).
+    /// Useful for debugging sync issues from Settings.
+    func forceSync() {
+        print("🔄 [iCloudKV] Force sync initiated...")
+        
+        // Force Apple to sync with iCloud servers
+        let syncResult = cloud.synchronize()
+        print("🔄 [iCloudKV] synchronize() returned: \(syncResult)")
+        
+        // Pull any changes from cloud → local
+        pullFromCloud()
+        
+        // Push any local changes to cloud
+        pushToCloud()
+        
+        print("✅ [iCloudKV] Force sync completed")
+    }
+    
+    /// Returns diagnostic information about the current KV store state.
+    func diagnostics() -> [String] {
+        var results: [String] = []
+        
+        results.append("─── iCloud KV Store Diagnostics ───")
+        
+        for key in SyncedKeys.all {
+            let localVal = local.object(forKey: key)
+            let cloudVal = cloud.object(forKey: key)
+            let match = valuesEqual(localVal, cloudVal)
+            let localStr = localVal.map { "\($0)" } ?? "nil"
+            let cloudStr = cloudVal.map { "\($0)" } ?? "nil"
+            let status = match ? "✅" : "⚠️ MISMATCH"
+            results.append("\(status) \(key): local=\(localStr.prefix(40)) | cloud=\(cloudStr.prefix(40))")
+        }
+        
+        return results
     }
 }
 

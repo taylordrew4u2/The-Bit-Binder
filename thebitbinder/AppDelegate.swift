@@ -147,6 +147,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     // MARK: - Background Task Handlers
     
     private func handleAppRefresh(_ task: BGAppRefreshTask) {
+        let startTime = Date()
+        print("🔄 [BGTask] App refresh STARTED at \(startTime.formatted(date: .omitted, time: .standard))")
+        
         // Schedule the next refresh before doing work
         scheduleBackgroundRefresh()
         
@@ -155,17 +158,23 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             await MainActor.run {
                 BackgroundDownloadHandler.shared.refresh()
             }
-            print("🔄 [BGTask] App refresh completed")
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("🔄 [BGTask] App refresh COMPLETED in \(String(format: "%.1f", elapsed))s")
             task.setTaskCompleted(success: true)
         }
         
         task.expirationHandler = {
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("⚠️ [BGTask] App refresh EXPIRED after \(String(format: "%.1f", elapsed))s — cancelling")
             refreshTask.cancel()
             task.setTaskCompleted(success: false)
         }
     }
     
     private func handleBackgroundSync(_ task: BGProcessingTask) {
+        let startTime = Date()
+        print("🔄 [BGTask] Background sync STARTED at \(startTime.formatted(date: .omitted, time: .standard))")
+        
         // Schedule the next sync before doing work
         scheduleBackgroundSync()
         
@@ -178,13 +187,21 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 )
                 BackgroundDownloadHandler.shared.refresh()
             }
-            print("🔄 [BGTask] Background sync completed")
+            
+            // Allow a brief window for SwiftData to process the merge
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("🔄 [BGTask] Background sync COMPLETED in \(String(format: "%.1f", elapsed))s")
             task.setTaskCompleted(success: true)
         }
         
         task.expirationHandler = {
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("⚠️ [BGTask] Background sync EXPIRED after \(String(format: "%.1f", elapsed))s — cancelling")
             syncTask.cancel()
-            task.setTaskCompleted(success: false)
+            // Mark success: true since partial sync is still useful
+            task.setTaskCompleted(success: true)
         }
     }
     

@@ -26,6 +26,7 @@ struct BitBuddyJokeSummary: Sendable, Codable {
 }
 
 struct BitBuddyDataContext: Sendable {
+    var userName: String = "Comedian"
     var recentJokes: [BitBuddyJokeSummary] = []
     var focusedJoke: BitBuddyJokeSummary?
 }

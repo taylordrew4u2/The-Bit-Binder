@@ -123,6 +123,9 @@ struct MainTabView: View {
     @State private var showAIChat = false
     @AppStorage("roastModeEnabled") private var roastMode = false
 
+    // Track the screen user was on before entering roast mode so we can restore it
+    @State private var preRoastScreen: AppScreen? = nil
+
     private var canGoBack: Bool { !screenHistory.isEmpty }
 
     private func navigate(to screen: AppScreen) {
@@ -139,17 +142,31 @@ struct MainTabView: View {
 
     private func goBack() {
         guard let previous = screenHistory.popLast() else { return }
+        // In roast mode, skip non-roast screens in history
+        if roastMode && !AppScreen.roastScreens.contains(previous) {
+            // Try to go back further, or stay on current screen
+            goBack()
+            return
+        }
         selectedScreen = previous
     }
 
-    // When roast mode turns on, jump to Roasts; when off, jump to Notepad
+    // When roast mode turns on, jump to Roasts; when off, restore previous screen
     private func handleRoastModeChange(isRoast: Bool) {
-        screenHistory.removeAll()
         if isRoast {
-            // In roast mode, ensure we're on a valid roast screen
+            // Save the current screen so we can restore it when roast mode is turned off
+            preRoastScreen = selectedScreen
+            screenHistory.removeAll()
             selectedScreen = .jokes // Always start with roasts in roast mode
         } else {
-            selectedScreen = .notepad
+            screenHistory.removeAll()
+            // Restore the screen the user was on before roast mode, or default to notepad
+            if let restored = preRoastScreen, !AppScreen.roastScreens.contains(restored) || restored == .settings {
+                selectedScreen = restored
+            } else {
+                selectedScreen = .notepad
+            }
+            preRoastScreen = nil
         }
     }
 
@@ -170,7 +187,7 @@ struct MainTabView: View {
                         }
                 } else {
                     switch selectedScreen {
-                    case .notepad:       
+                    case .notepad:
                         if roastMode {
                             // Roast mode should never show notepad - redirect to roasts
                             EmptyView()

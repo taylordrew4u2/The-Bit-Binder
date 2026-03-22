@@ -48,6 +48,9 @@ struct thebitbinderApp: App {
             } catch {
                 print("⚠️ [DataProtection] Could not create emergency backup: \(error)")
             }
+            
+            // 🧹 Clean up old emergency backups to prevent disk bloat
+            DataProtectionService.shared.cleanupEmergencyBackups()
         }
 
         // 1️⃣ Persistent + CloudKit (single container, full schema)
@@ -191,6 +194,14 @@ struct thebitbinderApp: App {
                 await startup.completeDataProtectionWithContext(sharedModelContainer.mainContext)
             }
             .environmentObject(userPreferences)
+            .alert("⚠️ Data Issue Detected", isPresented: $startup.showDataLossAlert) {
+                Button("Open Data Safety") {
+                    // User will navigate to Settings → Data Safety manually
+                }
+                Button("Dismiss", role: .cancel) { }
+            } message: {
+                Text(startup.dataLossDetails)
+            }
         }
         .modelContainer(sharedModelContainer)
         .onChange(of: scenePhase) {

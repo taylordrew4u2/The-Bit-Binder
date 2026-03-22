@@ -21,6 +21,8 @@ struct DataSafetyView: View {
     @State private var showingLogs = false
     @State private var showingEmergencyRecovery = false
     @State private var availableBackups: [BackupInfo] = []
+    @State private var showKVSyncAlert = false
+    @State private var kvSyncMessage = ""
     
     var body: some View {
         NavigationView {
@@ -46,6 +48,16 @@ struct DataSafetyView: View {
                             isHealthy: true
                         )
                     }
+                    
+                    // Disk space warning
+                    let freeSpace = Self.freeDiskSpaceBytes()
+                    let freeSpaceFormatted = ByteCountFormatter.string(fromByteCount: freeSpace, countStyle: .file)
+                    let isLowSpace = freeSpace < 200 * 1024 * 1024 // 200 MB
+                    StatusRow(
+                        title: "Free Disk Space",
+                        status: isLowSpace ? "⚠️ Low: \(freeSpaceFormatted)" : freeSpaceFormatted,
+                        isHealthy: !isLowSpace
+                    )
                 }
                 
                 // Actions Section
@@ -132,6 +144,44 @@ struct DataSafetyView: View {
                     }
                     
                     Button {
+                        iCloudKeyValueStore.shared.forceSync()
+                        kvSyncMessage = "✅ iCloud KV Store force-synced"
+                        showKVSyncAlert = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading) {
+                                Text("Force Sync KV Store")
+                                    .foregroundColor(.primary)
+                                Text("Push & pull iCloud key-value data")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                    
+                    Button {
+                        let diagnostics = iCloudKeyValueStore.shared.diagnostics()
+                        kvSyncMessage = diagnostics.joined(separator: "\n")
+                        showKVSyncAlert = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "stethoscope")
+                                .foregroundColor(.teal)
+                            VStack(alignment: .leading) {
+                                Text("KV Store Diagnostics")
+                                    .foregroundColor(.primary)
+                                Text("Check sync status for all keys")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                    
+                    Button {
                         showingEmergencyRecovery = true
                     } label: {
                         HStack {
@@ -205,9 +255,29 @@ struct DataSafetyView: View {
         .sheet(isPresented: $showingEmergencyRecovery) {
             EmergencyRecoveryView()
         }
+        .alert("iCloud KV Store", isPresented: $showKVSyncAlert) {
+            Button("OK") { }
+        } message: {
+            Text(kvSyncMessage)
+        }
         .task {
             await loadBackupInfo()
         }
+    }
+    
+    // MARK: - Disk Space
+    
+    /// Returns the available free disk space in bytes.
+    static func freeDiskSpaceBytes() -> Int64 {
+        do {
+            let attributes = try FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())
+            if let freeSpace = attributes[.systemFreeSize] as? Int64 {
+                return freeSpace
+            }
+        } catch {
+            print("⚠️ [DataSafety] Could not determine free disk space: \(error)")
+        }
+        return Int64.max // Assume plenty of space if we can't check
     }
     
     // MARK: - Actions

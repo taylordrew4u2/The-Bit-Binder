@@ -37,6 +37,7 @@ struct SettingsView: View {
     @AppStorage("tabOrder") private var tabOrderData: Data = Data()
     
     @AppStorage("roastModeEnabled") private var roastMode = false
+    @AppStorage("backgroundSyncEnabled") private var backgroundSyncEnabled = true
     
     var body: some View {
         NavigationStack {
@@ -130,10 +131,26 @@ struct SettingsView: View {
                                 .foregroundColor(AppTheme.Colors.brand)
                         }
                     }
+                    
+                    Toggle(isOn: $backgroundSyncEnabled) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Background Sync")
+                                    .foregroundColor(.primary)
+                                Text("Sync data when app is closed")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .tint(AppTheme.Colors.brand)
                 } header: {
                     Text("Cloud")
                 } footer: {
-                    Text("Automatically back up all your jokes, roasts, recordings, and photos to iCloud.")
+                    Text("iCloud backs up jokes, roasts, recordings, and photos. Background sync runs periodically when the app is closed, but iOS may delay it to save battery.")
                 }
                 
                 // MARK: - Data Safety

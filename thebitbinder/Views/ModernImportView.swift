@@ -109,6 +109,9 @@ struct ModernImportView: View {
     
     private var readyStateContent: some View {
         VStack(spacing: 16) {
+            // Rate limit status card
+            rateLimitStatusCard
+            
             Text("🎯 Smart Import Features")
                 .font(.headline)
             
@@ -125,6 +128,39 @@ struct ModernImportView: View {
         }
     }
     
+    private var rateLimitStatusCard: some View {
+        let info = GeminiRateLimitInfo.current()
+        
+        return VStack(spacing: 8) {
+            HStack {
+                Image(systemName: info.statusIcon)
+                    .font(.title2)
+                    .foregroundColor(info.statusColor)
+                Text(info.shortStatusText)
+                    .font(.headline)
+                    .foregroundColor(info.remaining > 0 ? .primary : .orange)
+            }
+            
+            Text(info.remainingMessageText)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(info.remaining > 100 ? Color.green.opacity(0.1) : 
+                      info.remaining > 0 ? Color.orange.opacity(0.1) : Color.red.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(info.remaining > 100 ? Color.green.opacity(0.3) : 
+                        info.remaining > 0 ? Color.orange.opacity(0.3) : Color.red.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
     private var processingStateContent: some View {
         VStack(spacing: 16) {
             ProgressView(value: processingProgress)
@@ -134,9 +170,13 @@ struct ModernImportView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
-            Text("Processing with new pipeline...")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            HStack(spacing: 6) {
+                Image(systemName: "wand.and.stars")
+                    .foregroundColor(.blue)
+                Text("GagGrabber is extracting your jokes...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
     }
     
@@ -187,17 +227,22 @@ struct ModernImportView: View {
     
     private func errorStateContent(_ error: String) -> some View {
         VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 50))
-                .foregroundColor(.red)
+            // Check if this is a rate limit error
+            let isRateLimitError = error.contains("GagGrabber") || error.contains("Adderall") || error.contains("limit") || error.contains("grabs")
             
-            Text("Import Failed")
+            Image(systemName: isRateLimitError ? "moon.zzz.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 50))
+                .foregroundColor(isRateLimitError ? .orange : .red)
+            
+            Text(isRateLimitError ? "GagGrabber Needs a Break" : "Import Failed")
                 .font(.title2.bold())
-                .foregroundColor(.red)
+                .foregroundColor(isRateLimitError ? .orange : .red)
             
             Text(error)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
                 .multilineTextAlignment(.center)
             
             Button("Try Again") {

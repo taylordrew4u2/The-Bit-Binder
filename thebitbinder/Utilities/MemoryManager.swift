@@ -83,11 +83,8 @@ final class MemoryManager {
         
         print("⚠️ [MemoryManager] Memory warning received - clearing caches")
         
-        // Clear caches on main thread (NSCache is thread-safe but UI-related caches should be on main)
+        // Clear caches on main thread
         DispatchQueue.main.async { [weak self] in
-            // Clear image caches
-            ImageCache.shared.clearCache()
-            
             // Clear URL caches
             URLCache.shared.removeAllCachedResponses()
             
@@ -106,8 +103,7 @@ final class MemoryManager {
     func handleBackgroundTransition() {
         print("📱 [MemoryManager] App entering background - reducing memory footprint")
         
-        // Clear caches immediately on main thread
-        ImageCache.shared.clearCache()
+        // Clear URL caches
         URLCache.shared.removeAllCachedResponses()
     }
     

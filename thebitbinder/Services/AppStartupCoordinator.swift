@@ -6,6 +6,11 @@ final class AppStartupCoordinator: ObservableObject {
     @Published private(set) var isReady = false
     @Published private(set) var statusText = "Loading..."
     @Published private(set) var dataProtectionStatus = ""
+    /// Set to true when DataValidationService detects significant data loss.
+    /// The main app view should observe this and show a recovery alert.
+    @Published var showDataLossAlert = false
+    /// Details of the data loss for the alert message.
+    @Published var dataLossDetails: String = ""
     
     private let dataProtection = DataProtectionService.shared
     private let dataValidation = DataValidationService.shared
@@ -58,7 +63,8 @@ final class AppStartupCoordinator: ObservableObject {
         
         if validation.significantDataLoss {
             print("🚨 [AppStartup] CRITICAL: Significant data loss detected!")
-            // You might want to show an alert to the user here
+            dataLossDetails = "Data validation found \(validation.issues.count) issue(s): \(validation.issues.prefix(3).joined(separator: "; ")). You can restore from a recent backup in Settings → Data Safety."
+            showDataLossAlert = true
         } else if !validation.isHealthy {
             print("⚠️ [AppStartup] Data validation found minor issues")
         } else {

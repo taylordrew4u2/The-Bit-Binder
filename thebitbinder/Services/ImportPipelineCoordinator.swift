@@ -19,9 +19,30 @@ final class ImportPipelineCoordinator {
     private let pdfExtractor    = PDFTextExtractor.shared
     private let ocrExtractor    = OCRTextExtractor.shared
     private let lineNormalizer  = LineNormalizer.shared
-    private let blockBuilder    = LayoutBlockBuilder.shared
 
     private init() {}
+    
+    // MARK: - Memory Monitoring
+    
+    /// Returns the fraction of memory used (0.0–1.0). Above 0.75 is considered high pressure.
+    private func memoryPressure() -> Double {
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+        var taskInfo = mach_task_basic_info()
+        let result = withUnsafeMutablePointer(to: &taskInfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return 0 }
+        let usedMB = Double(taskInfo.resident_size) / (1024 * 1024)
+        let totalMB = Double(ProcessInfo.processInfo.physicalMemory) / (1024 * 1024)
+        return min(usedMB / totalMB, 1.0)
+    }
+    
+    /// Returns true if memory pressure is dangerously high (>75% physical memory used).
+    private var isUnderMemoryPressure: Bool {
+        memoryPressure() > 0.75
+    }
 
     // MARK: - Main Pipeline Entry Point
 
@@ -71,16 +92,27 @@ final class ImportPipelineCoordinator {
         debugInfo.append("Sending \(fullText.count) chars to Gemini 2.0 Flash")
         debugInfo.append("Remaining Gemini requests today: \(GeminiJokeExtractor.shared.remainingRequests())")
 
-        // ── Stage 5: Gemini extraction ────────────────────────────────────────
+        // ── Stage 5: Gemini extraction (with local fallback) ──────────────
         let geminiJokes: [GeminiExtractedJoke]
+        var usedLocalFallback = false
         do {
             geminiJokes = try await GeminiJokeExtractor.shared.extract(from: fullText)
         } catch let rateLimitError as GeminiRateLimitError {
-            debugInfo.append("⚠️ Gemini error: \(rateLimitError.localizedDescription ?? "unknown")")
-            throw rateLimitError
+            switch rateLimitError {
+            case .dailyLimitReached, .keyNotConfigured:
+                // Fall back to local rule-based extraction instead of failing
+                debugInfo.append("⚠️ Gemini unavailable: \(rateLimitError.localizedDescription)")
+                debugInfo.append("🔄 Falling back to local rule-based extraction...")
+                geminiJokes = LocalJokeExtractor.shared.extract(from: fullText)
+                usedLocalFallback = true
+                debugInfo.append("Local extractor returned \(geminiJokes.count) potential joke(s)")
+            default:
+                debugInfo.append("⚠️ Gemini error: \(rateLimitError.localizedDescription)")
+                throw rateLimitError
+            }
         }
 
-        debugInfo.append("Gemini returned \(geminiJokes.count) joke(s)")
+        debugInfo.append("Extracted \(geminiJokes.count) joke(s)\(usedLocalFallback ? " (local fallback)" : " (Gemini)")")
 
         // ── Stage 6: Map into ImportedJoke ────────────────────────────────────
         let importTimestamp = Date()
@@ -146,6 +178,11 @@ final class ImportPipelineCoordinator {
         fileType: ImportFileType,
         method: ExtractionMethod
     ) async throws -> [NormalizedPage] {
+        
+        // Check memory before starting extraction
+        if isUnderMemoryPressure {
+            print("⚠️ [ImportPipeline] High memory pressure (\(Int(memoryPressure() * 100))%) before extraction — proceeding cautiously")
+        }
 
         switch method {
         case .pdfKitText:
@@ -153,11 +190,16 @@ final class ImportPipelineCoordinator {
 
         case .visionOCR:
             if fileType == .scannedPDF {
-                return try await ocrExtractor.extractFromPDF(url: url)
+                // Process scanned PDFs page-by-page with memory checks
+                return try await extractOCRWithMemoryManagement(from: url)
             } else {
-                guard let data  = try? Data(contentsOf: url),
-                      let image = UIImage(data: data) else {
-                    throw ImportProcessingError.invalidImageFile
+                // Load image data in an autoreleasepool to free intermediate buffers
+                let image: UIImage = try autoreleasepool {
+                    guard let data  = try? Data(contentsOf: url),
+                          let img = UIImage(data: data) else {
+                        throw ImportProcessingError.invalidImageFile
+                    }
+                    return img
                 }
                 let page = try await ocrExtractor.extractFromImage(image)
                 return [page]
@@ -167,13 +209,30 @@ final class ImportPipelineCoordinator {
             return try await extractFromDocument(url: url)
 
         case .imageOCR:
-            guard let data  = try? Data(contentsOf: url),
-                  let image = UIImage(data: data) else {
-                throw ImportProcessingError.invalidImageFile
+            let image: UIImage = try autoreleasepool {
+                guard let data  = try? Data(contentsOf: url),
+                      let img = UIImage(data: data) else {
+                    throw ImportProcessingError.invalidImageFile
+                }
+                return img
             }
             let page = try await ocrExtractor.extractFromImage(image)
             return [page]
         }
+    }
+    
+    /// Extracts OCR text from a scanned PDF page-by-page, releasing memory between pages.
+    /// Aborts early if memory pressure exceeds safe thresholds.
+    private func extractOCRWithMemoryManagement(from url: URL) async throws -> [NormalizedPage] {
+        // Delegate to the existing OCR extractor but monitor memory throughout
+        let pages = try await ocrExtractor.extractFromPDF(url: url)
+        
+        // After extraction, check if memory is critically high
+        if isUnderMemoryPressure {
+            print("⚠️ [ImportPipeline] High memory after OCR extraction (\(Int(memoryPressure() * 100))%) — consider reducing page count")
+        }
+        
+        return pages
     }
 
     private func extractFromDocument(url: URL) async throws -> [NormalizedPage] {

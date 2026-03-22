@@ -24,6 +24,8 @@ struct SmartImportReviewView: View {
     @State private var showingSaveConfirmation = false
     @State private var savedCount = 0
     @State private var brainstormCount = 0
+    @State private var showingSaveError = false
+    @State private var saveErrorMessage = ""
     
     init(importResult: ImportPipelineResult, selectedFolder: JokeFolder? = nil, onComplete: (() -> Void)? = nil) {
         self.importResult = importResult
@@ -47,7 +49,7 @@ struct SmartImportReviewView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(.white)
-                            Text(rateLimitErr.localizedDescription ?? "Gemini daily limit reached.")
+                            Text(rateLimitErr.localizedDescription)
                                 .font(.caption)
                                 .foregroundColor(.white)
                                 .lineLimit(2)
@@ -118,6 +120,18 @@ struct SmartImportReviewView: View {
                 }
             } message: {
                 Text("Saved \(savedCount) joke\(savedCount == 1 ? "" : "s") and sent \(brainstormCount) idea\(brainstormCount == 1 ? "" : "s") to Brainstorm.")
+            }
+            .alert("Save Failed", isPresented: $showingSaveError) {
+                Button("Try Again") {
+                    Task { await finishAndSave() }
+                }
+                Button("Discard", role: .destructive) {
+                    modelContext.rollback()
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text(saveErrorMessage)
             }
         }
         .onAppear {
@@ -559,49 +573,66 @@ struct SmartImportReviewView: View {
     
     // MARK: - Save Logic
     
+    /// Maximum number of save retry attempts
+    private let maxSaveRetries = 3
+    
     private func finishAndSave() async {
         let results = viewModel.getReviewResults()
         
-        do {
-            // Insert approved jokes
-            for importedJoke in results.approvedJokes {
-                let joke = Joke(content: importedJoke.body, title: importedJoke.title ?? "")
-                joke.dateCreated = importedJoke.sourceMetadata.importTimestamp
-                joke.dateModified = Date()
-                joke.tags = importedJoke.tags
-                joke.folder = selectedFolder
-                joke.importSource = importedJoke.sourceMetadata.fileName
-                joke.importConfidence = importedJoke.confidence.rawValue
-                joke.importTimestamp = importedJoke.sourceMetadata.importTimestamp
-                modelContext.insert(joke)
+        // Insert approved jokes
+        for importedJoke in results.approvedJokes {
+            let joke = Joke(content: importedJoke.body, title: importedJoke.title ?? "")
+            joke.dateCreated = importedJoke.sourceMetadata.importTimestamp
+            joke.dateModified = Date()
+            joke.tags = importedJoke.tags
+            joke.folder = selectedFolder
+            joke.importSource = importedJoke.sourceMetadata.fileName
+            joke.importConfidence = importedJoke.confidence.rawValue
+            joke.importTimestamp = importedJoke.sourceMetadata.importTimestamp
+            modelContext.insert(joke)
+        }
+        
+        // Insert brainstorm items
+        for item in results.brainstormItems {
+            let content = item.editedBody
+            let idea = BrainstormIdea(
+                content: content,
+                colorHex: BrainstormIdea.randomColor(),
+                isVoiceNote: false
+            )
+            modelContext.insert(idea)
+        }
+        
+        // Retry save with exponential backoff
+        var lastError: Error?
+        for attempt in 1...maxSaveRetries {
+            do {
+                try modelContext.save()
+                
+                // Small delay to allow CloudKit activity to transition to DONE state
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                
+                savedCount = results.approvedJokes.count
+                brainstormCount = results.brainstormItems.count
+                showingSaveConfirmation = true
+                
+                print("✅ [ImportReview] Successfully saved \(savedCount) joke(s) and \(brainstormCount) brainstorm idea(s) (attempt \(attempt))")
+                return // success — exit the function
+            } catch {
+                lastError = error
+                let delay = UInt64(pow(2.0, Double(attempt - 1))) * 1_000_000_000 // 1s, 2s, 4s
+                print("⚠️ [ImportReview] Save attempt \(attempt)/\(maxSaveRetries) failed: \(error.localizedDescription) — retrying in \(Int(pow(2.0, Double(attempt - 1))))s")
+                try? await Task.sleep(nanoseconds: delay)
             }
-            
-            // Insert brainstorm items
-            for item in results.brainstormItems {
-                let content = item.editedBody
-                let idea = BrainstormIdea(
-                    content: content,
-                    colorHex: BrainstormIdea.randomColor(),
-                    isVoiceNote: false
-                )
-                modelContext.insert(idea)
-            }
-            
-            // Save and wait for CloudKit activity to complete
-            try modelContext.save()
-            
-            // Small delay to allow CloudKit activity to transition to DONE state
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            
-            savedCount = results.approvedJokes.count
-            brainstormCount = results.brainstormItems.count
-            showingSaveConfirmation = true
-            
-            print("✅ [ImportReview] Successfully saved \(savedCount) joke(s) and \(brainstormCount) brainstorm idea(s)")
-        } catch {
-            print("❌ [ImportReview] Failed to save: \(error.localizedDescription)")
-            // Show error to user but don't dismiss
-            let nsError = error as NSError
+        }
+        
+        // All retries exhausted — show error to user
+        let errorDetail = lastError?.localizedDescription ?? "Unknown error"
+        saveErrorMessage = "Could not save imported jokes after \(maxSaveRetries) attempts: \(errorDetail)"
+        showingSaveError = true
+        
+        print("❌ [ImportReview] Failed to save after \(maxSaveRetries) attempts: \(errorDetail)")
+        if let nsError = lastError as NSError? {
             print("   Domain: \(nsError.domain), Code: \(nsError.code)")
             if let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
                 print("   Underlying: \(underlyingError.localizedDescription)")

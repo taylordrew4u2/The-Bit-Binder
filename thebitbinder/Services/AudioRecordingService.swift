@@ -15,12 +15,19 @@ class AudioRecordingService: NSObject, ObservableObject {
     @Published var isRecording = false
     @Published var isPaused = false
     @Published var recordingTime: TimeInterval = 0
+    /// Published error message for views to display in an alert when audio session setup fails.
+    @Published var audioSessionError: String?
     
     private var audioRecorder: AVAudioRecorder?
     private var recordingTimer: Timer?
     private var recordingStartTime: Date?
     private var pausedDuration: TimeInterval = 0
     private var lastRecordingURL: URL?
+    
+    /// Maximum number of retry attempts for audio session configuration
+    private let maxAudioSessionRetries = 3
+    /// Delay between retry attempts (seconds)
+    private let retryDelay: TimeInterval = 1.0
     
     var recordingURL: URL? {
         return lastRecordingURL ?? audioRecorder?.url
@@ -54,24 +61,54 @@ class AudioRecordingService: NSObject, ObservableObject {
     }
     
     private func setupAudioSession() {
-        // Lazily configure + activate the audio session on first recording
-        do {
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(
-                .playAndRecord,
-                mode: .default,
-                options: [
-                    .defaultToSpeaker,
-                    .allowBluetoothA2DP,
-                    .allowAirPlay,
-                    .mixWithOthers
-                ]
-            )
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-            print("✅ Audio session configured + activated for recording")
-        } catch {
-            print("❌ Failed to configure audio session: \(error)")
+        // Check if another app is playing audio and warn
+        let audioSession = AVAudioSession.sharedInstance()
+        if audioSession.isOtherAudioPlaying {
+            print("⚠️ [Audio] Another app is currently playing audio — session may conflict")
         }
+        
+        // Retry loop: attempt up to maxAudioSessionRetries times with retryDelay between attempts
+        var lastError: Error?
+        for attempt in 1...maxAudioSessionRetries {
+            do {
+                try audioSession.setCategory(
+                    .playAndRecord,
+                    mode: .default,
+                    options: [
+                        .defaultToSpeaker,
+                        .allowBluetoothA2DP,
+                        .allowAirPlay,
+                        .mixWithOthers
+                    ]
+                )
+                try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+                print("✅ [Audio] Audio session configured + activated for recording (attempt \(attempt))")
+                audioSessionError = nil
+                return // success
+            } catch {
+                lastError = error
+                print("⚠️ [Audio] Audio session setup attempt \(attempt)/\(maxAudioSessionRetries) failed: \(error.localizedDescription)")
+                if attempt < maxAudioSessionRetries {
+                    Thread.sleep(forTimeInterval: retryDelay)
+                }
+            }
+        }
+        
+        // All retries exhausted
+        let errorMsg: String
+        if audioSession.isOtherAudioPlaying {
+            errorMsg = "Could not configure audio — another app is using the speaker. Close other audio apps and try again."
+        } else {
+            errorMsg = "Could not configure audio for recording: \(lastError?.localizedDescription ?? "unknown error"). Please restart the app."
+        }
+        print("❌ [Audio] Audio session setup failed after \(maxAudioSessionRetries) attempts: \(errorMsg)")
+        audioSessionError = errorMsg
+    }
+    
+    /// Re-attempts audio session setup. Call from UI when user taps "Try Again".
+    func retryAudioSessionSetup() {
+        audioSessionError = nil
+        setupAudioSession()
     }
     
     func startRecording(fileName: String) -> Bool {
