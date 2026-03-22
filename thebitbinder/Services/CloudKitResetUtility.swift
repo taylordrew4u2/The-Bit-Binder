@@ -8,216 +8,170 @@
 import Foundation
 import CloudKit
 
-/// Utility for development-time CloudKit operations
-/// ⚠️ Only use in development builds!
+/// Utility for CloudKit schema-mismatch recovery.
+///
+/// CoreData+CloudKit maps every `@Relationship` property as a CloudKit
+/// `REFERENCE` field. If a corrupted record wrote that field as a `STRING`
+/// instead, the mirroring delegate enters a permanent error loop:
+///
+///   "invalid attempt to set value type STRING for field 'CD_folder'
+///    for type 'CD_Joke', defined to be: REFERENCE"
+///
+/// Because CoreData-managed record types (CD_*) are **not indexed**, you
+/// cannot query them with `CKQuery`. The only reliable fix is to delete the
+/// entire private-database zone. CoreData will recreate it and re-export
+/// every local record with the correct schema on next launch.
+///
+/// **Local data is never touched** — only remote CloudKit records are deleted.
 class CloudKitResetUtility {
-    
-    private static let containerID = "iCloud.666bit"
-    private static let zoneID = CKRecordZone.ID(zoneName: "com.apple.coredata.cloudkit.zone", ownerName: CKCurrentUserDefaultName)
-    
-    /// Checks CloudKit account status for debugging
-    static func checkCloudKitStatus() {
+
+    static let containerID = "iCloud.666bit"
+    static let zoneID = CKRecordZone.ID(
+        zoneName: "com.apple.coredata.cloudkit.zone",
+        ownerName: CKCurrentUserDefaultName
+    )
+
+    /// Version key for the cleanup. Bump this whenever a new round of
+    /// schema-mismatch fixes is needed so the one-time guard re-fires.
+    static let cleanupVersionKey = "cloudkit_schema_cleanup_v2"
+
+    // MARK: - Public Entry Point
+
+    /// One-time cleanup that fixes **all** STRING-vs-REFERENCE mismatches.
+    ///
+    /// Affected fields (all should be REFERENCE in CloudKit):
+    ///  - `CD_Joke.CD_folder`              → `JokeFolder`
+    ///  - `CD_ImportedJokeMetadata.CD_batch`→ `ImportBatch`
+    ///  - `CD_UnresolvedImportFragment.CD_batch` → `ImportBatch`
+    ///
+    /// Strategy:
+    ///  1. Try deleting every **known** corrupted record by ID.
+    ///  2. Regardless of step-1 outcome, **delete the entire zone** so
+    ///     CoreData rebuilds it cleanly from the local SQLite store.
+    ///
+    /// Safe because:
+    ///  - The local `default.store` is the source of truth.
+    ///  - After zone deletion CoreData re-exports every local record
+    ///    with correct REFERENCE types on its next export cycle.
+    static func repairCorruptedZone() async throws {
+        print("🔧 [CloudKit] Starting schema-mismatch repair (v2)...")
+
         let container = CKContainer(identifier: containerID)
-        
-        container.accountStatus { (status, error) in
-            DispatchQueue.main.async {
-                switch status {
-                case .available:
-                    print("✅ CloudKit account available")
-                case .noAccount:
-                    print("⚠️ No iCloud account")
-                case .restricted:
-                    print("⚠️ iCloud account restricted")
-                case .couldNotDetermine:
-                    print("⚠️ Could not determine iCloud status")
-                case .temporarilyUnavailable:
-                    print("⚠️ iCloud temporarily unavailable")
-                @unknown default:
-                    print("❓ Unknown iCloud status")
-                }
-                
-                if let error = error {
-                    print("❌ CloudKit error: \(error.localizedDescription)")
-                }
+        let database  = container.privateCloudDatabase
+
+        // ── Step 1: Best-effort deletion of known bad records ──────────
+        // This list comes from error logs. If any ID is already gone we
+        // treat that as success (.unknownItem is fine).
+        let knownCorruptedIDs = [
+            "762FB389-C2E2-41E2-BDA6-8D3A65142662"  // CD_Joke with STRING CD_folder
+        ]
+
+        for name in knownCorruptedIDs {
+            let rid = CKRecord.ID(recordName: name, zoneID: zoneID)
+            do {
+                try await database.deleteRecord(withID: rid)
+                print("  ✅ Deleted known corrupt record \(name)")
+            } catch let e as CKError where e.code == .unknownItem {
+                print("  ℹ️ Record \(name) already gone")
+            } catch {
+                print("  ⚠️ Could not delete \(name): \(error.localizedDescription)")
+                // Continue — zone delete below will catch everything
             }
         }
+
+        // ── Step 2: Delete the entire CoreData CloudKit zone ───────────
+        // This is the only 100 % reliable fix because:
+        //   • CD_* record types are now indexed (QUERYABLE) in the schema,
+        //   • There may be corrupted records we don't have IDs for.
+        //   • Zone delete wipes the server-side schema for this zone,
+        //     letting CoreData re-create it with correct field types.
+        do {
+            try await database.deleteRecordZone(withID: zoneID)
+            print("  ✅ Zone deleted — CoreData will re-export local data")
+        } catch let e as CKError where e.code == .zoneNotFound {
+            print("  ℹ️ Zone already deleted — nothing to do")
+        } catch {
+            print("  ❌ Zone deletion failed: \(error.localizedDescription)")
+            throw error
+        }
+
+        // ── Step 3: Mark success ───────────────────────────────────────
+        UserDefaults.standard.set(true, forKey: cleanupVersionKey)
+        print("✅ [CloudKit] Schema-mismatch repair complete")
     }
-    
+
+    // MARK: - Helpers
+
+    /// Checks CloudKit account status for debugging
+    static func checkCloudKitStatus() async -> CKAccountStatus {
+        let container = CKContainer(identifier: containerID)
+        do {
+            let status = try await container.accountStatus()
+            switch status {
+            case .available:            print("✅ CloudKit account available")
+            case .noAccount:            print("⚠️ No iCloud account")
+            case .restricted:           print("⚠️ iCloud account restricted")
+            case .couldNotDetermine:    print("⚠️ Could not determine iCloud status")
+            case .temporarilyUnavailable: print("⚠️ iCloud temporarily unavailable")
+            @unknown default:           print("❓ Unknown iCloud status: \(status.rawValue)")
+            }
+            return status
+        } catch {
+            print("❌ CloudKit error: \(error.localizedDescription)")
+            return .couldNotDetermine
+        }
+    }
+
     /// Logs CloudKit container configuration for debugging
     static func logContainerInfo() {
         let container = CKContainer(identifier: containerID)
         print("📦 CloudKit Container ID: \(container.containerIdentifier ?? "unknown")")
         print("🔧 Environment: Development")
-        
-        // Check private database
         let _ = container.privateCloudDatabase
         print("🔒 Private database configured")
-        
-        checkCloudKitStatus()
+
+        Task { _ = await checkCloudKitStatus() }
     }
-    
-    // MARK: - Corrupted Record Cleanup
-    
-    /// Deletes all CD_Joke records from CloudKit to fix schema type mismatch
-    /// Call this to clear corrupted records where CD_folder was stored as STRING instead of REFERENCE
-    static func deleteCorruptedJokeRecords() async throws {
-        print("🗑️ [CloudKit] Starting deletion of corrupted CD_Joke records...")
-        
-        let container = CKContainer(identifier: containerID)
-        let database = container.privateCloudDatabase
-        
-        // Query all CD_Joke records
-        let query = CKQuery(recordType: "CD_Joke", predicate: NSPredicate(value: true))
-        
-        do {
-            let (matchResults, _) = try await database.records(matching: query, inZoneWith: zoneID)
-            
-            let recordIDs = matchResults.compactMap { result -> CKRecord.ID? in
-                switch result.1 {
-                case .success(let record):
-                    return record.recordID
-                case .failure:
-                    return nil
-                }
-            }
-            
-            if recordIDs.isEmpty {
-                print("✅ [CloudKit] No CD_Joke records found to delete")
-                return
-            }
-            
-            print("🔍 [CloudKit] Found \(recordIDs.count) CD_Joke records to delete")
-            
-            // Delete in batches of 400 (CloudKit limit)
-            let batchSize = 400
-            for batchStart in stride(from: 0, to: recordIDs.count, by: batchSize) {
-                let batchEnd = min(batchStart + batchSize, recordIDs.count)
-                let batch = Array(recordIDs[batchStart..<batchEnd])
-                
-                let (_, deleteResults) = try await database.modifyRecords(saving: [], deleting: batch)
-                
-                let successCount = deleteResults.filter {
-                    if case .success = $0.value { return true }
-                    return false
-                }.count
-                
-                print("🗑️ [CloudKit] Deleted batch: \(successCount)/\(batch.count) records")
-            }
-            
-            print("✅ [CloudKit] Successfully deleted all CD_Joke records")
-            
-        } catch {
-            print("❌ [CloudKit] Error deleting records: \(error.localizedDescription)")
-            throw error
-        }
-    }
-    
-    /// Deletes a specific record by ID
+
+    /// Deletes a single record by its string name.
     static func deleteRecord(recordID: String) async throws {
-        print("🗑️ [CloudKit] Deleting record: \(recordID)")
-        
         let container = CKContainer(identifier: containerID)
-        let database = container.privateCloudDatabase
-        
-        let ckRecordID = CKRecord.ID(recordName: recordID, zoneID: zoneID)
-        
-        try await database.deleteRecord(withID: ckRecordID)
+        let database  = container.privateCloudDatabase
+        let rid = CKRecord.ID(recordName: recordID, zoneID: zoneID)
+        try await database.deleteRecord(withID: rid)
         print("✅ [CloudKit] Record deleted: \(recordID)")
     }
-    
-    /// Deletes all records of a specific type
-    static func deleteAllRecords(ofType recordType: String) async throws {
-        print("🗑️ [CloudKit] Deleting all \(recordType) records...")
-        
-        let container = CKContainer(identifier: containerID)
-        let database = container.privateCloudDatabase
-        
-        let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
-        
-        var cursor: CKQueryOperation.Cursor? = nil
-        var totalDeleted = 0
-        
-        repeat {
-            var matchResults: [(CKRecord.ID, Result<CKRecord, Error>)] = []
-            
-            if let existingCursor = cursor {
-                let result = try await database.records(continuingMatchFrom: existingCursor)
-                matchResults = result.matchResults
-                cursor = result.queryCursor
-            } else {
-                let result = try await database.records(matching: query, inZoneWith: zoneID)
-                matchResults = result.matchResults
-                cursor = result.queryCursor
-            }
-            
-            let recordIDs = matchResults.compactMap { result -> CKRecord.ID? in
-                switch result.1 {
-                case .success(let record):
-                    return record.recordID
-                case .failure:
-                    return nil
-                }
-            }
-            
-            if !recordIDs.isEmpty {
-                let (_, deleteResults) = try await database.modifyRecords(saving: [], deleting: recordIDs)
-                totalDeleted += deleteResults.count
-                print("🗑️ [CloudKit] Deleted \(deleteResults.count) \(recordType) records")
-            }
-            
-        } while cursor != nil
-        
-        print("✅ [CloudKit] Total \(recordType) records deleted: \(totalDeleted)")
-    }
-    
-    /// Nuclear option: Delete the entire CloudKit zone and all data
-    /// ⚠️ This will delete ALL synced data!
+
+    /// Nuclear option: delete the entire CoreData CloudKit zone.
+    /// CoreData will recreate the zone and re-export on next sync cycle.
     static func deleteEntireZone() async throws {
-        print("⚠️ [CloudKit] DELETING ENTIRE ZONE - This will remove all synced data!")
-        
+        print("⚠️ [CloudKit] DELETING ENTIRE ZONE — all remote records will be re-exported from local store")
         let container = CKContainer(identifier: containerID)
-        let database = container.privateCloudDatabase
-        
+        let database  = container.privateCloudDatabase
         try await database.deleteRecordZone(withID: zoneID)
-        
-        print("✅ [CloudKit] Zone deleted. CloudKit will recreate it on next sync.")
-    }
-    
-    /// Delete the specific corrupted record from the error log
-    static func deleteCorruptedRecordFromError() async throws {
-        // The record ID from the error: 762FB389-C2E2-41E2-BDA6-8D3A65142662
-        try await deleteRecord(recordID: "762FB389-C2E2-41E2-BDA6-8D3A65142662")
+        print("✅ [CloudKit] Zone deleted. CoreData will recreate it on next sync.")
     }
 }
 
+// MARK: - Debug Helpers
 #if DEBUG
 extension CloudKitResetUtility {
-    
-    /// For development only: Clear local CloudKit cache
-    /// Call this after resetting the CloudKit schema in CloudKit Console
-    static func clearLocalCache() {
-        // Note: This doesn't actually clear the cache programmatically
-        // Users need to reset simulator or delete/reinstall app
-        print("📋 To clear CloudKit cache:")
-        print("   1. Reset iOS Simulator: Device → Erase All Content and Settings")
-        print("   2. Or delete and reinstall the app on device")
-        print("   3. This ensures no cached CloudKit data conflicts with new schema")
-    }
-    
-    /// Development helper to verify the model is properly configured
-    static func verifyModelConfiguration() {
-        print("🔍 SwiftData Model Verification:")
-        print("   ✓ Joke.folder has @Relationship attribute → REFERENCE type")
-        print("   ✓ JokeFolder.jokes has inverse relationship to Joke.folder")
-        print("   ✓ ImportBatch has @Relationship to ImportedJokeMetadata")
-        print("   ✓ ImportedJokeMetadata.batch is optional ImportBatch relationship")
-        print("   ✓ CloudKit will map all relationships as REFERENCE type correctly")
-    }
-    
-    /// Force re-run the CloudKit cleanup (for testing)
+
+    /// Force re-run the cleanup on next launch (for testing).
     static func forceRerunCleanup() {
-        UserDefaults.standard.removeObject(forKey: "CloudKitFolderSchemaCleanupCompleted_v1")
-        print("🔄 [CloudKit] Cleanup flag reset - will run on next app launch")
+        UserDefaults.standard.removeObject(forKey: cleanupVersionKey)
+        print("🔄 [CloudKit] Cleanup flag reset — will run on next app launch")
+    }
+
+    /// Print a summary of how the SwiftData models map to CloudKit fields.
+    static func verifyModelConfiguration() {
+        print("🔍 SwiftData → CloudKit field mapping:")
+        print("   ✓ Joke.folder                         → CD_Joke.CD_folder (REFERENCE)")
+        print("   ✓ JokeFolder.jokes                    → inverse of CD_folder")
+        print("   ✓ ImportedJokeMetadata.batch           → CD_ImportedJokeMetadata.CD_batch (REFERENCE)")
+        print("   ✓ UnresolvedImportFragment.batch       → CD_UnresolvedImportFragment.CD_batch (REFERENCE)")
+        print("   ✓ ImportBatch.importedRecords          → cascade, inverse of CD_batch")
+        print("   ✓ ImportBatch.unresolvedFragments      → cascade, inverse of CD_batch")
     }
 }
 #endif

@@ -19,7 +19,7 @@ final class RoastTarget: Identifiable {
     var dateCreated: Date = Date()
     var dateModified: Date = Date()
 
-    @Relationship(deleteRule: .cascade)
+    @Relationship(deleteRule: .cascade, inverse: \RoastJoke.target)
     var jokes: [RoastJoke]?
 
     /// Convenience: sorted jokes, newest first

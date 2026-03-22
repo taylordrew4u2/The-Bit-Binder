@@ -7,16 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		BA859D962F6CF69600B61B1B /* bu.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = BA859D8E2F6CF69600B61B1B /* bu.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BAD6B2CE2F6F753E00A09B53 /* bit.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = BAD6B2C62F6F753E00A09B53 /* bit.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		BA859D942F6CF69600B61B1B /* PBXContainerItemProxy */ = {
+		BAD6B2CC2F6F753E00A09B53 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BAB3D0492EDF80F5007295C1 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = BA859D8D2F6CF69600B61B1B;
-			remoteInfo = bu;
+			remoteGlobalIDString = BAD6B2C52F6F753E00A09B53;
+			remoteInfo = bit;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -27,7 +27,7 @@
 			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
 			dstSubfolderSpec = 16;
 			files = (
-				BA859D962F6CF69600B61B1B /* bu.appex in Embed ExtensionKit Extensions */,
+				BAD6B2CE2F6F753E00A09B53 /* bit.appex in Embed ExtensionKit Extensions */,
 			);
 			name = "Embed ExtensionKit Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -35,18 +35,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		BA859D8E2F6CF69600B61B1B /* bu.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = bu.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BAB3D0522EDF80F5007295C1 /* thebitbinder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = thebitbinder.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BAD6B2C62F6F753E00A09B53 /* bit.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = bit.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		BA859D9A2F6CF69600B61B1B /* Exceptions for "bu" folder in "bu" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = BA859D8D2F6CF69600B61B1B /* bu */;
-		};
 		BAB3D05F2EDF80F6007295C1 /* Exceptions for "thebitbinder" folder in "thebitbinder" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -54,17 +47,16 @@
 			);
 			target = BAB3D0512EDF80F5007295C1 /* thebitbinder */;
 		};
+		BAD6B2D22F6F753E00A09B53 /* Exceptions for "bit" folder in "bit" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = BAD6B2C52F6F753E00A09B53 /* bit */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		BA859D8F2F6CF69600B61B1B /* bu */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				BA859D9A2F6CF69600B61B1B /* Exceptions for "bu" folder in "bu" target */,
-			);
-			path = bu;
-			sourceTree = "<group>";
-		};
 		BAB3D0542EDF80F5007295C1 /* thebitbinder */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -73,17 +65,25 @@
 			path = thebitbinder;
 			sourceTree = "<group>";
 		};
+		BAD6B2C72F6F753E00A09B53 /* bit */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BAD6B2D22F6F753E00A09B53 /* Exceptions for "bit" folder in "bit" target */,
+			);
+			path = bit;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		BA859D8B2F6CF69600B61B1B /* Frameworks */ = {
+		BAB3D04F2EDF80F5007295C1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BAB3D04F2EDF80F5007295C1 /* Frameworks */ = {
+		BAD6B2C32F6F753E00A09B53 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -97,7 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				BAB3D0542EDF80F5007295C1 /* thebitbinder */,
-				BA859D8F2F6CF69600B61B1B /* bu */,
+				BAD6B2C72F6F753E00A09B53 /* bit */,
 				BAB3D0532EDF80F5007295C1 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -106,7 +106,7 @@
 			isa = PBXGroup;
 			children = (
 				BAB3D0522EDF80F5007295C1 /* thebitbinder.app */,
-				BA859D8E2F6CF69600B61B1B /* bu.appex */,
+				BAD6B2C62F6F753E00A09B53 /* bit.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -114,28 +114,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		BA859D8D2F6CF69600B61B1B /* bu */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = BA859D972F6CF69600B61B1B /* Build configuration list for PBXNativeTarget "bu" */;
-			buildPhases = (
-				BA859D8A2F6CF69600B61B1B /* Sources */,
-				BA859D8B2F6CF69600B61B1B /* Frameworks */,
-				BA859D8C2F6CF69600B61B1B /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				BA859D8F2F6CF69600B61B1B /* bu */,
-			);
-			name = bu;
-			packageProductDependencies = (
-			);
-			productName = bu;
-			productReference = BA859D8E2F6CF69600B61B1B /* bu.appex */;
-			productType = "com.apple.product-type.extensionkit-extension";
-		};
 		BAB3D0512EDF80F5007295C1 /* thebitbinder */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = BAB3D0602EDF80F6007295C1 /* Build configuration list for PBXNativeTarget "thebitbinder" */;
@@ -148,7 +126,7 @@
 			buildRules = (
 			);
 			dependencies = (
-				BA859D952F6CF69600B61B1B /* PBXTargetDependency */,
+				BAD6B2CD2F6F753E00A09B53 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				BAB3D0542EDF80F5007295C1 /* thebitbinder */,
@@ -160,6 +138,28 @@
 			productReference = BAB3D0522EDF80F5007295C1 /* thebitbinder.app */;
 			productType = "com.apple.product-type.application";
 		};
+		BAD6B2C52F6F753E00A09B53 /* bit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BAD6B2CF2F6F753E00A09B53 /* Build configuration list for PBXNativeTarget "bit" */;
+			buildPhases = (
+				BAD6B2C22F6F753E00A09B53 /* Sources */,
+				BAD6B2C32F6F753E00A09B53 /* Frameworks */,
+				BAD6B2C42F6F753E00A09B53 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BAD6B2C72F6F753E00A09B53 /* bit */,
+			);
+			name = bit;
+			packageProductDependencies = (
+			);
+			productName = bit;
+			productReference = BAD6B2C62F6F753E00A09B53 /* bit.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -170,11 +170,11 @@
 				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
-					BA859D8D2F6CF69600B61B1B = {
-						CreatedOnToolsVersion = 26.3;
-					};
 					BAB3D0512EDF80F5007295C1 = {
 						CreatedOnToolsVersion = 16.2;
+					};
+					BAD6B2C52F6F753E00A09B53 = {
+						CreatedOnToolsVersion = 26.3;
 					};
 				};
 			};
@@ -195,20 +195,20 @@
 			projectRoot = "";
 			targets = (
 				BAB3D0512EDF80F5007295C1 /* thebitbinder */,
-				BA859D8D2F6CF69600B61B1B /* bu */,
+				BAD6B2C52F6F753E00A09B53 /* bit */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		BA859D8C2F6CF69600B61B1B /* Resources */ = {
+		BAB3D0502EDF80F5007295C1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BAB3D0502EDF80F5007295C1 /* Resources */ = {
+		BAD6B2C42F6F753E00A09B53 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -218,14 +218,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		BA859D8A2F6CF69600B61B1B /* Sources */ = {
+		BAB3D04E2EDF80F5007295C1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BAB3D04E2EDF80F5007295C1 /* Sources */ = {
+		BAD6B2C22F6F753E00A09B53 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -235,79 +235,14 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		BA859D952F6CF69600B61B1B /* PBXTargetDependency */ = {
+		BAD6B2CD2F6F753E00A09B53 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = BA859D8D2F6CF69600B61B1B /* bu */;
-			targetProxy = BA859D942F6CF69600B61B1B /* PBXContainerItemProxy */;
+			target = BAD6B2C52F6F753E00A09B53 /* bit */;
+			targetProxy = BAD6B2CC2F6F753E00A09B53 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		BA859D982F6CF69600B61B1B /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = bu/bu.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
-				DEVELOPMENT_TEAM = R44WG942GS;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = bu/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = bu;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 9.4;
-				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder.bu";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		BA859D992F6CF69600B61B1B /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = bu/bu.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
-				DEVELOPMENT_TEAM = R44WG942GS;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = bu/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = bu;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 9.4;
-				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder.bu";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
 		BAB3D0612EDF80F6007295C1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -350,7 +285,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 9.4;
-				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder";
+				PRODUCT_BUNDLE_IDENTIFIER = 666bit;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator maccatalyst";
@@ -403,7 +338,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 9.4;
-				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder";
+				PRODUCT_BUNDLE_IDENTIFIER = 666bit;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator maccatalyst";
@@ -534,18 +469,74 @@
 			};
 			name = Release;
 		};
+		BAD6B2D02F6F753E00A09B53 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = bit/bit.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				DEVELOPMENT_TEAM = R44WG942GS;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = bit/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = bit;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 9.4;
+				PRODUCT_BUNDLE_IDENTIFIER = 666bit.bit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BAD6B2D12F6F753E00A09B53 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = bit/bit.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				DEVELOPMENT_TEAM = R44WG942GS;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = bit/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = bit;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 9.4;
+				PRODUCT_BUNDLE_IDENTIFIER = 666bit.bit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		BA859D972F6CF69600B61B1B /* Build configuration list for PBXNativeTarget "bu" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				BA859D982F6CF69600B61B1B /* Debug */,
-				BA859D992F6CF69600B61B1B /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		BAB3D04C2EDF80F5007295C1 /* Build configuration list for PBXProject "thebitbinder" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -560,6 +551,15 @@
 			buildConfigurations = (
 				BAB3D0612EDF80F6007295C1 /* Debug */,
 				BAB3D0622EDF80F6007295C1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BAD6B2CF2F6F753E00A09B53 /* Build configuration list for PBXNativeTarget "bit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BAD6B2D02F6F753E00A09B53 /* Debug */,
+				BAD6B2D12F6F753E00A09B53 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

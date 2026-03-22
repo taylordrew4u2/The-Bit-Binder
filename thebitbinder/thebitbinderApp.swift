@@ -206,16 +206,22 @@ struct thebitbinderApp: App {
         }
     }
     
-    /// Aggressive CloudKit cleanup to delete corrupted records
+    /// One-time CloudKit cleanup — deletes the corrupted zone so CoreData
+    /// can re-export every local record with correct REFERENCE fields.
     private func performAggressiveCloudKitCleanup() async {
-        print("🚨 [CloudKit] Starting aggressive cleanup of corrupted records...")
+        let key = CloudKitResetUtility.cleanupVersionKey
+        guard !UserDefaults.standard.bool(forKey: key) else {
+            print("✅ [CloudKit] Schema cleanup already completed (\(key))")
+            return
+        }
+        
+        print("🚨 [CloudKit] Starting schema-mismatch repair...")
         
         do {
-            // Delete ALL CD_Joke records from CloudKit to fix schema mismatch
-            try await CloudKitResetUtility.deleteCorruptedJokeRecords()
-            print("✅ [CloudKit] Corrupted joke records deleted successfully")
+            try await CloudKitResetUtility.repairCorruptedZone()
+            print("✅ [CloudKit] Schema repair succeeded")
         } catch {
-            print("⚠️ [CloudKit] Cleanup error: \(error.localizedDescription)")
+            print("⚠️ [CloudKit] Repair error (will retry next launch): \(error.localizedDescription)")
         }
     }
 }

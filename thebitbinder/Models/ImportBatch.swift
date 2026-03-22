@@ -4,7 +4,6 @@ import SwiftData
 @Model
 final class ImportBatch: Identifiable {
     var id: UUID = UUID()
-    var entityName: String = "ImportBatch"  // Required to match CD_entityName in CloudKit schema
     var sourceFileName: String = ""
     var importTimestamp: Date = Date()
     var totalSegments: Int = 0

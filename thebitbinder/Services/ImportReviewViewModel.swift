@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-/// ViewModel for managing import review flow
+/// ViewModel for managing import review flow — joke-by-joke
 @MainActor
 final class ImportReviewViewModel: ObservableObject {
     
@@ -38,6 +38,25 @@ final class ImportReviewViewModel: ObservableObject {
     
     // MARK: - Initialization
     
+    /// Load ALL jokes (auto-saved + review queue) so the user sees everything
+    func loadAllItems(from result: ImportPipelineResult) {
+        let allJokes = result.autoSavedJokes + result.reviewQueueJokes
+        self.reviewItems = allJokes.map { joke in
+            ImportReviewItem(
+                id: joke.id,
+                originalJoke: joke,
+                editedTitle: joke.title ?? "",
+                editedBody: joke.body,
+                editedTags: joke.tags,
+                action: .pending,
+                splitPoints: [],
+                mergeWithNext: false
+            )
+        }
+        self.currentIndex = 0
+    }
+    
+    /// Load only review-queue items (original behavior)
     func loadReviewItems(from result: ImportPipelineResult) {
         self.reviewItems = result.reviewQueueJokes.map { joke in
             ImportReviewItem(
@@ -47,11 +66,10 @@ final class ImportReviewViewModel: ObservableObject {
                 editedBody: joke.body,
                 editedTags: joke.tags,
                 action: .pending,
-                splitPoints: [], // Could be populated if we support splitting in review
+                splitPoints: [],
                 mergeWithNext: false
             )
         }
-        
         self.currentIndex = 0
     }
     
@@ -77,107 +95,52 @@ final class ImportReviewViewModel: ObservableObject {
     // MARK: - Review Actions
     
     func approveCurrentItem() {
-        guard let item = currentItem else { return }
-        
-        // Update the item with user edits
-        reviewItems[currentIndex] = ImportReviewItem(
-            id: item.id,
-            originalJoke: item.originalJoke,
-            editedTitle: item.editedTitle,
-            editedBody: item.editedBody,
-            editedTags: item.editedTags,
-            action: .approved,
-            splitPoints: item.splitPoints,
-            mergeWithNext: item.mergeWithNext
-        )
-        
-        // Auto-advance to next item
-        if hasNext {
-            goToNext()
-        }
+        guard currentIndex < reviewItems.count else { return }
+        reviewItems[currentIndex].action = .approved
+        autoAdvance()
     }
     
     func rejectCurrentItem() {
-        guard let item = currentItem else { return }
-        
-        reviewItems[currentIndex] = ImportReviewItem(
-            id: item.id,
-            originalJoke: item.originalJoke,
-            editedTitle: item.editedTitle,
-            editedBody: item.editedBody,
-            editedTags: item.editedTags,
-            action: .rejected,
-            splitPoints: item.splitPoints,
-            mergeWithNext: item.mergeWithNext
-        )
-        
-        // Auto-advance to next item
-        if hasNext {
-            goToNext()
-        }
+        guard currentIndex < reviewItems.count else { return }
+        reviewItems[currentIndex].action = .rejected
+        autoAdvance()
+    }
+    
+    func sendCurrentToBrainstorm() {
+        guard currentIndex < reviewItems.count else { return }
+        reviewItems[currentIndex].action = .sendToBrainstorm
+        autoAdvance()
     }
     
     func markForSplitting() {
-        guard let item = currentItem else { return }
-        
-        reviewItems[currentIndex] = ImportReviewItem(
-            id: item.id,
-            originalJoke: item.originalJoke,
-            editedTitle: item.editedTitle,
-            editedBody: item.editedBody,
-            editedTags: item.editedTags,
-            action: .needsSplitting,
-            splitPoints: item.splitPoints,
-            mergeWithNext: item.mergeWithNext
-        )
+        guard currentIndex < reviewItems.count else { return }
+        reviewItems[currentIndex].action = .needsSplitting
     }
     
     func updateCurrentItemText(title: String, body: String, tags: [String]) {
-        guard let item = currentItem else { return }
-        
-        reviewItems[currentIndex] = ImportReviewItem(
-            id: item.id,
-            originalJoke: item.originalJoke,
-            editedTitle: title,
-            editedBody: body,
-            editedTags: tags,
-            action: item.action,
-            splitPoints: item.splitPoints,
-            mergeWithNext: item.mergeWithNext
-        )
+        guard currentIndex < reviewItems.count else { return }
+        reviewItems[currentIndex].editedTitle = title
+        reviewItems[currentIndex].editedBody = body
+        reviewItems[currentIndex].editedTags = tags
+    }
+    
+    private func autoAdvance() {
+        if hasNext {
+            currentIndex += 1
+        }
     }
     
     // MARK: - Batch Operations
     
     func approveAll() {
-        for i in 0..<reviewItems.count {
-            let item = reviewItems[i]
-            reviewItems[i] = ImportReviewItem(
-                id: item.id,
-                originalJoke: item.originalJoke,
-                editedTitle: item.editedTitle,
-                editedBody: item.editedBody,
-                editedTags: item.editedTags,
-                action: .approved,
-                splitPoints: item.splitPoints,
-                mergeWithNext: item.mergeWithNext
-            )
+        for i in 0..<reviewItems.count where reviewItems[i].action == .pending {
+            reviewItems[i].action = .approved
         }
     }
     
     func rejectAll() {
-        for i in 0..<reviewItems.count {
-            let item = reviewItems[i]
-            reviewItems[i] = ImportReviewItem(
-                id: item.id,
-                originalJoke: item.originalJoke,
-                editedTitle: item.editedTitle,
-                editedBody: item.editedBody,
-                editedTags: item.editedTags,
-                action: .rejected,
-                splitPoints: item.splitPoints,
-                mergeWithNext: item.mergeWithNext
-            )
+        for i in 0..<reviewItems.count where reviewItems[i].action == .pending {
+            reviewItems[i].action = .rejected
         }
     }
     
@@ -200,11 +163,16 @@ final class ImportReviewViewModel: ObservableObject {
             item.action == .pending ? item.originalJoke : nil
         }
         
+        let brainstorm = reviewItems.compactMap { item in
+            item.action == .sendToBrainstorm ? item : nil
+        }
+        
         return ImportReviewResults(
             approvedJokes: approved,
             rejectedJokes: rejected,
             jokesNeedingSplitting: needsSplitting,
-            pendingJokes: pending
+            pendingJokes: pending,
+            brainstormItems: brainstorm
         )
     }
     
@@ -215,10 +183,15 @@ final class ImportReviewViewModel: ObservableObject {
     var summaryText: String {
         let approved = reviewItems.filter { $0.action == .approved }.count
         let rejected = reviewItems.filter { $0.action == .rejected }.count
-        let splitting = reviewItems.filter { $0.action == .needsSplitting }.count
+        let brainstorm = reviewItems.filter { $0.action == .sendToBrainstorm }.count
         let pending = reviewItems.filter { $0.action == .pending }.count
         
-        return "Approved: \(approved), Rejected: \(rejected), Splitting: \(splitting), Pending: \(pending)"
+        var parts: [String] = []
+        if approved > 0 { parts.append("✅ \(approved)") }
+        if rejected > 0 { parts.append("❌ \(rejected)") }
+        if brainstorm > 0 { parts.append("💡 \(brainstorm)") }
+        if pending > 0 { parts.append("⏳ \(pending)") }
+        return parts.joined(separator: "  ")
     }
 }
 
@@ -250,16 +223,16 @@ struct ImportReviewItem: Identifiable {
             body: editedBody,
             rawSourceText: originalJoke.rawSourceText,
             tags: editedTags,
-            confidence: .medium, // User review brings confidence to medium
+            confidence: .medium,
             confidenceFactors: ConfidenceFactors(
                 extractionQuality: originalJoke.confidenceFactors.extractionQuality,
-                structuralCleanliness: 0.8, // Improved by user review
+                structuralCleanliness: 0.8,
                 titleDetection: editedTitle.isEmpty ? 0.3 : 0.9,
                 boundaryClarity: originalJoke.confidenceFactors.boundaryClarity,
                 ocrConfidence: originalJoke.confidenceFactors.ocrConfidence
             ),
             sourceMetadata: originalJoke.sourceMetadata,
-            validationResult: .singleJoke, // Validated by user
+            validationResult: .singleJoke,
             extractionMethod: originalJoke.extractionMethod
         )
     }
@@ -270,6 +243,7 @@ enum ReviewAction {
     case approved
     case rejected
     case needsSplitting
+    case sendToBrainstorm
 }
 
 struct ImportReviewResults {
@@ -277,9 +251,10 @@ struct ImportReviewResults {
     let rejectedJokes: [ImportedJoke]
     let jokesNeedingSplitting: [ImportedJoke]
     let pendingJokes: [ImportedJoke]
+    let brainstormItems: [ImportReviewItem]
     
     var totalCount: Int {
-        approvedJokes.count + rejectedJokes.count + jokesNeedingSplitting.count + pendingJokes.count
+        approvedJokes.count + rejectedJokes.count + jokesNeedingSplitting.count + pendingJokes.count + brainstormItems.count
     }
     
     var isComplete: Bool {

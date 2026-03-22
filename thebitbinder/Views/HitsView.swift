@@ -79,6 +79,7 @@ struct HitsView: View {
                             NavigationLink(destination: JokeDetailView(joke: joke)) {
                                 JokeCardView(joke: joke)
                             }
+                            .aspectRatio(1, contentMode: .fit) // Ensure square cells
                             .contextMenu {
                                 Button {
                                     joke.isHit = false

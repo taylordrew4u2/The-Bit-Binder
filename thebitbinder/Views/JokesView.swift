@@ -76,6 +76,14 @@ struct JokesView: View {
     @State private var importFileCount = 0
     @State private var importFileIndex = 0
     
+    // Smart import review
+    @State private var smartImportResult: ImportPipelineResult?
+    @State private var showingSmartImportReview = false
+    
+    // Batch select/delete mode
+    @State private var isSelectMode = false
+    @State private var selectedJokeIDs: Set<UUID> = []
+    
     // Performance: Debounced search and cached filtered results
     @State private var debouncedSearchText = ""
     @State private var searchDebounceTask: Task<Void, Never>?
@@ -399,6 +407,18 @@ struct JokesView: View {
                 .sheet(isPresented: $showingImportHistory) {
                     ImportBatchHistoryView()
                 }
+                .fullScreenCover(isPresented: $showingSmartImportReview) {
+                    if let result = smartImportResult {
+                        SmartImportReviewView(
+                            importResult: result,
+                            selectedFolder: selectedFolder,
+                            onComplete: {
+                                showingSmartImportReview = false
+                                smartImportResult = nil
+                            }
+                        )
+                    }
+                }
                 .modifier(JokesAlertsModifier(
                     showingExportAlert: $showingExportAlert,
                     showingImportSummary: $showingImportSummary,
@@ -478,14 +498,19 @@ struct JokesView: View {
                             ScrollView {
                                 LazyVGrid(columns: jokesColumns, spacing: 10) {
                                     ForEach(filteredJokes) { joke in
-                                        NavigationLink(destination: JokeDetailView(joke: joke)) {
-                                            JokeCardView(joke: joke, scale: CGFloat(jokesGridScale))
-                                        }
-                                        .contextMenu {
-                                            Button(role: .destructive) {
-                                                joke.moveToTrash()
-                                            } label: {
-                                                Label("Delete Joke", systemImage: "trash")
+                                        if isSelectMode {
+                                            jokeGridSelectableCard(joke: joke)
+                                        } else {
+                                            NavigationLink(destination: JokeDetailView(joke: joke)) {
+                                                JokeCardView(joke: joke, scale: CGFloat(jokesGridScale))
+                                            }
+                                            .aspectRatio(1, contentMode: .fit)
+                                            .contextMenu {
+                                                Button(role: .destructive) {
+                                                    joke.moveToTrash()
+                                                } label: {
+                                                    Label("Delete Joke", systemImage: "trash")
+                                                }
                                             }
                                         }
                                     }
@@ -498,11 +523,15 @@ struct JokesView: View {
                     } else {
                         List {
                             ForEach(filteredJokes) { joke in
-                                NavigationLink(destination: JokeDetailView(joke: joke)) {
-                                    JokeRowView(joke: joke)
-                                        .id(joke.id)
+                                if isSelectMode {
+                                    jokeListSelectableRow(joke: joke)
+                                } else {
+                                    NavigationLink(destination: JokeDetailView(joke: joke)) {
+                                        JokeRowView(joke: joke)
+                                            .id(joke.id)
+                                    }
+                                    .listRowSeparator(.hidden)
                                 }
-                                .listRowSeparator(.hidden)
                             }
                             .onDelete(perform: deleteJokes)
                         }
@@ -510,8 +539,109 @@ struct JokesView: View {
                         .scrollContentBackground(.hidden)
                     }
                 }
+                
+                // Batch action bar
+                if isSelectMode {
+                    batchActionBar
+                }
             }
         }
+    }
+    
+    // MARK: - Batch Select Mode Views
+    
+    @ViewBuilder
+    private func jokeGridSelectableCard(joke: Joke) -> some View {
+        let isSelected = selectedJokeIDs.contains(joke.id)
+        Button {
+            toggleSelection(joke)
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                JokeCardView(joke: joke, scale: CGFloat(jokesGridScale))
+                    .opacity(isSelected ? 0.7 : 1.0)
+                
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
+                    .padding(6)
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .buttonStyle(.plain)
+    }
+    
+    @ViewBuilder
+    private func jokeListSelectableRow(joke: Joke) -> some View {
+        let isSelected = selectedJokeIDs.contains(joke.id)
+        Button {
+            toggleSelection(joke)
+        } label: {
+            HStack {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
+                
+                JokeRowView(joke: joke)
+            }
+        }
+        .listRowSeparator(.hidden)
+        .buttonStyle(.plain)
+    }
+    
+    private var batchActionBar: some View {
+        HStack(spacing: 16) {
+            Button {
+                selectedJokeIDs = Set(filteredJokes.map(\.id))
+            } label: {
+                Text("Select All")
+                    .font(.subheadline)
+            }
+            
+            Spacer()
+            
+            Text("\(selectedJokeIDs.count) selected")
+                .font(.subheadline.bold())
+                .foregroundColor(AppTheme.Colors.textSecondary)
+            
+            Spacer()
+            
+            Button(role: .destructive) {
+                batchTrashSelected()
+            } label: {
+                Label("Trash", systemImage: "trash")
+                    .font(.subheadline.bold())
+            }
+            .disabled(selectedJokeIDs.isEmpty)
+            .tint(.red)
+            
+            Button {
+                isSelectMode = false
+                selectedJokeIDs.removeAll()
+            } label: {
+                Text("Done")
+                    .font(.subheadline.bold())
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(AppTheme.Colors.surfaceElevated.shadow(.drop(radius: 4, y: -2)))
+    }
+    
+    private func toggleSelection(_ joke: Joke) {
+        if selectedJokeIDs.contains(joke.id) {
+            selectedJokeIDs.remove(joke.id)
+        } else {
+            selectedJokeIDs.insert(joke.id)
+        }
+    }
+    
+    private func batchTrashSelected() {
+        for joke in jokes where selectedJokeIDs.contains(joke.id) {
+            joke.moveToTrash()
+        }
+        selectedJokeIDs.removeAll()
+        isSelectMode = false
+        try? modelContext.save()
     }
 
     @ToolbarContentBuilder
@@ -550,6 +680,14 @@ struct JokesView: View {
                         Button(action: { expandAllJokes.toggle() }) {
                             Label(expandAllJokes ? "Collapse Content" : "Expand Content", systemImage: expandAllJokes ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
                         }
+                        Divider()
+                        Button(action: {
+                            isSelectMode.toggle()
+                            if !isSelectMode { selectedJokeIDs.removeAll() }
+                        }) {
+                            Label(isSelectMode ? "Cancel Selection" : "Select Multiple", systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
+                        }
+                        Divider()
                         Menu {
                             Button(action: exportJokesToPDF) {
                                 Label("Export Jokes", systemImage: "doc.text")
@@ -849,168 +987,110 @@ struct JokesView: View {
     }
     
     private func processDocuments(_ urls: [URL]) {
-        print("📂📂📂 IMPORT START: \(urls.count) files selected")
+        print("📂📂📂 SMART IMPORT START: \(urls.count) files selected")
         isProcessingImages = true
         importedJokeNames = []
-        importStatusMessage = "Starting import..."
+        importStatusMessage = "Analyzing file..."
         importFileCount = urls.count
         importFileIndex = 0
         
         Task {
-            var totalAdded = 0
-            var skipped = 0
-            var duplicates: [String] = []
+            // For multi-file imports, we combine results from all files
+            var combinedAutoSaved: [ImportedJoke] = []
+            var combinedReview: [ImportedJoke] = []
+            var combinedRejected: [LayoutBlock] = []
+            var sourceFile = ""
             
             for url in urls {
                 await MainActor.run {
                     importFileIndex += 1
-                    importStatusMessage = "Reading \(url.lastPathComponent)..."
+                    importStatusMessage = "Analyzing \(url.lastPathComponent)..."
                 }
                 
-                print("📂 IMPORT: Processing \(url.lastPathComponent)")
-                
                 do {
-                    let batch = try await FileImportService.shared.importBatch(from: url)
-                    let persistedBatch = ImportBatch(
-                        sourceFileName: batch.sourceFileName,
-                        importTimestamp: batch.importTimestamp,
-                        totalSegments: batch.stats.totalSegments,
-                        totalImportedRecords: batch.stats.totalImportedRecords,
-                        unresolvedFragmentCount: batch.stats.unresolvedFragmentCount,
-                        highConfidenceBoundaries: batch.stats.highConfidenceBoundaries,
-                        mediumConfidenceBoundaries: batch.stats.mediumConfidenceBoundaries,
-                        lowConfidenceBoundaries: batch.stats.lowConfidenceBoundaries
-                    )
-                    await MainActor.run {
-                        self.modelContext.insert(persistedBatch)
-                    }
-                    var persistedUnresolvedForBatch: [UnresolvedImportFragment] = []
-                     
-                    await MainActor.run {
-                        importStatusMessage = "Adding \(batch.importedRecords.count) imported items..."
-                    }
+                    let result = try await FileImportService.shared.importWithPipeline(from: url)
+                    combinedAutoSaved.append(contentsOf: result.autoSavedJokes)
+                    combinedReview.append(contentsOf: result.reviewQueueJokes)
+                    combinedRejected.append(contentsOf: result.rejectedBlocks)
+                    sourceFile = result.sourceFile
                     
-                    // Performance: Batch all insertions for this file
-                    for record in batch.importedRecords.sorted(by: { $0.sourceOrder < $1.sourceOrder }) {
-                        let combinedContent = [record.body, record.notes]
-                            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-                            .joined(separator: record.notes.isEmpty ? "" : "\n\nNotes:\n")
-                        let content = combinedContent.isEmpty ? record.rawSourceText : combinedContent
-                        let title = record.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            ? String(content.prefix(60))
-                            : record.title
-                        
-                        if isLikelyDuplicate(content, title: title) {
-                            duplicates.append("\(title) — duplicate")
-                            skipped += 1
-                            continue
-                        }
-                        
-                        await MainActor.run {
-                            let joke = Joke(content: content, title: title, folder: self.selectedFolder)
-                            joke.tags = record.tags
-                            joke.category = record.tags.first
-                            self.modelContext.insert(joke)
-                            
-                            let metadata = ImportedJokeMetadata(
-                                jokeID: joke.id,
-                                title: record.title,
-                                rawSourceText: record.rawSourceText,
-                                notes: record.notes,
-                                confidence: record.confidence.rawValue,
-                                sourceOrder: record.sourceOrder,
-                                sourcePage: record.sourcePage,
-                                tags: record.tags,
-                                parsingFlagsJSON: encodeParsingFlags(record.parsingFlags),
-                                sourceFilename: record.sourceFilename,
-                                importTimestamp: record.importTimestamp,
-                                batch: persistedBatch
-                            )
-                            self.modelContext.insert(metadata)
-                            
-                            self.importedJokeNames.append(title)
-                            self.importStatusMessage = "Added \(self.importedJokeNames.count) jokes..."
-                        }
-                        totalAdded += 1
-                    }
-                    
-                    for unresolved in batch.unresolvedFragments where !unresolved.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        let title = unresolved.titleCandidate ?? String(unresolved.text.prefix(40))
-                        if isLikelyDuplicate(unresolved.text, title: title) {
-                            skipped += 1
-                            continue
-                        }
-                        await MainActor.run {
-                            let joke = Joke(content: unresolved.text, title: title, folder: self.selectedFolder)
-                            joke.tags = unresolved.tags
-                            self.modelContext.insert(joke)
-                            
-                            let metadata = ImportedJokeMetadata(
-                                jokeID: joke.id,
-                                title: title,
-                                rawSourceText: unresolved.text,
-                                notes: unresolved.normalizedText,
-                                confidence: unresolved.confidence.rawValue,
-                                sourceOrder: unresolved.sourceLocation.orderIndex,
-                                sourcePage: unresolved.sourceLocation.pageNumber,
-                                tags: unresolved.tags,
-                                parsingFlagsJSON: encodeParsingFlags(unresolved.parsingFlags),
-                                sourceFilename: unresolved.sourceLocation.fileName,
-                                importTimestamp: Date(),
-                                batch: persistedBatch
-                            )
-                            self.modelContext.insert(metadata)
-                            
-                            let unresolvedModel = UnresolvedImportFragment(
-                                text: unresolved.text,
-                                normalizedText: unresolved.normalizedText,
-                                kind: unresolved.kind.rawValue,
-                                confidence: unresolved.confidence.rawValue,
-                                sourceOrder: unresolved.sourceLocation.orderIndex,
-                                sourcePage: unresolved.sourceLocation.pageNumber,
-                                sourceFilename: unresolved.sourceLocation.fileName,
-                                titleCandidate: unresolved.titleCandidate,
-                                tags: unresolved.tags,
-                                parsingFlagsJSON: encodeParsingFlags(unresolved.parsingFlags),
-                                createdAt: Date(),
-                                isResolved: false,
-                                batch: persistedBatch
-                            )
-                            self.modelContext.insert(unresolvedModel)
-                            persistedUnresolvedForBatch.append(unresolvedModel)
-                            
-                            self.importedJokeNames.append(title)
-                        }
-                        totalAdded += 1
-                    }
-                    
-                    // Performance: Save all records for this file in one batch
                     await MainActor.run {
-                        try? self.modelContext.save()
-                        unresolvedImportFragments.append(contentsOf: persistedUnresolvedForBatch)
-                        if !persistedUnresolvedForBatch.isEmpty {
-                            showingReviewSheet = true
-                        }
+                        importStatusMessage = "Found \(result.autoSavedJokes.count + result.reviewQueueJokes.count) potential jokes..."
                     }
                 } catch {
-                    print("❌ IMPORT: Local batch import failed for \(url.lastPathComponent): \(error)")
-                    let rawText = await readTextFromFile(url: url)
-                    if let text = rawText {
-                        await processLegacyTextImport(text, totalAdded: &totalAdded, skipped: &skipped, duplicates: &duplicates)
+                    print("❌ IMPORT: Pipeline failed for \(url.lastPathComponent): \(error)")
+                    // Fallback: try reading raw text and running through splitter
+                    if let text = await readTextFromFile(url: url) {
+                        let chunks = SmartTextSplitter.split(text)
+                        for (i, chunk) in chunks.enumerated() {
+                            let joke = ImportedJoke(
+                                title: nil,
+                                body: chunk,
+                                rawSourceText: chunk,
+                                tags: [],
+                                confidence: .medium,
+                                confidenceFactors: ConfidenceFactors(
+                                    extractionQuality: 0.6,
+                                    structuralCleanliness: 0.6,
+                                    titleDetection: 0.3,
+                                    boundaryClarity: 0.5,
+                                    ocrConfidence: 1.0
+                                ),
+                                sourceMetadata: ImportSourceMetadata(
+                                    fileName: url.lastPathComponent,
+                                    pageNumber: 1,
+                                    orderInPage: i,
+                                    orderInFile: i,
+                                    boundingBox: nil,
+                                    importTimestamp: Date()
+                                ),
+                                validationResult: .requiresReview(reasons: ["Fallback extraction"]),
+                                extractionMethod: .documentText
+                            )
+                            combinedReview.append(joke)
+                        }
+                        sourceFile = url.lastPathComponent
                     }
                 }
             }
             
+            // Build combined result
+            let combinedResult = ImportPipelineResult(
+                sourceFile: sourceFile,
+                autoSavedJokes: combinedAutoSaved,
+                reviewQueueJokes: combinedReview,
+                rejectedBlocks: combinedRejected,
+                pipelineStats: PipelineStats(
+                    totalPagesProcessed: 0,
+                    totalLinesExtracted: 0,
+                    totalBlocksCreated: combinedAutoSaved.count + combinedReview.count,
+                    autoSavedCount: combinedAutoSaved.count,
+                    reviewQueueCount: combinedReview.count,
+                    rejectedCount: combinedRejected.count,
+                    extractionMethod: .documentText,
+                    processingTimeSeconds: 0,
+                    averageConfidence: 0.7
+                ),
+                debugInfo: nil
+            )
+            
             await MainActor.run {
-                self.importStatusMessage = ""
                 self.isProcessingImages = false
-                self.importSummary = (totalAdded, skipped)
-                self.showingImportSummary = true
-                self.possibleDuplicates = duplicates
+                self.importStatusMessage = ""
                 self.importedJokeNames = []
                 self.importFileCount = 0
                 self.importFileIndex = 0
-                print("🏁 IMPORT DONE: Added \(totalAdded), skipped \(skipped)")
+                
+                let totalJokes = combinedAutoSaved.count + combinedReview.count
+                if totalJokes > 0 {
+                    // Show the Smart Import Review for ALL jokes — let user decide
+                    self.smartImportResult = combinedResult
+                    self.showingSmartImportReview = true
+                } else {
+                    // Nothing found
+                    self.importSummary = (0, 0)
+                    self.showingImportSummary = true
+                }
             }
         }
     }
@@ -1454,53 +1534,61 @@ struct JokeCardView: View {
     var scale: CGFloat = 1.0
     @AppStorage("expandAllJokes") private var expandAllJokes = false
 
-    private var titleSize: CGFloat { max(9, 14 * scale) }
-    private var bodySize: CGFloat  { max(8,  12 * scale) }
-    private var metaSize: CGFloat  { max(7,  9 * scale) }
-    private var cardMinHeight: CGFloat { max(100, 180 * scale) }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: max(4, 12 * scale)) {
-            // Title
-            Text(joke.title)
-                .font(.system(size: titleSize, weight: .bold, design: .serif))
-                .foregroundColor(AppTheme.Colors.inkBlack)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+        GeometryReader { geometry in
+            let size = geometry.size.width // Square: use width for both dimensions
+            let padding = max(8, size * 0.08)
+            let titleSize = max(10, size * 0.09)
+            let bodySize = max(9, size * 0.075)
+            let metaSize = max(7, size * 0.055)
+            let spacing = max(4, size * 0.04)
+            
+            VStack(alignment: .leading, spacing: spacing) {
+                // Title - auto-scales with card size
+                Text(joke.title)
+                    .font(.system(size: titleSize, weight: .bold, design: .serif))
+                    .foregroundColor(AppTheme.Colors.inkBlack)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            // Content preview
-            Text(joke.content)
-                .font(.system(size: bodySize))
-                .foregroundColor(AppTheme.Colors.textSecondary)
-                .lineLimit(expandAllJokes ? nil : max(2, Int(5 * scale)))
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // Content preview - fills available space
+                Text(joke.content)
+                    .font(.system(size: bodySize))
+                    .foregroundColor(AppTheme.Colors.textSecondary)
+                    .lineLimit(expandAllJokes ? nil : max(3, Int(size / 25)))
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
 
-            // Footer
-            HStack(spacing: 8) {
-                if let folder = joke.folder {
-                    HStack(spacing: 4) {
-                        Image(systemName: "folder.fill")
-                            .font(.system(size: max(6, 7 * scale)))
-                        Text(folder.name)
-                            .font(.system(size: metaSize, weight: .medium))
+                // Footer - compact at bottom
+                HStack(spacing: 4) {
+                    if let folder = joke.folder {
+                        HStack(spacing: 2) {
+                            Image(systemName: "folder.fill")
+                                .font(.system(size: max(6, metaSize * 0.8)))
+                            Text(folder.name)
+                                .font(.system(size: metaSize, weight: .medium))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(AppTheme.Colors.jokesAccent)
+                        .padding(.horizontal, max(4, padding * 0.5))
+                        .padding(.vertical, max(2, padding * 0.25))
+                        .background(Capsule().fill(AppTheme.Colors.jokesAccent.opacity(0.1)))
                     }
-                    .foregroundColor(AppTheme.Colors.jokesAccent)
-                    .padding(.horizontal, max(4, 8 * scale))
-                    .padding(.vertical, max(2, 4 * scale))
-                    .background(Capsule().fill(AppTheme.Colors.jokesAccent.opacity(0.1)))
+                    Spacer()
+                    Text(joke.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
+                        .font(.system(size: metaSize))
+                        .foregroundColor(AppTheme.Colors.textTertiary)
                 }
-                Spacer()
-                Text(joke.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
-                    .font(.system(size: metaSize))
-                    .foregroundColor(AppTheme.Colors.textTertiary)
             }
+            .padding(padding)
+            .frame(width: size, height: size) // Force square
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(AppTheme.Colors.surfaceElevated))
+            .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
         }
-        .padding(max(8, 16 * scale))
-        .frame(minHeight: cardMinHeight)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(AppTheme.Colors.surfaceElevated))
-        .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
+        .aspectRatio(1, contentMode: .fit) // Ensure square aspect ratio
     }
 }
 

@@ -2,8 +2,14 @@ import UIKit
 import AVFoundation
 import UserNotifications
 import CloudKit
+import BackgroundTasks
 
 class AppDelegate: NSObject, UIApplicationDelegate {
+    
+    // MARK: - Background Task Identifiers (must match Info.plist BGTaskSchedulerPermittedIdentifiers)
+    static let refreshTaskIdentifier = "666bit.refresh"
+    static let syncTaskIdentifier    = "666bit.sync"
+    
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         _ = MemoryManager.shared
@@ -17,6 +23,29 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         // Required for CloudKit silent push notifications between devices
         application.registerForRemoteNotifications()
+        
+        // Register background tasks — must happen before app finishes launching
+        registerBackgroundTasks()
+        
+        // Initialize iCloud Drive ubiquity container — this registers BitBinder
+        // in Settings → iCloud → iCloud Drive so users can see it and toggle sync.
+        // Must be called on a background thread per Apple docs.
+        DispatchQueue.global(qos: .utility).async {
+            if let containerURL = FileManager.default.url(forUbiquityContainerIdentifier: "iCloud.666bit") {
+                let documentsURL = containerURL.appendingPathComponent("Documents")
+                if !FileManager.default.fileExists(atPath: documentsURL.path) {
+                    do {
+                        try FileManager.default.createDirectory(at: documentsURL, withIntermediateDirectories: true)
+                        print("✅ [iCloud Drive] Created Documents folder at: \(documentsURL.path)")
+                    } catch {
+                        print("⚠️ [iCloud Drive] Could not create Documents folder: \(error)")
+                    }
+                }
+                print("✅ [iCloud Drive] Ubiquity container initialized: \(containerURL.path)")
+            } else {
+                print("⚠️ [iCloud Drive] Ubiquity container not available (iCloud may be disabled)")
+            }
+        }
         
         // Verify iCloud account using the correct container
         Task {
@@ -87,6 +116,106 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         MemoryManager.shared.handleMemoryWarning()
     }
     
+    /// Called when the app moves to background — schedule pending background tasks.
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        scheduleBackgroundRefresh()
+        scheduleBackgroundSync()
+    }
+    
+    // MARK: - Background Task Registration
+    
+    private func registerBackgroundTasks() {
+        // App refresh task — lightweight periodic check (≤30s runtime)
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Self.refreshTaskIdentifier,
+            using: nil
+        ) { task in
+            self.handleAppRefresh(task as! BGAppRefreshTask)
+        }
+        
+        // Processing task — heavier iCloud sync work (minutes of runtime, requires power + network)
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Self.syncTaskIdentifier,
+            using: nil
+        ) { task in
+            self.handleBackgroundSync(task as! BGProcessingTask)
+        }
+        
+        print("✅ [BGTask] Registered background tasks: refresh, sync")
+    }
+    
+    // MARK: - Background Task Handlers
+    
+    private func handleAppRefresh(_ task: BGAppRefreshTask) {
+        // Schedule the next refresh before doing work
+        scheduleBackgroundRefresh()
+        
+        let refreshTask = Task {
+            // Refresh background download status
+            await MainActor.run {
+                BackgroundDownloadHandler.shared.refresh()
+            }
+            print("🔄 [BGTask] App refresh completed")
+            task.setTaskCompleted(success: true)
+        }
+        
+        task.expirationHandler = {
+            refreshTask.cancel()
+            task.setTaskCompleted(success: false)
+        }
+    }
+    
+    private func handleBackgroundSync(_ task: BGProcessingTask) {
+        // Schedule the next sync before doing work
+        scheduleBackgroundSync()
+        
+        let syncTask = Task {
+            // Trigger iCloud sync merge
+            await MainActor.run {
+                NotificationCenter.default.post(
+                    name: .NSPersistentStoreRemoteChange,
+                    object: nil
+                )
+                BackgroundDownloadHandler.shared.refresh()
+            }
+            print("🔄 [BGTask] Background sync completed")
+            task.setTaskCompleted(success: true)
+        }
+        
+        task.expirationHandler = {
+            syncTask.cancel()
+            task.setTaskCompleted(success: false)
+        }
+    }
+    
+    // MARK: - Background Task Scheduling
+    
+    private func scheduleBackgroundRefresh() {
+        let request = BGAppRefreshTaskRequest(identifier: Self.refreshTaskIdentifier)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 minutes
+        
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("📅 [BGTask] Scheduled background refresh")
+        } catch {
+            print("⚠️ [BGTask] Could not schedule refresh: \(error.localizedDescription)")
+        }
+    }
+    
+    private func scheduleBackgroundSync() {
+        let request = BGProcessingTaskRequest(identifier: Self.syncTaskIdentifier)
+        request.requiresNetworkConnectivity = true
+        request.requiresExternalPower = false
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60) // 1 hour
+        
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("📅 [BGTask] Scheduled background sync")
+        } catch {
+            print("⚠️ [BGTask] Could not schedule sync: \(error.localizedDescription)")
+        }
+    }
+    
     // MARK: - Audio Session Configuration
     
     private func configureAudioSession() {
@@ -97,7 +226,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 mode: .default,
                 options: [
                     .defaultToSpeaker,
-                    .allowBluetooth,
+                    .allowBluetoothHFP,
                     .allowBluetoothA2DP,
                     .allowAirPlay,
                     .mixWithOthers

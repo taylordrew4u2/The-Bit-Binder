@@ -87,30 +87,26 @@ final class AppStartupCoordinator: ObservableObject {
     
     // MARK: - CloudKit Cleanup
     
-    /// One-time cleanup for corrupted CloudKit records
-    /// This fixes the CD_folder STRING vs REFERENCE type mismatch
+    /// One-time cleanup for corrupted CloudKit records.
+    /// Fixes STRING-vs-REFERENCE mismatches on CD_folder, CD_batch, etc.
+    /// by deleting the entire CloudKit zone and letting CoreData re-export.
     private func cleanupCorruptedCloudKitRecords() async {
-        let cleanupKey = "CloudKitFolderSchemaCleanupCompleted_v1"
+        let key = CloudKitResetUtility.cleanupVersionKey   // "cloudkit_schema_cleanup_v2"
         
-        // Only run once
-        guard !UserDefaults.standard.bool(forKey: cleanupKey) else {
-            print("✅ [CloudKit] Schema cleanup already completed")
+        guard !UserDefaults.standard.bool(forKey: key) else {
+            print("✅ [CloudKit] Schema cleanup already completed (\(key))")
             return
         }
         
-        print("🔧 [CloudKit] Running one-time cleanup for CD_folder schema fix...")
+        print("🔧 [CloudKit] Running one-time schema-mismatch repair...")
         
         do {
-            // Delete the specific corrupted record from the error
-            try await CloudKitResetUtility.deleteCorruptedRecordFromError()
-            
-            // Mark as completed
-            UserDefaults.standard.set(true, forKey: cleanupKey)
+            try await CloudKitResetUtility.repairCorruptedZone()
+            // repairCorruptedZone sets the flag internally on success
             print("✅ [CloudKit] Schema cleanup completed successfully")
         } catch {
-            print("⚠️ [CloudKit] Cleanup error (may be already fixed): \(error.localizedDescription)")
-            // Still mark as completed to avoid repeated attempts
-            UserDefaults.standard.set(true, forKey: cleanupKey)
+            print("⚠️ [CloudKit] Cleanup error: \(error.localizedDescription)")
+            // Don't set the flag — let it retry on next launch
         }
     }
 }

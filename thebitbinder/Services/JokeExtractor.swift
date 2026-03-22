@@ -57,7 +57,7 @@ final class JokeExtractor {
     // MARK: - Title Extraction
     
     private func extractBody(from block: LayoutBlock, titleInfo: TitleInfo) -> String {
-        guard let title = titleInfo.title, let titleLineIndex = titleInfo.lineIndex else {
+        guard let _ = titleInfo.title, let titleLineIndex = titleInfo.lineIndex else {
             // No title found, use entire block as body
             return block.text
         }

@@ -23,6 +23,10 @@ struct BrainstormView: View {
     @State private var selectedIdea: BrainstormIdea?
     @State private var showEditSheet = false
     
+    // Batch select/delete mode
+    @State private var isSelectMode = false
+    @State private var selectedIdeaIDs: Set<UUID> = []
+    
     // Grid columns based on scale
     private var columns: [GridItem] {
         let count = max(2, Int(4 / gridScale))
@@ -55,6 +59,19 @@ struct BrainstormView: View {
             )
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(roastMode ? .dark : .light, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if !ideas.isEmpty {
+                        Button {
+                            isSelectMode.toggle()
+                            if !isSelectMode { selectedIdeaIDs.removeAll() }
+                        } label: {
+                            Text(isSelectMode ? "Cancel" : "Select")
+                                .font(.subheadline)
+                        }
+                    }
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 HStack {
                     Spacer()
@@ -197,36 +214,129 @@ struct BrainstormView: View {
     
     // MARK: - Idea Grid
     private var ideaGrid: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(ideas) { idea in
-                    Button {
-                        selectedIdea = idea
-                        showEditSheet = true
-                    } label: {
-                        IdeaCard(idea: idea, scale: gridScale, roastMode: roastMode)
-                    }
-                    .cardPress()
-                    .contextMenu {
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(ideas) { idea in
+                        if isSelectMode {
+                            ideaSelectableCard(idea: idea)
+                        } else {
                             Button {
                                 selectedIdea = idea
                                 showEditSheet = true
                             } label: {
-                                Label("Edit", systemImage: "pencil")
+                                IdeaCard(idea: idea, scale: gridScale, roastMode: roastMode)
                             }
-                            
-                            Button(role: .destructive) {
-                                withAnimation {
-                                    modelContext.delete(idea)
+                            .cardPress()
+                            .contextMenu {
+                                Button {
+                                    selectedIdea = idea
+                                    showEditSheet = true
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
                                 }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                                
+                                Button(role: .destructive) {
+                                    withAnimation {
+                                        modelContext.delete(idea)
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
                         }
+                    }
                 }
+                .padding(16)
+                .animation(.easeOut(duration: 0.2), value: gridScale)
             }
-            .padding(16)
-            .animation(.easeOut(duration: 0.2), value: gridScale)
+            
+            // Batch action bar
+            if isSelectMode {
+                brainstormBatchActionBar
+            }
+        }
+    }
+    
+    // MARK: - Batch Select Views
+    
+    @ViewBuilder
+    private func ideaSelectableCard(idea: BrainstormIdea) -> some View {
+        let isSelected = selectedIdeaIDs.contains(idea.id)
+        Button {
+            toggleIdeaSelection(idea)
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                IdeaCard(idea: idea, scale: gridScale, roastMode: roastMode)
+                    .opacity(isSelected ? 0.7 : 1.0)
+                
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
+                    .padding(6)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var brainstormBatchActionBar: some View {
+        HStack(spacing: 16) {
+            Button {
+                selectedIdeaIDs = Set(ideas.map(\.id))
+            } label: {
+                Text("Select All")
+                    .font(.subheadline)
+            }
+            
+            Spacer()
+            
+            Text("\(selectedIdeaIDs.count) selected")
+                .font(.subheadline.bold())
+                .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+            
+            Spacer()
+            
+            Button(role: .destructive) {
+                batchDeleteSelectedIdeas()
+            } label: {
+                Label("Delete", systemImage: "trash")
+                    .font(.subheadline.bold())
+            }
+            .disabled(selectedIdeaIDs.isEmpty)
+            .tint(.red)
+            
+            Button {
+                isSelectMode = false
+                selectedIdeaIDs.removeAll()
+            } label: {
+                Text("Done")
+                    .font(.subheadline.bold())
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            (roastMode ? AppTheme.Colors.roastSurface : AppTheme.Colors.surfaceElevated)
+                .shadow(.drop(radius: 4, y: -2))
+        )
+    }
+    
+    private func toggleIdeaSelection(_ idea: BrainstormIdea) {
+        if selectedIdeaIDs.contains(idea.id) {
+            selectedIdeaIDs.remove(idea.id)
+        } else {
+            selectedIdeaIDs.insert(idea.id)
+        }
+    }
+    
+    private func batchDeleteSelectedIdeas() {
+        withAnimation {
+            for idea in ideas where selectedIdeaIDs.contains(idea.id) {
+                modelContext.delete(idea)
+            }
+            selectedIdeaIDs.removeAll()
+            isSelectMode = false
+            try? modelContext.save()
         }
     }
     

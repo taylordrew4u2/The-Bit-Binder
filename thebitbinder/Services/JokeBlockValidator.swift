@@ -304,12 +304,39 @@ final class JokeBlockValidator {
             return false
         }
         
+        // ── Reject obvious non-joke content ──
+        let lower = text.lowercased()
+        
+        // Metadata / boilerplate
+        let rejectPatterns = [
+            "table of contents", "chapter ", "copyright", "all rights reserved",
+            "isbn", "published by", "printed in", "acknowledgment",
+            "about the author", "bibliography", "index", "dedication",
+            "www.", "http://", "https://", ".com/", "@gmail", "@yahoo",
+        ]
+        for pattern in rejectPatterns {
+            if lower.contains(pattern) { return false }
+        }
+        
+        // Mostly numbers or symbols (garbage OCR)
+        let letters = text.filter { $0.isLetter }
+        let letterRatio = Float(letters.count) / max(Float(text.count), 1)
+        if letterRatio < 0.5 { return false }
+        
+        // Too many repeated words (gibberish)
+        let words = lower.split(whereSeparator: \.isWhitespace)
+        if words.count > 6 {
+            let unique = Set(words)
+            if Float(unique.count) / Float(words.count) < 0.35 { return false }
+        }
+        
+        // ── Accept criteria (generous) ──
+        
         // Contains personal pronouns (common in jokes)
         let pronouns = ["I", "you", "my", "me", "we", "they", "he", "she"]
         let hasPronouns = pronouns.contains { pronoun in
             text.localizedCaseInsensitiveContains(" \(pronoun) ")
         }
-        
         if hasPronouns { return true }
         
         // Contains dialogue or quotes
@@ -318,12 +345,23 @@ final class JokeBlockValidator {
         }
         
         // Contains humor setup words
-        let setupWords = ["so", "there's", "walks into", "says", "asked"]
+        let setupWords = ["so", "there's", "walks into", "says", "asked",
+                          "ever notice", "what's the deal", "the thing about",
+                          "the other day", "you know what", "here's the thing",
+                          "my wife", "my husband", "my girlfriend", "my mom", "my dad"]
         let hasSetup = setupWords.contains { word in
-            text.localizedCaseInsensitiveContains(word)
+            lower.contains(word)
         }
+        if hasSetup { return true }
         
-        return hasSetup
+        // Has decent sentence structure (subject-verb patterns)
+        let sentenceEnders = text.filter { $0 == "." || $0 == "!" || $0 == "?" }.count
+        if sentenceEnders >= 1 && wordCount >= 8 { return true }
+        
+        // If it has enough words and looks like real text, accept it
+        if wordCount >= 10 && letterRatio > 0.7 { return true }
+        
+        return false
     }
     
     // MARK: - Confidence Calculation

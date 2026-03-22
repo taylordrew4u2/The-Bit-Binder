@@ -212,38 +212,72 @@ final class ImportPipelineCoordinator {
             text = attributedString.string
         }
         
-        // Convert to lines and create normalized page
-        let lines = text.components(separatedBy: .newlines)
-        var extractedLines: [ExtractedLine] = []
+        // ── Smart content-aware splitting ──
+        // First split the raw text into logical chunks (candidate jokes),
+        // then convert each chunk into its own "page" so the downstream
+        // block builder treats each as a separate unit.
+        let chunks = SmartTextSplitter.split(text)
         
-        for (index, line) in lines.enumerated() {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
+        var pages: [NormalizedPage] = []
+        for (chunkIndex, chunk) in chunks.enumerated() {
+            let chunkLines = chunk.components(separatedBy: .newlines)
+            var extractedLines: [ExtractedLine] = []
             
-            let extractedLine = ExtractedLine(
-                rawText: line,
-                normalizedText: trimmed,
-                pageNumber: 1,
-                lineNumber: index + 1,
-                boundingBox: CGRect(x: 0, y: CGFloat(index) * 20, width: 500, height: 20), // Estimated
-                confidence: 1.0,
-                estimatedFontSize: 12.0,
-                indentationLevel: calculateIndentationLevel(line),
-                yPosition: Float(index) * 20,
-                method: .documentText
-            )
+            for (lineIndex, line) in chunkLines.enumerated() {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                
+                let extractedLine = ExtractedLine(
+                    rawText: line,
+                    normalizedText: trimmed,
+                    pageNumber: chunkIndex + 1,
+                    lineNumber: lineIndex + 1,
+                    boundingBox: CGRect(x: 0, y: CGFloat(lineIndex) * 20, width: 500, height: 20),
+                    confidence: 1.0,
+                    estimatedFontSize: 12.0,
+                    indentationLevel: calculateIndentationLevel(line),
+                    yPosition: Float(lineIndex) * 20,
+                    method: .documentText
+                )
+                extractedLines.append(extractedLine)
+            }
             
-            extractedLines.append(extractedLine)
+            guard !extractedLines.isEmpty else { continue }
+            
+            pages.append(NormalizedPage(
+                pageNumber: chunkIndex + 1,
+                lines: extractedLines,
+                hasRepeatingHeader: false,
+                hasRepeatingFooter: false,
+                averageLineHeight: 20.0,
+                pageHeight: Float(extractedLines.count) * 20
+            ))
         }
         
-        return [NormalizedPage(
-            pageNumber: 1,
-            lines: extractedLines,
-            hasRepeatingHeader: false,
-            hasRepeatingFooter: false,
-            averageLineHeight: 20.0,
-            pageHeight: Float(extractedLines.count) * 20
-        )]
+        // Fallback: if splitter produced nothing, do old-school line-by-line
+        if pages.isEmpty {
+            let lines = text.components(separatedBy: .newlines)
+            var extractedLines: [ExtractedLine] = []
+            for (index, line) in lines.enumerated() {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                extractedLines.append(ExtractedLine(
+                    rawText: line, normalizedText: trimmed,
+                    pageNumber: 1, lineNumber: index + 1,
+                    boundingBox: CGRect(x: 0, y: CGFloat(index) * 20, width: 500, height: 20),
+                    confidence: 1.0, estimatedFontSize: 12.0,
+                    indentationLevel: calculateIndentationLevel(line),
+                    yPosition: Float(index) * 20, method: .documentText
+                ))
+            }
+            pages.append(NormalizedPage(
+                pageNumber: 1, lines: extractedLines,
+                hasRepeatingHeader: false, hasRepeatingFooter: false,
+                averageLineHeight: 20.0, pageHeight: Float(extractedLines.count) * 20
+            ))
+        }
+        
+        return pages
     }
     
     private func calculateIndentationLevel(_ line: String) -> Int {

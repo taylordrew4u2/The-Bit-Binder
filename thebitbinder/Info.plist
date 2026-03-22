@@ -4,8 +4,8 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.thebitbinder.refresh</string>
-		<string>com.thebitbinder.sync</string>
+		<string>666bit.refresh</string>
+		<string>666bit.sync</string>
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>BitBinder</string>
@@ -53,8 +53,6 @@
 	<string>Allow camera access to scan jokes from notebooks and import photos.</string>
 	<key>NSDocumentsFolderUsageDescription</key>
 	<string>Allow saving exported PDFs and recordings locally.</string>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Use Face ID to secure your comedy notebook.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow microphone access to record your performances and talk to The BitBuddy AI assistant.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
@@ -71,9 +69,9 @@
 			<true/>
 			<key>NSUbiquitousContainerName</key>
 			<string>BitBinder</string>
-			<key>NSUbiquitousContainerSupportedFormats</key>
+			<key>NSUbiquitousContainerSupportedFolderFormats</key>
 			<array>
-				<string>public.data</string>
+				<string>public.folder</string>
 			</array>
 		</dict>
 	</dict>
@@ -83,8 +81,6 @@
 		<string>fetch</string>
 		<string>processing</string>
 		<string>remote-notification</string>
-		<string>push-to-talk</string>
-		<string>external-accessory</string>
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
@@ -97,6 +93,8 @@
 	<array>
 		<string>arm64</string>
 	</array>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

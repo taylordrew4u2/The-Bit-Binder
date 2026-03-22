@@ -16,7 +16,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     static let shared = SchemaDeploymentService()
     
     private let container: CKContainer
-    private let schemaVersion = "2.1.0"  // Increment when schema changes
+    private let schemaVersion = "2.2.0"  // Increment when schema changes
     private let signatureService: CloudKitSignatureService
     
     /// All CloudKit record types managed by this schema
@@ -94,66 +94,107 @@ final class SchemaDeploymentService: @unchecked Sendable {
         
         ═══════════════════════════════════════════════════════════════
         BitBinder CloudKit Schema v\(schemaVersion)
+        Q = QUERYABLE, S = SORTABLE
         ═══════════════════════════════════════════════════════════════
         
         CD_Joke:
-          - CD_id, CD_content, CD_title
-          - CD_dateCreated, CD_dateModified
-          - CD_isDeleted, CD_deletedDate
-          - CD_folder (REFERENCE)
-          - CD_primaryCategory, CD_allCategoriesString
+          - CD_id [Q], CD_content, CD_title [Q]
+          - CD_dateCreated [Q,S], CD_dateModified [Q,S]
+          - CD_isDeleted [Q], CD_deletedDate
+          - CD_folder (REFERENCE) [Q]
+          - CD_primaryCategory [Q], CD_allCategoriesString
           - CD_categoryScoresString, CD_styleTagsString
           - CD_craftNotesString, CD_comedicTone
-          - CD_structureScore, CD_category
+          - CD_structureScore, CD_category [Q]
           - CD_tagsString, CD_difficulty, CD_humorRating
-          - CD_isHit
-          - CD_importSource (NEW)
-          - CD_importConfidence (NEW)
-          - CD_importTimestamp (NEW)
+          - CD_isHit [Q]
+          - CD_importSource
+          - CD_importConfidence
+          - CD_importTimestamp
+        
+        CD_JokeFolder:
+          - CD_id [Q], CD_name [Q]
+          - CD_dateCreated [Q,S], CD_isRecentlyAdded
+        
+        CD_Recording:
+          - CD_id [Q], CD_title [Q]
+          - CD_dateCreated [Q,S], CD_duration
+          - CD_fileURL, CD_transcription
+          - CD_isProcessed
+        
+        CD_SetList:
+          - CD_id [Q], CD_name [Q]
+          - CD_dateCreated [Q,S], CD_dateModified [Q,S]
+          - CD_jokeIDsString, CD_roastJokeIDsString
+          - CD_notes
+        
+        CD_RoastTarget:
+          - CD_id [Q], CD_name [Q]
+          - CD_dateCreated [Q,S], CD_dateModified [Q,S]
+          - CD_notes, CD_photoData (BYTES)
+        
+        CD_RoastJoke:
+          - CD_id [Q], CD_content, CD_title [Q]
+          - CD_dateCreated [Q,S], CD_dateModified [Q,S]
+          - CD_target (REFERENCE) [Q]
+        
+        CD_BrainstormIdea:
+          - CD_id [Q], CD_content
+          - CD_colorHex, CD_dateCreated [Q,S]
+          - CD_isVoiceNote
+        
+        CD_NotebookPhotoRecord:
+          - CD_id [Q], CD_notes
+          - CD_imageData (BYTES), CD_dateAdded [Q,S]
         
         CD_ImportBatch:
-          - CD_id, CD_sourceFileName, CD_importTimestamp
+          - CD_id [Q], CD_sourceFileName, CD_importTimestamp [Q,S]
           - CD_totalSegments, CD_totalImportedRecords
           - CD_unresolvedFragmentCount
           - CD_highConfidenceBoundaries
           - CD_mediumConfidenceBoundaries
           - CD_lowConfidenceBoundaries
-          - CD_extractionMethod (NEW)
-          - CD_pipelineVersion (NEW)
-          - CD_processingTimeSeconds (NEW)
-          - CD_autoSavedCount (NEW)
-          - CD_reviewQueueCount (NEW)
-          - CD_rejectedCount (NEW)
+          - CD_extractionMethod
+          - CD_pipelineVersion
+          - CD_processingTimeSeconds
+          - CD_autoSavedCount
+          - CD_reviewQueueCount
+          - CD_rejectedCount
         
         CD_ImportedJokeMetadata:
-          - CD_id, CD_jokeID, CD_title
+          - CD_id [Q], CD_jokeID [Q], CD_title
           - CD_rawSourceText, CD_notes
           - CD_confidence, CD_sourceOrder
           - CD_sourcePage, CD_tagsString
           - CD_parsingFlagsJSON, CD_sourceFilename
-          - CD_importTimestamp
+          - CD_importTimestamp [Q,S]
           - CD_batch (REFERENCE)
-          - CD_extractionMethod (NEW)
-          - CD_confidenceScore (NEW)
-          - CD_extractionQuality (NEW)
-          - CD_structuralCleanliness (NEW)
-          - CD_titleDetectionScore (NEW)
-          - CD_boundaryClarity (NEW)
-          - CD_ocrConfidence (NEW)
-          - CD_validationResult (NEW)
-          - CD_needsReview (NEW)
+          - CD_extractionMethod
+          - CD_confidenceScore
+          - CD_extractionQuality
+          - CD_structuralCleanliness
+          - CD_titleDetectionScore
+          - CD_boundaryClarity
+          - CD_ocrConfidence
+          - CD_validationResult
+          - CD_needsReview
         
         CD_UnresolvedImportFragment:
-          - CD_id, CD_text, CD_normalizedText
+          - CD_id [Q], CD_text, CD_normalizedText
           - CD_kind, CD_confidence
           - CD_sourceOrder, CD_sourcePage
           - CD_sourceFilename, CD_titleCandidate
           - CD_tagsString, CD_parsingFlagsJSON
-          - CD_createdAt, CD_isResolved
+          - CD_createdAt [Q,S], CD_isResolved [Q]
           - CD_batch (REFERENCE)
-          - CD_validationResult (NEW)
-          - CD_issuesJSON (NEW)
-          - CD_confidenceScore (NEW)
+          - CD_validationResult
+          - CD_issuesJSON
+          - CD_confidenceScore
+        
+        CD_ChatMessage:
+          - CD_id [Q], CD_text
+          - CD_isUser, CD_timestamp [Q,S]
+          - CD_conversationId [Q]
         
         ═══════════════════════════════════════════════════════════════
         
@@ -175,6 +216,34 @@ final class SchemaDeploymentService: @unchecked Sendable {
             jokeDescriptor.fetchLimit = 1
             let _: [Joke] = try context.fetch(jokeDescriptor)
             
+            var folderDescriptor = FetchDescriptor<JokeFolder>()
+            folderDescriptor.fetchLimit = 1
+            let _: [JokeFolder] = try context.fetch(folderDescriptor)
+            
+            var recordingDescriptor = FetchDescriptor<Recording>()
+            recordingDescriptor.fetchLimit = 1
+            let _: [Recording] = try context.fetch(recordingDescriptor)
+            
+            var setListDescriptor = FetchDescriptor<SetList>()
+            setListDescriptor.fetchLimit = 1
+            let _: [SetList] = try context.fetch(setListDescriptor)
+            
+            var roastTargetDescriptor = FetchDescriptor<RoastTarget>()
+            roastTargetDescriptor.fetchLimit = 1
+            let _: [RoastTarget] = try context.fetch(roastTargetDescriptor)
+            
+            var roastJokeDescriptor = FetchDescriptor<RoastJoke>()
+            roastJokeDescriptor.fetchLimit = 1
+            let _: [RoastJoke] = try context.fetch(roastJokeDescriptor)
+            
+            var brainstormDescriptor = FetchDescriptor<BrainstormIdea>()
+            brainstormDescriptor.fetchLimit = 1
+            let _: [BrainstormIdea] = try context.fetch(brainstormDescriptor)
+            
+            var photoDescriptor = FetchDescriptor<NotebookPhotoRecord>()
+            photoDescriptor.fetchLimit = 1
+            let _: [NotebookPhotoRecord] = try context.fetch(photoDescriptor)
+            
             var batchDescriptor = FetchDescriptor<ImportBatch>()
             batchDescriptor.fetchLimit = 1
             let _: [ImportBatch] = try context.fetch(batchDescriptor)
@@ -187,7 +256,11 @@ final class SchemaDeploymentService: @unchecked Sendable {
             fragmentDescriptor.fetchLimit = 1
             let _: [UnresolvedImportFragment] = try context.fetch(fragmentDescriptor)
             
-            print("📋 [Schema] Schema sync triggered successfully")
+            var chatDescriptor = FetchDescriptor<ChatMessage>()
+            chatDescriptor.fetchLimit = 1
+            let _: [ChatMessage] = try context.fetch(chatDescriptor)
+            
+            print("📋 [Schema] Schema sync triggered for all \(recordTypes.count) record types")
         } catch {
             print("⚠️ [Schema] Error during schema sync: \(error.localizedDescription)")
         }
@@ -197,6 +270,26 @@ final class SchemaDeploymentService: @unchecked Sendable {
     func getSchemaChangeSummary() -> String {
         return """
         Schema Changes in v\(schemaVersion):
+        
+        v2.2.0 — QUERYABLE Index Additions:
+        All CD_* record types now have QUERYABLE indexes on key fields
+        so CKQuery fetch/filter/sort works correctly.
+        
+          • CD_RoastTarget: CD_id, CD_name, CD_dateCreated, CD_dateModified, ___recordID
+          • CD_RoastJoke: CD_id, CD_title, CD_target, CD_dateCreated, CD_dateModified
+          • CD_Joke: CD_id, CD_title, CD_category, CD_folder, CD_isDeleted, CD_isHit,
+                     CD_primaryCategory, CD_dateCreated, CD_dateModified
+          • CD_JokeFolder: CD_id, CD_name, CD_dateCreated
+          • CD_Recording: CD_id, CD_title, CD_dateCreated
+          • CD_SetList: CD_id, CD_name, CD_dateCreated, CD_dateModified
+          • CD_BrainstormIdea: CD_id, CD_dateCreated
+          • CD_NotebookPhotoRecord: CD_id, CD_dateAdded
+          • CD_ChatMessage: CD_id, CD_conversationId, CD_timestamp
+          • CD_ImportBatch: CD_id, CD_importTimestamp
+          • CD_ImportedJokeMetadata: CD_id, CD_jokeID, CD_importTimestamp
+          • CD_UnresolvedImportFragment: CD_id, CD_createdAt, CD_isResolved
+        
+        v2.1.0 — Import Pipeline Fields:
         
         1. CD_Joke - Added import tracking:
            • importSource (file name)
@@ -212,20 +305,13 @@ final class SchemaDeploymentService: @unchecked Sendable {
            • rejectedCount
         
         3. CD_ImportedJokeMetadata - Added confidence factors:
-           • extractionMethod
-           • confidenceScore (0.0-1.0)
-           • extractionQuality
-           • structuralCleanliness
-           • titleDetectionScore
-           • boundaryClarity
-           • ocrConfidence
-           • validationResult
-           • needsReview
+           • extractionMethod, confidenceScore (0.0-1.0)
+           • extractionQuality, structuralCleanliness
+           • titleDetectionScore, boundaryClarity
+           • ocrConfidence, validationResult, needsReview
         
         4. CD_UnresolvedImportFragment - Added validation:
-           • validationResult
-           • issuesJSON
-           • confidenceScore
+           • validationResult, issuesJSON, confidenceScore
         """
     }
     

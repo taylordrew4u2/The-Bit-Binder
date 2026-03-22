@@ -37,6 +37,7 @@ final class DataValidationService: ObservableObject {
         result.roastTargetsCount = await countEntities(of: RoastTarget.self, context: context)
         result.roastJokesCount = await countEntities(of: RoastJoke.self, context: context)
         result.brainstormIdeasCount = await countEntities(of: BrainstormIdea.self, context: context)
+        result.notebookPhotoRecordsCount = await countEntities(of: NotebookPhotoRecord.self, context: context)
         result.importBatchesCount = await countEntities(of: ImportBatch.self, context: context)
         result.chatMessagesCount = await countEntities(of: ChatMessage.self, context: context)
         
@@ -223,7 +224,8 @@ final class DataValidationService: ObservableObject {
             (current.setListsCount, previous.setListsCount),
             (current.roastTargetsCount, previous.roastTargetsCount),
             (current.roastJokesCount, previous.roastJokesCount),
-            (current.brainstormIdeasCount, previous.brainstormIdeasCount)
+            (current.brainstormIdeasCount, previous.brainstormIdeasCount),
+            (current.notebookPhotoRecordsCount, previous.notebookPhotoRecordsCount)
         ]
         
         for (current, previous) in losses {
@@ -257,6 +259,7 @@ final class DataValidationService: ObservableObject {
             roastTargetsCount: result.roastTargetsCount,
             roastJokesCount: result.roastJokesCount,
             brainstormIdeasCount: result.brainstormIdeasCount,
+            notebookPhotoRecordsCount: result.notebookPhotoRecordsCount,
             importBatchesCount: result.importBatchesCount,
             chatMessagesCount: result.chatMessagesCount,
             validationDate: Date()
@@ -356,13 +359,14 @@ struct DataValidationResult {
     var roastTargetsCount = 0
     var roastJokesCount = 0
     var brainstormIdeasCount = 0
+    var notebookPhotoRecordsCount = 0
     var importBatchesCount = 0
     var chatMessagesCount = 0
     
     var totalEntities: Int {
         jokesCount + foldersCount + recordingsCount + setListsCount +
         roastTargetsCount + roastJokesCount + brainstormIdeasCount +
-        importBatchesCount + chatMessagesCount
+        notebookPhotoRecordsCount + importBatchesCount + chatMessagesCount
     }
     
     var issues: [String] = []
@@ -382,6 +386,7 @@ struct DataValidationCounts: Codable {
     let roastTargetsCount: Int
     let roastJokesCount: Int
     let brainstormIdeasCount: Int
+    let notebookPhotoRecordsCount: Int
     let importBatchesCount: Int
     let chatMessagesCount: Int
     let validationDate: Date
