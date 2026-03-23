@@ -16,7 +16,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     static let shared = SchemaDeploymentService()
     
     private let container: CKContainer
-    private let schemaVersion = "2.2.0"  // Increment when schema changes
+    private let schemaVersion = "2.3.0"  // Increment when schema changes
     private let signatureService: CloudKitSignatureService
     
     /// All CloudKit record types managed by this schema
@@ -121,12 +121,14 @@ final class SchemaDeploymentService: @unchecked Sendable {
           - CD_dateCreated [Q,S], CD_duration
           - CD_fileURL, CD_transcription
           - CD_isProcessed
+          - CD_isDeleted [Q], CD_deletedDate
         
         CD_SetList:
           - CD_id [Q], CD_name [Q]
           - CD_dateCreated [Q,S], CD_dateModified [Q,S]
           - CD_jokeIDsString, CD_roastJokeIDsString
           - CD_notes
+          - CD_isDeleted [Q], CD_deletedDate
         
         CD_RoastTarget:
           - CD_id [Q], CD_name [Q]
@@ -137,15 +139,18 @@ final class SchemaDeploymentService: @unchecked Sendable {
           - CD_id [Q], CD_content, CD_title [Q]
           - CD_dateCreated [Q,S], CD_dateModified [Q,S]
           - CD_target (REFERENCE) [Q]
+          - CD_isDeleted [Q], CD_deletedDate
         
         CD_BrainstormIdea:
           - CD_id [Q], CD_content
           - CD_colorHex, CD_dateCreated [Q,S]
           - CD_isVoiceNote
+          - CD_isDeleted [Q], CD_deletedDate
         
         CD_NotebookPhotoRecord:
           - CD_id [Q], CD_notes
           - CD_imageData (BYTES), CD_dateAdded [Q,S]
+          - CD_isDeleted [Q], CD_deletedDate
         
         CD_ImportBatch:
           - CD_id [Q], CD_sourceFileName, CD_importTimestamp [Q,S]
@@ -271,9 +276,22 @@ final class SchemaDeploymentService: @unchecked Sendable {
         return """
         Schema Changes in v\(schemaVersion):
         
+        v2.3.0 — Soft-Delete Fields (trash support):
+        Added isDeleted (QUERYABLE) + deletedDate to all remaining model types.
+        Mirrors the existing Joke soft-delete pattern introduced in v2.2.0.
+        
+          • CD_Recording:          CD_isDeleted [Q], CD_deletedDate
+          • CD_SetList:            CD_isDeleted [Q], CD_deletedDate
+          • CD_RoastJoke:          CD_isDeleted [Q], CD_deletedDate
+          • CD_BrainstormIdea:     CD_isDeleted [Q], CD_deletedDate
+          • CD_NotebookPhotoRecord: CD_isDeleted [Q], CD_deletedDate
+        
+        All active @Query filters now include isDeleted==false predicates.
+        Trash views added for all types. Auto-purge after 30 days at launch.
+        
         v2.2.0 — QUERYABLE Index Additions:
-        All CD_* record types now have QUERYABLE indexes on key fields
-        so CKQuery fetch/filter/sort works correctly.
+        All CD_* record types now have QUERYABLE indexes on key fields.
+        """
         
           • CD_RoastTarget: CD_id, CD_name, CD_dateCreated, CD_dateModified, ___recordID
           • CD_RoastJoke: CD_id, CD_title, CD_target, CD_dateCreated, CD_dateModified
