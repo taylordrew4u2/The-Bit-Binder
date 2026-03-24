@@ -144,7 +144,11 @@ struct JokesAlertsModifier: ViewModifier {
                 Button("Delete", role: .destructive) {
                     if let target = roastTargetToDelete {
                         modelContext.delete(target)
-                        try? modelContext.save()
+                        do {
+                            try modelContext.save()
+                        } catch {
+                            print("❌ [JokesViewModifiers] Failed to delete roast target: \(error)")
+                        }
                         roastTargetToDelete = nil
                     }
                 }
@@ -273,12 +277,20 @@ struct ReviewImportsSheet: View {
         joke.tags = fragment.tags
         modelContext.insert(joke)
         fragment.isResolved = true
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ [JokesViewModifiers] Failed to save fragment as joke: \(error)")
+        }
     }
     
     private func markResolved(_ fragment: UnresolvedImportFragment) {
         fragment.isResolved = true
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ [JokesViewModifiers] Failed to save resolved state: \(error)")
+        }
     }
 }
 

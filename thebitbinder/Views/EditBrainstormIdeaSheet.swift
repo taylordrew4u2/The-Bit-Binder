@@ -15,6 +15,8 @@ struct EditBrainstormIdeaSheet: View {
 
     @Bindable var idea: BrainstormIdea
     @State private var content: String = ""
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -90,14 +92,25 @@ struct EditBrainstormIdeaSheet: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .onAppear { content = idea.content }
+        .alert("Save Failed", isPresented: $showSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(saveErrorMessage)
+        }
     }
 
     private func saveChanges() {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         idea.content = trimmed
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("❌ [EditBrainstormIdeaSheet] Failed to save changes: \(error)")
+            saveErrorMessage = "Could not save changes: \(error.localizedDescription)"
+            showSaveError = true
+        }
     }
 }
 

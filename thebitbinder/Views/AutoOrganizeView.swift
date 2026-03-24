@@ -390,7 +390,11 @@ struct AutoOrganizeView: View {
         }
         
         joke.folder = targetFolder
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ [AutoOrganizeView] Failed to save folder assignment: \(error)")
+        }
     }
 }
 

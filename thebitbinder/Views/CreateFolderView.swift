@@ -14,6 +14,8 @@ struct CreateFolderView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     @State private var folderName = ""
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
     
     var body: some View {
         NavigationView {
@@ -45,12 +47,23 @@ struct CreateFolderView: View {
             }
         }
         .tint(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+        .alert("Save Failed", isPresented: $showSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(saveErrorMessage)
+        }
     }
     
     private func createFolder() {
         let folder = JokeFolder(name: folderName)
         modelContext.insert(folder)
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("❌ [CreateFolderView] Failed to save folder: \(error)")
+            saveErrorMessage = "Could not create folder: \(error.localizedDescription)"
+            showSaveError = true
+        }
     }
 }

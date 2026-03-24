@@ -222,7 +222,11 @@ struct BrainstormView: View {
                                 Button(role: .destructive) {
                                     withAnimation {
                                         idea.moveToTrash()
-                                        try? modelContext.save()
+                                        do {
+                                            try modelContext.save()
+                                        } catch {
+                                            print("❌ [BrainstormView] Failed to save after soft-delete: \(error)")
+                                        }
                                     }
                                 } label: {
                                     Label("Delete", systemImage: "trash")
@@ -387,7 +391,11 @@ struct BrainstormView: View {
                 isVoiceNote: true
             )
             modelContext.insert(newIdea)
-            try? modelContext.save()
+            do {
+                try modelContext.save()
+            } catch {
+                print("❌ [BrainstormView] Failed to save voice note idea: \(error)")
+            }
             speechManager.transcribedText = ""
         }
         

@@ -14,6 +14,8 @@ struct CreateSetListView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     @State private var name = ""
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
     
     var body: some View {
         NavigationView {
@@ -45,12 +47,23 @@ struct CreateSetListView: View {
             }
         }
         .tint(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+        .alert("Save Failed", isPresented: $showSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(saveErrorMessage)
+        }
     }
     
     private func createSetList() {
         let setList = SetList(name: name)
         modelContext.insert(setList)
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("❌ [CreateSetListView] Failed to save set list: \(error)")
+            saveErrorMessage = "Could not create set list: \(error.localizedDescription)"
+            showSaveError = true
+        }
     }
 }

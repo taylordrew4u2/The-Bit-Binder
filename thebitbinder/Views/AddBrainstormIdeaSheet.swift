@@ -15,6 +15,8 @@ struct AddBrainstormIdeaSheet: View {
 
     @State private var content = ""
     @State private var isVoiceNote: Bool
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
     let initialText: String
 
     init(isVoiceNote: Bool = false, initialText: String = "") {
@@ -77,6 +79,11 @@ struct AddBrainstormIdeaSheet: View {
         .onAppear {
             if !initialText.isEmpty { content = initialText }
         }
+        .alert("Save Failed", isPresented: $showSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(saveErrorMessage)
+        }
     }
 
     private func saveIdea() {
@@ -84,8 +91,14 @@ struct AddBrainstormIdeaSheet: View {
         guard !trimmed.isEmpty else { return }
         let idea = BrainstormIdea(content: trimmed, colorHex: BrainstormIdea.randomColor(), isVoiceNote: isVoiceNote)
         modelContext.insert(idea)
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("❌ [AddBrainstormIdeaSheet] Failed to save idea: \(error)")
+            saveErrorMessage = "Could not save thought: \(error.localizedDescription)"
+            showSaveError = true
+        }
     }
 }
 

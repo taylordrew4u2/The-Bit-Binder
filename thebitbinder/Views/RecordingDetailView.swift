@@ -245,7 +245,11 @@ struct RecordingDetailView: View {
                 
                 await MainActor.run {
                     recording.transcription = result.transcription
-                    try? modelContext.save()
+                    do {
+                        try modelContext.save()
+                    } catch {
+                        print("❌ [RecordingDetailView] Failed to save transcription: \(error)")
+                    }
                     isTranscribing = false
                 }
             } catch {

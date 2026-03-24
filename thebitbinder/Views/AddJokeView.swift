@@ -17,6 +17,8 @@ struct AddJokeView: View {
     @State private var title = ""
     @State private var content = ""
     @State private var autoAssign = UserDefaults.standard.bool(forKey: "autoOrganizeEnabled")
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
     var selectedFolder: JokeFolder?
     
     var body: some View {
@@ -65,15 +67,25 @@ struct AddJokeView: View {
             }
         }
         .tint(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+        .alert("Save Failed", isPresented: $showSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(saveErrorMessage)
+        }
     }
     
     private func saveJoke() {
         let joke = Joke(content: content, title: title, folder: selectedFolder)
         modelContext.insert(joke)
-        try? modelContext.save()
         
-        NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
-        
-        dismiss()
+        do {
+            try modelContext.save()
+            NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
+            dismiss()
+        } catch {
+            print("❌ [AddJokeView] Failed to save joke: \(error)")
+            saveErrorMessage = "Could not save joke: \(error.localizedDescription)"
+            showSaveError = true
+        }
     }
 }

@@ -627,7 +627,11 @@ struct JokesView: View {
         }
         selectedJokeIDs.removeAll()
         isSelectMode = false
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ [JokesView] Failed to save after batch trash: \(error)")
+        }
     }
 
     @ToolbarContentBuilder
@@ -1175,7 +1179,11 @@ struct JokesView: View {
         sharedDefaults.synchronize()
         
         if importedCount > 0 {
-            try? modelContext.save()
+            do {
+                try modelContext.save()
+            } catch {
+                print("❌ [JokesView] Failed to save imported voice memos: \(error)")
+            }
             importSummary = (importedCount, 0)
             showingImportSummary = true
             print("✅ [VoiceMemo] Imported \(importedCount) voice memos")
