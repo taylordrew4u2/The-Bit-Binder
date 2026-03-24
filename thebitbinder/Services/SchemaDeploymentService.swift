@@ -283,7 +283,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
           • CD_Recording:          CD_isDeleted [Q], CD_deletedDate
           • CD_SetList:            CD_isDeleted [Q], CD_deletedDate
           • CD_RoastJoke:          CD_isDeleted [Q], CD_deletedDate
-          • CD_BrainstormIdea:     CD_isDeleted [Q], CD_deletedDate
+          • CD_BrainstormIdea:    _isDeleted [Q], CD_deletedDate
           • CD_NotebookPhotoRecord: CD_isDeleted [Q], CD_deletedDate
         
         All active @Query filters now include isDeleted==false predicates.
@@ -291,45 +291,37 @@ final class SchemaDeploymentService: @unchecked Sendable {
         
         v2.2.0 — QUERYABLE Index Additions:
         All CD_* record types now have QUERYABLE indexes on key fields.
-        """
-        
-          • CD_RoastTarget: CD_id, CD_name, CD_dateCreated, CD_dateModified, ___recordID
-          • CD_RoastJoke: CD_id, CD_title, CD_target, CD_dateCreated, CD_dateModified
-          • CD_Joke: CD_id, CD_title, CD_category, CD_folder, CD_isDeleted, CD_isHit,
-                     CD_primaryCategory, CD_dateCreated, CD_dateModified
-          • CD_JokeFolder: CD_id, CD_name, CD_dateCreated
-          • CD_Recording: CD_id, CD_title, CD_dateCreated
-          • CD_SetList: CD_id, CD_name, CD_dateCreated, CD_dateModified
-          • CD_BrainstormIdea: CD_id, CD_dateCreated
-          • CD_NotebookPhotoRecord: CD_id, CD_dateAdded
-          • CD_ChatMessage: CD_id, CD_conversationId, CD_timestamp
-          • CD_ImportBatch: CD_id, CD_importTimestamp
-          • CD_ImportedJokeMetadata: CD_id, CD_jokeID, CD_importTimestamp
-          • CD_UnresolvedImportFragment: CD_id, CD_createdAt, CD_isResolved
-        
+
+          CD_RoastTarget: CD_id, CD_name, CD_dateCreated, CD_dateModified
+          CD_RoastJoke: CD_id, CD_title, CD_target, CD_dateCreated, CD_dateModified
+          CD_Joke: CD_id, CD_title, CD_category, CD_folder, CD_isDeleted, CD_isHit,
+                   CD_primaryCategory, CD_dateCreated, CD_dateModified
+          CD_JokeFolder: CD_id, CD_name, CD_dateCreated
+          CD_Recording: CD_id, CD_title, CD_dateCreated
+          CD_SetList: CD_id, CD_name, CD_dateCreated, CD_dateModified
+          CD_BrainstormIdea: CD_id, CD_dateCreated
+          CD_NotebookPhotoRecord: CD_id, CD_dateAdded
+          CD_ChatMessage: CD_id, CD_conversationId, CD_timestamp
+          CD_ImportBatch: CD_id, CD_importTimestamp
+          CD_ImportedJokeMetadata: CD_id, CD_jokeID, CD_importTimestamp
+          CD_UnresolvedImportFragment: CD_id, CD_createdAt, CD_isResolved
+
         v2.1.0 — Import Pipeline Fields:
-        
+
         1. CD_Joke - Added import tracking:
-           • importSource (file name)
-           • importConfidence (high/medium/low)
-           • importTimestamp
-        
+           importSource, importConfidence, importTimestamp
+
         2. CD_ImportBatch - Added pipeline metrics:
-           • extractionMethod
-           • pipelineVersion
-           • processingTimeSeconds
-           • autoSavedCount
-           • reviewQueueCount
-           • rejectedCount
-        
+           extractionMethod, pipelineVersion, processingTimeSeconds,
+           autoSavedCount, reviewQueueCount, rejectedCount
+
         3. CD_ImportedJokeMetadata - Added confidence factors:
-           • extractionMethod, confidenceScore (0.0-1.0)
-           • extractionQuality, structuralCleanliness
-           • titleDetectionScore, boundaryClarity
-           • ocrConfidence, validationResult, needsReview
-        
+           extractionMethod, confidenceScore, extractionQuality,
+           structuralCleanliness, titleDetectionScore, boundaryClarity,
+           ocrConfidence, validationResult, needsReview
+
         4. CD_UnresolvedImportFragment - Added validation:
-           • validationResult, issuesJSON, confidenceScore
+           validationResult, issuesJSON, confidenceScore
         """
     }
     

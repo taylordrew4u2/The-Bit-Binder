@@ -16,8 +16,12 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
 
     private let baseURL = "https://openrouter.ai/api/v1/chat/completions"
 
-    /// The model to use. Defaults to a free Mistral model; users can change it
-    /// by storing a custom model string under the UserDefaults key below.
+    private let systemPrompt = """
+    You are a JSON API. You output ONLY a valid JSON array — no markdown, no prose, no explanation.
+    Every response must start with [ and end with ]. Never wrap output in code fences.
+    """
+
+    /// The model to use. Can be overridden via UserDefaults (e.g. from a settings screen).
     private static let modelDefaultsKey = "openrouter_model"
     private var model: String {
         UserDefaults.standard.string(forKey: Self.modelDefaultsKey)
@@ -38,10 +42,11 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
         let requestBody: [String: Any] = [
             "model": model,
             "messages": [
-                ["role": "user", "content": prompt]
+                ["role": "system", "content": systemPrompt],
+                ["role": "user",   "content": prompt]
             ],
             "temperature": 0.3,
-            "max_tokens": 4096
+            "max_tokens": 16384
         ]
 
         var request = URLRequest(url: URL(string: baseURL)!)
@@ -51,7 +56,7 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
         request.setValue("https://openrouter.ai", forHTTPHeaderField: "HTTP-Referer")
         request.setValue("thebitbinder", forHTTPHeaderField: "X-Title")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-        request.timeoutInterval = 30
+        request.timeoutInterval = 120
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -72,12 +77,29 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
               let firstChoice = choices.first,
-              let message = firstChoice["message"] as? [String: Any],
-              let content = message["content"] as? String else {
+              let message = firstChoice["message"] as? [String: Any] else {
             let raw = String(data: data, encoding: .utf8) ?? "<empty>"
-            throw AIProviderError.apiError(.openRouter, "Unexpected response format: \(raw.prefix(200))")
+            throw AIProviderError.apiError(.openRouter, "Unexpected response format: \(raw.prefix(300))")
         }
 
-        return try JokeExtractionPrompt.parseResponse(content)
+        // openrouter/free auto-routes to any available model.  Some use
+        // "reasoning" mode where the real output is in `reasoning`, not `content`.
+        let content: String
+        if let c = message["content"] as? String, !c.isEmpty {
+            content = c
+        } else if let r = message["reasoning"] as? String, !r.isEmpty {
+            print("⚠️ [OpenRouter] Model returned reasoning instead of content — extracting from reasoning field")
+            content = r
+        } else {
+            let raw = String(data: data, encoding: .utf8) ?? "<empty>"
+            throw AIProviderError.apiError(.openRouter, "Empty response from model: \(raw.prefix(300))")
+        }
+
+        let finishReason = firstChoice["finish_reason"] as? String ?? ""
+        if finishReason == "length" {
+            print("⚠️ [OpenRouter] Response truncated (finish_reason=length) — attempting partial JSON repair")
+        }
+
+        return try JokeExtractionPrompt.parseResponse(content, provider: .openRouter)
     }
 }

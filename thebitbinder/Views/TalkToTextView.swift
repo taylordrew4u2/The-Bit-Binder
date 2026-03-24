@@ -21,6 +21,8 @@ struct TalkToTextView: View {
     @State private var permissionStatus: PermissionStatus = .notDetermined
     @State private var showingPermissionAlert = false
     @State private var errorMessage: String?
+    @State private var showSavedConfirmation = false
+    @State private var isSaving = false
     
     @StateObject private var speechRecognizer = SpeechRecognizer()
     
@@ -54,11 +56,11 @@ struct TalkToTextView: View {
                             .symbolEffect(.variableColor, isActive: isRecording)
                     }
                     
-                    Text(isRecording ? "Listening..." : "Talk-to-Text")
+                    Text(isRecording ? "Listening..." : "Talk-to-Text Joke")
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    Text("Speak your joke and it will be transcribed")
+                    Text("Speak your joke and it will be saved to your jokes")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -143,9 +145,14 @@ struct TalkToTextView: View {
                             saveJoke()
                         } label: {
                             HStack(spacing: 10) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 20))
-                                Text("Save as Joke")
+                                if isSaving {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 20))
+                                }
+                                Text("Save Joke")
                                     .fontWeight(.semibold)
                             }
                             .frame(maxWidth: .infinity)
@@ -154,6 +161,7 @@ struct TalkToTextView: View {
                             .foregroundColor(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
+                        .disabled(isSaving)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -183,7 +191,7 @@ struct TalkToTextView: View {
                     dismiss()
                 }
             } message: {
-                Text("Microphone and Speech Recognition permissions are required for Talk-to-Text. Please enable them in Settings.")
+                Text("Microphone and Speech Recognition permissions are required for Talk-to-Text Joke. Please enable them in Settings.")
             }
             .onChange(of: speechRecognizer.transcribedText) { _, newValue in
                 transcribedText = newValue
@@ -191,6 +199,22 @@ struct TalkToTextView: View {
             .onChange(of: speechRecognizer.error) { _, newValue in
                 errorMessage = newValue
             }
+            .overlay {
+                if showSavedConfirmation {
+                    VStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 48))
+                            .foregroundColor(.green)
+                        Text("Joke Saved!")
+                            .font(.headline)
+                    }
+                    .padding(30)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: showSavedConfirmation)
         }
     }
     
@@ -297,19 +321,47 @@ struct TalkToTextView: View {
     
     private func saveJoke() {
         let text = transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else {
+            errorMessage = "Cannot save an empty joke."
+            return
+        }
+        
+        isSaving = true
+        errorMessage = nil
         
         // Create the joke
+        let title = generateTitle(from: text)
         let newJoke = Joke(
             content: text,
-            title: generateTitle(from: text),
+            title: title,
             folder: selectedFolder
         )
         
         modelContext.insert(newJoke)
-        try? modelContext.save()
         
-        dismiss()
+        do {
+            try modelContext.save()
+            #if DEBUG
+            print("✅ [TalkToTextView] Joke saved — id: \(newJoke.id), title: \"\(title)\", folder: \(selectedFolder?.name ?? "none")")
+            #endif
+            
+            // Notify other views that the joke database changed (matches AddJokeView pattern)
+            NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
+            
+            isSaving = false
+            showSavedConfirmation = true
+            
+            // Brief confirmation then dismiss
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                dismiss()
+            }
+        } catch {
+            isSaving = false
+            #if DEBUG
+            print("❌ [TalkToTextView] Failed to save joke: \(error)")
+            #endif
+            errorMessage = "Could not save joke: \(error.localizedDescription)"
+        }
     }
     
     private func generateTitle(from text: String) -> String {

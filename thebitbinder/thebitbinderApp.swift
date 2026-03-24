@@ -177,10 +177,12 @@ struct thebitbinderApp: App {
             ZStack {
                 if startup.isReady {
                     ContentView()
+                        .transition(.opacity)
                 } else {
                     LaunchScreenView(statusText: startup.statusText, userName: userPreferences.userName)
                 }
             }
+            .animation(.easeOut(duration: 0.35), value: startup.isReady)
             .task {
                 // 🚨 IMMEDIATE: Delete corrupted CloudKit records before sync starts
                 await performAggressiveCloudKitCleanup()

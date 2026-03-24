@@ -51,27 +51,10 @@ struct NotebookView: View {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(photos, id: \.id) { photo in
-                                // Load image from stored imageData
-                                if let imageData = photo.imageData, let uiImage = UIImage(data: imageData) {
-                                    Image(uiImage: uiImage)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(minWidth: 100, minHeight: 100)
-                                        .clipped()
-                                        .cornerRadius(8)
-                                        .onTapGesture { showingDetail = photo }
-                                        .contextMenu {
-                                            Button(role: .destructive) { delete(photo) } label: { Label("Delete", systemImage: "trash") }
-                                        }
-                                } else {
-                                    Color.gray
-                                        .frame(minWidth: 100, minHeight: 100)
-                                        .cornerRadius(8)
-                                        .overlay(Text("No Image").foregroundColor(.white))
-                                        .onTapGesture { showingDetail = photo }
-                                        .contextMenu {
-                                            Button(role: .destructive) { delete(photo) } label: { Label("Delete", systemImage: "trash") }
-                                        }
+                                NotebookThumbnailCell(photo: photo) {
+                                    showingDetail = photo
+                                } onDelete: {
+                                    delete(photo)
                                 }
                             }
                         }
@@ -133,38 +116,64 @@ struct NotebookView: View {
     
     private func importPhoto(from item: PhotosPickerItem) async {
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else { return }
-            guard let uiImage = UIImage(data: data) else { return }
-            
-            // Compress and store as imageData directly
-            if let jpegData = uiImage.jpegData(compressionQuality: 0.8) {
-                let newPhoto = NotebookPhotoRecord(notes: "", imageData: jpegData)
-                await MainActor.run {
-                    modelContext.insert(newPhoto)
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        print("❌ [NotebookView] Failed to save imported photo: \(error)")
-                    }
-                }
-            }
-        } catch {
-            // ignore errors silently for now
-        }
-    }
-    
-    private func saveCameraImage(_ image: UIImage) async {
-        // Compress and store as imageData directly
-        if let jpegData = image.jpegData(compressionQuality: 0.8) {
+            guard let rawData = try await item.loadTransferable(type: Data.self) else { return }
+
+            // Downscale to max 1500 px long edge then compress.
+            // rawData + UIImage + full-res jpegData can be 10–30 MB simultaneously;
+            // the autoreleasepool frees them before we hit MainActor.
+            guard let jpegData: Data = autoreleasepool(invoking: {
+                guard let uiImage = UIImage(data: rawData) else { return nil }
+                let scaled = NotebookView.downscaleForStorage(uiImage, maxLongEdge: 1500)
+                return scaled.jpegData(compressionQuality: 0.8)
+            }) else { return }
+
             let newPhoto = NotebookPhotoRecord(notes: "", imageData: jpegData)
             await MainActor.run {
                 modelContext.insert(newPhoto)
                 do {
                     try modelContext.save()
                 } catch {
-                    print("❌ [NotebookView] Failed to save camera photo: \(error)")
+                    print("❌ [NotebookView] Failed to save imported photo: \(error)")
                 }
             }
+        } catch {
+            print("❌ [NotebookView] importPhoto error: \(error)")
+        }
+    }
+    
+    private func saveCameraImage(_ image: UIImage) async {
+        // Downscale then compress; releases intermediate buffers before saving.
+        guard let jpegData: Data = autoreleasepool(invoking: {
+            let scaled = NotebookView.downscaleForStorage(image, maxLongEdge: 1500)
+            return scaled.jpegData(compressionQuality: 0.8)
+        }) else { return }
+
+        let newPhoto = NotebookPhotoRecord(notes: "", imageData: jpegData)
+        await MainActor.run {
+            modelContext.insert(newPhoto)
+            do {
+                try modelContext.save()
+            } catch {
+                print("❌ [NotebookView] Failed to save camera photo: \(error)")
+            }
+        }
+    }
+
+    /// Scales `image` so its longest edge is at most `maxLongEdge` pixels.
+    /// Returns the original image unchanged if it is already small enough.
+    static func downscaleForStorage(_ image: UIImage, maxLongEdge: CGFloat) -> UIImage {
+        let size = image.size
+        let longEdge = max(size.width, size.height)
+        guard longEdge > maxLongEdge else { return image }
+
+        let scale = maxLongEdge / longEdge
+        let newSize = CGSize(width: (size.width * scale).rounded(), height: (size.height * scale).rounded())
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: newSize, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
         }
     }
     
@@ -275,3 +284,66 @@ struct CameraView: View {
     }
 }
 #endif
+
+// MARK: - Notebook Thumbnail Cell
+//
+// Decodes the stored JPEG into a fixed 200×200 px thumbnail on a background
+// thread, so the main thread and LazyVGrid are never blocked by image decode,
+// and only ~120 KB per cell is held in memory (vs 3–8 MB for a full UIImage).
+
+private struct NotebookThumbnailCell: View {
+    let photo: NotebookPhotoRecord
+    let onTap: () -> Void
+    let onDelete: () -> Void
+
+    @State private var thumbnail: UIImage?
+
+    var body: some View {
+        Group {
+            if let thumb = thumbnail {
+                Image(uiImage: thumb)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Color.gray.opacity(0.2)
+                    .overlay(ProgressView().tint(.secondary))
+            }
+        }
+        .frame(minWidth: 100, minHeight: 100)
+        .clipped()
+        .cornerRadius(8)
+        .onTapGesture { onTap() }
+        .contextMenu {
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .task(id: photo.id) {
+            await decodeThumbnail()
+        }
+    }
+
+    private func decodeThumbnail() async {
+        guard thumbnail == nil, let data = photo.imageData else { return }
+        // Hop off the main actor — image decode is CPU-bound
+        let decoded: UIImage? = await Task.detached(priority: .utility) {
+            autoreleasepool {
+                guard let full = UIImage(data: data) else { return nil }
+                // Render at 200 px max long edge (sufficient for a grid thumbnail)
+                let size = full.size
+                let longEdge = max(size.width, size.height)
+                guard longEdge > 200 else { return full }
+                let scale = 200.0 / longEdge
+                let newSize = CGSize(width: (size.width * scale).rounded(),
+                                    height: (size.height * scale).rounded())
+                let fmt = UIGraphicsImageRendererFormat()
+                fmt.scale = 1
+                fmt.opaque = true
+                return UIGraphicsImageRenderer(size: newSize, format: fmt).image { _ in
+                    full.draw(in: CGRect(origin: .zero, size: newSize))
+                }
+            }
+        }.value
+        thumbnail = decoded
+    }
+}

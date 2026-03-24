@@ -39,25 +39,14 @@ struct RoastTargetDetailView: View {
         VStack(spacing: 0) {
             // Target Header Card
             VStack(spacing: 12) {
-                // Avatar
-                if let photoData = target.photoData,
-                   let uiImage = UIImage(data: photoData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 80, height: 80)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(accentColor, lineWidth: 3))
-                } else {
-                    ZStack {
-                        Circle()
-                            .fill(accentColor.opacity(0.15))
-                            .frame(width: 80, height: 80)
-                        Text(target.name.prefix(1).uppercased())
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
-                            .foregroundColor(accentColor)
-                    }
-                }
+                // Avatar — async background decode, no main-thread stall
+                AsyncAvatarView(
+                    photoData: target.photoData,
+                    size: 80,
+                    fallbackInitial: String(target.name.prefix(1).uppercased()),
+                    accentColor: accentColor
+                )
+                .overlay(Circle().stroke(accentColor, lineWidth: target.photoData != nil ? 3 : 0))
 
                 Text(target.name)
                     .font(.title2.bold())
@@ -367,9 +356,9 @@ struct EditRoastTargetView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if let photoImage = photoImage, let photoData = photoImage.jpegData(compressionQuality: 0.8) {
-                            target.photoData = photoData
-                        }
+                        // target.photoData is already written in the onChange handler
+                        // (downscaled + compressed). Re-encoding the display UIImage
+                        // here would double-compress and waste memory; skip it.
                         target.dateModified = Date()
                         do {
                             try modelContext.save()
@@ -393,18 +382,36 @@ struct EditRoastTargetView: View {
             }
             .onChange(of: selectedPhoto) { _, newValue in
                 Task {
-                    if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                        await MainActor.run {
-                            target.photoData = data
-                            photoImage = UIImage(data: data)
+                    guard let rawData = try? await newValue?.loadTransferable(type: Data.self) else { return }
+                    // Downscale to 1500 px max long edge and compress before storing.
+                    // Raw Photos library data can be 5–15 MB; we must not store or
+                    // decode it at full resolution.
+                    let (storedData, displayImage): (Data?, UIImage?) = await Task.detached(priority: .utility) {
+                        autoreleasepool {
+                            guard let full    = UIImage(data: rawData) else { return (nil, nil) }
+                            let scaled        = RoastTargetPhotoHelper.downscale(full, maxLongEdge: 1500)
+                            let jpeg          = scaled.jpegData(compressionQuality: 0.8)
+                            // Decode a small display thumbnail (400 px) for the edit view
+                            let thumb         = RoastTargetPhotoHelper.downscale(full, maxLongEdge: 400)
+                            return (jpeg, thumb)
                         }
+                    }.value
+                    await MainActor.run {
+                        if let storedData { target.photoData = storedData }
+                        photoImage = displayImage
                     }
                 }
             }
-            .onAppear {
-                if let photoData = target.photoData {
-                    photoImage = UIImage(data: photoData)
-                }
+            .task {
+                // Decode display thumbnail asynchronously so we never block the main thread
+                guard photoImage == nil, let stored = target.photoData else { return }
+                let thumb: UIImage? = await Task.detached(priority: .utility) {
+                    autoreleasepool {
+                        guard let full = UIImage(data: stored) else { return nil }
+                        return RoastTargetPhotoHelper.downscale(full, maxLongEdge: 400)
+                    }
+                }.value
+                photoImage = thumb
             }
         }
     }

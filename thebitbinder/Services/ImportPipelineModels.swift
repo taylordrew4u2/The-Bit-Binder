@@ -15,7 +15,8 @@ enum ImportFileType {
     case scannedPDF
     case image
     case document
-    case unknown
+    case unknown     // unrecognised extension — attempt OCR as last resort
+    case unsupported // known extension that we explicitly do not support (e.g. .swift, .py)
 }
 
 enum ExtractionMethod: String, Codable {
@@ -179,15 +180,13 @@ struct ImportSourceMetadata {
 
 struct ImportPipelineResult {
     let sourceFile: String
-    let autoSavedJokes: [ImportedJoke]          // High confidence, validated single jokes
-    let reviewQueueJokes: [ImportedJoke]        // Needs user review
-    let rejectedBlocks: [LayoutBlock]           // Not jokes, don't save
+    let autoSavedJokes: [ImportedJoke]
+    let reviewQueueJokes: [ImportedJoke]
+    let rejectedBlocks: [LayoutBlock]
     let pipelineStats: PipelineStats
     let debugInfo: PipelineDebugInfo?
-    /// Which provider was used (e.g., OpenAI, Arcee, OpenRouter, or Local Extraction)
+    /// Which AI provider was used (e.g., "OpenAI", "Arcee", "OpenRouter")
     let providerUsed: String
-    /// True when all providers failed and we fell back to local extraction
-    let usedLocalFallback: Bool
 }
 
 struct PipelineStats {

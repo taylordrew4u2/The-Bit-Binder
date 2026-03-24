@@ -9,28 +9,12 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @State private var showLaunchScreen = true
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     var body: some View {
-        ZStack {
-            MainTabView()
-            
-            if showLaunchScreen {
-                LaunchScreenView()
-                    .transition(.opacity)
-                    .zIndex(1)
-            }
-        }
-        // Flip the whole app color scheme based on roast mode
-        .preferredColorScheme(roastMode ? .dark : .light)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation(.easeOut(duration: 0.25)) {
-                    showLaunchScreen = false
-                }
-            }
-        }
+        MainTabView()
+            // Flip the whole app color scheme based on roast mode
+            .preferredColorScheme(roastMode ? .dark : .light)
     }
 }
 

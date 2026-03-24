@@ -175,6 +175,12 @@ extension CloudKitResetUtility {
         print("   ✓ UnresolvedImportFragment.batch       → CD_UnresolvedImportFragment.CD_batch (REFERENCE)")
         print("   ✓ ImportBatch.importedRecords          → cascade, inverse of CD_batch")
         print("   ✓ ImportBatch.unresolvedFragments      → cascade, inverse of CD_batch")
+        print("   ✓ Joke.isDeleted / deletedDate         → soft-delete (v2.2.0)")
+        print("   ✓ Recording.isDeleted / deletedDate    → soft-delete (v2.3.0)")
+        print("   ✓ SetList.isDeleted / deletedDate      → soft-delete (v2.3.0)")
+        print("   ✓ RoastJoke.isDeleted / deletedDate    → soft-delete (v2.3.0)")
+        print("   ✓ BrainstormIdea.isDeleted / deletedDate → soft-delete (v2.3.0)")
+        print("   ✓ NotebookPhotoRecord.isDeleted / deletedDate → soft-delete (v2.3.0)")
     }
 }
 #endif

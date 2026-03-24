@@ -222,7 +222,7 @@ struct HomeView: View {
                 .sheet(isPresented: $showAddJoke) { AddJokeView() }
                 .sheet(isPresented: $showBrainstorm) { AddBrainstormIdeaSheet() }
                 .sheet(isPresented: $showVoiceNote) { StandaloneRecordingView() }
-                .sheet(isPresented: $showTalkToText) { TalkToTextView(selectedFolder: nil) }
+                .sheet(isPresented: $showTalkToText) { TalkToTextView(selectedFolder: nil as JokeFolder?) }
         }
     }
 
@@ -247,12 +247,52 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - My Jokes Shortcut
+
+    private var myJokesShortcut: some View {
+        Button {
+            NotificationCenter.default.post(
+                name: .navigateToScreen,
+                object: nil,
+                userInfo: ["screen": AppScreen.jokes.rawValue]
+            )
+        } label: {
+            HStack(spacing: AppTheme.Spacing.sm) {
+                Image(systemName: AppScreen.jokes.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                Text("My Jokes")
+                    .font(.system(size: 16, weight: .semibold, design: .serif))
+                Spacer()
+                Text("\(activeJokes.count)")
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundColor(AppTheme.Colors.jokesAccent.opacity(0.8))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundColor(AppTheme.Colors.jokesAccent)
+            .padding(.horizontal, AppTheme.Spacing.lg)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
+                    .fill(AppTheme.Colors.jokesAccent.opacity(0.10))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
+                    .strokeBorder(AppTheme.Colors.jokesAccent.opacity(0.25), lineWidth: 1)
+            )
+        }
+        .buttonStyle(TouchReactiveStyle(pressedScale: 0.97, hapticStyle: .light))
+    }
+
     // MARK: - iPhone layout (optimized single column)
 
     private var iPhoneLayout: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 headerSection
+                    .padding(.bottom, AppTheme.Spacing.md)
+
+                myJokesShortcut
                     .padding(.bottom, AppTheme.Spacing.xl)
 
                 continueSection
@@ -283,6 +323,10 @@ struct HomeView: View {
             VStack(spacing: 0) {
                 headerSection
                     .frame(maxWidth: 640) // Tighter header constraint
+                    .padding(.bottom, AppTheme.Spacing.md)
+
+                myJokesShortcut
+                    .frame(maxWidth: 640)
                     .padding(.bottom, AppTheme.Spacing.xl)
 
                 HStack(alignment: .top, spacing: AppTheme.Spacing.xl) {
@@ -317,6 +361,10 @@ struct HomeView: View {
             VStack(spacing: 0) {
                 // Header spans full width but constrained
                 headerSection
+                    .frame(maxWidth: 840)
+                    .padding(.bottom, AppTheme.Spacing.md)
+
+                myJokesShortcut
                     .frame(maxWidth: 840)
                     .padding(.bottom, AppTheme.Spacing.xl)
 
@@ -563,24 +611,44 @@ struct HomeView: View {
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14) // Reduced from 16 for tighter feel
+                    .padding(.vertical, 14)
                     .background(
-                        RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous) // Changed from .large
+                        RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
                             .fill(AppTheme.Colors.primaryAction)
                     )
                 }
                 .buttonStyle(TouchReactiveStyle(pressedScale: 0.97, hapticStyle: .light))
 
-                // Secondary actions — horizontal row with better proportions
+                // Talk-to-Text Joke — prominent full-width button
+                Button { showTalkToText = true } label: {
+                    HStack(spacing: AppTheme.Spacing.sm) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 18, weight: .medium))
+                        Text("Talk-to-Text Joke")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(AppTheme.Colors.primaryAction)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
+                            .fill(AppTheme.Colors.surfaceElevated)
+                            .shadow(color: AppTheme.Shadows.sm.color, radius: AppTheme.Shadows.sm.radius, x: 0, y: AppTheme.Shadows.sm.y)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
+                            .strokeBorder(AppTheme.Colors.primaryAction.opacity(0.25), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(TouchReactiveStyle(pressedScale: 0.97, hapticStyle: .light))
+
+                // Secondary actions — horizontal row
                 HStack(spacing: AppTheme.Spacing.sm) {
                     QuickCaptureButton(icon: "lightbulb", label: "Brainstorm", color: AppTheme.Colors.brainstormAccent) {
                         showBrainstorm = true
                     }
-                    QuickCaptureButton(icon: "mic.fill", label: "Voice Note", color: AppTheme.Colors.recordingsAccent) {
+                    QuickCaptureButton(icon: "mic.fill", label: "Record", color: AppTheme.Colors.recordingsAccent) {
                         showVoiceNote = true
-                    }
-                    QuickCaptureButton(icon: "text.bubble.fill", label: "Talk to Text", color: AppTheme.Colors.primaryAction) {
-                        showTalkToText = true
                     }
                 }
             }

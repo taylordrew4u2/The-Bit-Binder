@@ -83,8 +83,8 @@ final class AppStartupCoordinator: ObservableObject {
         print("   - Validation service ready")
         print("   - Migration service ready")
         
-        // Brief pause to ensure all systems are ready
-        try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
+        // Brief hold so the launch animation is visible but doesn't feel slow.
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
     }
     
     /// Call this after ModelContainer is available to complete data validation and migration
@@ -145,11 +145,12 @@ final class AppStartupCoordinator: ObservableObject {
     /// Recordings: audio files are deleted before the DB record is removed.
     private func purgeExpiredTrashItems(context: ModelContext) {
         let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let distantFuture = Date.distantFuture
         var purgeCount = 0
 
         // Jokes
         if let jokes = try? context.fetch(FetchDescriptor<Joke>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? .distantFuture) < cutoff }
+            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for joke in jokes { context.delete(joke) }
             purgeCount += jokes.count
@@ -157,7 +158,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // BrainstormIdeas
         if let ideas = try? context.fetch(FetchDescriptor<BrainstormIdea>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? .distantFuture) < cutoff }
+            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for idea in ideas { context.delete(idea) }
             purgeCount += ideas.count
@@ -165,7 +166,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // SetLists
         if let setLists = try? context.fetch(FetchDescriptor<SetList>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? .distantFuture) < cutoff }
+            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for setList in setLists { context.delete(setList) }
             purgeCount += setLists.count
@@ -173,7 +174,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // RoastJokes
         if let roastJokes = try? context.fetch(FetchDescriptor<RoastJoke>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? .distantFuture) < cutoff }
+            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for joke in roastJokes { context.delete(joke) }
             purgeCount += roastJokes.count
@@ -181,7 +182,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // NotebookPhotoRecords
         if let photos = try? context.fetch(FetchDescriptor<NotebookPhotoRecord>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? .distantFuture) < cutoff }
+            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for photo in photos { context.delete(photo) }
             purgeCount += photos.count
@@ -189,7 +190,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // Recordings — delete audio file first, then DB record
         if let recordings = try? context.fetch(FetchDescriptor<Recording>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? .distantFuture) < cutoff }
+            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for recording in recordings {
                 // Resolve audio file URL

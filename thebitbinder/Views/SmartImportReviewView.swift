@@ -45,11 +45,11 @@ struct SmartImportReviewView: View {
                     progressSection
                     
                     // GagGrabber rate-limit banner
-                    if let rateLimitErr = viewModel.rateLimitError {
+                    if viewModel.rateLimitError != nil {
                         HStack(spacing: 8) {
                             Image(systemName: "moon.zzz.fill")
                                 .foregroundColor(.white)
-                            Text(rateLimitErr.localizedDescription)
+                            Text(viewModel.rateLimitError!.localizedDescription)
                                 .font(.caption)
                                 .foregroundColor(.white)
                                 .lineLimit(3)
@@ -65,27 +65,6 @@ struct SmartImportReviewView: View {
                         .padding(.top, 4)
                     }
                     
-                    // AI asleep banner when local fallback was used
-                    if importResult.usedLocalFallback {
-                        HStack(spacing: 8) {
-                            Image(systemName: "moon.zzz.fill")
-                                .foregroundColor(.white)
-                            Text("AI is asleep — used local extraction. Results may be rough; please double-check.")
-                                .font(.caption.bold())
-                                .foregroundColor(.white)
-                                .lineLimit(3)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.orange.opacity(0.9))
-                        )
-                        .padding(.horizontal, 12)
-                        .padding(.top, 4)
-                    }
-
                     // Auto-accepted summary banner
                     if viewModel.autoAcceptedCount > 0 {
                         HStack(spacing: 8) {
@@ -787,8 +766,7 @@ struct SmartImportReviewView: View {
                 processingTimeSeconds: 0.5, averageConfidence: 0.7
             ),
             debugInfo: nil,
-            providerUsed: "Extraction",
-            usedLocalFallback: false
+            providerUsed: "Extraction"
         )
     )
 }

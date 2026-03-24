@@ -112,14 +112,14 @@ struct JokeCardView: View {
                 // Subtle hit glow border
                 RoundedRectangle(cornerRadius: AppTheme.Radius.large, style: .continuous)
                     .strokeBorder(
-                        isHit 
+                        isHit
                             ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.hitsGold).opacity(0.4)
                             : Color.clear,
                         lineWidth: 1.5
                     )
             )
             .shadow(
-                color: isHit 
+                color: isHit
                     ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.hitsGold).opacity(0.15)
                     : Color.black.opacity(0.05),
                 radius: isHit ? 8 : 4,
@@ -224,7 +224,7 @@ struct JokeRowView: View {
         .overlay(
             RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
                 .strokeBorder(
-                    isHit 
+                    isHit
                         ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.hitsGold).opacity(0.3)
                         : Color.clear,
                     lineWidth: 1
@@ -258,14 +258,14 @@ struct FolderChip: View {
             .background(
                 Capsule()
                     .fill(
-                        isSelected 
+                        isSelected
                             ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
                             : (roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.paperAged)
                     )
             )
             .foregroundColor(
-                isSelected 
-                    ? .white 
+                isSelected
+                    ? .white
                     : (roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
             )
         }
@@ -287,11 +287,11 @@ struct TheHitsChip: View {
                 Image(systemName: roastMode ? "flame.fill" : "star.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(
-                        isSelected 
+                        isSelected
                             ? AnyShapeStyle(.white)
                             : AnyShapeStyle(
                                 LinearGradient(
-                                    colors: roastMode 
+                                    colors: roastMode
                                         ? [AppTheme.Colors.roastAccent, .orange]
                                         : [AppTheme.Colors.hitsGold, AppTheme.Colors.hitsGoldLight],
                                     startPoint: .topLeading,
@@ -333,8 +333,8 @@ struct TheHitsChip: View {
                     )
             )
             .foregroundColor(
-                isSelected 
-                    ? .white 
+                isSelected
+                    ? .white
                     : (roastMode ? .white.opacity(0.9) : AppTheme.Colors.inkBlack)
             )
         }
@@ -353,14 +353,14 @@ struct JokesEmptyState: View {
         BitBinderEmptyState(
             icon: roastMode ? "flame.fill" : "theatermasks.fill",
             title: hasFilter ? "No jokes here" : (roastMode ? "No roasts yet" : "No jokes yet"),
-            subtitle: hasFilter 
-                ? "Try a different filter or search term" 
+            subtitle: hasFilter
+                ? "Try a different filter or search term"
                 : (roastMode ? "Add your first target to start writing roasts" : "Start writing your first joke or import from files"),
             actionTitle: hasFilter ? nil : (roastMode ? "Add Target" : "Add Joke"),
             action: onAddJoke,
             roastMode: roastMode,
-            iconGradient: roastMode 
-                ? AppTheme.Colors.roastEmberGradient 
+            iconGradient: roastMode
+                ? AppTheme.Colors.roastEmberGradient
                 : LinearGradient(
                     colors: [AppTheme.Colors.primaryAction, AppTheme.Colors.primaryActionLight],
                     startPoint: .topLeading,

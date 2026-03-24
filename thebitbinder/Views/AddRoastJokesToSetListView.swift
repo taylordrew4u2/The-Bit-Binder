@@ -142,24 +142,13 @@ struct AddRoastJokesToSetListView: View {
             }
         } label: {
             HStack(spacing: 10) {
-                // Avatar
-                if let photoData = target.photoData,
-                   let uiImage = UIImage(data: photoData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 32, height: 32)
-                        .clipShape(Circle())
-                } else {
-                    ZStack {
-                        Circle()
-                            .fill(accent.opacity(0.15))
-                            .frame(width: 32, height: 32)
-                        Text(target.name.prefix(1).uppercased())
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(accent)
-                    }
-                }
+                // Avatar — async background decode
+                AsyncAvatarView(
+                    photoData: target.photoData,
+                    size: 32,
+                    fallbackInitial: String(target.name.prefix(1).uppercased()),
+                    accentColor: accent
+                )
 
                 Text(target.name)
                     .font(.system(size: 15, weight: .semibold))

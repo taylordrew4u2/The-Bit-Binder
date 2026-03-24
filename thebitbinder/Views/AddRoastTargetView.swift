@@ -90,11 +90,20 @@ struct AddRoastTargetView: View {
             }
             .onChange(of: selectedPhoto) { _, newValue in
                 Task {
-                    if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                        await MainActor.run {
-                            photoData = data
-                            photoImage = UIImage(data: data)
+                    guard let rawData = try? await newValue?.loadTransferable(type: Data.self) else { return }
+                    // Downscale before storing: raw Photos data can be 5–15 MB.
+                    let (stored, thumb): (Data?, UIImage?) = await Task.detached(priority: .utility) {
+                        autoreleasepool {
+                            guard let full = UIImage(data: rawData) else { return (nil, nil) }
+                            let scaled     = RoastTargetPhotoHelper.downscale(full, maxLongEdge: 1500)
+                            let jpeg       = scaled.jpegData(compressionQuality: 0.8)
+                            let display    = RoastTargetPhotoHelper.downscale(full, maxLongEdge: 400)
+                            return (jpeg, display)
                         }
+                    }.value
+                    await MainActor.run {
+                        if let stored { photoData = stored }
+                        photoImage = thumb
                     }
                 }
             }

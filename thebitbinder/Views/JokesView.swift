@@ -8,7 +8,6 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
-import PDFKit
 
 struct JokesView: View {
     @Environment(\.modelContext) private var modelContext
@@ -79,6 +78,8 @@ struct JokesView: View {
     // Smart import review
     @State private var smartImportResult: ImportPipelineResult?
     @State private var showingSmartImportReview = false
+    @State private var importErrorMessage = ""
+    @State private var showingImportError = false
     
     // Batch select/delete mode
     @State private var isSelectMode = false
@@ -88,7 +89,6 @@ struct JokesView: View {
     @State private var debouncedSearchText = ""
     @State private var searchDebounceTask: Task<Void, Never>?
     @State private var cachedFilteredJokes: [Joke] = []
-    @State private var needsFilterRefresh = true
 
     // MARK: - The Hits Button
     
@@ -274,42 +274,43 @@ struct JokesView: View {
     }
 
     
-    var filteredJokes: [Joke] {
-        // Return cached result if available and no refresh needed
-        if !needsFilterRefresh && !cachedFilteredJokes.isEmpty {
-            return cachedFilteredJokes
-        }
-        
-        // Start with base jokes depending on selected filter
+    // A stable key that changes whenever any filter input changes.
+    // Used by .task(id:) to re-run filtering only when something actually changed.
+    private var filterKey: String {
+        let folder = selectedFolder?.id.uuidString ?? "nil"
+        let hits   = showingHitsFilter ? "1" : "0"
+        let recent = showRecentlyAdded  ? "1" : "0"
+        let search = debouncedSearchText
+        let count  = jokes.count
+        return "\(folder)|\(hits)|\(recent)|\(search)|\(count)"
+    }
+
+    var filteredJokes: [Joke] { cachedFilteredJokes }
+
+    private func rebuildFilteredJokes() {
         let base: [Joke]
         if showingHitsFilter {
-            // Show only hits
-            base = jokes.filter { $0.isHit }
+            base = jokes.filter { $0.isHit && !$0.isDeleted }
         } else if showRecentlyAdded {
             let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-            base = jokes.filter { $0.dateCreated >= sevenDaysAgo }
+            base = jokes.filter { !$0.isDeleted && $0.dateCreated >= sevenDaysAgo }
         } else if let folder = selectedFolder {
             let folderId = folder.id
-            base = jokes.filter { $0.folder?.id == folderId }
+            base = jokes.filter { !$0.isDeleted && $0.folder?.id == folderId }
         } else {
-            base = jokes
+            base = jokes.filter { !$0.isDeleted }
         }
-        
-        // Exclude trashed jokes
-        let active = base.filter { !$0.isDeleted }
-        
-        // Apply search filter if needed - use debounced text
+
         let trimmed = debouncedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let filtered: [Joke]
         if trimmed.isEmpty {
-            filtered = active
+            filtered = base
         } else {
             let lower = trimmed.lowercased()
-            filtered = active.filter { matchesSearch($0, lower: lower) }
+            filtered = base.filter { matchesSearch($0, lower: lower) }
         }
-        
-        // Sort by dateModified descending (most recently touched first)
-        return filtered.sorted { $0.dateModified > $1.dateModified }
+
+        cachedFilteredJokes = filtered.sorted { $0.dateModified > $1.dateModified }
     }
     
     var body: some View {
@@ -322,6 +323,7 @@ struct JokesView: View {
                 .navigationTitle(roastMode ? "🔥 Roasts" : "Jokes")
                 .navigationBarTitleDisplayMode(.inline)
                 .searchable(text: $searchText, prompt: roastMode ? "Search targets" : "Search jokes")
+                .ignoresSafeArea(.keyboard, edges: .bottom)
                 .bitBinderToolbar(roastMode: roastMode)
                 .onAppear { checkPendingVoiceMemoImports() }
                 .toolbar { combinedToolbarContent }
@@ -366,6 +368,11 @@ struct JokesView: View {
                         )
                     }
                 }
+                .alert("Import Failed", isPresented: $showingImportError) {
+                    Button("OK", role: .cancel) { }
+                } message: {
+                    Text(importErrorMessage)
+                }
                 .modifier(JokesAlertsModifier(
                     showingExportAlert: $showingExportAlert,
                     showingImportSummary: $showingImportSummary,
@@ -382,6 +389,10 @@ struct JokesView: View {
                     modelContext: modelContext
                 ))
                 .overlay { importOverlay }
+                // Rebuild filtered list whenever filter inputs change
+                .task(id: filterKey) {
+                    rebuildFilteredJokes()
+                }
                 // Performance: Debounce search text updates
                 .onChange(of: searchText) { _, newValue in
                     searchDebounceTask?.cancel()
@@ -390,15 +401,9 @@ struct JokesView: View {
                         guard !Task.isCancelled else { return }
                         await MainActor.run {
                             debouncedSearchText = newValue
-                            needsFilterRefresh = true
                         }
                     }
                 }
-                // Invalidate cache when filter criteria change
-                .onChange(of: selectedFolder) { _, _ in needsFilterRefresh = true }
-                .onChange(of: showRecentlyAdded) { _, _ in needsFilterRefresh = true }
-                .onChange(of: showingHitsFilter) { _, _ in needsFilterRefresh = true }
-                .onChange(of: jokes.count) { _, _ in needsFilterRefresh = true }
         }
     }
 
@@ -648,54 +653,59 @@ struct JokesView: View {
                 }
             }
         } else {
+            // Split the leading HStack into two separate ToolbarItems.
+            // A single ToolbarItem wrapping an HStack causes UIKit's
+            // _UIButtonBarButton wrapper to collapse to width==0 during
+            // the first layout pass, producing an unsatisfiable constraint warning.
             ToolbarItem(placement: .navigationBarLeading) {
-                HStack(spacing: 12) {
+                Menu {
+                    Button(action: { showingCreateFolder = true }) {
+                        Label("New Folder", systemImage: "folder.badge.plus")
+                    }
+                    Button(action: { showingAutoOrganize = true }) {
+                        Label("Auto-Organize", systemImage: "wand.and.stars")
+                    }
+                    Button(action: { showingImportHistory = true }) {
+                        Label("Import History", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                    }
+                    Button(action: { expandAllJokes.toggle() }) {
+                        Label(expandAllJokes ? "Collapse Content" : "Expand Content",
+                              systemImage: expandAllJokes ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
+                    }
+                    Divider()
+                    Button(action: {
+                        isSelectMode.toggle()
+                        if !isSelectMode { selectedJokeIDs.removeAll() }
+                    }) {
+                        Label(isSelectMode ? "Cancel Selection" : "Select Multiple",
+                              systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
+                    }
+                    Divider()
                     Menu {
-                        Button(action: { showingCreateFolder = true }) {
-                            Label("New Folder", systemImage: "folder.badge.plus")
+                        Button(action: exportJokesToPDF) {
+                            Label("Export Jokes", systemImage: "doc.text")
                         }
-                        Button(action: { showingAutoOrganize = true }) {
-                            Label("Auto-Organize", systemImage: "wand.and.stars")
+                        Button(action: exportBrainstormToPDF) {
+                            Label("Export Brainstorm", systemImage: "lightbulb")
                         }
-                        Button(action: { showingImportHistory = true }) {
-                            Label("Import History", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                        }
-                        Button(action: { expandAllJokes.toggle() }) {
-                            Label(expandAllJokes ? "Collapse Content" : "Expand Content", systemImage: expandAllJokes ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
-                        }
-                        Divider()
-                        Button(action: {
-                            isSelectMode.toggle()
-                            if !isSelectMode { selectedJokeIDs.removeAll() }
-                        }) {
-                            Label(isSelectMode ? "Cancel Selection" : "Select Multiple", systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
-                        }
-                        Divider()
-                        Menu {
-                            Button(action: exportJokesToPDF) {
-                                Label("Export Jokes", systemImage: "doc.text")
-                            }
-                            Button(action: exportBrainstormToPDF) {
-                                Label("Export Brainstorm", systemImage: "lightbulb")
-                            }
-                            Button(action: exportEverythingToPDF) {
-                                Label("Export Everything", systemImage: "square.and.arrow.up")
-                            }
-                        } label: {
-                            Label("Export to PDF", systemImage: "square.and.arrow.up")
+                        Button(action: exportEverythingToPDF) {
+                            Label("Export Everything", systemImage: "square.and.arrow.up")
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Label("Export to PDF", systemImage: "square.and.arrow.up")
                     }
-                    
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            viewMode = viewMode == .grid ? .list : .grid
-                        }
-                    } label: {
-                        Image(systemName: viewMode.icon)
-                            .foregroundColor(AppTheme.Colors.jokesAccent)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewMode = viewMode == .grid ? .list : .grid
                     }
+                } label: {
+                    Image(systemName: viewMode.icon)
+                        .foregroundColor(AppTheme.Colors.jokesAccent)
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -704,7 +714,7 @@ struct JokesView: View {
                         Label("Add Manually", systemImage: "square.and.pencil")
                     }
                     Button(action: { showingTalkToText = true }) {
-                        Label("Talk-to-Text", systemImage: "mic.badge.plus")
+                        Label("Talk-to-Text Joke", systemImage: "mic.badge.plus")
                     }
                     Button(action: { showingScanner = true }) {
                         Label("Scan from Camera", systemImage: "camera")
@@ -790,85 +800,93 @@ struct JokesView: View {
         importStatusMessage = "Scanning \(images.count) image\(images.count == 1 ? "" : "s")..."
         importFileCount = images.count
         importFileIndex = 0
-        
+
         Task {
-            let extractionService = BitBuddyService.shared
-            
-            for image in images {
+            var combinedAutoSaved:  [ImportedJoke] = []
+            var combinedReview:     [ImportedJoke] = []
+            var combinedRejected:   [LayoutBlock]  = []
+            var providersUsed = Set<String>()
+            var failedMessages: [String] = []  // collect per-file errors — never silently drop them
+
+            for (idx, image) in images.enumerated() {
                 await MainActor.run {
-                    importFileIndex += 1
-                    importStatusMessage = "Scanning image \(importFileIndex)/\(importFileCount)..."
+                    importFileIndex = idx + 1
+                    importStatusMessage = "GagGrabber extracting jokes from scan \(importFileIndex)..."
                 }
-                
+
+                // Write the UIImage to a temp PNG so the pipeline can process it normally
+                guard let pngData = image.pngData() else {
+                    failedMessages.append("Image \(idx + 1): could not encode as PNG")
+                    continue
+                }
+                let tmpURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("scan_\(idx)_\(UUID().uuidString).png")
                 do {
-                    let text = try await TextRecognitionService.recognizeText(from: image)
-                    
+                    try pngData.write(to: tmpURL)
+                    defer { try? FileManager.default.removeItem(at: tmpURL) }
+
+                    await MainActor.run { importStatusMessage = "GagGrabber extracting jokes from scan \(importFileIndex)..." }
+
+                    let result = try await FileImportService.shared.importWithPipeline(from: tmpURL)
+                    combinedAutoSaved.append(contentsOf: result.autoSavedJokes)
+                    combinedReview.append(contentsOf: result.reviewQueueJokes)
+                    combinedRejected.append(contentsOf: result.rejectedBlocks)
+                    providersUsed.insert(result.providerUsed)
+
                     await MainActor.run {
-                        importStatusMessage = "🤖 Extracting jokes..."
-                    }
-                    
-                    let extractedJokes = try await extractionService.extractJokes(from: text)
-                    
-                    await MainActor.run {
-                        importStatusMessage = "Found \(extractedJokes.count) jokes, adding..."
-                    }
-                    
-                    // Performance: Batch all joke insertions then save once
-                    var jokesToCategorize: [(Joke, String)] = []
-                    
-                    for jokeText in extractedJokes {
-                        let trimmed = jokeText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard trimmed.count >= 3 else { continue }
-                        let title = String(trimmed.prefix(60))
-                        
-                        await MainActor.run {
-                            let joke = Joke(content: trimmed, title: title, folder: self.selectedFolder)
-                            self.modelContext.insert(joke)
-                            jokesToCategorize.append((joke, trimmed))
-                            self.importedJokeNames.append(title)
-                            self.importStatusMessage = "Added \(self.importedJokeNames.count) jokes..."
-                        }
-                    }
-                    
-                    // Save all jokes in one batch
-                    await MainActor.run {
-                        try? self.modelContext.save()
-                    }
-                    
-                    // Background categorization after batch save
-                    for (joke, content) in jokesToCategorize {
-                        Task.detached {
-                            do {
-                                let analysis = try await BitBuddyService.shared.analyzeJoke(content)
-                                await MainActor.run {
-                                    joke.category = analysis.category
-                                    joke.tags = analysis.tags
-                                    joke.difficulty = analysis.difficulty
-                                    joke.humorRating = analysis.humorRating
-                                    
-                                    var folder = self.folders.first(where: { $0.name == analysis.category })
-                                    if folder == nil {
-                                        folder = JokeFolder(name: analysis.category)
-                                        self.modelContext.insert(folder!)
-                                    }
-                                    joke.folder = folder
-                                    // Note: Don't save after each categorization - let SwiftData auto-save
-                                }
-                            } catch { }
-                        }
+                        importStatusMessage = "Found \(result.autoSavedJokes.count + result.reviewQueueJokes.count) fragment(s)..."
                     }
                 } catch {
-                    print("❌ SCANNER: Error: \(error)")
+                    print("❌ SCANNER: Pipeline failed for image \(idx + 1): \(error)")
+                    failedMessages.append("Image \(idx + 1): \(error.localizedDescription)")
                 }
             }
+
+            let providerSummary = providersUsed.count == 1 ? providersUsed.first! : (providersUsed.isEmpty ? "Unknown" : "Multiple")
+            let combinedResult = ImportPipelineResult(
+                sourceFile: "Scanned Image",
+                autoSavedJokes: combinedAutoSaved,
+                reviewQueueJokes: combinedReview,
+                rejectedBlocks: combinedRejected,
+                pipelineStats: PipelineStats(
+                    totalPagesProcessed: images.count,
+                    totalLinesExtracted: 0,
+                    totalBlocksCreated: combinedAutoSaved.count + combinedReview.count,
+                    autoSavedCount: combinedAutoSaved.count,
+                    reviewQueueCount: combinedReview.count,
+                    rejectedCount: combinedRejected.count,
+                    extractionMethod: .visionOCR,
+                    processingTimeSeconds: 0,
+                    averageConfidence: 0.7
+                ),
+                debugInfo: nil,
+                providerUsed: providerSummary
+            )
+
             await MainActor.run {
-                // Final save after all categorizations
-                try? self.modelContext.save()
                 isProcessingImages = false
                 importStatusMessage = ""
                 importedJokeNames = []
                 importFileCount = 0
                 importFileIndex = 0
+
+                let total = combinedAutoSaved.count + combinedReview.count
+                if total > 0 {
+                    self.smartImportResult = combinedResult
+                    self.showingSmartImportReview = true
+                    // Surface partial-failure info even when some files succeeded
+                    if !failedMessages.isEmpty {
+                        self.importErrorMessage = "Some scans failed:\n" + failedMessages.joined(separator: "\n")
+                        self.showingImportError = true
+                    }
+                } else if !failedMessages.isEmpty {
+                    // Every file failed — show the collected errors
+                    self.importErrorMessage = failedMessages.joined(separator: "\n")
+                    self.showingImportError = true
+                } else {
+                    self.importSummary = (0, 0)
+                    self.showingImportSummary = true
+                }
             }
         }
     }
@@ -879,94 +897,95 @@ struct JokesView: View {
         importStatusMessage = "Loading \(items.count) photo\(items.count == 1 ? "" : "s")..."
         importFileCount = items.count
         importFileIndex = 0
-        var added = 0
-        var skipped = 0
-        var duplicates: [String] = []
-        let extractionService = BitBuddyService.shared
-        
-        for item in items {
+
+        var combinedAutoSaved:  [ImportedJoke] = []
+        var combinedReview:     [ImportedJoke] = []
+        var combinedRejected:   [LayoutBlock]  = []
+        var providersUsed = Set<String>()
+        var failedMessages: [String] = []  // collect per-photo errors — never silently drop them
+
+        for (idx, item) in items.enumerated() {
             await MainActor.run {
-                importFileIndex += 1
+                importFileIndex = idx + 1
                 importStatusMessage = "Scanning photo \(importFileIndex)/\(importFileCount)..."
             }
-            
-            if let data = try? await item.loadTransferable(type: Data.self),
-               let image = UIImage(data: data) {
-                do {
-                    let text = try await TextRecognitionService.recognizeText(from: image)
-                    
-                    await MainActor.run {
-                        importStatusMessage = "🤖 Extracting jokes..."
-                    }
-                    
-                    let extractedJokes = try await extractionService.extractJokes(from: text)
-                    
-                    // Performance: Batch all insertions
-                    var jokesToCategorize: [(Joke, String)] = []
-                    
-                    for jokeText in extractedJokes {
-                        let trimmed = jokeText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard trimmed.count >= 3 else { continue }
-                        let title = String(trimmed.prefix(60))
-                        
-                        if isLikelyDuplicate(trimmed, title: title) {
-                            duplicates.append("\(title) — duplicate")
-                            skipped += 1
-                        } else {
-                            await MainActor.run {
-                                let joke = Joke(content: trimmed, title: title, folder: self.selectedFolder)
-                                self.modelContext.insert(joke)
-                                jokesToCategorize.append((joke, trimmed))
-                                self.importedJokeNames.append(title)
-                                self.importStatusMessage = "Added \(self.importedJokeNames.count) jokes..."
-                            }
-                            added += 1
-                        }
-                    }
-                    
-                    // Batch save all jokes from this photo
-                    await MainActor.run {
-                        try? self.modelContext.save()
-                    }
-                    
-                    // Background categorization after save
-                    for (joke, content) in jokesToCategorize {
-                        Task.detached {
-                            do {
-                                let analysis = try await BitBuddyService.shared.analyzeJoke(content)
-                                await MainActor.run {
-                                    joke.category = analysis.category
-                                    joke.tags = analysis.tags
-                                    joke.difficulty = analysis.difficulty
-                                    joke.humorRating = analysis.humorRating
-                                    
-                                    var folder = self.folders.first(where: { $0.name == analysis.category })
-                                    if folder == nil {
-                                        folder = JokeFolder(name: analysis.category)
-                                        self.modelContext.insert(folder!)
-                                    }
-                                    joke.folder = folder
-                                }
-                            } catch { }
-                        }
-                    }
-                } catch {
-                    print("❌ PHOTOS: Error: \(error)")
+
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data),
+                  let pngData = image.pngData() else {
+                failedMessages.append("Photo \(idx + 1): could not load image data")
+                continue
+            }
+
+            let tmpURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("photo_\(idx)_\(UUID().uuidString).png")
+            do {
+                try pngData.write(to: tmpURL)
+                defer { try? FileManager.default.removeItem(at: tmpURL) }
+
+                await MainActor.run { importStatusMessage = "GagGrabber extracting jokes from photo \(importFileIndex)..." }
+
+                let result = try await FileImportService.shared.importWithPipeline(from: tmpURL)
+                combinedAutoSaved.append(contentsOf: result.autoSavedJokes)
+                combinedReview.append(contentsOf: result.reviewQueueJokes)
+                combinedRejected.append(contentsOf: result.rejectedBlocks)
+                providersUsed.insert(result.providerUsed)
+
+                await MainActor.run {
+                    importStatusMessage = "Found \(result.autoSavedJokes.count + result.reviewQueueJokes.count) fragment(s)..."
                 }
+            } catch {
+                print("❌ PHOTOS: Pipeline failed for photo \(idx + 1): \(error)")
+                failedMessages.append("Photo \(idx + 1): \(error.localizedDescription)")
             }
         }
+
+        let providerSummary = providersUsed.count == 1 ? providersUsed.first! : (providersUsed.isEmpty ? "Unknown" : "Multiple")
+        let combinedResult = ImportPipelineResult(
+            sourceFile: "Photo Library",
+            autoSavedJokes: combinedAutoSaved,
+            reviewQueueJokes: combinedReview,
+            rejectedBlocks: combinedRejected,
+            pipelineStats: PipelineStats(
+                totalPagesProcessed: items.count,
+                totalLinesExtracted: 0,
+                totalBlocksCreated: combinedAutoSaved.count + combinedReview.count,
+                autoSavedCount: combinedAutoSaved.count,
+                reviewQueueCount: combinedReview.count,
+                rejectedCount: combinedRejected.count,
+                extractionMethod: .visionOCR,
+                processingTimeSeconds: 0,
+                averageConfidence: 0.7
+            ),
+            debugInfo: nil,
+            providerUsed: providerSummary
+        )
+
         await MainActor.run {
-            // Final save for any remaining categorizations
-            try? self.modelContext.save()
-            importSummary = (added, skipped)
-            showingImportSummary = true
-            possibleDuplicates = duplicates
             selectedPhotos = []
             isProcessingImages = false
             importStatusMessage = ""
             importedJokeNames = []
             importFileCount = 0
             importFileIndex = 0
+
+            let total = combinedAutoSaved.count + combinedReview.count
+            if total > 0 {
+                self.smartImportResult = combinedResult
+                self.showingSmartImportReview = true
+                // Surface partial-failure info even when some photos succeeded
+                if !failedMessages.isEmpty {
+                    self.importErrorMessage = "Some photos failed:\n" + failedMessages.joined(separator: "\n")
+                    self.showingImportError = true
+                }
+            } else if !failedMessages.isEmpty {
+                // Every photo failed — show the collected errors
+                self.importErrorMessage = failedMessages.joined(separator: "\n")
+                self.showingImportError = true
+            } else {
+                self.importSummary = (0, 0)
+                self.showingImportSummary = true
+            }
         }
     }
     
@@ -984,13 +1003,13 @@ struct JokesView: View {
             var combinedReview: [ImportedJoke] = []
             var combinedRejected: [LayoutBlock] = []
             var sourceFile = ""
-            var anyLocalFallback = false
             var providersUsed = Set<String>()
+            var failedMessages: [String] = []  // collect per-file errors — never silently drop them
             
             for url in urls {
                 await MainActor.run {
                     importFileIndex += 1
-                    importStatusMessage = "Analyzing \(url.lastPathComponent)..."
+                    importStatusMessage = "GagGrabber scanning \(url.lastPathComponent)..."
                 }
                 
                 do {
@@ -1000,51 +1019,15 @@ struct JokesView: View {
                     combinedRejected.append(contentsOf: result.rejectedBlocks)
                     sourceFile = result.sourceFile
                     providersUsed.insert(result.providerUsed)
-                    if result.usedLocalFallback { anyLocalFallback = true }
                     
                     await MainActor.run {
-                        if result.usedLocalFallback {
-                            importStatusMessage = "AI is asleep — using local extraction (may be rough)"
-                        } else {
-                            importStatusMessage = "Found \(result.autoSavedJokes.count + result.reviewQueueJokes.count) potential jokes..."
-                        }
+                        importStatusMessage = "Found \(result.autoSavedJokes.count + result.reviewQueueJokes.count) fragment(s)..."
                     }
                 } catch {
-                    print("❌ IMPORT: Pipeline failed for \(url.lastPathComponent): \(error)")
-                    // Fallback: try reading raw text and running through splitter
-                    if let text = await readTextFromFile(url: url) {
-                        let chunks = SmartTextSplitter.split(text)
-                        for (i, chunk) in chunks.enumerated() {
-                            let joke = ImportedJoke(
-                                title: nil,
-                                body: chunk,
-                                rawSourceText: chunk,
-                                tags: [],
-                                confidence: .medium,
-                                confidenceFactors: ConfidenceFactors(
-                                    extractionQuality: 0.6,
-                                    structuralCleanliness: 0.6,
-                                    titleDetection: 0.3,
-                                    boundaryClarity: 0.5,
-                                    ocrConfidence: 1.0
-                                ),
-                                sourceMetadata: ImportSourceMetadata(
-                                    fileName: url.lastPathComponent,
-                                    pageNumber: 1,
-                                    orderInPage: i,
-                                    orderInFile: i,
-                                    boundingBox: nil,
-                                    importTimestamp: Date()
-                                ),
-                                validationResult: .requiresReview(reasons: ["Fallback extraction"]),
-                                extractionMethod: .documentText
-                            )
-                            combinedReview.append(joke)
-                        }
-                        sourceFile = url.lastPathComponent
-                        anyLocalFallback = true
-                        providersUsed.insert("Local Extraction")
-                    }
+                    print("❌ IMPORT: AI extraction failed for \(url.lastPathComponent): \(error)")
+                    failedMessages.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                    // Do not fall back to local extraction — surface the error below.
+                    // Continue looping so other selected files can still be processed.
                 }
             }
             
@@ -1073,24 +1056,32 @@ struct JokesView: View {
                     averageConfidence: 0.7
                 ),
                 debugInfo: nil,
-                providerUsed: providerSummary,
-                usedLocalFallback: anyLocalFallback
+                providerUsed: providerSummary
             )
             
             await MainActor.run {
                 self.isProcessingImages = false
-                self.importStatusMessage = anyLocalFallback ? "AI is asleep — used local extraction" : ""
+                self.importStatusMessage = ""
                 self.importedJokeNames = []
                 self.importFileCount = 0
                 self.importFileIndex = 0
                 
                 let totalJokes = combinedAutoSaved.count + combinedReview.count
                 if totalJokes > 0 {
-                    // Show the Smart Import Review for ALL jokes — let user decide
+                    // Show the Smart Import Review for all AI-reviewed fragments
                     self.smartImportResult = combinedResult
                     self.showingSmartImportReview = true
+                    // Surface partial-failure info even when some files succeeded
+                    if !failedMessages.isEmpty {
+                        self.importErrorMessage = "Some files failed:\n" + failedMessages.joined(separator: "\n")
+                        self.showingImportError = true
+                    }
+                } else if !failedMessages.isEmpty {
+                    // AI failed on every file — show the collected errors
+                    self.importErrorMessage = failedMessages.joined(separator: "\n")
+                    self.showingImportError = true
                 } else {
-                    // Nothing found
+                    // AI ran but found nothing at all
                     self.importSummary = (0, 0)
                     self.showingImportSummary = true
                 }
@@ -1098,195 +1089,8 @@ struct JokesView: View {
         }
     }
     
-    // MARK: - New PDF/AI Pipeline Methods
+    // MARK: - Export Methods
 
-    private func processLegacyTextImport(_ text: String, totalAdded: inout Int, skipped: inout Int, duplicates: inout [String]) async {
-        var jokes: [String] = []
-        do {
-            jokes = try await BitBuddyService.shared.extractJokes(from: text)
-        } catch {
-            jokes = basicSplitJokes(from: text)
-        }
-        
-        if jokes.isEmpty {
-            jokes = [text.trimmingCharacters(in: .whitespacesAndNewlines)]
-        }
-        
-        for jokeText in jokes {
-            let trimmed = jokeText.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.count >= 3 else { continue }
-            
-            let title = String(trimmed.prefix(60))
-            
-            if isLikelyDuplicate(trimmed, title: title) {
-                duplicates.append("\(title) — duplicate")
-                skipped += 1
-                continue
-            }
-            
-            await MainActor.run {
-                let joke = Joke(content: trimmed, title: title, folder: self.selectedFolder)
-                self.modelContext.insert(joke)
-                try? self.modelContext.save()
-                totalAdded += 1
-                importedJokeNames.append(title)
-            }
-        }
-    }
-
-    /// Read text from any file type
-    private func readTextFromFile(url: URL) async -> String? {
-        let ext = url.pathExtension.lowercased()
-        print("📖 READ: \(url.lastPathComponent) ext=\(ext)")
-        
-        // PDF
-        if ext == "pdf" {
-            var allText = ""
-            await processPDFToText(url: url) { pageText in
-                allText += pageText + "\n\n"
-            }
-            if !allText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                print("📖 READ: PDF → \(allText.count) chars")
-                return allText
-            }
-            return nil
-        }
-        
-        // Word docs
-        if ["doc", "docx"].contains(ext) {
-            if let attrStr = try? NSAttributedString(url: url, options: [:], documentAttributes: nil) {
-                print("📖 READ: DOC → \(attrStr.string.count) chars")
-                return attrStr.string
-            }
-            return nil
-        }
-        
-        // Images — OCR
-        if ["jpg", "jpeg", "png", "heic", "heif", "tiff", "bmp", "gif"].contains(ext) {
-            if let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
-                let text = try? await TextRecognitionService.recognizeText(from: image)
-                print("📖 READ: IMAGE → \(text?.count ?? 0) chars")
-                return text
-            }
-            return nil
-        }
-        
-        // Everything else — try as plain text
-        if let text = try? String(contentsOf: url, encoding: .utf8), !text.isEmpty {
-            print("📖 READ: TEXT → \(text.count) chars")
-            return text
-        }
-        
-        // Last resort — try reading raw data as ascii
-        if let data = try? Data(contentsOf: url) {
-            if let text = String(data: data, encoding: .ascii), !text.isEmpty {
-                print("📖 READ: ASCII → \(text.count) chars")
-                return text
-            }
-        }
-        
-        print("❌ READ: Could not read \(url.lastPathComponent)")
-        return nil
-    }
-    
-    /// Basic joke splitting when AI is unavailable
-    private func basicSplitJokes(from text: String) -> [String] {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Try splitting by numbered list (1. 2. 3.)
-        let numberedPattern = #"(?:^|\n)\s*\d+[\.\)]\s+"#
-        if let regex = try? NSRegularExpression(pattern: numberedPattern, options: [.anchorsMatchLines]) {
-            let range = NSRange(trimmed.startIndex..., in: trimmed)
-            let matches = regex.matches(in: trimmed, options: [], range: range)
-            if matches.count >= 2 {
-                var jokes: [String] = []
-                var lastEnd = trimmed.startIndex
-                for (i, match) in matches.enumerated() {
-                    if let r = Range(match.range, in: trimmed) {
-                        if i > 0 {
-                            let joke = String(trimmed[lastEnd..<r.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-                            if joke.count >= 3 { jokes.append(joke) }
-                        }
-                        lastEnd = r.upperBound
-                    }
-                }
-                let last = String(trimmed[lastEnd...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                if last.count >= 3 { jokes.append(last) }
-                if !jokes.isEmpty { return jokes }
-            }
-        }
-        
-        // Try splitting by blank lines
-        let lines = trimmed.components(separatedBy: "\n")
-        var jokes: [String] = []
-        var current = ""
-        for line in lines {
-            let l = line.trimmingCharacters(in: .whitespaces)
-            if l.isEmpty {
-                if !current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    jokes.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
-                    current = ""
-                }
-            } else {
-                current += (current.isEmpty ? "" : "\n") + l
-            }
-        }
-        if !current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            jokes.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
-        if jokes.count >= 2 { return jokes }
-        
-        // Try splitting by single newlines
-        let singleLines = lines
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && $0.count >= 3 }
-        if singleLines.count >= 2 { return singleLines }
-        
-        // Return whole text as one joke
-        return trimmed.isEmpty ? [] : [trimmed]
-    }
-    
-    /// Extract text from all PDF pages
-    private func processPDFToText(url: URL, onPageText: @escaping (String) -> Void) async {
-        guard let document = CGPDFDocument(url as CFURL) else {
-            print("❌ PDF: Failed to load \(url.lastPathComponent)")
-            return
-        }
-        
-        let maxDim: CGFloat = 1800
-        let pageCount = document.numberOfPages
-        await MainActor.run {
-            processingTotal = pageCount
-            processingCurrent = 0
-        }
-        
-        for pageNum in 1...pageCount {
-            guard let page = document.page(at: pageNum) else { continue }
-            let media = page.getBoxRect(.mediaBox)
-            let scale = min(maxDim / max(media.width, media.height), 2.0)
-            let renderSize = CGSize(width: media.width * scale, height: media.height * scale)
-            let format = UIGraphicsImageRendererFormat.default()
-            format.scale = 1.0
-            let renderer = UIGraphicsImageRenderer(size: renderSize, format: format)
-            let image = renderer.image { ctx in
-                UIColor.white.set()
-                ctx.fill(CGRect(origin: .zero, size: renderSize))
-                ctx.cgContext.translateBy(x: 0, y: renderSize.height)
-                ctx.cgContext.scaleBy(x: scale, y: -scale)
-                ctx.cgContext.drawPDFPage(page)
-            }
-            do {
-                let text = try await TextRecognitionService.recognizeText(from: image)
-                onPageText(text)
-                print("📄 PDF: Page \(pageNum)/\(pageCount) → \(text.count) chars")
-            } catch {
-                print("❌ PDF: OCR failed on page \(pageNum): \(error)")
-            }
-            await MainActor.run { processingCurrent += 1 }
-            await Task.yield()
-        }
-    }
-    
     private func exportJokesToPDF() {
         let jokesToExport: [Joke]
         if selectedFolder != nil {
@@ -1343,7 +1147,7 @@ struct JokesView: View {
     
     private func checkPendingVoiceMemoImports() {
         // Use App Group shared defaults for extension communication
-        guard let sharedDefaults = UserDefaults(suiteName: "group.R44WG942GS.thebitbinder") else {
+        guard let sharedDefaults = UserDefaults(suiteName: "group.666bit") else {
             print("⚠️ [VoiceMemo] App Group not available")
             return
         }

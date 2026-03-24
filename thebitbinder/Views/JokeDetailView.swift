@@ -12,7 +12,6 @@ import SwiftData
 struct JokeDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query private var folders: [JokeFolder]
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     @Bindable var joke: Joke
@@ -20,6 +19,8 @@ struct JokeDetailView: View {
     @State private var showingFolderPicker = false
     @State private var showingDeleteAlert = false
     @State private var showingMetadata = false
+    // Folders loaded lazily — only when the picker sheet opens
+    @State private var folders: [JokeFolder] = []
     
     // Accent color based on mode
     private var accentColor: Color {
@@ -67,10 +68,16 @@ struct JokeDetailView: View {
         .sheet(isPresented: $showingFolderPicker) {
             FolderPickerView(selectedFolder: $joke.folder, folders: folders)
         }
+        .onChange(of: showingFolderPicker) { _, isOpen in
+            if isOpen {
+                folders = (try? modelContext.fetch(FetchDescriptor<JokeFolder>())) ?? []
+            }
+        }
         .onDisappear {
             // Auto-save edits — always update word count on exit
             joke.dateModified = Date()
             joke.updateWordCount()
+            folders = []  // free memory
         }
     }
     

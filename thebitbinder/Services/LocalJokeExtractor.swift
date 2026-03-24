@@ -2,17 +2,32 @@
 //  LocalJokeExtractor.swift
 //  thebitbinder
 //
-//  Rule-based local joke extraction fallback.
-//  Used when the Gemini daily API limit is reached or when offline.
-//  Splits text by blank-line boundaries, filters by heuristic length/structure,
-//  and produces ImportedJoke objects with .low confidence for user review.
+//  ⚠️  DEAD CODE — NOT used by the import pipeline.
+//
+//  This class is a legacy rule-based joke extractor that was previously used
+//  as a fallback when the Gemini AI API was unavailable. Gemini has been
+//  replaced by a multi-provider AI pipeline (OpenAI / Arcee / OpenRouter).
+//
+//  The current pipeline in `ImportPipelineCoordinator` has NO local fallback.
+//  If every AI provider fails, the pipeline throws `AIExtractionFailedError`
+//  and surfaces the error to the user — it never calls this class.
+//
+//  DO NOT call `LocalJokeExtractor` from any import path. If you find yourself
+//  wanting to use it, you are violating the architecture contract defined in
+//  `AIJokeExtractionManager.swift`. Add a new AI provider instead.
+//
+//  This file is kept to avoid breaking any unit tests that may reference it.
+//  It can be deleted once those tests are removed or updated.
 //
 
 import Foundation
 import CoreGraphics
 
-/// Simple rule-based joke extractor that works entirely offline.
-/// This is the fallback when Gemini rate limits are hit.
+/// ⚠️  DEAD CODE — NOT called by the import pipeline.
+///
+/// Legacy rule-based extractor kept for reference. The active pipeline uses
+/// `AIJokeExtractionManager` (OpenAI / Arcee / OpenRouter) with NO local fallback.
+/// See file header for full context.
 final class LocalJokeExtractor {
     
     static let shared = LocalJokeExtractor()
@@ -71,7 +86,7 @@ final class LocalJokeExtractor {
                 jokeText: body,
                 humorMechanism: nil,
                 confidence: 0.3, // Low confidence — always send to review
-                explanation: "Extracted locally (Gemini unavailable)",
+                explanation: "Extracted by legacy local rule-based extractor (NOT from AI pipeline)",
                 title: title,
                 tags: tags
             ))

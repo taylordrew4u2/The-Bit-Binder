@@ -2,9 +2,10 @@
 //  AIJokeExtractionManager.swift
 //  thebitbinder
 //
-//  Manages multiple joke extraction providers with automatic fallback.
-//  When one provider fails or hits a rate limit, it tries the next one.
-//  Falls back to LocalJokeExtractor as a last resort.
+//  Manages multiple joke extraction providers with automatic fallback between
+//  AI providers. If every configured AI provider fails, the pipeline receives
+//  a hard error — there is NO local/rule-based fallback. The user must always
+//  get AI-reviewed results or an explicit failure message.
 //
 //  ⚠️  HARDWIRED RESTRICTION: Extraction is ONLY for file imports.
 //  BitBuddy is 100% local/rule-based and must NEVER call extraction providers.
@@ -87,7 +88,7 @@ final class AIJokeExtractionManager {
     // MARK: - Provider Order
 
     /// Returns the user's preferred provider order.
-    /// Defaults to: OpenAI → Arcee → OpenRouter
+    /// Defaults to: Arcee → OpenRouter (both free) → OpenAI (disabled by default)
     var providerOrder: [AIProviderType] {
         get {
             if let data = UserDefaults.standard.data(forKey: orderKey),
@@ -96,7 +97,8 @@ final class AIJokeExtractionManager {
                 let missing = AIProviderType.allCases.filter { !decoded.contains($0) }
                 return decoded + missing
             }
-            return AIProviderType.allCases
+            // Free providers first — OpenAI requires paid credits and is disabled by default
+            return [.arceeAI, .openRouter, .openAI]
         }
         set {
             if let data = try? JSONEncoder().encode(newValue) {
@@ -106,13 +108,15 @@ final class AIJokeExtractionManager {
     }
 
     /// Set of providers the user has manually disabled.
+    /// OpenAI is disabled by default — it requires paid credits.
     var disabledProviders: Set<AIProviderType> {
         get {
             if let data = UserDefaults.standard.data(forKey: disabledKey),
                let decoded = try? JSONDecoder().decode(Set<AIProviderType>.self, from: data) {
                 return decoded
             }
-            return []
+            // OpenAI disabled out-of-the-box — only free providers active
+            return [.openAI]
         }
         set {
             if let data = try? JSONEncoder().encode(newValue) {
@@ -177,85 +181,77 @@ final class AIJokeExtractionManager {
         rateLimitedUntil[provider] = Date().addingTimeInterval(duration)
     }
 
-    // MARK: - Extraction with Fallback (import-only)
+    // MARK: - Extraction (import-only — AI always required)
 
-    /// The main extraction method. Tries each configured provider in order,
-    /// falling back on rate limits or errors. Returns the jokes and which provider succeeded.
+    /// The main extraction method. Tries each configured provider in order.
+    /// If a provider is rate-limited or returns an error, the next one is tried.
+    /// If NO provider succeeds, this throws `AIExtractionFailedError` —
+    /// there is NO local/rule-based fallback. The caller must surface the failure.
     ///
     /// ⚠️  Requires an `AIExtractionToken`. Only the file-import pipeline may call this.
-    /// BitBuddy and all other features must NEVER call this method.
-    func extractJokes(from text: String, token: AIExtractionToken) async -> (jokes: [GeminiExtractedJoke], provider: AIProviderType?, usedLocalFallback: Bool) {
+    func extractJokes(from text: String, token: AIExtractionToken) async throws -> (jokes: [GeminiExtractedJoke], provider: AIProviderType) {
         assertAuthorised(token)
 
         print("🔍 [Extraction] Starting with \(text.count) chars")
         print("🔍 [Extraction] Providers in use order: \(providerOrder.map(\.displayName).joined(separator: " → "))")
 
-        // Fast network check — if there's no connectivity, skip all providers
-        // and go straight to local extraction instead of waiting for timeouts.
-        if !Self.hasNetworkConnectivity() {
-            print("📡 [Extraction] No network connectivity — using local extraction")
-            let localJokes = LocalJokeExtractor.shared.extract(from: text)
-            return (localJokes, nil, true)
+        // If no connectivity, skip straight to throwing — don't silently degrade.
+        if await !Self.hasNetworkConnectivity() {
+            print("📡 [Extraction] No network — all AI providers unreachable")
+            throw AIExtractionFailedError(
+                reason: "GagGrabber can't connect — no internet. Connect to Wi-Fi or cellular and try again.",
+                underlyingErrors: [:]
+            )
         }
 
         var errors: [AIProviderType: Error] = [:]
         var hitNetworkError = false
 
         for providerType in providerOrder {
-            // If a previous provider failed with a network error, don't bother
-            // trying the rest — they'll all fail the same way.
+            // If a previous provider hit a network error, skip the rest —
+            // they will all fail the same way.
             if hitNetworkError {
                 print("⏭️ [Extraction] Skipping \(providerType.displayName) (network down)")
                 continue
             }
 
-            // Skip disabled providers
             guard !disabledProviders.contains(providerType) else {
                 print("⏭️ [Extraction] Skipping \(providerType.displayName) (disabled)")
                 continue
             }
 
-            // Skip unconfigured providers
             guard let provider = providers[providerType], provider.isConfigured() else {
                 print("⏭️ [Extraction] Skipping \(providerType.displayName) (no API key)")
                 continue
             }
 
-            // Skip rate-limited providers
             guard !isRateLimited(providerType) else {
                 print("⏭️ [Extraction] Skipping \(providerType.displayName) (rate limited)")
                 continue
             }
 
-            // Try this provider
             do {
                 print("🔄 [Extraction] Trying \(providerType.displayName)…")
                 let jokes = try await provider.extractJokes(from: text)
-                print("✅ [Extraction] \(providerType.displayName) returned \(jokes.count) joke(s)")
-                return (jokes, providerType, false)
+                print("✅ [Extraction] \(providerType.displayName) returned \(jokes.count) fragment(s)")
+                return (jokes, providerType)
             } catch let error as AIProviderError {
                 switch error {
                 case .rateLimited(_, let retryAfter):
                     print("⚠️ [Extraction] \(providerType.displayName) rate limited, trying next…")
                     markRateLimited(providerType, forSeconds: retryAfter)
-                    errors[providerType] = error
                 case .keyNotConfigured:
                     print("⚠️ [Extraction] \(providerType.displayName) key not configured, trying next…")
-                    errors[providerType] = error
                 default:
                     print("❌ [Extraction] \(providerType.displayName) error: \(error.localizedDescription)")
-                    errors[providerType] = error
                 }
+                errors[providerType] = error
             } catch {
                 print("❌ [Extraction] \(providerType.displayName) unexpected error: \(error.localizedDescription)")
-
-                // Detect network errors — if the network is down, skip remaining providers
                 if Self.isNetworkError(error) {
-                    print("📡 [Extraction] Network error detected — skipping remaining providers")
+                    print("📡 [Extraction] Network error — skipping remaining providers")
                     hitNetworkError = true
                 }
-
-                // Check for common rate limit patterns in the error
                 let desc = error.localizedDescription.lowercased()
                 if desc.contains("rate") || desc.contains("quota") || desc.contains("429") || desc.contains("limit") {
                     markRateLimited(providerType, forSeconds: nil)
@@ -264,20 +260,21 @@ final class AIJokeExtractionManager {
             }
         }
 
-        // All AI providers failed — fall back to local extraction
-        print("🔄 [Extraction] All providers failed, using local rule-based extraction")
-        let localJokes = LocalJokeExtractor.shared.extract(from: text)
-        return (localJokes, nil, true)
+        // Every AI provider failed — surface a hard error.
+        print("❌ [Extraction] All AI providers failed — throwing error (no local fallback)")
+        throw AIExtractionFailedError(
+            reason: "GagGrabber struck out — none of its sources came through. Check your network and try again in a few minutes.",
+            underlyingErrors: errors
+        )
     }
 
-    /// Convenience: extracts jokes for the import pipeline.
-    /// When all providers fail, returns local extraction results instead of throwing.
+    /// Convenience wrapper used by `ImportPipelineCoordinator`.
+    /// Returns the jokes and the provider name, or throws `AIExtractionFailedError`.
     ///
     /// ⚠️  Requires an `AIExtractionToken`. Only file-import callers may use this.
-    func extractJokesForPipeline(from text: String, token: AIExtractionToken) async -> (jokes: [GeminiExtractedJoke], usedLocalFallback: Bool, providerUsed: String) {
-        let result = await extractJokes(from: text, token: token)
-        let providerName = result.provider?.displayName ?? "Local Extraction"
-        return (result.jokes, result.usedLocalFallback, providerName)
+    func extractJokesForPipeline(from text: String, token: AIExtractionToken) async throws -> (jokes: [GeminiExtractedJoke], providerUsed: String) {
+        let result = try await extractJokes(from: text, token: token)
+        return (result.jokes, result.provider.displayName)
     }
 
     // MARK: - Status Messages
@@ -286,34 +283,67 @@ final class AIJokeExtractionManager {
     var statusMessage: String {
         let available = availableProviders
         if available.isEmpty {
-            return "Import tool needs setup. Check Settings for more info."
+            return "GagGrabber needs setup — add an API key in Settings."
         } else if available.count == 1 {
-            return "Import tool ready! Add more providers for automatic fallback."
+            return "GagGrabber is ready! Add more sources for automatic fallback."
         } else {
-            return "Import tool ready with \(available.count) providers. If one fails, it'll automatically switch."
+            return "GagGrabber is ready with \(available.count) sources. If one's busy, it'll automatically switch."
         }
     }
 
     // MARK: - Network Helpers
 
-    /// Quick connectivity check using NWPathMonitor snapshot.
-    /// Returns false if the device has no route to the internet.
-    private static func hasNetworkConnectivity() -> Bool {
-        let monitor = NWPathMonitor()
-        let path = monitor.currentPath
-        monitor.cancel()
-        return path.status == .satisfied
+    /// Thread-safe one-shot flag used to guarantee a continuation is
+    /// resumed exactly once across multiple closures.
+    private final class OnceFlag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _fired = false
+
+        /// Atomically checks-and-sets the flag. Returns `true` the
+        /// first time it is called; all subsequent calls return `false`.
+        func tryFire() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            guard !_fired else { return false }
+            _fired = true
+            return true
+        }
     }
 
-    /// Returns true if the error is a network-level failure
-    /// (no route, timeout, DNS, connection refused, etc.).
-    static func isNetworkError(_ error: Error) -> Bool {
+    /// Async network connectivity check using NWPathMonitor.
+    /// Returns `true` if the device has a usable network path.
+    /// Falls back to `true` (optimistic) after 500 ms so a slow
+    /// path evaluation never permanently blocks the import pipeline.
+    private static func hasNetworkConnectivity() async -> Bool {
+        await withCheckedContinuation { continuation in
+            let monitor = NWPathMonitor()
+            let queue   = DispatchQueue(label: "net.check", qos: .utility)
+            let once    = OnceFlag()
+
+            monitor.pathUpdateHandler = { path in
+                guard once.tryFire() else { return }
+                monitor.cancel()
+                continuation.resume(returning: path.status == .satisfied)
+            }
+            monitor.start(queue: queue)
+
+            // Safety timeout — resume optimistically if no update within 500 ms.
+            queue.asyncAfter(deadline: .now() + 0.5) {
+                guard once.tryFire() else { return }
+                monitor.cancel()
+                continuation.resume(returning: true)
+            }
+        }
+    }
+
+    /// Checks if an error is a network-layer failure (no connectivity, DNS, etc.)
+    private static func isNetworkError(_ error: Error) -> Bool {
         let nsError = error as NSError
 
-        // URLSession network errors
+        // NSURLErrorDomain network errors
         if nsError.domain == NSURLErrorDomain {
-            let networkCodes: Set<Int> = [
-                NSURLErrorNotConnectedToInternet,   // -1009
+            let networkCodes = [
+                NSURLErrorNotConnectedToInternet,    // -1009
                 NSURLErrorNetworkConnectionLost,     // -1005
                 NSURLErrorCannotFindHost,            // -1003
                 NSURLErrorCannotConnectToHost,       // -1004
@@ -328,8 +358,7 @@ final class AIJokeExtractionManager {
 
         // POSIX-level errors (from NWConnection / TCP stack)
         if nsError.domain == NSPOSIXErrorDomain {
-            // 53 = EHOSTUNREACH (the exact error in the log)
-            // 54 = ECONNRESET, 61 = ECONNREFUSED
+            // 53 = EHOSTUNREACH, 54 = ECONNRESET, 61 = ECONNREFUSED
             return [53, 54, 61].contains(nsError.code)
         }
 
@@ -343,5 +372,25 @@ final class AIJokeExtractionManager {
         return desc.contains("network") || desc.contains("no route")
             || desc.contains("not connected") || desc.contains("timed out")
             || desc.contains("host") || desc.contains("offline")
+    }
+}
+
+// MARK: - AI Extraction Failure Error
+
+/// Thrown by `AIJokeExtractionManager` when every configured AI provider has
+/// been tried and none succeeded. There is no local fallback — the import must
+/// stop and show the user an actionable error message.
+struct AIExtractionFailedError: LocalizedError {
+    let reason: String
+    let underlyingErrors: [AIProviderType: Error]
+
+    var errorDescription: String? { reason }
+
+    var detailedDescription: String {
+        guard !underlyingErrors.isEmpty else { return reason }
+        let details = underlyingErrors
+            .map { "  • \($0.key.displayName): \($0.value.localizedDescription)" }
+            .joined(separator: "\n")
+        return "\(reason)\n\nGagGrabber details:\n\(details)"
     }
 }

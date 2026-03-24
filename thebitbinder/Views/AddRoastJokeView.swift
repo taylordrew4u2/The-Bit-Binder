@@ -25,23 +25,12 @@ struct AddRoastJokeView: View {
                 // Who you're roasting
                 Section {
                     HStack(spacing: 12) {
-                        if let photoData = target.photoData,
-                           let uiImage = UIImage(data: photoData) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 40, height: 40)
-                                .clipShape(Circle())
-                        } else {
-                            ZStack {
-                                Circle()
-                                    .fill(accentColor.opacity(0.15))
-                                    .frame(width: 40, height: 40)
-                                Text(target.name.prefix(1).uppercased())
-                                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                                    .foregroundColor(accentColor)
-                            }
-                        }
+                        AsyncAvatarView(
+                            photoData: target.photoData,
+                            size: 40,
+                            fallbackInitial: String(target.name.prefix(1).uppercased()),
+                            accentColor: accentColor
+                        )
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Roasting")
                                 .font(.caption)

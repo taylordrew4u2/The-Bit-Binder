@@ -28,12 +28,14 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// Model used by default for each provider
+    /// Model used by default for each provider.
+    /// ⚠️  Free OpenRouter models rotate frequently. If a model 404s,
+    /// update it here. `openrouter/free` auto-routes to whatever is live.
     var defaultModel: String {
         switch self {
         case .openAI:      return "gpt-4o-mini"
-        case .arceeAI:     return "arcee-ai/trinity-large-preview:free"
-        case .openRouter:  return "mistralai/mistral-7b-instruct:free"
+        case .arceeAI:     return "mistralai/mistral-small-3.1-24b-instruct:free"  // 24B, 128k ctx, strong JSON instruction following
+        case .openRouter:  return "openrouter/free"  // auto-routes to the best available free model
         }
     }
 
@@ -96,16 +98,15 @@ enum AIProviderError: LocalizedError {
         switch self {
         case .keyNotConfigured(let provider):
             return "\(provider.displayName) is not configured. Add your API key in Settings → API Keys."
-        case .rateLimited(let provider, let retry):
-            let retryStr = retry.map { " Try again in \($0 / 60) minutes." } ?? ""
-            return "\(provider.displayName) rate limit reached.\(retryStr)"
+        case .rateLimited(_, let retry):
+            let retryStr = retry.map { " Try again in \($0 / 60) minutes." } ?? " Try again in a bit."
+            return "GagGrabber needs a breather.\(retryStr)"
         case .apiError(let provider, let msg):
             return "\(provider.displayName) error: \(msg)"
         case .noJokesFound(let provider):
             return "\(provider.displayName) found no jokes in the provided content."
-        case .allProvidersFailed(let errors):
-            let names = errors.keys.map(\.displayName).joined(separator: ", ")
-            return "All providers failed (\(names)). Falling back to local extraction."
+        case .allProvidersFailed(_):
+            return "GagGrabber couldn't reach any of its sources. Check your network and API keys in Settings."
         }
     }
 }
@@ -127,56 +128,148 @@ protocol AIJokeExtractionProvider {
 
 enum JokeExtractionPrompt {
     static func textPrompt(for text: String) -> String {
-        let maxChars = 12_000
-        let truncated = text.count > maxChars
-            ? String(text.prefix(maxChars)) + "\n...[truncated]"
-            : text
-
+        // NO truncation — the entire file content is sent verbatim.
+        // Every word must be accounted for in the response.
         return """
-        You are a comedy writing assistant. Extract every stand-up joke from the text below.
+        You are a comedy-writing assistant reviewing a stand-up comedian's file.
+        Your job is to return EVERY piece of text from the file — not just the obvious jokes.
 
-        CRITICAL: Each joke MUST be a SEPARATE entry. Split on:
-        - "NEXT JOKE", "NEW JOKE", "NEW BIT", "---", "***", "===", "//"
-        - Numbered items: "1.", "2.", "#1", "Joke 1:"
-        - Blank lines, bullet points
+        ABSOLUTE RULES:
+        1. DO NOT drop, skip, summarise, or omit any text. Every sentence, phrase, or
+           fragment from the file must appear as its own entry in your response.
+        2. Give each entry a confidence score:
+           - 0.8–1.0 → clearly a joke / bit / punchline
+           - 0.5–0.79 → possibly a joke, premise, tag, or crowd-work line
+           - 0.0–0.49 → not a joke (title, note, header, metadata, random word, etc.)
+             but STILL include it — the user will decide.
+        3. Never combine unrelated material into one entry.
+        4. Split on blank lines, "---", "***", "===", "//", "NEXT JOKE", "NEW BIT",
+           numbered items (1., 2., #1, Joke 1:), and bullet points.
+        5. When in doubt, SPLIT into smaller entries rather than merging.
+        6. Preserve the original wording exactly — do not paraphrase or clean up.
 
-        RULES:
-        1. When in doubt, SPLIT
-        2. One punchline = one entry
-        3. Never combine unrelated material
+        Return ONLY a valid JSON array with NO markdown fences and NO extra text:
+        [{"jokeText":"<exact text>","humorMechanism":"<type or null>","confidence":<0.0-1.0>,"explanation":"<why this score, or null>","title":"<detected title or null>","tags":["tag1"]}]
 
-        Return ONLY a valid JSON array (no markdown fences, no extra text):
-        [{"jokeText":"<ONE joke>","humorMechanism":"<type or null>","confidence":<0.0-1.0>,"explanation":"<or null>","title":"<or null>","tags":["tag1"]}]
+        If the file is completely empty: []
 
-        If no jokes: []
-
-        --- TEXT ---
-        \(truncated)
+        --- FILE CONTENT (process every word) ---
+        \(text)
         """
     }
 
     /// Parse the raw string response into `[GeminiExtractedJoke]`.
-    static func parseResponse(_ raw: String) throws -> [GeminiExtractedJoke] {
-        var jsonString = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    ///
+    /// Handles the most common model output shapes in order:
+    ///  1. Markdown code fences (```json … ```)
+    ///  2. JSON object wrapper — `{"jokes": [...]}` (the canonical shape from
+    ///     OpenAI's `json_schema` structured outputs, which require a root object)
+    ///  3. Leading/trailing prose around the array (free-text models that ignore
+    ///     system prompts)
+    ///  4. Truncated arrays caused by `finish_reason=length` — heals the last
+    ///     incomplete object and closes the array so we keep all complete entries
+    ///
+    /// - Parameters:
+    ///   - raw: The raw string content from the model's message.
+    ///   - provider: Used only to construct error messages.
+    static func parseResponse(_ raw: String, provider: AIProviderType = .openAI) throws -> [GeminiExtractedJoke] {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Strip markdown code fences
-        if jsonString.hasPrefix("```") {
-            let lines = jsonString.components(separatedBy: .newlines)
-            jsonString = lines.dropFirst().dropLast().joined(separator: "\n")
-            jsonString = jsonString.trimmingCharacters(in: .whitespacesAndNewlines)
+        // ── 1. Strip markdown code fences ────────────────────────────────────
+        // Handles ```json\n...\n``` and ```\n...\n```
+        if s.hasPrefix("```") {
+            var lines = s.components(separatedBy: .newlines)
+            // Drop opening fence line
+            lines.removeFirst()
+            // Drop trailing ``` line (if present)
+            if lines.last?.trimmingCharacters(in: .whitespaces).hasPrefix("```") == true {
+                lines.removeLast()
+            }
+            s = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        // Try to find JSON array boundaries if there's extra text
-        if let start = jsonString.firstIndex(of: "["),
-           let end = jsonString.lastIndex(of: "]") {
-            jsonString = String(jsonString[start...end])
+        // ── 2. Unwrap JSON object wrapper ─────────────────────────────────────
+        // OpenAI's json_schema structured-outputs mode requires a root JSON object.
+        // Our schema enforces { "jokes": [...] }.  Arcee/OpenRouter free-text models
+        // may also wrap spontaneously with keys like "jokes", "data", "results", etc.
+        // Extract the first array value from the object when the top level is an object.
+        if s.hasPrefix("{") {
+            if let data = s.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                // Prefer "jokes" key first (our canonical schema key), then any array value.
+                let jokeArray: [[String: Any]]? = (obj["jokes"] as? [[String: Any]])
+                    ?? obj.values.compactMap { $0 as? [[String: Any]] }.first
+                if let arr = jokeArray,
+                   let arrData = try? JSONSerialization.data(withJSONObject: arr),
+                   let arrString = String(data: arrData, encoding: .utf8) {
+                    s = arrString
+                }
+            }
         }
 
-        guard let data = jsonString.data(using: .utf8) else {
-            throw AIProviderError.apiError(.openAI, "Response is not valid UTF-8")
+        // ── 3. Extract array bounds (strip leading/trailing prose) ────────────
+        if let start = s.firstIndex(of: "["),
+           let end   = s.lastIndex(of: "]"),
+           start <= end {
+            s = String(s[start...end])
         }
 
-        return try JSONDecoder().decode([GeminiExtractedJoke].self, from: data)
+        // ── 4. First parse attempt — clean JSON ───────────────────────────────
+        if let data = s.data(using: .utf8),
+           let jokes = try? JSONDecoder().decode([GeminiExtractedJoke].self, from: data) {
+            return jokes
+        }
+
+        // ── 5. Truncation repair ──────────────────────────────────────────────
+        // When finish_reason=length the array is cut off mid-object, e.g.:
+        //   [..., {"jokeText":"text", "confidence":0.
+        // Strategy: find the last complete object (ends with }) inside the array,
+        // close the array after it, and decode whatever we recovered.
+        let repaired = repairTruncatedArray(s)
+        if let data = repaired.data(using: .utf8),
+           let jokes = try? JSONDecoder().decode([GeminiExtractedJoke].self, from: data) {
+            print("⚠️ [\(provider.displayName)] Recovered \(jokes.count) joke(s) from truncated response")
+            return jokes
+        }
+
+        // ── 6. Hard failure — nothing worked ─────────────────────────────────
+        let preview = String(raw.prefix(200))
+        throw AIProviderError.apiError(
+            provider,
+            "Could not parse JSON response. Preview: \(preview)"
+        )
+    }
+
+    /// Attempt to recover a valid JSON array from a string that was cut off
+    /// mid-element. Finds the last `}` that closes a complete top-level object
+    /// inside the array and wraps everything up to that point as `[...]`.
+    private static func repairTruncatedArray(_ s: String) -> String {
+        // Find the outermost array start
+        guard let arrayStart = s.firstIndex(of: "[") else { return "[]" }
+        let inner = String(s[arrayStart...])
+
+        // Walk backwards from the end to find the last complete object boundary
+        var depth = 0
+        var lastCompleteObjectEnd: String.Index? = nil
+        var inString = false
+        var escape = false
+
+        for idx in inner.indices {
+            let ch = inner[idx]
+            if escape { escape = false; continue }
+            if ch == "\\" && inString { escape = true; continue }
+            if ch == "\"" { inString.toggle(); continue }
+            if inString { continue }
+            if ch == "{" { depth += 1 }
+            if ch == "}" {
+                depth -= 1
+                if depth == 0 { lastCompleteObjectEnd = idx }
+            }
+        }
+
+        guard let end = lastCompleteObjectEnd else { return "[]" }
+        let recovered = "[" + String(inner[inner.index(after: inner.startIndex)...end]) + "]"
+        return recovered
     }
 }
 
@@ -308,69 +401,75 @@ struct GeminiExtractedJoke: Codable, Identifiable, Equatable {
         orderInFile: Int,
         importTimestamp: Date
     ) -> ImportedJoke {
-        // Map confidence from Float (0.0-1.0) to ImportConfidence
+        // ── Confidence mapping ────────────────────────────────────────────────
+        // The AI returns a Float 0.0–1.0. We map it to three ImportConfidence
+        // tiers which control whether the joke auto-saves or goes to review:
+        //
+        //   ≥ 0.8  (.high)   → validationResult: .singleJoke
+        //                       needsReview = false → auto-saved
+        //   0.6–0.79 (.medium) → validationResult: .singleJoke
+        //                       needsReview = false → auto-saved (correct: medium
+        //                       confidence is the AI saying "pretty sure it's a joke")
+        //   < 0.6  (.low)    → validationResult: .requiresReview
+        //                       needsReview = true  → goes to review queue
+        //
+        // Low-confidence items (headers, notes, random words — AI scores < 0.5)
+        // always land in the review queue so the user sees every fragment.
+
         let importConfidence: ImportConfidence = {
-            if confidence >= 0.8 {
-                return .high
-            } else if confidence >= 0.6 {
-                return .medium
-            } else {
-                return .low
-            }
+            if confidence >= 0.8 { return .high }
+            else if confidence >= 0.6 { return .medium }
+            else { return .low }
         }()
-        
-        // Create confidence factors from the joke's confidence
+
         let factors = ConfidenceFactors(
-            extractionQuality: confidence,
-            structuralCleanliness: 0.7,
-            titleDetection: (title != nil) ? 0.8 : 0.3,
-            boundaryClarity: 0.75,
-            ocrConfidence: 1.0
+            extractionQuality:       confidence,
+            structuralCleanliness:   0.7,
+            titleDetection:          (title != nil) ? 0.8 : 0.3,
+            boundaryClarity:         0.75,
+            ocrConfidence:           1.0   // AI works on text, not raw images
         )
-        
-        // Create metadata
+
         let metadata = ImportSourceMetadata(
-            fileName: sourceFile,
-            pageNumber: pageNumber,
-            orderInPage: orderInFile,
-            orderInFile: orderInFile,
-            boundingBox: nil,
+            fileName:        sourceFile,
+            pageNumber:      pageNumber,
+            orderInPage:     orderInFile,
+            orderInFile:     orderInFile,
+            boundingBox:     nil,
             importTimestamp: importTimestamp
         )
-        
-        // Determine validation result (assume single joke for now)
+
         let validationResult: ValidationResult = {
-            if confidence >= 0.8 {
-                return .singleJoke
-            } else if confidence >= 0.6 {
+            if confidence >= 0.6 {
                 return .singleJoke
             } else {
-                return .requiresReview(reasons: ["Low confidence from AI extraction"])
+                // AI confidence < 0.6 means it's uncertain — force user review.
+                let reason = explanation ?? "GagGrabber confidence \(String(format: "%.0f%%", confidence * 100)) — please verify"
+                return .requiresReview(reasons: [reason])
             }
         }()
-        
+
         return ImportedJoke(
-            title: title,
-            body: jokeText,
-            rawSourceText: jokeText,
-            tags: tags,
-            confidence: importConfidence,
+            title:            title,
+            body:             jokeText,
+            rawSourceText:    jokeText,
+            tags:             tags,
+            confidence:       importConfidence,
             confidenceFactors: factors,
-            sourceMetadata: metadata,
+            sourceMetadata:   metadata,
             validationResult: validationResult,
-            extractionMethod: .imageOCR
+            // AI extraction works on text extracted from the file, not raw image pixels.
+            // .documentText is correct regardless of whether the source was a PDF, TXT, or DOC.
+            extractionMethod: .documentText
         )
     }
 }
 
-// MARK: - Rate Limit Error
-
+// MARK: - Rate Limit Error (legacy stub — kept for any remaining references)
+// NOTE: AIProviderError.rateLimited is the canonical rate-limit error.
+// GeminiRateLimitError is dead code and should not be used in new code.
+// Keeping the struct stub prevents compile errors if any external code references it.
 struct GeminiRateLimitError: Error {
     let provider: AIProviderType
     let retryAfterSeconds: Int?
-    
-    var localizedDescription: String {
-        let retryStr = retryAfterSeconds.map { " Try again in \($0 / 60) minutes." } ?? ""
-        return "\(provider.displayName) rate limit reached.\(retryStr)"
-    }
 }

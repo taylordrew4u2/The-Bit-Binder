@@ -35,22 +35,8 @@ struct NotebookTrashView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 12)], spacing: 12) {
                         ForEach(trashedPhotos, id: \.id) { photo in
                             ZStack(alignment: .bottomTrailing) {
-                                Group {
-                                    if let data = photo.imageData, let uiImage = UIImage(data: data) {
-                                        Image(uiImage: uiImage)
-                                            .resizable()
-                                            .scaledToFill()
-                                    } else {
-                                        Color.gray.overlay(
-                                            Image(systemName: "photo")
-                                                .foregroundColor(.white)
-                                        )
-                                    }
-                                }
-                                .frame(minWidth: 100, minHeight: 100)
-                                .clipped()
-                                .cornerRadius(8)
-                                .opacity(0.65) // Visual cue that item is in trash
+                                AsyncThumbnailView(imageData: photo.imageData, size: 100, opacity: 0.65)
+                                    .cornerRadius(8)
                             }
                             .contextMenu {
                                 Button {

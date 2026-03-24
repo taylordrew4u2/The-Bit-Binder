@@ -53,17 +53,19 @@ final class FileImportService {
     func saveApprovedJokes(_ jokes: [ImportedJoke], to modelContext: ModelContext) throws {
         for importedJoke in jokes {
             let joke = Joke(content: importedJoke.body, title: importedJoke.title ?? "")
-            joke.dateCreated = importedJoke.sourceMetadata.importTimestamp
+            joke.dateCreated  = importedJoke.sourceMetadata.importTimestamp
             joke.dateModified = importedJoke.sourceMetadata.importTimestamp
-            
-            // Set tags
-            joke.tags = importedJoke.tags
-            
+            joke.tags         = importedJoke.tags
+
+            // Populate import-tracking fields so history / CloudKit schema stay consistent
+            joke.importSource     = importedJoke.sourceMetadata.fileName
+            joke.importConfidence = importedJoke.confidence.rawValue
+            joke.importTimestamp  = importedJoke.sourceMetadata.importTimestamp
+
             modelContext.insert(joke)
-            
             dataLogger.logDataCreation(joke, context: modelContext)
         }
-        
+
         try modelContext.save()
         dataLogger.logBulkOperation("IMPORT_SAVE", entityType: "Joke", count: jokes.count, context: modelContext)
     }

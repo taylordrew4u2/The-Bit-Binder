@@ -51,9 +51,29 @@ final class ImportPipelineCoordinator {
         let startTime = Date()
         var debugInfo: [String] = []
 
+        // ── Stage 0: Upfront Validation ────────────────────────────────────────
+        // Check file type FIRST — before touching the file data, before OCR, before AI.
+        // This prevents code/.swift files from reaching the image extraction path.
+        let fileType = await router.detectFileType(url: url)
+
+        if fileType == .unsupported {
+            let ext = url.pathExtension.isEmpty ? "unknown" : url.pathExtension
+            print("🚫 [ImportPipeline] Rejected unsupported file type: .\(ext) (\(url.lastPathComponent))")
+            throw ImportValidationError.unsupportedFileType(extension: ext)
+        }
+
+        // Verify the file is readable and non-empty before any expensive work.
+        guard FileManager.default.isReadableFile(atPath: url.path) else {
+            throw ImportValidationError.fileNotReadable(url)
+        }
+        let fileAttributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let fileSize = (fileAttributes?[.size] as? Int) ?? 0
+        if fileSize == 0 {
+            throw ImportValidationError.emptyFile(url)
+        }
+
         // ── Stage 1: File Type Detection ─────────────────────────────────────
         debugInfo.append("=== Stage 1: File Type Detection ===")
-        let fileType        = await router.detectFileType(url: url)
         let extractionMethod = router.getExtractionMethod(for: fileType)
         debugInfo.append("Detected file type: \(fileType)")
         debugInfo.append("Selected extraction method: \(extractionMethod)")
@@ -88,28 +108,49 @@ final class ImportPipelineCoordinator {
             .map(\.normalizedText)
             .joined(separator: "\n")
 
-        debugInfo.append("\n=== Stage 4: Joke Extraction (Multi-Provider) ===")
+        debugInfo.append("\n=== Stage 4: Joke Extraction (AI — no local fallback) ===")
         let availableAI = AIJokeExtractionManager.shared.availableProviders
         debugInfo.append("Sending \(fullText.count) chars to extraction")
         debugInfo.append("Available providers: \(availableAI.map(\.displayName).joined(separator: " → "))")
 
-        // ── Stage 5: Multi-provider extraction (with local fallback) ──────
+        // ── Stage 5: AI extraction — throws AIExtractionFailedError if every provider fails ──
+        // There is NO local fallback. If this throws, the caller must surface an error to the user.
+        //
+        // Large files (>40k chars) are split into ~30k-char chunks to keep each
+        // request well within the model's output token budget and avoid
+        // finish_reason=length truncation. Each chunk is extracted independently
+        // and the results are concatenated before mapping to ImportedJoke objects.
+        // The chunk boundary is on a newline so we never cut mid-sentence.
         let importToken = AIExtractionToken(caller: "ImportPipelineCoordinator")
-        let extractionResult = await AIJokeExtractionManager.shared.extractJokesForPipeline(from: fullText, token: importToken)
-        let geminiJokes = extractionResult.jokes
-        let usedLocalFallback = extractionResult.usedLocalFallback
-        let providerUsed = extractionResult.providerUsed
+        let geminiJokes: [GeminiExtractedJoke]
+        let providerUsed: String
 
-        if usedLocalFallback {
-            debugInfo.append("⚠️ All AI providers unavailable — used local rule-based extraction")
-            debugInfo.append("Local extractor returned \(geminiJokes.count) potential joke(s)")
+        let textChunks = splitIntoExtractionChunks(fullText)
+        if textChunks.count == 1 {
+            // Fast path — single chunk, no overhead
+            let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: textChunks[0], token: importToken)
+            geminiJokes  = result.jokes
+            providerUsed = result.providerUsed
         } else {
-            debugInfo.append("✅ Extracted \(geminiJokes.count) joke(s) via \(providerUsed)")
+            // Multi-chunk path — accumulate results across chunks
+            var allJokes: [GeminiExtractedJoke] = []
+            var lastProvider = "Unknown"
+            debugInfo.append("⚡ Large file split into \(textChunks.count) chunks for extraction")
+            for (chunkIndex, chunk) in textChunks.enumerated() {
+                debugInfo.append("  Chunk \(chunkIndex + 1)/\(textChunks.count): \(chunk.count) chars")
+                let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: chunk, token: importToken)
+                allJokes.append(contentsOf: result.jokes)
+                lastProvider = result.providerUsed
+            }
+            geminiJokes  = allJokes
+            providerUsed = lastProvider
         }
 
-        debugInfo.append("Extracted \(geminiJokes.count) joke(s) (\(providerUsed))")
+        debugInfo.append("✅ Extracted \(geminiJokes.count) fragment(s) via \(providerUsed)")
 
         // ── Stage 6: Map into ImportedJoke ────────────────────────────────────
+        // Fragments with confidence ≥ 0.8 go to auto-save; everything else goes
+        // to the review queue so the user sees and decides on every single fragment.
         let importTimestamp = Date()
         var autoSavedJokes:   [ImportedJoke] = []
         var reviewQueueJokes: [ImportedJoke] = []
@@ -160,11 +201,10 @@ final class ImportPipelineCoordinator {
             sourceFile:       url.lastPathComponent,
             autoSavedJokes:   autoSavedJokes,
             reviewQueueJokes: reviewQueueJokes,
-            rejectedBlocks:   [],          // Providers discard non-jokes; no raw blocks to track
+            rejectedBlocks:   [],
             pipelineStats:    stats,
             debugInfo:        pipelineDebugInfo,
-            providerUsed:     providerUsed,
-            usedLocalFallback: usedLocalFallback
+            providerUsed:     providerUsed
         )
     }
 
@@ -190,15 +230,22 @@ final class ImportPipelineCoordinator {
                 // Process scanned PDFs page-by-page with memory checks
                 return try await extractOCRWithMemoryManagement(from: url)
             } else {
-                // Load image data in an autoreleasepool to free intermediate buffers
-                let image: UIImage = try autoreleasepool {
-                    guard let data  = try? Data(contentsOf: url),
-                          let img = UIImage(data: data) else {
-                        throw ImportProcessingError.invalidImageFile
+                // Decode the image file, extract the CGImage, then immediately release
+                // the UIImage and raw Data before the async Vision call begins.
+                // (autoreleasepool cannot wrap async calls, so we separate the sync
+                //  decode from the async extraction explicitly.)
+                let cgImage: CGImage = try {
+                    autoreleasepool {
+                        guard let data = try? Data(contentsOf: url),
+                              let img  = UIImage(data: data),
+                              let cg   = img.cgImage else {
+                            return nil as CGImage?
+                        }
+                        return cg
                     }
-                    return img
-                }
-                let page = try await ocrExtractor.extractFromImage(image)
+                }() ?? { throw ImportProcessingError.invalidImageFile }()
+                // UIImage and Data are released here; only the CGImage survives
+                let page = try await ocrExtractor.extractFromCGImage(cgImage)
                 return [page]
             }
 
@@ -206,14 +253,18 @@ final class ImportPipelineCoordinator {
             return try await extractFromDocument(url: url)
 
         case .imageOCR:
-            let image: UIImage = try autoreleasepool {
-                guard let data  = try? Data(contentsOf: url),
-                      let img = UIImage(data: data) else {
-                    throw ImportProcessingError.invalidImageFile
+            let cgImage: CGImage = try {
+                autoreleasepool {
+                    guard let data = try? Data(contentsOf: url),
+                          let img  = UIImage(data: data),
+                          let cg   = img.cgImage else {
+                        return nil as CGImage?
+                    }
+                    return cg
                 }
-                return img
-            }
-            let page = try await ocrExtractor.extractFromImage(image)
+            }() ?? { throw ImportProcessingError.invalidImageFile }()
+            // UIImage and Data released; only CGImage survives into async call
+            let page = try await ocrExtractor.extractFromCGImage(cgImage)
             return [page]
         }
     }
@@ -316,6 +367,54 @@ final class ImportPipelineCoordinator {
     }
 
     // MARK: - Helpers
+
+    /// Maximum characters per extraction chunk.
+    ///
+    /// 30 000 chars ≈ 7 500 tokens of input text.  At a 3:1 output/input ratio
+    /// the model would need ~22 500 output tokens — well within gpt-4o-mini's
+    /// 16 384 output token limit per call.  We stay conservative at 30k chars
+    /// so even very wordy files don't risk truncation mid-joke.
+    ///
+    /// Files under this limit are sent as a single request (the common case).
+    private static let extractionChunkSizeChars = 30_000
+
+    /// Splits `text` into at most `extractionChunkSizeChars`-character chunks
+    /// aligned on newline boundaries so we never cut a sentence in half.
+    ///
+    /// Chunks overlap by one blank line so a joke split across the boundary
+    /// doesn't get lost.  In practice comedian files are rarely >30k chars so
+    /// this fast path almost never runs.
+    private func splitIntoExtractionChunks(_ text: String) -> [String] {
+        let limit = Self.extractionChunkSizeChars
+        guard text.count > limit else { return [text] }
+
+        var chunks: [String] = []
+        var remaining = text[text.startIndex...]
+
+        while !remaining.isEmpty {
+            if remaining.count <= limit {
+                chunks.append(String(remaining))
+                break
+            }
+
+            // Find the last newline within the first `limit` characters
+            let endIdx = remaining.index(remaining.startIndex, offsetBy: limit)
+            let searchRegion = remaining[..<endIdx]
+            let splitIdx = searchRegion.lastIndex(of: "\n") ?? endIdx
+
+            let chunk = String(remaining[..<splitIdx])
+            if !chunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                chunks.append(chunk)
+            }
+
+            // Advance past the split point, skipping leading whitespace
+            let nextStart = remaining.index(after: splitIdx)
+            if nextStart >= remaining.endIndex { break }
+            remaining = remaining[nextStart...]
+        }
+
+        return chunks.isEmpty ? [text] : chunks
+    }
 
     private func calculateAverageConfidence(_ jokes: [ImportedJoke]) -> Float {
         guard !jokes.isEmpty else { return 0.0 }
