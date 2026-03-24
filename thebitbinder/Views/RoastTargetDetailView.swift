@@ -39,14 +39,14 @@ struct RoastTargetDetailView: View {
         VStack(spacing: 0) {
             // Target Header Card
             VStack(spacing: 12) {
-                // Avatar — async background decode, no main-thread stall
+                // Avatar — async background decode
                 AsyncAvatarView(
                     photoData: target.photoData,
                     size: 80,
                     fallbackInitial: String(target.name.prefix(1).uppercased()),
                     accentColor: accentColor
                 )
-                .overlay(Circle().stroke(accentColor, lineWidth: target.photoData != nil ? 3 : 0))
+                .overlay(Circle().stroke(accentColor, lineWidth: 3))
 
                 Text(target.name)
                     .font(.title2.bold())
@@ -356,9 +356,7 @@ struct EditRoastTargetView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        // target.photoData is already written in the onChange handler
-                        // (downscaled + compressed). Re-encoding the display UIImage
-                        // here would double-compress and waste memory; skip it.
+                        // Photo data is already set via onChange handler with downscaling
                         target.dateModified = Date()
                         do {
                             try modelContext.save()
@@ -382,36 +380,21 @@ struct EditRoastTargetView: View {
             }
             .onChange(of: selectedPhoto) { _, newValue in
                 Task {
-                    guard let rawData = try? await newValue?.loadTransferable(type: Data.self) else { return }
-                    // Downscale to 1500 px max long edge and compress before storing.
-                    // Raw Photos library data can be 5–15 MB; we must not store or
-                    // decode it at full resolution.
-                    let (storedData, displayImage): (Data?, UIImage?) = await Task.detached(priority: .utility) {
-                        autoreleasepool {
-                            guard let full    = UIImage(data: rawData) else { return (nil, nil) }
-                            let scaled        = RoastTargetPhotoHelper.downscale(full, maxLongEdge: 1500)
-                            let jpeg          = scaled.jpegData(compressionQuality: 0.8)
-                            // Decode a small display thumbnail (400 px) for the edit view
-                            let thumb         = RoastTargetPhotoHelper.downscale(full, maxLongEdge: 400)
-                            return (jpeg, thumb)
+                    if let data = try? await newValue?.loadTransferable(type: Data.self),
+                       let original = UIImage(data: data) {
+                        let scaled = RoastTargetPhotoHelper.downscale(original, maxLongEdge: 800)
+                        let scaledData = scaled.jpegData(compressionQuality: 0.8)
+                        await MainActor.run {
+                            target.photoData = scaledData
+                            photoImage = scaled
                         }
-                    }.value
-                    await MainActor.run {
-                        if let storedData { target.photoData = storedData }
-                        photoImage = displayImage
                     }
                 }
             }
-            .task {
-                // Decode display thumbnail asynchronously so we never block the main thread
-                guard photoImage == nil, let stored = target.photoData else { return }
-                let thumb: UIImage? = await Task.detached(priority: .utility) {
-                    autoreleasepool {
-                        guard let full = UIImage(data: stored) else { return nil }
-                        return RoastTargetPhotoHelper.downscale(full, maxLongEdge: 400)
-                    }
-                }.value
-                photoImage = thumb
+            .onAppear {
+                if let photoData = target.photoData {
+                    photoImage = UIImage(data: photoData)
+                }
             }
         }
     }

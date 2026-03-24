@@ -16,7 +16,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     static let shared = SchemaDeploymentService()
     
     private let container: CKContainer
-    private let schemaVersion = "2.3.0"  // Increment when schema changes
+    private let schemaVersion = "2.4.0"  // Increment when schema changes
     private let signatureService: CloudKitSignatureService
     
     /// All CloudKit record types managed by this schema
@@ -47,14 +47,23 @@ final class SchemaDeploymentService: @unchecked Sendable {
         print("📋 [Schema] Verifying CloudKit schema deployment (v\(schemaVersion))...")
         
         let database = container.privateCloudDatabase
+        // CoreData+CloudKit stores records in this zone, NOT the default zone
+        let zoneID = CKRecordZone.ID(
+            zoneName: "com.apple.coredata.cloudkit.zone",
+            ownerName: CKCurrentUserDefaultName
+        )
         
         for recordType in recordTypes {
             do {
-                // Try to fetch schema by querying for records (will create schema if needed)
+                // Query the CoreData zone — the default zone has no CD_* records
                 let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
                 query.sortDescriptors = [NSSortDescriptor(key: "___createTime", ascending: false)]
                 
-                let (results, _) = try await database.records(matching: query, resultsLimit: 1)
+                let (results, _) = try await database.records(
+                    matching: query,
+                    inZoneWith: zoneID,
+                    resultsLimit: 1
+                )
                 _ = results // Silence unused warning
                 print("  ✅ \(recordType) - OK")
             } catch let error as CKError {
@@ -107,7 +116,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
           - CD_craftNotesString, CD_comedicTone
           - CD_structureScore, CD_category [Q]
           - CD_tagsString, CD_difficulty, CD_humorRating
-          - CD_isHit [Q]
+          - CD_isHit [Q], CD_wordCount
           - CD_importSource
           - CD_importConfidence
           - CD_importTimestamp

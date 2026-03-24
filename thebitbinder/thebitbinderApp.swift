@@ -37,8 +37,13 @@ struct thebitbinderApp: App {
         // all existing user data invisible. Always use "default.store".
         let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
         
-        // 🛡️ CRITICAL DATA PROTECTION: Check if store file exists and create emergency backup
-        if FileManager.default.fileExists(atPath: storeURL.path) {
+        // 🛡️ CRITICAL DATA PROTECTION: Create emergency backup at most once per 24 hours
+        // (DataProtectionService.checkVersionAndBackupIfNeeded handles version-change backups separately)
+        let lastEmergencyBackupKey = "lastEmergencyBackupTimestamp"
+        let lastBackupTimestamp = UserDefaults.standard.double(forKey: lastEmergencyBackupKey)
+        let hoursSinceLastBackup = (Date().timeIntervalSince1970 - lastBackupTimestamp) / 3600
+        
+        if FileManager.default.fileExists(atPath: storeURL.path) && hoursSinceLastBackup >= 24 {
             let timestamp = Int(Date().timeIntervalSince1970)
             let emergencyBackupURL = URL.applicationSupportDirectory
                 .appending(path: "emergency_backup_\(timestamp).store")
@@ -57,6 +62,7 @@ struct thebitbinderApp: App {
                 }
                 
                 print("🛡️ [DataProtection] Emergency backup created before container initialization")
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastEmergencyBackupKey)
             } catch {
                 print("⚠️ [DataProtection] Could not create emergency backup: \(error)")
             }

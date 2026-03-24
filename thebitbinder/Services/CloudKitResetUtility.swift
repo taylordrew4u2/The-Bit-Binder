@@ -33,7 +33,10 @@ class CloudKitResetUtility {
 
     /// Version key for the cleanup. Bump this whenever a new round of
     /// schema-mismatch fixes is needed so the one-time guard re-fires.
-    static let cleanupVersionKey = "cloudkit_schema_cleanup_v3"
+    /// v4: Added soft-delete fields (CD_isDeleted, CD_deletedDate) to
+    ///     Recording, SetList, RoastJoke, BrainstormIdea, NotebookPhotoRecord
+    ///     and CD_wordCount to Joke.
+    static let cleanupVersionKey = "cloudkit_schema_cleanup_v4"
 
     // MARK: - Public Entry Point
 
@@ -55,7 +58,7 @@ class CloudKitResetUtility {
     ///  - After zone deletion CoreData re-exports every local record
     ///    with correct REFERENCE types on its next export cycle.
     static func repairCorruptedZone() async throws {
-        print("🔧 [CloudKit] Starting schema-mismatch repair (v3 — includes CD_RoastJoke.CD_target)...")
+        print("🔧 [CloudKit] Starting schema-mismatch repair (v4 — adds soft-delete fields + CD_wordCount)...")
 
         let container = CKContainer(identifier: containerID)
         let database  = container.privateCloudDatabase

@@ -29,15 +29,17 @@ final class DataValidationService: ObservableObject {
         
         print("🔍 [DataValidation] Starting data integrity check...")
         
-        // Count all entities
-        result.jokesCount = await countEntities(of: Joke.self, context: context)
+        // Count active (non-soft-deleted) entities for types with soft-delete.
+        // Using active-only counts prevents false data-loss alerts after trash
+        // purge, since purged items should not count toward the baseline.
+        result.jokesCount = await countActiveJokes(context: context)
         result.foldersCount = await countEntities(of: JokeFolder.self, context: context)
-        result.recordingsCount = await countEntities(of: Recording.self, context: context)
-        result.setListsCount = await countEntities(of: SetList.self, context: context)
+        result.recordingsCount = await countActiveRecordings(context: context)
+        result.setListsCount = await countActiveSetLists(context: context)
         result.roastTargetsCount = await countEntities(of: RoastTarget.self, context: context)
-        result.roastJokesCount = await countEntities(of: RoastJoke.self, context: context)
-        result.brainstormIdeasCount = await countEntities(of: BrainstormIdea.self, context: context)
-        result.notebookPhotoRecordsCount = await countEntities(of: NotebookPhotoRecord.self, context: context)
+        result.roastJokesCount = await countActiveRoastJokes(context: context)
+        result.brainstormIdeasCount = await countActiveBrainstormIdeas(context: context)
+        result.notebookPhotoRecordsCount = await countActiveNotebookPhotos(context: context)
         result.importBatchesCount = await countEntities(of: ImportBatch.self, context: context)
         result.chatMessagesCount = await countEntities(of: ChatMessage.self, context: context)
         
@@ -82,6 +84,28 @@ final class DataValidationService: ObservableObject {
             print("❌ [DataValidation] Failed to count \(type): \(error)")
             return 0
         }
+    }
+    
+    // MARK: - Active-Only Counts (exclude soft-deleted items)
+    // These prevent false data-loss alerts when trash purge removes old items.
+    
+    private func countActiveJokes(context: ModelContext) async -> Int {
+        (try? context.fetch(FetchDescriptor<Joke>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+    }
+    private func countActiveRecordings(context: ModelContext) async -> Int {
+        (try? context.fetch(FetchDescriptor<Recording>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+    }
+    private func countActiveSetLists(context: ModelContext) async -> Int {
+        (try? context.fetch(FetchDescriptor<SetList>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+    }
+    private func countActiveRoastJokes(context: ModelContext) async -> Int {
+        (try? context.fetch(FetchDescriptor<RoastJoke>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+    }
+    private func countActiveBrainstormIdeas(context: ModelContext) async -> Int {
+        (try? context.fetch(FetchDescriptor<BrainstormIdea>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+    }
+    private func countActiveNotebookPhotos(context: ModelContext) async -> Int {
+        (try? context.fetch(FetchDescriptor<NotebookPhotoRecord>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
     }
     
     // MARK: - Entity-Specific Validation
@@ -139,14 +163,24 @@ final class DataValidationService: ObservableObject {
             var missingFiles = 0
             
             for recording in recordings {
+                // Skip soft-deleted recordings — they may have had their file removed already
+                if recording.isDeleted { continue }
+                
                 // Check if file URL is valid
                 if recording.fileURL.isEmpty {
                     invalidFileURLs += 1
                     continue
                 }
                 
-                // Check if file actually exists
-                let fileURL = URL(fileURLWithPath: recording.fileURL)
+                // Resolve file URL — recordings may store absolute or relative paths
+                let fileURL: URL
+                if recording.fileURL.hasPrefix("/") {
+                    fileURL = URL(fileURLWithPath: recording.fileURL)
+                } else {
+                    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                    fileURL = docs.appendingPathComponent(recording.fileURL)
+                }
+                
                 if !FileManager.default.fileExists(atPath: fileURL.path) {
                     missingFiles += 1
                 }

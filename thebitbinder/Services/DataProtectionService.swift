@@ -176,9 +176,14 @@ final class DataProtectionService: ObservableObject {
             let appSupportContents = try fileManager.contentsOfDirectory(at: URL.applicationSupportDirectory, includingPropertiesForKeys: nil)
             
             for fileURL in appSupportContents {
-                // Skip the main SwiftData files (already backed up separately)
-                if fileURL.lastPathComponent.contains("default.store") ||
-                   fileURL.lastPathComponent == "DataBackups" {
+                // Skip the main SwiftData files (already backed up separately),
+                // our own backup directory, and emergency/corrupted backups
+                // (they are already redundant copies of the store)
+                let name = fileURL.lastPathComponent
+                if name.contains("default.store") ||
+                   name == "DataBackups" ||
+                   name.hasPrefix("emergency_backup_") ||
+                   name.hasPrefix("corrupted_store_backup_") {
                     continue
                 }
                 

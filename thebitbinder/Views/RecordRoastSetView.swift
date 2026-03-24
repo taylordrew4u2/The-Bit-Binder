@@ -22,6 +22,8 @@ struct RecordRoastSetView: View {
     @State private var recordingURL: URL?
     @State private var errorMessage: String?
     @State private var showDiscardAlert = false
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
     
     private let accentColor = AppTheme.Colors.roastAccent
     
@@ -114,9 +116,7 @@ struct RecordRoastSetView: View {
                     
                     if recordingURL != nil && !isRecording {
                         Button {
-                            // For now, we'll just save it as a single roast
-                            // In the future, this could transcribe and split
-                            dismiss()
+                            saveRecording()
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "checkmark.circle.fill")
@@ -160,11 +160,65 @@ struct RecordRoastSetView: View {
             } message: {
                 Text("You have an active or unsaved recording. Are you sure you want to discard it?")
             }
+            .alert("Save Failed", isPresented: $showSaveError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(saveErrorMessage)
+            }
             .onDisappear {
                 if isRecording {
                     stopRecording()
                 }
             }
+        }
+    }
+    
+    private func saveRecording() {
+        guard let tempURL = recordingURL else {
+            saveErrorMessage = "No recording file found."
+            showSaveError = true
+            return
+        }
+        
+        // Move from temp to documents for persistence
+        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let destinationURL = documentsDir.appendingPathComponent(tempURL.lastPathComponent)
+        
+        do {
+            // Remove any existing file at destination
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            try FileManager.default.moveItem(at: tempURL, to: destinationURL)
+        } catch {
+            #if DEBUG
+            print("❌ [RecordRoastSetView] Failed to move recording file: \(error)")
+            #endif
+            saveErrorMessage = "Could not save recording file: \(error.localizedDescription)"
+            showSaveError = true
+            return
+        }
+        
+        // Create a Recording model
+        let recording = Recording(
+            title: "Roast Set – \(target.name)",
+            fileURL: destinationURL.lastPathComponent,
+            duration: recordingTime
+        )
+        modelContext.insert(recording)
+        
+        do {
+            try modelContext.save()
+            #if DEBUG
+            print("✅ [RecordRoastSetView] Recording saved for '\(target.name)' (duration: \(recordingTime)s)")
+            #endif
+            dismiss()
+        } catch {
+            #if DEBUG
+            print("❌ [RecordRoastSetView] Failed to save recording model: \(error)")
+            #endif
+            saveErrorMessage = "Could not save recording: \(error.localizedDescription)"
+            showSaveError = true
         }
     }
     

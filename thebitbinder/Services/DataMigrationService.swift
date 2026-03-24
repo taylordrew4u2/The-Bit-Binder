@@ -184,7 +184,8 @@ final class DataMigrationService: ObservableObject {
     }
     
     private func calculateSchemaHash() -> String {
-        // Create a simple hash of the current schema
+        // Create a hash of the current schema that changes when fields are
+        // added, removed, or renamed — not just when entity names change.
         let schema = Schema([
             Joke.self,
             JokeFolder.self,
@@ -200,9 +201,14 @@ final class DataMigrationService: ObservableObject {
             ChatMessage.self,
         ])
         
-        // Create a simple hash based on entity names
-        let entityNames = schema.entities.map { $0.name }.sorted().joined()
-        return entityNames.data(using: .utf8)?.base64EncodedString() ?? ""
+        // Include entity names AND their property names so adding/removing
+        // a field produces a different hash.
+        let entityDescriptions = schema.entities.sorted { $0.name < $1.name }.map { entity in
+            let props = entity.properties.map(\.name).sorted().joined(separator: ",")
+            return "\(entity.name):\(props)"
+        }
+        let fingerprint = entityDescriptions.joined(separator: "|")
+        return fingerprint.data(using: .utf8)?.base64EncodedString() ?? ""
     }
     
     // MARK: - Recovery Functions

@@ -91,8 +91,9 @@ final class AppStartupCoordinator: ObservableObject {
     func completeDataProtectionWithContext(_ context: ModelContext) async {
         print("🔧 [AppStartup] Completing data protection with model context...")
         
-        // FIRST: Clean up corrupted CloudKit records (one-time fix)
-        await cleanupCorruptedCloudKitRecords()
+        // NOTE: CloudKit zone cleanup (repairCorruptedZone) already runs in
+        // thebitbinderApp.performAggressiveCloudKitCleanup() before this method
+        // is called. No need to duplicate it here — both used the same guard key.
         
         // Purge soft-deleted items older than 30 days before validation runs
         purgeExpiredTrashItems(context: context)
@@ -225,28 +226,4 @@ final class AppStartupCoordinator: ObservableObject {
         }
     }
 
-    // MARK: - CloudKit Cleanup
-    
-    /// One-time cleanup for corrupted CloudKit records.
-    /// Fixes STRING-vs-REFERENCE mismatches on CD_folder, CD_batch, etc.
-    /// by deleting the entire CloudKit zone and letting CoreData re-export.
-    private func cleanupCorruptedCloudKitRecords() async {
-        let key = CloudKitResetUtility.cleanupVersionKey   // "cloudkit_schema_cleanup_v2"
-        
-        guard !UserDefaults.standard.bool(forKey: key) else {
-            print("✅ [CloudKit] Schema cleanup already completed (\(key))")
-            return
-        }
-        
-        print("🔧 [CloudKit] Running one-time schema-mismatch repair...")
-        
-        do {
-            try await CloudKitResetUtility.repairCorruptedZone()
-            // repairCorruptedZone sets the flag internally on success
-            print("✅ [CloudKit] Schema cleanup completed successfully")
-        } catch {
-            print("⚠️ [CloudKit] Cleanup error: \(error.localizedDescription)")
-            // Don't set the flag — let it retry on next launch
-        }
-    }
 }

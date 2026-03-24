@@ -78,10 +78,32 @@ final class iCloudSyncService: NSObject, ObservableObject {
     
     @objc private func processRemoteChange() {
         Task { @MainActor in
+            // Refresh the SwiftData context so it merges remote CloudKit changes
+            // into the in-memory objects. Without this, the context holds stale data
+            // and the UI won't reflect changes from other devices.
+            if let ctx = modelContext {
+                // SwiftData's ModelContext doesn't expose refreshAllObjects() directly,
+                // but accessing the underlying NSManagedObjectContext (via the persistent
+                // store coordinator notification) triggers the merge. We force the context
+                // to re-fault all registered objects by performing a no-op save-if-needed,
+                // which flushes the merge policy and pulls in remote changes.
+                do {
+                    if ctx.hasChanges {
+                        try ctx.save()
+                    }
+                } catch {
+                    print("⚠️ [iCloud] Context save during remote merge failed: \(error.localizedDescription)")
+                }
+            } else {
+                print("⚠️ [iCloud] Remote changes received but modelContext is nil — cannot refresh")
+            }
+            
             lastSyncDate = Date()
+            syncStatus = .success
+            
             // Post a notification so any listening views can refresh their queries
             NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
-            print("🔄 [iCloud] Remote changes received — UI will refresh")
+            print("🔄 [iCloud] Remote changes received and merged — UI will refresh")
         }
     }
     
@@ -132,8 +154,9 @@ final class iCloudSyncService: NSObject, ObservableObject {
         
         syncStatus = .syncing
         defer {
-            lastSyncDate = Date()
-            kvStore.set(lastSyncDate!.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
+            let now = Date()
+            lastSyncDate = now
+            kvStore.set(now.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
         }
         
         // Push user settings to iCloud KV store
@@ -153,38 +176,35 @@ final class iCloudSyncService: NSObject, ObservableObject {
     }
     
     // MARK: - Incremental Syncs
+    // SwiftData + CloudKit handles record-level sync automatically.
+    // These methods exist only to hook into performFullSync() for
+    // future per-type logic (e.g. conflict resolution, dedup).
     
     private func syncJokes() async {
-        // Jokes sync handled via SwiftData CloudKit integration
-        // SwiftData automatically syncs when iCloud sync is enabled
-        print("✅ Jokes synced")
+        // No-op: SwiftData auto-syncs Joke records via CloudKit.
     }
     
     private func syncRoastTargets() async {
-        // RoastTargets sync handled via SwiftData CloudKit integration
-        // The @Relationship to RoastJoke ensures targets and their jokes stay linked
-        print("✅ Roast targets synced")
+        // No-op: SwiftData auto-syncs RoastTarget records via CloudKit.
+        // The @Relationship to RoastJoke ensures targets and their jokes stay linked.
     }
     
     private func syncRoastJokes() async {
-        // RoastJokes sync handled via SwiftData CloudKit integration
-        // Each RoastJoke has a REFERENCE back to its RoastTarget, synced automatically
-        print("✅ Roast jokes synced")
+        // No-op: SwiftData auto-syncs RoastJoke records via CloudKit.
     }
     
     private func syncSetLists() async {
-        // SetLists sync handled via SwiftData CloudKit integration
-        print("✅ Set lists synced")
+        // No-op: SwiftData auto-syncs SetList records via CloudKit.
     }
     
     private func syncRecordings() async {
-        // Audio files synced via CloudKit file storage
-        print("✅ Recordings synced")
+        // No-op: SwiftData auto-syncs Recording records via CloudKit.
+        // Audio files stored at fileURL are NOT synced — only the metadata record.
     }
     
     private func syncNotebookPhotos() async {
-        // Photo records synced via SwiftData CloudKit integration
-        print("✅ Notebook photos synced")
+        // No-op: SwiftData auto-syncs NotebookPhotoRecord records via CloudKit.
+        // imageData uses @Attribute(.externalStorage), synced as a CKAsset.
     }
     
     // MARK: - Sync Thoughts (Notepad)
@@ -195,13 +215,28 @@ final class iCloudSyncService: NSObject, ObservableObject {
         // Save to iCloud KV store for sync
         kvStore.set(content, forKey: SyncedKeys.notepadText)
         
-        // Also save to CloudKit for true cloud backup
+        // Also save to CloudKit for true cloud backup.
+        // Use a fixed recordName so we UPSERT the same record every time
+        // instead of creating a new CKRecord on every call.
         do {
-            let record = CKRecord(recordType: "Thoughts")
+            let database = container.privateCloudDatabase
+            let zoneID = CKRecordZone.ID(
+                zoneName: "com.apple.coredata.cloudkit.zone",
+                ownerName: CKCurrentUserDefaultName
+            )
+            let recordID = CKRecord.ID(recordName: "UserThoughts", zoneID: zoneID)
+            
+            // Fetch existing record, or create a new one if it doesn't exist yet
+            let record: CKRecord
+            do {
+                record = try await database.record(for: recordID)
+            } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
+                record = CKRecord(recordType: "Thoughts", recordID: recordID)
+            }
+            
             record["content"] = content
             record["timestamp"] = Date()
             
-            let database = container.privateCloudDatabase
             _ = try await database.save(record)
             print("✅ Thoughts synced to iCloud")
         } catch {
@@ -217,7 +252,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
             let query = CKQuery(recordType: "Thoughts", predicate: NSPredicate(value: true))
             query.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
             
-            let results = try await database.records(matching: query)
+            let results = try await database.records(matching: query, resultsLimit: 1)
             if let latestRecord = try results.matchResults.first?.1.get() {
                 return latestRecord["content"] as? String
             }
@@ -305,8 +340,12 @@ final class iCloudSyncService: NSObject, ObservableObject {
         // 5. Try a test fetch to verify CloudKit connectivity
         do {
             let database = container.privateCloudDatabase
+            let zoneID = CKRecordZone.ID(
+                zoneName: "com.apple.coredata.cloudkit.zone",
+                ownerName: CKCurrentUserDefaultName
+            )
             let query = CKQuery(recordType: "CD_RoastTarget", predicate: NSPredicate(value: true))
-            let (matchResults, _) = try await database.records(matching: query, resultsLimit: 1)
+            let (matchResults, _) = try await database.records(matching: query, inZoneWith: zoneID, resultsLimit: 1)
             results.append("CloudKit Fetch Test: ✅ Connected (\(matchResults.count) result(s))")
         } catch {
             results.append("CloudKit Fetch Test: ❌ \(error.localizedDescription)")

@@ -22,6 +22,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var recordingTimer: Timer?
     private var recordingStartTime: Date?
     private var pausedDuration: TimeInterval = 0
+    private var pauseStartTime: Date?
     private var lastRecordingURL: URL?
     
     /// Maximum number of retry attempts for audio session configuration
@@ -152,12 +153,20 @@ class AudioRecordingService: NSObject, ObservableObject {
         guard isRecording && !isPaused else { return }
         audioRecorder?.pause()
         isPaused = true
+        pauseStartTime = Date()
         recordingTimer?.invalidate()
         recordingTimer = nil
     }
     
     func resumeRecording() {
         guard isRecording && isPaused else { return }
+        
+        // Accumulate the time spent paused
+        if let pauseStart = pauseStartTime {
+            pausedDuration += Date().timeIntervalSince(pauseStart)
+        }
+        pauseStartTime = nil
+        
         audioRecorder?.record()
         isPaused = false
         
@@ -172,6 +181,13 @@ class AudioRecordingService: NSObject, ObservableObject {
     
     func stopRecording() -> (url: URL?, duration: TimeInterval) {
         let url = audioRecorder?.url
+        
+        // If we're currently paused, account for the final pause duration
+        if let pauseStart = pauseStartTime {
+            pausedDuration += Date().timeIntervalSince(pauseStart)
+            pauseStartTime = nil
+        }
+        
         let duration = recordingTime
         
         audioRecorder?.stop()
@@ -209,6 +225,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         recordingTime = 0
         recordingStartTime = nil
         pausedDuration = 0
+        pauseStartTime = nil
         audioRecorder = nil
         lastRecordingURL = nil
     }

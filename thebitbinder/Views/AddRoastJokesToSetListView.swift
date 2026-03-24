@@ -35,7 +35,7 @@ struct AddRoastJokesToSetListView: View {
 
     private func availableJokes(for target: RoastTarget) -> [RoastJoke] {
         let all = (target.jokes ?? [])
-            .filter { !currentRoastJokeIDs.contains($0.id) }
+            .filter { !$0.isDeleted && !currentRoastJokeIDs.contains($0.id) }
             .sorted { $0.dateCreated > $1.dateCreated }
 
         guard !searchText.isEmpty else { return all }

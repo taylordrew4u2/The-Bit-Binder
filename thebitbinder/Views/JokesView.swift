@@ -256,21 +256,19 @@ struct JokesView: View {
                         NavigationLink(destination: RoastTargetDetailView(target: target)) {
                             RoastTargetListRow(target: target)
                         }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                roastTargetToDelete = target
+                                showingDeleteRoastAlert = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
-                    .onDelete(perform: deleteRoastTargets)
                 }
                 .listStyle(.plain)
             }
         }
-    }
-    
-    private func deleteRoastTargets(at offsets: IndexSet) {
-        let targets = roastTargets
-        for index in offsets {
-            guard index < targets.count else { continue }
-            modelContext.delete(targets[index])
-        }
-        try? modelContext.save()
     }
 
     
@@ -1207,26 +1205,14 @@ struct RoastTargetCard: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            // Avatar
-            Group {
-                if let data = target.photoData, let img = UIImage(data: data) {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 58, height: 58)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(AppTheme.Colors.roastAccent.opacity(0.5), lineWidth: 1.5))
-                } else {
-                    ZStack {
-                        Circle()
-                            .fill(AppTheme.Colors.roastAccent.opacity(0.18))
-                            .frame(width: 58, height: 58)
-                        Text(target.name.prefix(1).uppercased())
-                            .font(.system(size: 24, weight: .bold, design: .serif))
-                            .foregroundColor(AppTheme.Colors.roastAccent)
-                    }
-                }
-            }
+            // Avatar — async background decode
+            AsyncAvatarView(
+                photoData: target.photoData,
+                size: 58,
+                fallbackInitial: String(target.name.prefix(1).uppercased()),
+                accentColor: AppTheme.Colors.roastAccent
+            )
+            .overlay(Circle().stroke(AppTheme.Colors.roastAccent.opacity(0.5), lineWidth: 1.5))
 
             // Name + count
             VStack(spacing: 3) {
@@ -1269,25 +1255,14 @@ struct RoastTargetGridCard: View {
 
     var body: some View {
         VStack(spacing: max(8, 12 * scale)) {
-            // Avatar
-            if let photoData = target.photoData,
-               let uiImage = UIImage(data: photoData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: avatarSize, height: avatarSize)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(accentColor.opacity(0.5), lineWidth: 2))
-            } else {
-                ZStack {
-                    Circle()
-                        .fill(accentColor.opacity(0.15))
-                        .frame(width: avatarSize, height: avatarSize)
-                    Text(target.name.prefix(1).uppercased())
-                        .font(.system(size: initialFontSize, weight: .bold, design: .rounded))
-                        .foregroundColor(accentColor)
-                }
-            }
+            // Avatar — async background decode
+            AsyncAvatarView(
+                photoData: target.photoData,
+                size: avatarSize,
+                fallbackInitial: String(target.name.prefix(1).uppercased()),
+                accentColor: accentColor
+            )
+            .overlay(Circle().stroke(accentColor.opacity(0.5), lineWidth: 2))
 
             // Name
             Text(target.name)
@@ -1327,25 +1302,14 @@ struct RoastTargetListRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            // Avatar
-            if let photoData = target.photoData,
-               let uiImage = UIImage(data: photoData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 50, height: 50)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(accentColor.opacity(0.5), lineWidth: 1.5))
-            } else {
-                ZStack {
-                    Circle()
-                        .fill(accentColor.opacity(0.15))
-                        .frame(width: 50, height: 50)
-                    Text(target.name.prefix(1).uppercased())
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
-                        .foregroundColor(accentColor)
-                }
-            }
+            // Avatar — async background decode
+            AsyncAvatarView(
+                photoData: target.photoData,
+                size: 50,
+                fallbackInitial: String(target.name.prefix(1).uppercased()),
+                accentColor: accentColor
+            )
+            .overlay(Circle().stroke(accentColor.opacity(0.5), lineWidth: 1.5))
 
             // Target info
             VStack(alignment: .leading, spacing: 4) {
