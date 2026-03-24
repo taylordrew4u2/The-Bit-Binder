@@ -20,7 +20,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>9.4</string>
 	<key>CFBundleVersion</key>
-	<string>12</string>
+	<string>13</string>
 	<key>CloudKitSchemaConfiguration</key>
 	<dict>
 		<key>PublicKeyAlgorithm</key>
@@ -108,8 +108,6 @@
 	<array>
 		<string>arm64</string>
 	</array>
-	<key>UISupportsDocumentBrowser</key>
-	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -123,5 +121,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
 </dict>
 </plist>
