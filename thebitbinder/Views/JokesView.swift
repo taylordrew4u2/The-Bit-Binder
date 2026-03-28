@@ -622,16 +622,34 @@ struct JokesView: View {
     }
     
     private func batchTrashSelected() {
-        for joke in jokes where selectedJokeIDs.contains(joke.id) {
+        // Capture into a local array FIRST — iterating the live @Query
+        // while mutating can skip items because SwiftData reactively
+        // updates query results mid-loop.
+        let jokesToTrash = jokes.filter { selectedJokeIDs.contains($0.id) }
+        
+        guard !jokesToTrash.isEmpty else {
+            print("⚠️ [JokesView] No jokes matched selectedJokeIDs for batch trash")
+            selectedJokeIDs.removeAll()
+            isSelectMode = false
+            return
+        }
+        
+        for joke in jokesToTrash {
             joke.moveToTrash()
         }
+        
+        let count = jokesToTrash.count
         selectedJokeIDs.removeAll()
         isSelectMode = false
+        
         do {
             try modelContext.save()
+            print("✅ [JokesView] Batch trashed \(count) joke(s)")
         } catch {
             print("❌ [JokesView] Failed to save after batch trash: \(error)")
         }
+        
+        NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
     }
 
     @ToolbarContentBuilder
@@ -757,6 +775,11 @@ struct JokesView: View {
             guard index < snapshot.count else { continue }
             // Soft-delete into trash
             snapshot[index].moveToTrash()
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ [JokesView] Failed to save after delete: \(error)")
         }
         NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
     }
