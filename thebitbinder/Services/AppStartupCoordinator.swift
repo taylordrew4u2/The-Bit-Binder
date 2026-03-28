@@ -95,6 +95,16 @@ final class AppStartupCoordinator: ObservableObject {
         // thebitbinderApp.performAggressiveCloudKitCleanup() before this method
         // is called. No need to duplicate it here — both used the same guard key.
         
+        // One-time reset: clear stale validation counts from pre-migration era.
+        // After a bundle ID change, entity counts start at 0 until CloudKit syncs,
+        // which falsely triggers "significant data loss" detection.
+        let migrationCountsResetKey = "DataValidation_CountsReset_v10"
+        if !UserDefaults.standard.bool(forKey: migrationCountsResetKey) {
+            UserDefaults.standard.removeObject(forKey: "DataValidation_Counts")
+            UserDefaults.standard.set(true, forKey: migrationCountsResetKey)
+            print("🔄 [AppStartup] Reset stale validation counts after bundle ID migration")
+        }
+        
         // Purge soft-deleted items older than 30 days before validation runs
         purgeExpiredTrashItems(context: context)
 
