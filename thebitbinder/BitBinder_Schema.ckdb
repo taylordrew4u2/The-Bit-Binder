@@ -182,10 +182,10 @@ DEFINE SCHEMA
     );
 
     RECORD TYPE CD_RoastTarget (
-        CD_dateCreated  TIMESTAMP QUERYABLE SORTABLE INDEXED,
-        CD_dateModified TIMESTAMP QUERYABLE SORTABLE INDEXED,
-        CD_id           STRING QUERYABLE INDEXED,
-        CD_name         STRING QUERYABLE INDEXED,
+        CD_dateCreated  TIMESTAMP QUERYABLE SORTABLE,
+        CD_dateModified TIMESTAMP QUERYABLE SORTABLE,
+        CD_id           STRING QUERYABLE,
+        CD_name         STRING QUERYABLE,
         CD_notes        STRING,
         CD_photoData    BYTES,
         "___createTime" TIMESTAMP,
