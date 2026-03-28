@@ -34,9 +34,6 @@ enum BackgroundDownloadConstants {
     
     /// Directory name for downloaded assets within the shared container.
     static let downloadedAssetsDirectory = "BackgroundAssets"
-    
-    /// The main app's bundle identifier.
-    static let appBundleIdentifier = "666bit"
 }
 
 @main
