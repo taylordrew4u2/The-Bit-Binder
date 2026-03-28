@@ -297,7 +297,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 9.4;
-				PRODUCT_BUNDLE_IDENTIFIER = 666bit;
+				PRODUCT_BUNDLE_IDENTIFIER = The-BitBinder.thebitbinder;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "The-BitBinder.thebitbinder";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -352,7 +352,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 9.4;
-				PRODUCT_BUNDLE_IDENTIFIER = 666bit;
+				PRODUCT_BUNDLE_IDENTIFIER = The-BitBinder.thebitbinder;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "The-BitBinder.thebitbinder";
 				PRODUCT_NAME = "$(TARGET_NAME)";
