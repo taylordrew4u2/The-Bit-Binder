@@ -29,6 +29,9 @@ enum BackgroundDownloadConstants {
     /// UserDefaults key for download error log.
     static let lastDownloadErrorKey = "lastBackgroundDownloadError"
     
+    /// UserDefaults key for last successful download timestamp.
+    static let lastDownloadTimestampKey = "lastBackgroundDownloadTimestamp"
+    
     /// UserDefaults key for pending download identifiers.
     static let pendingDownloadsKey = "pendingBackgroundDownloads"
     
