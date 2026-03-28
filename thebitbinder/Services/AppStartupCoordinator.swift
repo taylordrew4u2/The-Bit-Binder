@@ -84,7 +84,7 @@ final class AppStartupCoordinator: ObservableObject {
         print("   - Migration service ready")
         
         // Brief hold so the launch animation is visible but doesn't feel slow.
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        try? await Task.sleep(nanoseconds: 150_000_000) // 0.15 seconds
     }
     
     /// Call this after ModelContainer is available to complete data validation and migration

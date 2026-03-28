@@ -37,39 +37,9 @@ struct thebitbinderApp: App {
         // all existing user data invisible. Always use "default.store".
         let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
         
-        // 🛡️ CRITICAL DATA PROTECTION: Create emergency backup at most once per 24 hours
-        // (DataProtectionService.checkVersionAndBackupIfNeeded handles version-change backups separately)
-        let lastEmergencyBackupKey = "lastEmergencyBackupTimestamp"
-        let lastBackupTimestamp = UserDefaults.standard.double(forKey: lastEmergencyBackupKey)
-        let hoursSinceLastBackup = (Date().timeIntervalSince1970 - lastBackupTimestamp) / 3600
-        
-        if FileManager.default.fileExists(atPath: storeURL.path) && hoursSinceLastBackup >= 24 {
-            let timestamp = Int(Date().timeIntervalSince1970)
-            let emergencyBackupURL = URL.applicationSupportDirectory
-                .appending(path: "emergency_backup_\(timestamp).store")
-            
-            do {
-                // Backup the main store file
-                try FileManager.default.copyItem(at: storeURL, to: emergencyBackupURL)
-                
-                // Also backup WAL and SHM journal files (contains uncommitted data)
-                for ext in ["-shm", "-wal"] {
-                    let sourceJournal = URL(fileURLWithPath: storeURL.path + ext)
-                    let destJournal = URL(fileURLWithPath: emergencyBackupURL.path + ext)
-                    if FileManager.default.fileExists(atPath: sourceJournal.path) {
-                        try FileManager.default.copyItem(at: sourceJournal, to: destJournal)
-                    }
-                }
-                
-                print("🛡️ [DataProtection] Emergency backup created before container initialization")
-                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastEmergencyBackupKey)
-            } catch {
-                print("⚠️ [DataProtection] Could not create emergency backup: \(error)")
-            }
-            
-            // 🧹 Clean up old emergency backups to prevent disk bloat
-            DataProtectionService.shared.cleanupEmergencyBackups()
-        }
+        // 🛡️ NOTE: Emergency backups are now performed AFTER launch in
+        // performDeferredBackup() to avoid watchdog timeout (code 9).
+        // The ModelContainer closure must be fast.
 
         // 1️⃣ Persistent + CloudKit (single container, full schema)
         do {
@@ -190,28 +160,29 @@ struct thebitbinderApp: App {
             }
             .animation(.easeOut(duration: 0.35), value: startup.isReady)
             .task {
-                // 🚨 IMMEDIATE: Delete corrupted CloudKit records before sync starts
-                await performAggressiveCloudKitCleanup()
-                
                 // Wire the main context into the sync service so remote change
                 // notifications can call refreshAllObjects() on the right context
                 iCloudSyncService.shared.modelContext = sharedModelContainer.mainContext
                 
                 // Register for remote push notifications — CloudKit uses silent
                 // pushes to tell the app "new data available, please fetch"
-                // Without this, sync only happens when the app is foregrounded
                 UIApplication.shared.registerForRemoteNotifications()
                 
                 #if DEBUG
-                // CloudKit debugging for development
                 CloudKitResetUtility.logContainerInfo()
                 #endif
                 
-                // Start app initialization
+                // Start app initialization (lightweight — shows UI quickly)
                 await startup.start()
                 
                 // Complete data protection with model context
                 await startup.completeDataProtectionWithContext(sharedModelContainer.mainContext)
+                
+                // 🛡️ Deferred heavy work — runs AFTER UI is visible
+                await performDeferredBackup()
+                
+                // CloudKit cleanup runs after backup so UI is already showing
+                await performAggressiveCloudKitCleanup()
             }
             .environmentObject(userPreferences)
             .alert("⚠️ Data Issue Detected", isPresented: $startup.showDataLossAlert) {
@@ -245,6 +216,45 @@ struct thebitbinderApp: App {
                 NotificationManager.shared.scheduleIfNeeded()
             }
         }
+    }
+    
+    /// Performs the emergency backup on a background thread AFTER the app
+    /// has finished launching. This was previously done synchronously in the
+    /// ModelContainer initializer, which caused watchdog timeout (code 9).
+    private func performDeferredBackup() async {
+        await Task.detached(priority: .utility) {
+            let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
+            let lastEmergencyBackupKey = "lastEmergencyBackupTimestamp"
+            let lastBackupTimestamp = UserDefaults.standard.double(forKey: lastEmergencyBackupKey)
+            let hoursSinceLastBackup = (Date().timeIntervalSince1970 - lastBackupTimestamp) / 3600
+            
+            guard FileManager.default.fileExists(atPath: storeURL.path),
+                  hoursSinceLastBackup >= 24 else { return }
+            
+            let timestamp = Int(Date().timeIntervalSince1970)
+            let emergencyBackupURL = URL.applicationSupportDirectory
+                .appending(path: "emergency_backup_\(timestamp).store")
+            
+            do {
+                try FileManager.default.copyItem(at: storeURL, to: emergencyBackupURL)
+                for ext in ["-shm", "-wal"] {
+                    let src = URL(fileURLWithPath: storeURL.path + ext)
+                    let dst = URL(fileURLWithPath: emergencyBackupURL.path + ext)
+                    if FileManager.default.fileExists(atPath: src.path) {
+                        try FileManager.default.copyItem(at: src, to: dst)
+                    }
+                }
+                print("🛡️ [DataProtection] Deferred emergency backup created")
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastEmergencyBackupKey)
+            } catch {
+                print("⚠️ [DataProtection] Could not create emergency backup: \(error)")
+            }
+            
+            // Clean up old backups
+            await MainActor.run {
+                DataProtectionService.shared.cleanupEmergencyBackups()
+            }
+        }.value
     }
     
     /// One-time CloudKit cleanup — deletes the corrupted zone so CoreData
