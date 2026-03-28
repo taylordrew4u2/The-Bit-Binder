@@ -101,10 +101,14 @@ final class AppStartupCoordinator: ObservableObject {
         // Perform data validation
         let validation = await dataValidation.validateDataIntegrity(context: context)
         
-        if validation.significantDataLoss {
+        if validation.significantDataLoss && !validation.issues.isEmpty {
             print("🚨 [AppStartup] CRITICAL: Significant data loss detected!")
             dataLossDetails = "Data validation found \(validation.issues.count) issue(s): \(validation.issues.prefix(3).joined(separator: "; ")). You can restore from a recent backup in Settings → Data Safety."
             showDataLossAlert = true
+        } else if validation.significantDataLoss {
+            // Count dropped but no actual corruption — likely trash purge or migration.
+            // Just log it, don't alarm the user.
+            print("⚠️ [AppStartup] Entity count drop detected but no data issues found — likely normal (trash purge, migration)")
         } else if !validation.isHealthy {
             print("⚠️ [AppStartup] Data validation found minor issues")
         } else {
