@@ -34,7 +34,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
     
     // CloudKit container — must match the container used in ModelContainer CloudKit config
     private lazy var container: CKContainer = {
-        return CKContainer(identifier: "iCloud.666bit")
+        return CKContainer(identifier: "iCloud.The-BitBinder.thebitbinder")
     }()
     
     override init() {
@@ -325,7 +325,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
         }
         
         // 2. Container ID
-        results.append("Container: iCloud.666bit")
+        results.append("Container: iCloud.The-BitBinder.thebitbinder")
         
         // 3. Sync enabled
         results.append("Sync Enabled: \(isSyncEnabled ? "✅ Yes" : "❌ No")")

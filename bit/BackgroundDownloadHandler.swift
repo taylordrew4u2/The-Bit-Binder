@@ -13,15 +13,15 @@ import BackgroundAssets
 import os.log
 import ExtensionFoundation
 
-private let logger = Logger(subsystem: "666bit.bit", category: "BackgroundDownload")
+private let logger = Logger(subsystem: "The-BitBinder.thebitbinder.bit", category: "BackgroundDownload")
 
 /// Shared constants between the main app and the background downloader extension.
 enum BackgroundDownloadConstants {
     /// App group identifier shared between the main app and this extension.
-    static let appGroupIdentifier = "group.666bit"
+    static let appGroupIdentifier = "group.The-BitBinder.thebitbinder"
     
-    /// UserDefaults key for the last successful download timestamp.
-    static let lastDownloadTimestampKey = "lastBackgroundDownloadTimestamp"
+    /// The bundle identifier of the main app.
+    static let appBundleIdentifier = "The-BitBinder.thebitbinder"
     
     /// UserDefaults key for total downloaded asset count.
     static let downloadedAssetCountKey = "backgroundDownloadedAssetCount"

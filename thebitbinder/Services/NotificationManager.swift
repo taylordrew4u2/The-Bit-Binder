@@ -44,7 +44,7 @@ final class NotificationManager: NSObject, ObservableObject, UNUserNotificationC
 
     // MARK: - Constants
 
-    private let notifID = "666bit.dailyReminder"
+    private let notifID = "The-BitBinder.thebitbinder.dailyReminder"
 
     static let reminderMessages: [String] = [
         "Stop working on your manifesto and get back to writing a new set",

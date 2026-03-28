@@ -36,7 +36,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     ]
     
     private init() {
-        self.container = CKContainer(identifier: "iCloud.666bit")
+        self.container = CKContainer(identifier: "iCloud.The-BitBinder.thebitbinder")
         self.signatureService = CloudKitSignatureService.shared
     }
     

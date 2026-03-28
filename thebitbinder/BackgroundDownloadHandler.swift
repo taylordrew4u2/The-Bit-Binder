@@ -19,10 +19,10 @@ final class BackgroundDownloadHandler: ObservableObject {
     
     static let shared = BackgroundDownloadHandler()
     
-    private let logger = Logger(subsystem: "666bit", category: "BackgroundDownload")
+    private let logger = Logger(subsystem: "The-BitBinder.thebitbinder", category: "BackgroundDownload")
     
     /// Shared app group identifier — must match the extension.
-    private let appGroupIdentifier = "group.666bit"
+    private let appGroupIdentifier = "group.The-BitBinder.thebitbinder"
     
     // MARK: - Published State
     

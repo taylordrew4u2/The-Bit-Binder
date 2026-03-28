@@ -1149,7 +1149,7 @@ struct JokesView: View {
     
     private func checkPendingVoiceMemoImports() {
         // Use App Group shared defaults for extension communication
-        guard let sharedDefaults = UserDefaults(suiteName: "group.666bit") else {
+        guard let sharedDefaults = UserDefaults(suiteName: "group.The-BitBinder.thebitbinder") else {
             print("⚠️ [VoiceMemo] App Group not available")
             return
         }

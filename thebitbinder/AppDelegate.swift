@@ -7,8 +7,8 @@ import BackgroundTasks
 class AppDelegate: NSObject, UIApplicationDelegate {
     
     // MARK: - Background Task Identifiers (must match Info.plist BGTaskSchedulerPermittedIdentifiers)
-    static let refreshTaskIdentifier = "666bit.refresh"
-    static let syncTaskIdentifier    = "666bit.sync"
+    static let refreshTaskIdentifier = "The-BitBinder.thebitbinder.refresh"
+    static let syncTaskIdentifier    = "The-BitBinder.thebitbinder.sync"
     
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -31,7 +31,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // in Settings → iCloud → iCloud Drive so users can see it and toggle sync.
         // Must be called on a background thread per Apple docs.
         DispatchQueue.global(qos: .utility).async {
-            if let containerURL = FileManager.default.url(forUbiquityContainerIdentifier: "iCloud.666bit") {
+            if let containerURL = FileManager.default.url(forUbiquityContainerIdentifier: "iCloud.The-BitBinder.thebitbinder") {
                 let documentsURL = containerURL.appendingPathComponent("Documents")
                 if !FileManager.default.fileExists(atPath: documentsURL.path) {
                     do {
@@ -50,7 +50,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // Verify iCloud account using the correct container
         Task {
             do {
-                let status = try await CKContainer(identifier: "iCloud.666bit").accountStatus()
+                let status = try await CKContainer(identifier: "iCloud.The-BitBinder.thebitbinder").accountStatus()
                 switch status {
                 case .available:
                     print("✅ [CloudKit] iCloud account available — sync enabled")

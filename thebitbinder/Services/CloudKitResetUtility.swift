@@ -25,7 +25,7 @@ import CloudKit
 /// **Local data is never touched** — only remote CloudKit records are deleted.
 class CloudKitResetUtility {
 
-    static let containerID = "iCloud.666bit"
+    static let containerID = "iCloud.The-BitBinder.thebitbinder"
     static let zoneID = CKRecordZone.ID(
         zoneName: "com.apple.coredata.cloudkit.zone",
         ownerName: CKCurrentUserDefaultName

@@ -77,7 +77,7 @@ struct thebitbinderApp: App {
                 schema: schema,
                 url: storeURL,
                 allowsSave: true,
-                cloudKitDatabase: .private("iCloud.666bit")
+                cloudKitDatabase: .private("iCloud.The-BitBinder.thebitbinder")
             )
             let container = try ModelContainer(for: schema, configurations: [config])
             print("✅ [ModelContainer] Persistent + CloudKit ready")

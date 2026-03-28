@@ -14,7 +14,7 @@ final class DataOperationLogger {
     
     static let shared = DataOperationLogger()
     
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "666bit", category: "DataOperations")
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "The-BitBinder.thebitbinder", category: "DataOperations")
     private let logFileURL: URL
     private let maxLogFileSize: Int = 10 * 1024 * 1024 // 10MB
     private let maxLogFiles = 5
