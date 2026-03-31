@@ -47,7 +47,7 @@
 		<key>SchemaVerificationEnabled</key>
 		<true/>
 		<key>SchemaVersion</key>
-		<string>2.3.0</string>
+		<string>2.4.0</string>
 	</dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
