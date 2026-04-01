@@ -10,7 +10,7 @@
 //  intentionally lenient (additionalProperties: true on each joke item) so
 //  we don't break if the model adds a harmless extra field.
 //
-//  ⚠️  DO NOT switch back to `json_object`.  That mode forces a JSON *object*
+//    DO NOT switch back to `json_object`.  That mode forces a JSON *object*
 //  response, which conflicts with the prompt asking for an array and causes
 //  the model to wrap results in a random key like {"jokes":[...]}.  While
 //  parseResponse handles that wrapper today, relying on it is fragile.
@@ -76,7 +76,7 @@ final class OpenAIProvider: AIJokeExtractionProvider {
         AIKeyLoader.loadKey(for: .openAI) != nil
     }
 
-    func extractJokes(from text: String) async throws -> [GeminiExtractedJoke] {
+    func extractJokes(from text: String) async throws -> [AIExtractedJoke] {
         guard let apiKey = AIKeyLoader.loadKey(for: .openAI) else {
             throw AIProviderError.keyNotConfigured(.openAI)
         }
@@ -131,7 +131,7 @@ final class OpenAIProvider: AIJokeExtractionProvider {
         // Warn loudly when the model was cut off — the JSON will be incomplete.
         let finishReason = firstChoice["finish_reason"] as? String ?? ""
         if finishReason == "length" {
-            print("⚠️ [OpenAI] Response truncated (finish_reason=length) — attempting partial JSON repair")
+            print(" [OpenAI] Response truncated (finish_reason=length) — attempting partial JSON repair")
         }
 
         return try JokeExtractionPrompt.parseResponse(content, provider: .openAI)

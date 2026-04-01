@@ -308,6 +308,14 @@ struct TalkToTextView: View {
     }
     
     private func startRecording() {
+        // If permissions haven't been determined yet, re-check them before recording
+        if permissionStatus == .notDetermined {
+            Task {
+                await requestPermissions()
+            }
+            return
+        }
+        
         guard permissionStatus == .authorized else {
             showingPermissionAlert = true
             return
@@ -349,7 +357,7 @@ struct TalkToTextView: View {
         do {
             try modelContext.save()
             #if DEBUG
-            print("✅ [TalkToTextView] Joke saved — id: \(newJoke.id), title: \"\(title)\", folder: \(selectedFolder?.name ?? "none")")
+            print(" [TalkToTextView] Joke saved — id: \(newJoke.id), title: \"\(title)\", folder: \(selectedFolder?.name ?? "none")")
             #endif
             
             // Notify other views that the joke database changed (matches AddJokeView pattern)
@@ -365,7 +373,7 @@ struct TalkToTextView: View {
         } catch {
             isSaving = false
             #if DEBUG
-            print("❌ [TalkToTextView] Failed to save joke: \(error)")
+            print(" [TalkToTextView] Failed to save joke: \(error)")
             #endif
             errorMessage = "Could not save joke: \(error.localizedDescription)"
         }
@@ -411,7 +419,7 @@ class SpeechRecognizer: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             guard let self = self, self.shouldBeRunning else { return }
-            print("⚠️ [SpeechRecognizer] Memory warning — stopping to free resources")
+            print(" [SpeechRecognizer] Memory warning — stopping to free resources")
             // Preserve transcription so user doesn't lose work
             self.accumulatedText = self.transcribedText
             self.shouldBeRunning = false

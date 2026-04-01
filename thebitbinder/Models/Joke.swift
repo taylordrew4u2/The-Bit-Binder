@@ -17,14 +17,15 @@ final class Joke: Identifiable {
     var dateModified: Date = Date()
     
     // Many-to-many: A joke can be in multiple folders
-    @Relationship var folders: [JokeFolder] = []
+    // CloudKit requires ALL relationships to be optional
+    @Relationship(deleteRule: .nullify, inverse: \JokeFolder.jokes) var folders: [JokeFolder]?
     
     // Legacy single folder support (computed for backward compatibility)
     var folder: JokeFolder? {
-        get { folders.first }
+        get { (folders ?? []).first }
         set {
             if let newFolder = newValue {
-                if !folders.contains(where: { $0.id == newFolder.id }) {
+                if !(folders ?? []).contains(where: { $0.id == newFolder.id }) {
                     folders = [newFolder]
                 }
             } else {
@@ -136,7 +137,7 @@ final class Joke: Identifiable {
         self.title = title.isEmpty ? KeywordTitleGenerator.title(from: content) : title
         self.dateCreated = Date()
         self.dateModified = Date()
-        self.folder = folder
+        if let folder { self.folders = [folder] } else { self.folders = [] }
         self.comedicTone = nil
         self.structureScore = 0.0
         self.wordCount = content.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count

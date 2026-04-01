@@ -41,7 +41,7 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         }
         
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            print("📂 PICKER: User selected \(urls.count) files: \(urls.map { $0.lastPathComponent })")
+            print(" PICKER: User selected \(urls.count) files: \(urls.map { $0.lastPathComponent })")
             completion(urls)
         }
     }

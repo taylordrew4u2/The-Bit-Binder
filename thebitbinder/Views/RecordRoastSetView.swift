@@ -192,7 +192,7 @@ struct RecordRoastSetView: View {
             try FileManager.default.moveItem(at: tempURL, to: destinationURL)
         } catch {
             #if DEBUG
-            print("❌ [RecordRoastSetView] Failed to move recording file: \(error)")
+            print(" [RecordRoastSetView] Failed to move recording file: \(error)")
             #endif
             saveErrorMessage = "Could not save recording file: \(error.localizedDescription)"
             showSaveError = true
@@ -210,12 +210,12 @@ struct RecordRoastSetView: View {
         do {
             try modelContext.save()
             #if DEBUG
-            print("✅ [RecordRoastSetView] Recording saved for '\(target.name)' (duration: \(recordingTime)s)")
+            print(" [RecordRoastSetView] Recording saved for '\(target.name)' (duration: \(recordingTime)s)")
             #endif
             dismiss()
         } catch {
             #if DEBUG
-            print("❌ [RecordRoastSetView] Failed to save recording model: \(error)")
+            print(" [RecordRoastSetView] Failed to save recording model: \(error)")
             #endif
             saveErrorMessage = "Could not save recording: \(error.localizedDescription)"
             showSaveError = true

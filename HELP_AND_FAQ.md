@@ -32,7 +32,7 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 ## Feature Guides
 
-### 📝 Notepad (Home)
+###  Notepad (Home)
 
 **What it is**: Your quick capture area - like the back of a napkin, but digital.
 
@@ -52,7 +52,7 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 ---
 
-### 🎭 Jokes View (Jokes Section)
+###  Jokes View (Jokes Section)
 
 **What it is**: Your organized joke library.
 
@@ -96,22 +96,22 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 ---
 
-### 🔥 Roast Mode
+###  Roast Mode
 
 **What it is**: A complete theme change for writing targeted comedy about specific people.
 
 **How to enable**:
-1. **Settings** → **Mode** section
+1. **Settings**  **Mode** section
 2. Toggle **Roast Mode** on
 3. Entire app goes dark with flame accents
 4. Menu becomes "RoastBinder"
 5. Jokes section shows "Roasts" instead
 
 **Menu in Roast Mode**:
-- 🔥 Roasts (instead of Jokes)
-- 🔥 Roast Sets (instead of Set Lists)
-- 🔥 Burn Recordings (instead of Recordings)
-- 🔥 Fire Notebook (instead of Notebook)
+-  Roasts (instead of Jokes)
+-  Roast Sets (instead of Set Lists)
+-  Burn Recordings (instead of Recordings)
+-  Fire Notebook (instead of Notebook)
 - Settings
 
 **How to add a roast target**:
@@ -129,7 +129,7 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 ---
 
-### 📋 Set Lists
+###  Set Lists
 
 **What it is**: Organize jokes into performance sets.
 
@@ -158,7 +158,7 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 ---
 
-### 🎙️ Voice Recordings
+###  Voice Recordings
 
 **What it is**: Record yourself performing and store transcriptions.
 
@@ -191,7 +191,7 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 ---
 
-### 📸 Notebook Saver (Scanning)
+###  Notebook Saver (Scanning)
 
 **What it is**: Digitize your physical comedy notebooks.
 
@@ -216,7 +216,7 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 ---
 
-### ⚙️ Settings
+###  Settings
 
 **Layout**:
 - Reorder your tabs by dragging
@@ -255,18 +255,18 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 *(See `iCLOUD_SYNC_GUIDE.md` for complete guide)*
 
 **Quick Summary**:
-- Tap Settings → iCloud Sync
+- Tap Settings  iCloud Sync
 - Toggle on to enable
 - All data automatically backs up to iCloud
 - Access from any Apple device
 - Completely optional and encrypted
 
 **What Syncs**:
-- ✅ Thoughts (notepad)
-- ✅ Jokes & Roasts
-- ✅ Set Lists
-- ✅ Recordings (audio + transcriptions)
-- ✅ Notebook Photos
+-  Thoughts (notepad)
+-  Jokes & Roasts
+-  Set Lists
+-  Recordings (audio + transcriptions)
+-  Notebook Photos
 
 ---
 
@@ -294,7 +294,7 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 **Try these steps**:
 1. **Restart the app**: Close completely, reopen
-2. **Clear cache**: Go to Settings → BitBinder → Offload App (keeps data)
+2. **Clear cache**: Go to Settings  BitBinder  Offload App (keeps data)
 3. **Check storage**: iPhone may be running low on space
 4. **Disable effects**: If rendering is slow, reduce animations
 5. **Sync status**: Check if iCloud sync is causing delays
@@ -327,7 +327,7 @@ Switch to List View if grid is slow!
 
 ### "iCloud Sync Not Working"
 - Check internet connection (WiFi/Cellular)
-- Ensure signed into iCloud (Settings → [Your Name] → iCloud)
+- Ensure signed into iCloud (Settings  [Your Name]  iCloud)
 - Tap "Sync Now" manually
 - See iCloud Sync Guide for detailed troubleshooting
 
@@ -338,7 +338,7 @@ Switch to List View if grid is slow!
 
 ### "Photos Won't Upload"
 - Check storage space on device
-- Ensure permissions granted (Settings → BitBinder → Camera/Photos)
+- Ensure permissions granted (Settings  BitBinder  Camera/Photos)
 - Try uploading again
 
 ### "Can't Find My Jokes"
@@ -421,7 +421,7 @@ A: Not directly in-app. Export and use a voice editor, or record again.
 A: No! Jokes and roasts are completely separate. Switching modes doesn't affect either.
 
 **Q: Can I switch between modes?**
-A: Yes, anytime. Just toggle in Settings → Mode.
+A: Yes, anytime. Just toggle in Settings  Mode.
 
 **Q: Can I have both jokes and roasts at the same time?**
 A: No. Roast Mode is mutually exclusive (by design—stay focused).
@@ -453,14 +453,14 @@ A: To record your performances. Optional—only for Recordings feature.
 A: To import photos and add them to roast targets. Optional.
 
 **Q: Can I revoke permissions?**
-A: Yes. Settings → BitBinder → toggle off. You won't be able to use those features.
+A: Yes. Settings  BitBinder  toggle off. You won't be able to use those features.
 
 ---
 
 ### Exporting & Sharing
 
 **Q: Can I export jokes as PDF?**
-A: Yes! Settings → Export All Jokes → Choose format.
+A: Yes! Settings  Export All Jokes  Choose format.
 
 **Q: Can I email my jokes?**
 A: Yes! Use export feature, then mail the PDF.
@@ -598,4 +598,4 @@ For now:
 **BitBinder v9.3+**  
 *Professional comedy notebook app designed by comedians, for comedians.*
 
-Happy writing! 🎭
+Happy writing! 

@@ -138,7 +138,7 @@ struct AudioImportView: View {
                 }
                 .padding(.bottom, 30)
             }
-            .navigationTitle("Import Voice Memos")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -437,7 +437,6 @@ struct AudioImportResultsView: View {
                                     Text(transcription)
                                         .font(.caption)
                                         .foregroundColor(.secondary)
-                                        .lineLimit(3)
                                 }
                                 Text("Confidence: \(result.confidenceDescription)")
                                     .font(.caption2)
@@ -468,7 +467,7 @@ struct AudioImportResultsView: View {
                     }
                 }
             }
-            .navigationTitle("Import Results")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

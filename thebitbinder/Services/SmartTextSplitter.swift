@@ -258,7 +258,7 @@ enum SmartTextSplitter {
         )
         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // ── Reject criteria ──
+        //  Reject criteria 
         
         // Too short
         let wordCount = text.split(whereSeparator: \.isWhitespace).count

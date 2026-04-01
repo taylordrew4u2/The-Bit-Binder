@@ -14,12 +14,28 @@ final class JokeFolder: Identifiable {
     var name: String = ""
     var dateCreated: Date = Date()
     var isRecentlyAdded: Bool = false  // Special marker for "Recently Added" folder
-    @Relationship(deleteRule: .nullify, inverse: \Joke.folders) var jokes: [Joke]?
-    
+    @Relationship(deleteRule: .nullify) var jokes: [Joke]?
+
+    // Soft-delete (trash) support
+    var isDeleted: Bool = false
+    var deletedDate: Date?
+
     init(name: String, isRecentlyAdded: Bool = false) {
         self.id = UUID()
         self.name = name
         self.dateCreated = Date()
         self.isRecentlyAdded = isRecentlyAdded
+    }
+
+    // MARK: - Trash Helpers
+
+    func moveToTrash() {
+        isDeleted = true
+        deletedDate = Date()
+    }
+
+    func restoreFromTrash() {
+        isDeleted = false
+        deletedDate = nil
     }
 }

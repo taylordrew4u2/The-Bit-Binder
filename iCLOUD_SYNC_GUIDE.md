@@ -6,22 +6,22 @@ BitBinder now supports automatic iCloud syncing for all your comedy material. Ke
 
 ## What Gets Synced
 
-✅ **Thoughts & Ideas** - Your notepad content and quick thoughts  
-✅ **Jokes & Roasts** - All your written jokes and roast targets  
-✅ **Set Lists** - Your comedy set lists and performances  
-✅ **Voice Recordings** - Voice memos and stand-up recordings  
-✅ **Notebook Photos** - Scanned pages from your physical notebooks  
+ **Thoughts & Ideas** - Your notepad content and quick thoughts  
+ **Jokes & Roasts** - All your written jokes and roast targets  
+ **Set Lists** - Your comedy set lists and performances  
+ **Voice Recordings** - Voice memos and stand-up recordings  
+ **Notebook Photos** - Scanned pages from your physical notebooks  
 
 ## Supported Devices
 
 | Device | Support | Notes |
 |--------|---------|-------|
-| **iPhone** | ✅ Full | iOS 17+ required |
-| **iPad** | ✅ Full | iPadOS 17+ required |
-| **iPad Pro** | ✅ Full | iPadOS 17+ required |
-| **iPad mini** | ✅ Full | iPadOS 17+ required |
-| **iPad Air** | ✅ Full | iPadOS 17+ required |
-| **Mac** | ✅ Via iCloud | Access via iCloud.com or future Mac app |
+| **iPhone** |  Full | iOS 17+ required |
+| **iPad** |  Full | iPadOS 17+ required |
+| **iPad Pro** |  Full | iPadOS 17+ required |
+| **iPad mini** |  Full | iPadOS 17+ required |
+| **iPad Air** |  Full | iPadOS 17+ required |
+| **Mac** |  Via iCloud | Access via iCloud.com or future Mac app |
 
 ---
 
@@ -29,15 +29,15 @@ BitBinder now supports automatic iCloud syncing for all your comedy material. Ke
 
 ### On iPhone
 
-1. **Open BitBinder** → Tap menu button (book icon)
+1. **Open BitBinder**  Tap menu button (book icon)
 2. **Tap Settings** (gear icon)
-3. **Tap "Cloud"** section → **"iCloud Sync"**
+3. **Tap "Cloud"** section  **"iCloud Sync"**
 4. **Toggle "Enable iCloud Sync"** on
 5. **Wait for initial sync** (usually seconds)
 
 ### On iPad
 
-1. **Open BitBinder** → Tap menu button (book icon in bottom-right)
+1. **Open BitBinder**  Tap menu button (book icon in bottom-right)
 2. **Tap Settings** in the sidebar
 3. **Scroll to "Cloud"** section
 4. **Tap "iCloud Sync"**
@@ -69,10 +69,10 @@ BitBinder now supports automatic iCloud syncing for all your comedy material. Ke
 
 | Indicator | Meaning |
 |-----------|---------|
-| 🟢 **Green dot** | Syncing is enabled and active |
-| ⏱️ **Last Sync time** | Shows when data was last synced |
-| ✅ **Checkmark** | Sync completed successfully |
-| ⚠️ **Error message** | Sync encountered an issue |
+|  **Green dot** | Syncing is enabled and active |
+|  **Last Sync time** | Shows when data was last synced |
+|  **Checkmark** | Sync completed successfully |
+|  **Error message** | Sync encountered an issue |
 
 ---
 
@@ -100,12 +100,12 @@ BitBinder now supports automatic iCloud syncing for all your comedy material. Ke
 
 ## Security & Privacy
 
-🔒 **End-to-End Encrypted**
+ **End-to-End Encrypted**
 - Your data is encrypted in transit using HTTPS
 - Stored encrypted in iCloud using CloudKit
 - Apple cannot read your comedy material
 
-🔐 **Your Data Only**
+ **Your Data Only**
 - Only your iCloud account can access your data
 - No sharing between devices unless you authorize it
 - Complete privacy and ownership
@@ -118,12 +118,12 @@ BitBinder now supports automatic iCloud syncing for all your comedy material. Ke
 ### "iCloud not available"
 
 **On iPhone:**
-- Settings app → [Your Name] → iCloud → Ensure signed in
-- Settings app → [Your Name] → iCloud → iCloud Drive → Enabled
+- Settings app  [Your Name]  iCloud  Ensure signed in
+- Settings app  [Your Name]  iCloud  iCloud Drive  Enabled
 
 **On iPad:**
-- Settings app → [Your Name] → iCloud → Ensure signed in
-- Settings app → [Your Name] → iCloud → iCloud Drive → Enabled
+- Settings app  [Your Name]  iCloud  Ensure signed in
+- Settings app  [Your Name]  iCloud  iCloud Drive  Enabled
 
 ### Sync is slow
 
@@ -157,7 +157,7 @@ BitBinder now supports automatic iCloud syncing for all your comedy material. Ke
 
 ### Still having issues?
 
-1. Check iCloud status: Settings → [Your Name] → iCloud → Storage
+1. Check iCloud status: Settings  [Your Name]  iCloud  Storage
 2. Restart BitBinder (force quit and reopen)
 3. Restart device
 4. Check Apple System Status: apple.com/support/systemstatus
@@ -186,7 +186,7 @@ BitBinder now supports automatic iCloud syncing for all your comedy material. Ke
 
 ## Best Practices
 
-### ✅ Do
+###  Do
 
 - Enable iCloud Sync on **ALL your devices**
 - Use the **same Apple ID** everywhere
@@ -194,7 +194,7 @@ BitBinder now supports automatic iCloud syncing for all your comedy material. Ke
 - Use **manual sync before important gigs**
 - Keep enough iCloud storage free
 
-### ❌ Don't
+###  Don't
 
 - Disable iCloud Sync if you want backups
 - Assume data synced instantly (wait a few seconds)
@@ -207,15 +207,15 @@ BitBinder now supports automatic iCloud syncing for all your comedy material. Ke
 
 ### On iPhone
 
-1. **Settings app** → **[Your Name]** → **iCloud**
+1. **Settings app**  **[Your Name]**  **iCloud**
 2. **Enable iCloud Drive**
-3. **Open BitBinder** → Menu → Settings → iCloud Sync → Enable
+3. **Open BitBinder**  Menu  Settings  iCloud Sync  Enable
 
 ### On iPad
 
-1. **Settings app** → **[Your Name]** → **iCloud**
+1. **Settings app**  **[Your Name]**  **iCloud**
 2. **Enable iCloud Drive**
-3. **Open BitBinder** → Menu → Settings → iCloud Sync → Enable
+3. **Open BitBinder**  Menu  Settings  iCloud Sync  Enable
 
 ---
 
@@ -268,4 +268,4 @@ Your comedy material will never be synced unless you explicitly enable it.
 
 ---
 
-**Happy syncing across all your devices!** 🎭☁️📱💻
+**Happy syncing across all your devices!** 

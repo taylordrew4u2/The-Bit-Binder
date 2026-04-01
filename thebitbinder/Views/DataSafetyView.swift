@@ -17,7 +17,7 @@ struct DataSafetyView: View {
     
     @Query private var jokes: [Joke]
     @Query private var recordings: [Recording]
-    @Query private var roastTargets: [RoastTarget]
+    @Query(filter: #Predicate<RoastTarget> { !$0.isDeleted }) private var roastTargets: [RoastTarget]
     
     @AppStorage("roastModeEnabled") private var roastMode = false
     
@@ -72,7 +72,7 @@ struct DataSafetyView: View {
                     let isLowSpace = freeSpace < 200 * 1024 * 1024 // 200 MB
                     StatusRow(
                         title: "Free Disk Space",
-                        status: isLowSpace ? "⚠️ Low: \(freeSpaceFormatted)" : freeSpaceFormatted,
+                        status: isLowSpace ? " Low: \(freeSpaceFormatted)" : freeSpaceFormatted,
                         isHealthy: !isLowSpace
                     )
                 }
@@ -244,7 +244,7 @@ struct DataSafetyView: View {
                             }
                             
                             if result.significantDataLoss {
-                                Text("⚠️ SIGNIFICANT DATA LOSS DETECTED")
+                                Text(" SIGNIFICANT DATA LOSS DETECTED")
                                     .fontWeight(.bold)
                                     .foregroundColor(.red)
                             }
@@ -254,7 +254,7 @@ struct DataSafetyView: View {
                 }
                 #endif
             }
-            .navigationTitle("Data Safety")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable {
                 await loadBackupInfo()
@@ -348,7 +348,7 @@ struct DataSafetyView: View {
                 return freeSpace
             }
         } catch {
-            print("⚠️ [DataSafety] Could not determine free disk space: \(error)")
+            print(" [DataSafety] Could not determine free disk space: \(error)")
         }
         return Int64.max // Assume plenty of space if we can't check
     }
@@ -417,7 +417,7 @@ struct DataSafetyView: View {
 #if !targetEnvironment(macCatalyst)
         if MFMailComposeViewController.canSendMail() {
             mailAttachmentURL = url
-            mailSubject = "My BitBinder Roasts 🔥"
+            mailSubject = "My BitBinder Roasts "
             showMailComposer = true
         } else {
             showMailUnavailableAlert = true
@@ -496,7 +496,7 @@ struct DataSafetyView: View {
             
             var copiedCount = 0
             for recording in recordings {
-                let sourceURL = URL(fileURLWithPath: recording.fileURL)
+                let sourceURL = recording.resolvedURL
                 guard fm.fileExists(atPath: sourceURL.path) else { continue }
                 
                 let safeName = recording.title
@@ -532,7 +532,7 @@ struct DataSafetyView: View {
             
             if let error = archiveError {
                 #if DEBUG
-                print("❌ Audio archive error: \(error)")
+                print(" Audio archive error: \(error)")
                 #endif
                 return nil
             }
@@ -540,7 +540,7 @@ struct DataSafetyView: View {
             return resultURL
         } catch {
             #if DEBUG
-            print("❌ Audio export error: \(error)")
+            print(" Audio export error: \(error)")
             #endif
             return nil
         }
@@ -685,7 +685,7 @@ struct BackupsView: View {
                     }
                 }
             }
-            .navigationTitle("Backups")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -800,11 +800,11 @@ struct BackupsView: View {
             try FileManager.default.removeItem(at: backup.url)
             backupToDelete = nil
             #if DEBUG
-            print("🗑️ [BackupsView] Deleted backup: \(backup.name)")
+            print(" [BackupsView] Deleted backup: \(backup.name)")
             #endif
         } catch {
             #if DEBUG
-            print("❌ [BackupsView] Failed to delete backup: \(error)")
+            print(" [BackupsView] Failed to delete backup: \(error)")
             #endif
         }
     }

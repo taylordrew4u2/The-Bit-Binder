@@ -18,9 +18,9 @@ final class ImportReviewViewModel: ObservableObject {
     /// Set when extraction hits a rate-limit or all providers fail during import.
     @Published var rateLimitError: AIExtractionFailedError? = nil
 
-    // Gemini request stats (quota tracking - TODO: implement)
-    var geminiRequestsRemaining: Int { Int.max }
-    var geminiRequestsUsed: Int      { 0 }
+    // Legacy quota stats placeholder. Multi-provider extraction no longer tracks per-provider usage here.
+    var aiRequestsRemaining: Int { Int.max }
+    var aiRequestsUsed: Int      { 0 }
 
     /// Indices of items that were auto-accepted (from the high-confidence autoSavedJokes bucket)
     private(set) var autoAcceptedIndices: Set<Int> = []
@@ -251,10 +251,10 @@ final class ImportReviewViewModel: ObservableObject {
         let pending = reviewItems.filter { $0.action == .pending }.count
         
         var parts: [String] = []
-        if approved > 0 { parts.append("✅ \(approved)") }
-        if rejected > 0 { parts.append("❌ \(rejected)") }
-        if brainstorm > 0 { parts.append("💡 \(brainstorm)") }
-        if pending > 0 { parts.append("⏳ \(pending)") }
+        if approved > 0 { parts.append(" \(approved)") }
+        if rejected > 0 { parts.append(" \(rejected)") }
+        if brainstorm > 0 { parts.append(" \(brainstorm)") }
+        if pending > 0 { parts.append(" \(pending)") }
         return parts.joined(separator: "  ")
     }
 }

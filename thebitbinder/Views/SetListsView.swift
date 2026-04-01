@@ -14,7 +14,10 @@ struct SetListsView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     @State private var showingCreateSetList = false
+    @State private var showingTrash = false
     @State private var searchText = ""
+    @State private var persistenceError: String?
+    @State private var showingPersistenceError = false
     
     var filteredSetLists: [SetList] {
         if searchText.isEmpty {
@@ -49,7 +52,7 @@ struct SetListsView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle(roastMode ? "🔥 Roast Sets" : "Set Lists")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: SetList.self) { setList in
                 SetListDetailView(setList: setList)
@@ -57,10 +60,17 @@ struct SetListsView: View {
             .searchable(text: $searchText, prompt: roastMode ? "Search roast sets" : "Search set lists")
             .bitBinderToolbar(roastMode: roastMode)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    NavigationLink(destination: SetListTrashView()) {
-                        Image(systemName: "trash")
-                            .font(.body)
+                ToolbarItem(placement: .principal) {
+                    Menu {
+                        Button(action: { showingCreateSetList = true }) {
+                            Label("New Set List", systemImage: "plus")
+                        }
+                        Divider()
+                        Button { showingTrash = true } label: {
+                            Label("Trash", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                             .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
                     }
                 }
@@ -71,8 +81,16 @@ struct SetListsView: View {
                     }
                 }
             }
+            .navigationDestination(isPresented: $showingTrash) {
+                SetListTrashView()
+            }
             .sheet(isPresented: $showingCreateSetList) {
                 CreateSetListView()
+            }
+            .alert("Error", isPresented: $showingPersistenceError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(persistenceError ?? "An unknown error occurred")
             }
         }
     }
@@ -84,7 +102,9 @@ struct SetListsView: View {
         do {
             try modelContext.save()
         } catch {
-            print("❌ [SetListsView] Failed to save after soft-delete: \(error)")
+            print(" [SetListsView] Failed to save after soft-delete: \(error)")
+            persistenceError = "Could not delete set list: \(error.localizedDescription)"
+            showingPersistenceError = true
         }
     }
 }

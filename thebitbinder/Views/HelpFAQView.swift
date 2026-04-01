@@ -56,7 +56,7 @@ struct HelpFAQView: View {
                 }
             }
         }
-        .navigationTitle("Help & FAQ")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -230,7 +230,7 @@ private let allSections: [FAQSectionModel] = [
         FAQItem("Can I transcribe a recording?",
                 "Yes — open a recording and tap the transcribe button. It uses Apple's on-device speech recognition."),
         FAQItem("How do I export my recordings?",
-                "Go to Settings → Export → Export All Audio Files to share or save as a zip archive."),
+                "Go to Settings  Export  Export All Audio Files to share or save as a zip archive."),
     ]),
     FAQSectionModel(title: "Roast Mode", icon: "flame.fill", items: [
         FAQItem("What is Roast Mode?",
@@ -244,13 +244,13 @@ private let allSections: [FAQSectionModel] = [
     ]),
     FAQSectionModel(title: "iCloud Sync", icon: "icloud.and.arrow.up.fill", items: [
         FAQItem("How do I enable iCloud Sync?",
-                "Go to Settings → iCloud Sync → toggle Enable iCloud Sync. Make sure you're signed into iCloud on your device."),
+                "Go to Settings  iCloud Sync  toggle Enable iCloud Sync. Make sure you're signed into iCloud on your device."),
         FAQItem("What gets synced to iCloud?",
                 "Jokes, roasts, set lists, recordings, notebook photos, and your notepad thoughts are all synced."),
         FAQItem("Does syncing happen automatically?",
                 "Yes — once enabled, data syncs in the background whenever changes are made. You can also tap Sync Now for an immediate sync."),
         FAQItem("My sync isn't working. What do I do?",
-                "Check that you're signed into iCloud in Settings → [Your Name] → iCloud, and that BitBinder has iCloud access enabled."),
+                "Check that you're signed into iCloud in Settings  [Your Name]  iCloud, and that BitBinder has iCloud access enabled."),
     ]),
     FAQSectionModel(title: "BitBuddy", icon: "bubble.left.and.bubble.right.fill", items: [
         FAQItem("What is BitBuddy?",
@@ -284,7 +284,7 @@ private let allSections: [FAQSectionModel] = [
         FAQItem("Do I need an account?",
                 "No — the app works fully offline without an account. Sign in to unlock sync features across devices."),
         FAQItem("How do I export all my jokes?",
-                "Settings → Export → Export All Jokes. Choose PDF, email, or share sheet."),
+                "Settings  Export  Export All Jokes. Choose PDF, email, or share sheet."),
         FAQItem("Can I delete all my data?",
                 "You can delete individual jokes, recordings, and ideas from within each section. A full data reset option is coming in a future update."),
         FAQItem("Is my data private?",

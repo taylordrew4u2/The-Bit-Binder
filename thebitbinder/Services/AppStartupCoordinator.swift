@@ -32,15 +32,15 @@ final class AppStartupCoordinator: ObservableObject {
     // MARK: - API Key Seeding
 
     /// Seeds API keys from the bundled plists into UserDefaults on first launch
-    /// (or whenever UserDefaults doesn't already have a key for a provider).
-    /// UserDefaults is always checked first by AIKeyLoader, so this is the
+    /// (or whenever Keychain doesn't already have a key for a provider).
+    /// Keychain is always checked first by AIKeyLoader, so this is the
     /// most reliable way to ensure keys are available without Xcode target setup.
     private func seedAPIKeysIfNeeded() {
         let providers: [AIProviderType] = AIProviderType.allCases
         for provider in providers {
             // Only seed if there's no user-entered key already
-            let existing = UserDefaults.standard.string(forKey: provider.userDefaultsKey)
-            guard existing == nil || existing!.isEmpty else { continue }
+            let existing = KeychainHelper.load(forKey: provider.keychainKey)
+            guard existing == nil || (existing?.isEmpty ?? true) else { continue }
 
             // Try to read from the bundled plist
             if let url = Bundle.main.url(forResource: provider.secretsPlistName, withExtension: "plist"),
@@ -48,16 +48,16 @@ final class AppStartupCoordinator: ObservableObject {
                let key = dict[provider.plistKey] as? String,
                !key.isEmpty,
                !key.hasPrefix("YOUR_") {
-                UserDefaults.standard.set(key, forKey: provider.userDefaultsKey)
-                print("🔑 [AppStartup] Seeded \(provider.displayName) key from plist")
+                KeychainHelper.save(key, forKey: provider.keychainKey)
+                print(" [AppStartup] Seeded \(provider.displayName) key to Keychain from plist")
             }
         }
 
         // Log provider readiness
-        print("📥 [AppStartup] Extraction providers loaded:")
+        print(" [AppStartup] Extraction providers loaded:")
         for provider in AIProviderType.allCases {
             let key = AIKeyLoader.loadKey(for: provider)
-            let status = key != nil ? "✅ ready" : "⚠️  no key"
+            let status = key != nil ? " ready" : "  no key"
             print("   \(provider.displayName): \(status)")
         }
     }
@@ -78,7 +78,7 @@ final class AppStartupCoordinator: ObservableObject {
         statusText = "Validating system..."
         
         // Log data protection readiness
-        print("✅ [AppStartup] Data protection sequence completed")
+        print(" [AppStartup] Data protection sequence completed")
         print("   - Backup service ready")
         print("   - Validation service ready")
         print("   - Migration service ready")
@@ -89,7 +89,7 @@ final class AppStartupCoordinator: ObservableObject {
     
     /// Call this after ModelContainer is available to complete data validation and migration
     func completeDataProtectionWithContext(_ context: ModelContext) async {
-        print("🔧 [AppStartup] Completing data protection with model context...")
+        print(" [AppStartup] Completing data protection with model context...")
         
         // NOTE: CloudKit zone cleanup (repairCorruptedZone) already runs in
         // thebitbinderApp.performAggressiveCloudKitCleanup() before this method
@@ -102,7 +102,7 @@ final class AppStartupCoordinator: ObservableObject {
         if !UserDefaults.standard.bool(forKey: migrationCountsResetKey) {
             UserDefaults.standard.removeObject(forKey: "DataValidation_Counts")
             UserDefaults.standard.set(true, forKey: migrationCountsResetKey)
-            print("🔄 [AppStartup] Reset stale validation counts after bundle ID migration")
+            print(" [AppStartup] Reset stale validation counts after bundle ID migration")
         }
         
         // Purge soft-deleted items older than 30 days before validation runs
@@ -112,24 +112,24 @@ final class AppStartupCoordinator: ObservableObject {
         let validation = await dataValidation.validateDataIntegrity(context: context)
         
         if validation.significantDataLoss && !validation.issues.isEmpty {
-            print("🚨 [AppStartup] CRITICAL: Significant data loss detected!")
-            dataLossDetails = "Data validation found \(validation.issues.count) issue(s): \(validation.issues.prefix(3).joined(separator: "; ")). You can restore from a recent backup in Settings → Data Safety."
+            print(" [AppStartup] CRITICAL: Significant data loss detected!")
+            dataLossDetails = "Data validation found \(validation.issues.count) issue(s): \(validation.issues.prefix(3).joined(separator: "; ")). You can restore from a recent backup in Settings  Data Safety."
             showDataLossAlert = true
         } else if validation.significantDataLoss {
             // Count dropped but no actual corruption — likely trash purge or migration.
             // Just log it, don't alarm the user.
-            print("⚠️ [AppStartup] Entity count drop detected but no data issues found — likely normal (trash purge, migration)")
+            print(" [AppStartup] Entity count drop detected but no data issues found — likely normal (trash purge, migration)")
         } else if !validation.isHealthy {
-            print("⚠️ [AppStartup] Data validation found minor issues")
+            print(" [AppStartup] Data validation found minor issues")
         } else {
-            print("✅ [AppStartup] Data validation passed")
+            print(" [AppStartup] Data validation passed")
         }
         
-        // Auto-repair broken relationships (Joke→Folder AND RoastJoke→RoastTarget)
+        // Auto-repair broken relationships (JokeFolder AND RoastJokeRoastTarget)
         if !validation.issues.isEmpty {
             let repaired = await dataValidation.repairDataIssues(context: context, issues: validation.issues)
             if !repaired.isEmpty {
-                print("🔧 [AppStartup] Auto-repaired \(repaired.count) issue(s): \(repaired.joined(separator: "; "))")
+                print(" [AppStartup] Auto-repaired \(repaired.count) issue(s): \(repaired.joined(separator: "; "))")
             }
         }
         
@@ -145,11 +145,11 @@ final class AppStartupCoordinator: ObservableObject {
         
         switch migrationResult {
         case .success(let message):
-            print("✅ [AppStartup] Migration: \(message)")
+            print(" [AppStartup] Migration: \(message)")
         case .warning(let message):
-            print("⚠️ [AppStartup] Migration: \(message)")
+            print(" [AppStartup] Migration: \(message)")
         case .failure(let message):
-            print("❌ [AppStartup] Migration: \(message)")
+            print(" [AppStartup] Migration: \(message)")
         }
     }
     
@@ -203,24 +203,34 @@ final class AppStartupCoordinator: ObservableObject {
             purgeCount += photos.count
         }
 
+        // RoastTargets — cascade deletes their RoastJokes
+        if let targets = try? context.fetch(FetchDescriptor<RoastTarget>(
+            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+        )) {
+            for target in targets { context.delete(target) }
+            purgeCount += targets.count
+        }
+
+        // JokeFolders — nullifies joke relationships on delete
+        if let folders = try? context.fetch(FetchDescriptor<JokeFolder>(
+            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+        )) {
+            for folder in folders { context.delete(folder) }
+            purgeCount += folders.count
+        }
+
         // Recordings — delete audio file first, then DB record
         if let recordings = try? context.fetch(FetchDescriptor<Recording>(
             predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for recording in recordings {
-                // Resolve audio file URL
-                let fileURL: URL
-                if recording.fileURL.hasPrefix("/") {
-                    fileURL = URL(fileURLWithPath: recording.fileURL)
-                } else {
-                    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                    fileURL = docs.appendingPathComponent(recording.fileURL)
-                }
+                // Resolve audio file URL (handles stale absolute paths)
+                let fileURL = recording.resolvedURL
                 if FileManager.default.fileExists(atPath: fileURL.path) {
                     do {
                         try FileManager.default.removeItem(at: fileURL)
                     } catch {
-                        print("⚠️ [AutoPurge] Could not delete audio file '\(fileURL.lastPathComponent)': \(error)")
+                        print(" [AutoPurge] Could not delete audio file '\(fileURL.lastPathComponent)': \(error)")
                     }
                 }
                 context.delete(recording)
@@ -231,12 +241,12 @@ final class AppStartupCoordinator: ObservableObject {
         if purgeCount > 0 {
             do {
                 try context.save()
-                print("🗑️ [AutoPurge] Permanently deleted \(purgeCount) item(s) from trash (>30 days old)")
+                print(" [AutoPurge] Permanently deleted \(purgeCount) item(s) from trash (>30 days old)")
             } catch {
-                print("❌ [AutoPurge] Failed to save after trash purge: \(error)")
+                print(" [AutoPurge] Failed to save after trash purge: \(error)")
             }
         } else {
-            print("✅ [AutoPurge] No expired trash items found")
+            print(" [AutoPurge] No expired trash items found")
         }
     }
 

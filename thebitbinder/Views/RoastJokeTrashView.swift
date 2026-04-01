@@ -14,8 +14,13 @@ struct RoastJokeTrashView: View {
     @Environment(\.modelContext) private var modelContext
     let target: RoastTarget
 
+    @AppStorage("showFullContent") private var showFullContent = true
     @State private var searchText = ""
     @State private var showingEmptyTrashAlert = false
+    @State private var jokeToDelete: RoastJoke?
+    @State private var showingDeleteOneAlert = false
+    @State private var persistenceError: String?
+    @State private var showingErrorAlert = false
 
     private var trashedJokes: [RoastJoke] {
         (target.jokes ?? [])
@@ -46,10 +51,15 @@ struct RoastJokeTrashView: View {
                                 Text(joke.title)
                                     .font(.headline)
                             }
-                            Text(joke.content)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(3)
+                            if showFullContent {
+                                Text(joke.content)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            } else if joke.title.isEmpty {
+                                Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                            }
                             if let deletedDate = joke.deletedDate {
                                 Text("Deleted \(deletedDate.formatted(date: .abbreviated, time: .shortened))")
                                     .font(.caption)
@@ -59,23 +69,14 @@ struct RoastJokeTrashView: View {
                         .padding(.vertical, 4)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
-                                modelContext.delete(joke)
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [RoastJokeTrashView] Failed to permanently delete roast joke: \(error)")
-                                }
+                                jokeToDelete = joke
+                                showingDeleteOneAlert = true
                             } label: {
                                 Label("Delete Forever", systemImage: "trash.fill")
                             }
 
                             Button {
-                                joke.restoreFromTrash()
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [RoastJokeTrashView] Failed to restore roast joke: \(error)")
-                                }
+                                restoreJoke(joke)
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
@@ -83,23 +84,14 @@ struct RoastJokeTrashView: View {
                         }
                         .contextMenu {
                             Button {
-                                joke.restoreFromTrash()
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [RoastJokeTrashView] Failed to restore roast joke: \(error)")
-                                }
+                                restoreJoke(joke)
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
 
                             Button(role: .destructive) {
-                                modelContext.delete(joke)
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [RoastJokeTrashView] Failed to permanently delete roast joke: \(error)")
-                                }
+                                jokeToDelete = joke
+                                showingDeleteOneAlert = true
                             } label: {
                                 Label("Delete Forever", systemImage: "trash.fill")
                             }
@@ -109,7 +101,7 @@ struct RoastJokeTrashView: View {
                 .listStyle(.insetGrouped)
             }
         }
-        .navigationTitle("Roast Trash")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, prompt: "Search trash")
         .toolbar {
@@ -123,20 +115,66 @@ struct RoastJokeTrashView: View {
                 }
             }
         }
-        .alert("Empty Roast Trash?", isPresented: $showingEmptyTrashAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Empty", role: .destructive) {
-                for joke in trashedJokes {
-                    modelContext.delete(joke)
-                }
-                do {
-                    try modelContext.save()
-                } catch {
-                    print("❌ [RoastJokeTrashView] Failed to save after empty trash: \(error)")
+        .alert("Delete Forever?", isPresented: $showingDeleteOneAlert) {
+            Button("Cancel", role: .cancel) { jokeToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let joke = jokeToDelete {
+                    permanentlyDelete(joke)
+                    jokeToDelete = nil
                 }
             }
         } message: {
+            Text("This roast will be permanently deleted. This cannot be undone.")
+        }
+        .alert("Empty Roast Trash?", isPresented: $showingEmptyTrashAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Empty", role: .destructive) {
+                emptyTrash()
+            }
+        } message: {
             Text("This permanently deletes all \(trashedJokes.count) trashed roast\(trashedJokes.count == 1 ? "" : "s") for \(target.name). This cannot be undone.")
+        }
+        .alert("Error", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(persistenceError ?? "An unknown error occurred")
+        }
+    }
+
+    // MARK: - Actions
+
+    private func restoreJoke(_ joke: RoastJoke) {
+        joke.restoreFromTrash()
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [RoastJokeTrashView] Failed to restore: \(error)")
+            persistenceError = "Could not restore roast: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
+
+    private func permanentlyDelete(_ joke: RoastJoke) {
+        modelContext.delete(joke)
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [RoastJokeTrashView] Failed to delete: \(error)")
+            persistenceError = "Could not delete roast: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
+
+    private func emptyTrash() {
+        for joke in trashedJokes {
+            modelContext.delete(joke)
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [RoastJokeTrashView] Failed to empty trash: \(error)")
+            persistenceError = "Could not empty trash: \(error.localizedDescription)"
+            showingErrorAlert = true
         }
     }
 }

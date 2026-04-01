@@ -21,6 +21,10 @@ struct SetListTrashView: View {
 
     @State private var searchText = ""
     @State private var showingEmptyTrashAlert = false
+    @State private var setListToDelete: SetList?
+    @State private var showingDeleteOneAlert = false
+    @State private var persistenceError: String?
+    @State private var showingErrorAlert = false
 
     private var filtered: [SetList] {
         let t = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -57,23 +61,14 @@ struct SetListTrashView: View {
                         .padding(.vertical, 4)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
-                                modelContext.delete(setList)
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [SetListTrashView] Failed to permanently delete set list: \(error)")
-                                }
+                                setListToDelete = setList
+                                showingDeleteOneAlert = true
                             } label: {
                                 Label("Delete Forever", systemImage: "trash.fill")
                             }
 
                             Button {
-                                setList.restoreFromTrash()
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [SetListTrashView] Failed to restore set list: \(error)")
-                                }
+                                restoreSetList(setList)
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
@@ -81,23 +76,14 @@ struct SetListTrashView: View {
                         }
                         .contextMenu {
                             Button {
-                                setList.restoreFromTrash()
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [SetListTrashView] Failed to restore set list: \(error)")
-                                }
+                                restoreSetList(setList)
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
 
                             Button(role: .destructive) {
-                                modelContext.delete(setList)
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [SetListTrashView] Failed to permanently delete set list: \(error)")
-                                }
+                                setListToDelete = setList
+                                showingDeleteOneAlert = true
                             } label: {
                                 Label("Delete Forever", systemImage: "trash.fill")
                             }
@@ -107,7 +93,7 @@ struct SetListTrashView: View {
                 .listStyle(.insetGrouped)
             }
         }
-        .navigationTitle(roastMode ? "🔥 Set List Trash" : "Set List Trash")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, prompt: "Search trash")
         .toolbar {
@@ -121,20 +107,66 @@ struct SetListTrashView: View {
                 }
             }
         }
-        .alert("Empty Set List Trash?", isPresented: $showingEmptyTrashAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Empty", role: .destructive) {
-                for setList in trashedSetLists {
-                    modelContext.delete(setList)
-                }
-                do {
-                    try modelContext.save()
-                } catch {
-                    print("❌ [SetListTrashView] Failed to save after empty trash: \(error)")
+        .alert("Delete Forever?", isPresented: $showingDeleteOneAlert) {
+            Button("Cancel", role: .cancel) { setListToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let setList = setListToDelete {
+                    permanentlyDelete(setList)
+                    setListToDelete = nil
                 }
             }
         } message: {
+            Text("This set list will be permanently deleted. This cannot be undone.")
+        }
+        .alert("Empty Set List Trash?", isPresented: $showingEmptyTrashAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Empty", role: .destructive) {
+                emptyTrash()
+            }
+        } message: {
             Text("This permanently deletes all \(trashedSetLists.count) set list\(trashedSetLists.count == 1 ? "" : "s"). This cannot be undone.")
+        }
+        .alert("Error", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(persistenceError ?? "An unknown error occurred")
+        }
+    }
+
+    // MARK: - Actions
+
+    private func restoreSetList(_ setList: SetList) {
+        setList.restoreFromTrash()
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [SetListTrashView] Failed to restore: \(error)")
+            persistenceError = "Could not restore set list: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
+
+    private func permanentlyDelete(_ setList: SetList) {
+        modelContext.delete(setList)
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [SetListTrashView] Failed to delete: \(error)")
+            persistenceError = "Could not delete set list: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
+
+    private func emptyTrash() {
+        for setList in trashedSetLists {
+            modelContext.delete(setList)
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [SetListTrashView] Failed to empty trash: \(error)")
+            persistenceError = "Could not empty trash: \(error.localizedDescription)"
+            showingErrorAlert = true
         }
     }
 }

@@ -14,23 +14,43 @@ struct BrainstormView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<BrainstormIdea> { !$0.isDeleted }, sort: \BrainstormIdea.dateCreated, order: .reverse) private var ideas: [BrainstormIdea]
     @AppStorage("roastModeEnabled") private var roastMode = false
+    @AppStorage("showFullContent") private var showFullContent = true
     
     @State private var showAddSheet = false
     @State private var gridScale: CGFloat = 1.0
+    @GestureState private var pinchMagnification: CGFloat = 1.0
     @State private var isRecording = false
     @StateObject private var speechManager = SpeechRecognitionManager()
     @State private var showingPermissionAlert = false
-    @State private var selectedIdea: BrainstormIdea?
-    @State private var showEditSheet = false
     
     // Batch select/delete mode
     @State private var isSelectMode = false
     @State private var selectedIdeaIDs: Set<UUID> = []
     
+    // Persistence error surfacing
+    @State private var showingTrash = false
+    @State private var persistenceError: String?
+    @State private var showingErrorAlert = false
+    
+    // Pinch-to-zoom
+    private var effectiveGridScale: CGFloat {
+        min(max(gridScale * pinchMagnification, 0.5), 2.0)
+    }
+    
+    private var pinchGesture: some Gesture {
+        MagnifyGesture()
+            .updating($pinchMagnification) { value, state, _ in
+                state = value.magnification
+            }
+            .onEnded { value in
+                gridScale = min(max(gridScale * value.magnification, 0.5), 2.0)
+            }
+    }
+    
     // Grid columns based on scale
     private var columns: [GridItem] {
-        let count = max(2, Int(4 / gridScale))
-        return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
+        let count = max(2, Int(4 / effectiveGridScale))
+        return Array(repeating: GridItem(.flexible(), spacing: 0), count: count)
     }
     
     var body: some View {
@@ -41,9 +61,6 @@ struct BrainstormView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Zoom control slider
-                    zoomControl
-                    
                     if ideas.isEmpty {
                         emptyState
                     } else {
@@ -51,28 +68,37 @@ struct BrainstormView: View {
                     }
                 }
             }
-            .navigationTitle(roastMode ? "🔥 Fire Ideas" : "Brainstorm")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if !ideas.isEmpty {
-                        Button {
-                            isSelectMode.toggle()
-                            if !isSelectMode { selectedIdeaIDs.removeAll() }
-                        } label: {
-                            Text(isSelectMode ? "Cancel" : "Select")
-                                .font(.subheadline)
+                ToolbarItem(placement: .principal) {
+                    Menu {
+                        if !ideas.isEmpty {
+                            Button {
+                                isSelectMode.toggle()
+                                if !isSelectMode { selectedIdeaIDs.removeAll() }
+                            } label: {
+                                Label(isSelectMode ? "Cancel Select" : "Select Multiple",
+                                      systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
+                            }
                         }
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: BrainstormTrashView()) {
-                        Image(systemName: "trash")
-                            .font(.body)
+                        Button(action: { showFullContent.toggle() }) {
+                            Label(showFullContent ? "Show Titles Only" : "Show Full Content",
+                                  systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
+                        }
+                        Divider()
+                        Button { showingTrash = true } label: {
+                            Label("Trash", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                             .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
                     }
                 }
+            }
+            .navigationDestination(isPresented: $showingTrash) {
+                BrainstormTrashView()
             }
             .safeAreaInset(edge: .bottom) {
                 HStack {
@@ -130,11 +156,7 @@ struct BrainstormView: View {
             .sheet(isPresented: $showAddSheet) {
                 AddBrainstormIdeaSheet(isVoiceNote: false, initialText: "")
             }
-            .sheet(isPresented: $showEditSheet) {
-                if let idea = selectedIdea {
-                    EditBrainstormIdeaSheet(idea: idea)
-                }
-            }
+            // Detail view is now a navigation push via BrainstormDetailView
             .alert("Microphone Permission Required", isPresented: $showingPermissionAlert) {
                 Button("Settings", role: .none) {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -145,6 +167,11 @@ struct BrainstormView: View {
             } message: {
                 Text("Please enable microphone access in Settings to use voice recording.")
             }
+            .alert("Error", isPresented: $showingErrorAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(persistenceError ?? "An unknown error occurred")
+            }
         }
         .tint(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
         .onChange(of: speechManager.isRecording) { oldValue, newValue in
@@ -152,31 +179,6 @@ struct BrainstormView: View {
                 isRecording = false
             }
         }
-    }
-    
-    // MARK: - Zoom Control
-    private var zoomControl: some View {
-        HStack(spacing: 16) {
-            Image(systemName: "minus.magnifyingglass")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
-            
-            Slider(value: $gridScale, in: 0.5...2.0, step: 0.1)
-                .tint(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
-            
-            Image(systemName: "plus.magnifyingglass")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-        )
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
     }
     
     // MARK: - Empty State
@@ -191,16 +193,15 @@ struct BrainstormView: View {
     private var ideaGrid: some View {
         VStack(spacing: 0) {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
+                LazyVGrid(columns: columns, spacing: 0) {
                     ForEach(ideas) { idea in
                         if isSelectMode {
                             ideaSelectableCard(idea: idea)
                         } else {
-                            Button {
-                                selectedIdea = idea
-                                showEditSheet = true
+                            NavigationLink {
+                                BrainstormDetailView(idea: idea)
                             } label: {
-                                IdeaCard(idea: idea, scale: gridScale, roastMode: roastMode)
+                                IdeaCard(idea: idea, scale: effectiveGridScale, roastMode: roastMode, showFullContent: showFullContent)
                             }
                             .cardPress()
                             .contextMenu {
@@ -208,13 +209,6 @@ struct BrainstormView: View {
                                     promoteToJoke(idea)
                                 } label: {
                                     Label("Promote to Joke", systemImage: "arrow.up.doc.fill")
-                                }
-                                
-                                Button {
-                                    selectedIdea = idea
-                                    showEditSheet = true
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
                                 }
                                 
                                 Divider()
@@ -225,7 +219,9 @@ struct BrainstormView: View {
                                         do {
                                             try modelContext.save()
                                         } catch {
-                                            print("❌ [BrainstormView] Failed to save after soft-delete: \(error)")
+                                            print(" [BrainstormView] Failed to save after soft-delete: \(error)")
+                                            persistenceError = "Could not delete thought: \(error.localizedDescription)"
+                                            showingErrorAlert = true
                                         }
                                     }
                                 } label: {
@@ -235,9 +231,9 @@ struct BrainstormView: View {
                         }
                     }
                 }
-                .padding(16)
-                .animation(.easeOut(duration: 0.2), value: gridScale)
+                .animation(.easeOut(duration: 0.2), value: effectiveGridScale)
             }
+            .simultaneousGesture(pinchGesture)
             
             // Batch action bar
             if isSelectMode {
@@ -255,7 +251,7 @@ struct BrainstormView: View {
             toggleIdeaSelection(idea)
         } label: {
             ZStack(alignment: .topTrailing) {
-                IdeaCard(idea: idea, scale: gridScale, roastMode: roastMode)
+                IdeaCard(idea: idea, scale: effectiveGridScale, roastMode: roastMode, showFullContent: showFullContent)
                     .opacity(isSelected ? 0.7 : 1.0)
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -327,7 +323,9 @@ struct BrainstormView: View {
             do {
                 try modelContext.save()
             } catch {
-                print("❌ [BrainstormView] Failed to save after batch soft-delete: \(error)")
+                print(" [BrainstormView] Failed to save after batch soft-delete: \(error)")
+                persistenceError = "Could not delete thoughts: \(error.localizedDescription)"
+                showingErrorAlert = true
             }
         }
     }
@@ -394,7 +392,9 @@ struct BrainstormView: View {
             do {
                 try modelContext.save()
             } catch {
-                print("❌ [BrainstormView] Failed to save voice note idea: \(error)")
+                print(" [BrainstormView] Failed to save voice note idea: \(error)")
+                persistenceError = "Could not save voice note: \(error.localizedDescription)"
+                showingErrorAlert = true
             }
             speechManager.transcribedText = ""
         }
@@ -421,7 +421,7 @@ struct BrainstormView: View {
         } catch {
             // Save failed — remove the unsaved joke to avoid a phantom entry
             modelContext.delete(joke)
-            print("❌ [BrainstormView] Failed to save promoted joke: \(error)")
+            print(" [BrainstormView] Failed to save promoted joke: \(error)")
             return
         }
         
@@ -433,7 +433,7 @@ struct BrainstormView: View {
         do {
             try modelContext.save()
         } catch {
-            print("⚠️ [BrainstormView] Joke saved but failed to trash original idea: \(error)")
+            print(" [BrainstormView] Joke saved but failed to trash original idea: \(error)")
         }
         
         // Notify user with haptic feedback
@@ -544,6 +544,7 @@ struct IdeaCard: View {
     let idea: BrainstormIdea
     let scale: CGFloat
     let roastMode: Bool
+    var showFullContent: Bool = true
     
     // Refined 5-color palette (less rainbow, more cohesive)
     private static let refinedColors: [String: Color] = [
@@ -563,12 +564,21 @@ struct IdeaCard: View {
         return Color(red: 0.99, green: 0.96, blue: 0.90)
     }
     
-    private var cardHeight: CGFloat {
-        max(90, 130 * scale)
+    // Adapt font size so all text fits in the card
+    private var contentFontSize: CGFloat {
+        let length = idea.content.count
+        let base: CGFloat = 13 * scale
+        if length > 200 {
+            return max(9, base * 0.7)
+        } else if length > 100 {
+            return max(10, base * 0.82)
+        } else {
+            return max(11, base)
+        }
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             // Header with voice indicator
             HStack(spacing: 6) {
                 if idea.isVoiceNote {
@@ -589,16 +599,22 @@ struct IdeaCard: View {
                 Spacer()
             }
             
-            // Content
-            Text(idea.content)
-                .font(.system(size: max(11, 13 * scale), weight: .regular, design: .serif))
-                .foregroundColor(roastMode ? .white.opacity(0.92) : AppTheme.Colors.inkBlack.opacity(0.9))
-                .lineLimit(Int(max(3, 6 * scale)))
-                .lineSpacing(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            Spacer(minLength: 4)
+            // Content — show all text or just the first line
+            if showFullContent {
+                Text(idea.content)
+                    .font(.system(size: contentFontSize, weight: .regular, design: .serif))
+                    .foregroundColor(roastMode ? .white.opacity(0.92) : AppTheme.Colors.inkBlack.opacity(0.9))
+                    .lineSpacing(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(idea.content.components(separatedBy: .newlines).first ?? idea.content)
+                    .font(.system(size: max(11, 13 * scale), weight: .medium, design: .serif))
+                    .foregroundColor(roastMode ? .white.opacity(0.92) : AppTheme.Colors.inkBlack.opacity(0.9))
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             
             // Footer with timestamp
             HStack {
@@ -608,21 +624,16 @@ struct IdeaCard: View {
                     .foregroundColor(roastMode ? .white.opacity(0.35) : AppTheme.Colors.textTertiary)
             }
         }
-        .padding(12)
+        .padding(6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: cardHeight)
-        .background(
-            RoundedRectangle(cornerRadius: AppTheme.Radius.large, style: .continuous)
-                .fill(roastMode ? AppTheme.Colors.roastCard : cardColor)
-                .shadow(color: roastMode ? .black.opacity(0.25) : .black.opacity(0.06), radius: 5, y: 2)
-        )
+        .background(roastMode ? AppTheme.Colors.roastCard : cardColor)
         .overlay(
-            RoundedRectangle(cornerRadius: AppTheme.Radius.large, style: .continuous)
-                .strokeBorder(
+            Rectangle()
+                .stroke(
                     roastMode
                         ? AppTheme.Colors.roastAccent.opacity(0.2)
-                        : Color.black.opacity(0.04),
-                    lineWidth: 1
+                        : Color.black.opacity(0.08),
+                    lineWidth: 0.5
                 )
         )
     }

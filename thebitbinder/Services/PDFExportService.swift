@@ -167,7 +167,7 @@ class PDFExportService {
                 context.beginPage()
                 
                 // Draw title
-                let title = "🔥 The BitBinder - Roasts"
+                let title = " The BitBinder - Roasts"
                 let titleSize = title.size(withAttributes: titleAttributes)
                 title.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: titleAttributes)
                 yPosition += titleSize.height + 10
@@ -188,7 +188,7 @@ class PDFExportService {
                     guard !jokes.isEmpty else { continue }
                     
                     // Target name header
-                    let targetHeader = "🎯 \(target.name)"
+                    let targetHeader = " \(target.name)"
                     let targetHeaderSize = targetHeader.boundingRect(
                         with: CGSize(width: contentWidth, height: .greatestFiniteMagnitude),
                         options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -264,7 +264,7 @@ class PDFExportService {
                     }
                     
                     // Divider between targets
-                    let divider = String(repeating: "─", count: 40)
+                    let divider = String(repeating: "", count: 40)
                     if yPosition + 30.0 > pageHeight - margin {
                         context.beginPage()
                         yPosition = margin
@@ -327,7 +327,7 @@ class PDFExportService {
                 
                 context.beginPage()
                 
-                let title = "💡 The BitBinder - Brainstorm"
+                let title = " The BitBinder - Brainstorm"
                 let titleSize = title.size(withAttributes: titleAttrs)
                 title.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: titleAttrs)
                 yPosition += titleSize.height + 8
@@ -420,10 +420,10 @@ class PDFExportService {
                 let summary = "\(jokes.count) joke\(jokes.count == 1 ? "" : "s") · \(ideas.count) brainstorm idea\(ideas.count == 1 ? "" : "s")"
                 y += drawText(summary, attrs: subtitleAttrs, x: margin, y: y, width: contentWidth) + 40
                 
-                // ── JOKES SECTION ──
+                //  JOKES SECTION 
                 if !jokes.isEmpty {
                     if y + 40 > pageHeight - margin { context.beginPage(); y = margin }
-                    y += drawText("✍️ Jokes", attrs: sectionAttrs, x: margin, y: y, width: contentWidth) + 20
+                    y += drawText(" Jokes", attrs: sectionAttrs, x: margin, y: y, width: contentWidth) + 20
                     
                     for (index, joke) in jokes.enumerated() {
                         let number = "\(index + 1)."
@@ -444,11 +444,11 @@ class PDFExportService {
                     }
                 }
                 
-                // ── BRAINSTORM SECTION ──
+                //  BRAINSTORM SECTION 
                 if !ideas.isEmpty {
                     // Always start brainstorm on a new page
                     context.beginPage(); y = margin
-                    y += drawText("💡 Brainstorm Ideas", attrs: sectionAttrs, x: margin, y: y, width: contentWidth) + 20
+                    y += drawText(" Brainstorm Ideas", attrs: sectionAttrs, x: margin, y: y, width: contentWidth) + 20
                     
                     for (index, idea) in ideas.enumerated() {
                         let number = "\(index + 1)."

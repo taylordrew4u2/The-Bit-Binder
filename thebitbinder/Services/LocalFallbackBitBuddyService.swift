@@ -80,129 +80,129 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // JOKES
         // ═══════════════════════════════════════════
         case "save_joke":
-            return "✅ Got it, \(userName)! I'll save that joke to your collection. Head to Jokes to see it."
+            return " Got it, \(userName)! I'll save that joke to your collection. Head to Jokes to see it."
         case "save_joke_in_folder":
             let folder = entities["folder"] ?? "your folder"
-            return "📂 Saved! I've filed this joke under \(folder). You can find it in the Jokes section."
+            return " Saved! I've filed this joke under \(folder). You can find it in the Jokes section."
         case "edit_joke":
-            return "📝 Opening the joke editor — make your changes and I'll keep the original safe in case you want to revert."
+            return " Opening the joke editor — make your changes and I'll keep the original safe in case you want to revert."
         case "rename_joke":
             let title = entities["title"] ?? entities["quoted_value"] ?? "the new title"
-            return "📝 Renamed! This joke is now called \"\(title)\". You can find it under the new name in Jokes."
+            return " Renamed! This joke is now called \"\(title)\". You can find it under the new name in Jokes."
         case "delete_joke":
-            return "🗑️ Joke moved to trash. You can restore it anytime from the Trash section if you change your mind."
+            return " Joke moved to trash. You can restore it anytime from the Trash section if you change your mind."
         case "restore_deleted_joke":
-            return "♻️ Restored! That joke is back in your collection right where it belongs."
+            return " Restored! That joke is back in your collection right where it belongs."
         case "mark_hit":
-            return "⭐ Marked as a Hit! This joke is now in your proven material. You've earned that star."
+            return " Marked as a Hit! This joke is now in your proven material. You've earned that star."
         case "unmark_hit":
             return "Removed from The Hits. The joke is still saved — it just lost its star status."
         case "add_tags":
             let tags = entities["value"] ?? entities["quoted_value"] ?? "tags"
-            return "🏷️ Tags added! Labeled with \(tags). Use tags to filter your jokes later."
+            return " Tags added! Labeled with \(tags). Use tags to filter your jokes later."
         case "remove_tags":
-            return "🏷️ Tags removed. This joke is now untagged — a blank canvas."
+            return " Tags removed. This joke is now untagged — a blank canvas."
         case "move_joke_folder":
             let folder = entities["folder"] ?? "the new folder"
-            return "📂 Moved! This joke is now filed under \(folder)."
+            return " Moved! This joke is now filed under \(folder)."
         case "create_folder":
             let folder = entities["value"] ?? entities["quoted_value"] ?? "New Folder"
-            return "📁 Folder \"\(folder)\" created! Start adding jokes to it."
+            return " Folder \"\(folder)\" created! Start adding jokes to it."
         case "rename_folder":
-            return "📁 Folder renamed! The new name is live across all your jokes."
+            return " Folder renamed! The new name is live across all your jokes."
         case "delete_folder":
-            return "📁 Folder deleted. Any jokes inside have been moved to unfiled."
+            return " Folder deleted. Any jokes inside have been moved to unfiled."
         case "search_jokes":
             let query = entities["value"] ?? "your search"
-            return "🔍 Searching your jokes for \"\(query)\"... Head to the Jokes tab to see results."
+            return " Searching your jokes for \"\(query)\"... Head to the Jokes tab to see results."
         case "filter_jokes_recent":
-            return "📅 Here's what you've been working on recently. Check the Jokes tab for your latest material."
+            return " Here's what you've been working on recently. Check the Jokes tab for your latest material."
         case "filter_jokes_by_folder":
             let folder = entities["folder"] ?? "that folder"
-            return "📂 Filtering by \(folder). Switch to the Jokes tab to see everything in that folder."
+            return " Filtering by \(folder). Switch to the Jokes tab to see everything in that folder."
         case "filter_jokes_by_tag":
-            return "🏷️ Filtering by tag. Open Jokes to see the matching material."
+            return " Filtering by tag. Open Jokes to see the matching material."
         case "list_hits":
-            return "⭐ Opening The Hits — your proven material that lands every time. Head to Jokes and filter by Hits to see them."
+            return " Opening The Hits — your proven material that lands every time. Head to Jokes and filter by Hits to see them."
         case "share_joke":
-            return "📤 Joke ready to share! I'll open the share sheet so you can send it however you like."
+            return " Joke ready to share! I'll open the share sheet so you can send it however you like."
         case "duplicate_joke":
-            return "📋 Duplicated! You now have a fresh copy to experiment with without risking the original."
+            return " Duplicated! You now have a fresh copy to experiment with without risking the original."
         case "merge_jokes":
-            return "🔀 I'll pull these versions together. Check the merged result in Jokes and see if the combined version hits harder."
+            return " I'll pull these versions together. Check the merged result in Jokes and see if the combined version hits harder."
             
         // ═══════════════════════════════════════════
         // BRAINSTORM
         // ═══════════════════════════════════════════
         case "add_brainstorm_note":
-            return "💡 Idea captured! It's pinned to your Brainstorm board as a sticky note. Come back to it whenever inspiration strikes."
+            return " Idea captured! It's pinned to your Brainstorm board as a sticky note. Come back to it whenever inspiration strikes."
         case "voice_capture_idea":
-            return "🎙️ Voice capture ready! Tap the mic button on the Brainstorm page to start speaking your idea."
+            return " Voice capture ready! Tap the mic button on the Brainstorm page to start speaking your idea."
         case "edit_brainstorm_note":
-            return "📝 Opening that brainstorm note for editing. Polish it up!"
+            return " Opening that brainstorm note for editing. Polish it up!"
         case "delete_brainstorm_note":
-            return "🗑️ Brainstorm note deleted. Sometimes clearing the board makes room for the next big idea."
+            return " Brainstorm note deleted. Sometimes clearing the board makes room for the next big idea."
         case "promote_idea_to_joke":
-            return "🎭 Promoted! That brainstorm idea is now a full joke in your collection. Time to start writing the setup and punchline."
+            return " Promoted! That brainstorm idea is now a full joke in your collection. Time to start writing the setup and punchline."
         case "search_brainstorm":
             let query = entities["value"] ?? "that topic"
-            return "🔍 Searching your brainstorm notes for \"\(query)\"... Head to the Brainstorm tab."
+            return " Searching your brainstorm notes for \"\(query)\"... Head to the Brainstorm tab."
         case "group_brainstorm_topics":
-            return "📊 Grouping your brainstorm notes by topic... Head to Brainstorm to see which ideas cluster together. You might find a whole chunk hiding in there."
+            return " Grouping your brainstorm notes by topic... Head to Brainstorm to see which ideas cluster together. You might find a whole chunk hiding in there."
             
         // ═══════════════════════════════════════════
         // SET LISTS
         // ═══════════════════════════════════════════
         case "create_set_list":
             let name = entities["set_name"] ?? entities["quoted_value"] ?? "New Set"
-            return "📋 Set list \"\(name)\" created! Start adding jokes to build your lineup."
+            return " Set list \"\(name)\" created! Start adding jokes to build your lineup."
         case "rename_set_list":
-            return "📝 Set list renamed! The new title is live."
+            return " Set list renamed! The new title is live."
         case "delete_set_list":
-            return "🗑️ Set list deleted. Those jokes are still saved individually — just the list is gone."
+            return " Set list deleted. Those jokes are still saved individually — just the list is gone."
         case "add_joke_to_set":
-            return "➕ Joke added to the set list! Drag to reorder if you want it in a different slot."
+            return " Joke added to the set list! Drag to reorder if you want it in a different slot."
         case "remove_joke_from_set":
-            return "➖ Removed from the set list. The joke is still in your collection."
+            return " Removed from the set list. The joke is still in your collection."
         case "reorder_set":
-            return "↕️ Set reordered! Your lineup is updated. Remember: strong opener, build in the middle, killer closer."
+            return " Set reordered! Your lineup is updated. Remember: strong opener, build in the middle, killer closer."
         case "estimate_set_time":
-            return "⏱️ Rule of thumb: most comics average about 1–2 minutes per joke on stage. A tight 5-minute set is usually 3–5 jokes, a 10-minute set is 5–8. Open your set list to see the exact joke count and do the math!"
+            return " Rule of thumb: most comics average about 1–2 minutes per joke on stage. A tight 5-minute set is usually 3–5 jokes, a 10-minute set is 5–8. Open your set list to see the exact joke count and do the math!"
         case "shuffle_set":
-            return "🔀 Set shuffled! Sometimes a random order reveals pairings you'd never have thought of. Try reading it through."
+            return " Set shuffled! Sometimes a random order reveals pairings you'd never have thought of. Try reading it through."
         case "suggest_set_opener":
-            return "🎤 For an opener, pick something accessible — a relatable observation or a quick-hit joke that doesn't need context. Your most crowd-friendly material goes first."
+            return " For an opener, pick something accessible — a relatable observation or a quick-hit joke that doesn't need context. Your most crowd-friendly material goes first."
         case "suggest_set_closer":
-            return "🎤 Close with your strongest material — the joke with the biggest reaction. Callbacks work great as closers too. Leave them wanting more."
+            return " Close with your strongest material — the joke with the biggest reaction. Callbacks work great as closers too. Leave them wanting more."
         case "present_set":
-            return "📺 Entering performance mode! Your set list is ready to go — swipe through joke by joke on stage."
+            return " Entering performance mode! Your set list is ready to go — swipe through joke by joke on stage."
         case "find_set_list":
-            return "🔍 Searching your set lists... Head to the Set Lists tab to see the match."
+            return " Searching your set lists... Head to the Set Lists tab to see the match."
             
         // ═══════════════════════════════════════════
         // RECORDINGS
         // ═══════════════════════════════════════════
         case "start_recording":
-            return "🔴 Recording started! I'll capture everything. Tap stop when you're done."
+            return " Recording started! I'll capture everything. Tap stop when you're done."
         case "stop_recording":
-            return "⏹️ Recording saved! You can play it back, transcribe it, or attach it to a set list."
+            return " Recording saved! You can play it back, transcribe it, or attach it to a set list."
         case "rename_recording":
-            return "📝 Recording renamed! Give it a title that'll jog your memory about the set."
+            return " Recording renamed! Give it a title that'll jog your memory about the set."
         case "delete_recording":
-            return "🗑️ Recording deleted. Audio files take up space, so good call if it wasn't a keeper."
+            return " Recording deleted. Audio files take up space, so good call if it wasn't a keeper."
         case "play_recording":
-            return "▶️ Playing back your recording. Listen for the laughs — and the silences."
+            return " Playing back your recording. Listen for the laughs — and the silences."
         case "transcribe_recording":
-            return "📝 Transcription started! This will convert your set audio into searchable text. Check back in Recordings when it's done."
+            return " Transcription started! This will convert your set audio into searchable text. Check back in Recordings when it's done."
         case "search_transcripts":
             let query = entities["value"] ?? "that word"
-            return "🔍 Searching transcripts for \"\(query)\"... I'll pull up every set where you mentioned it."
+            return " Searching transcripts for \"\(query)\"... I'll pull up every set where you mentioned it."
         case "clip_recording":
-            return "✂️ Clip tool ready! Select the start and end points in the Recordings tab to extract just the good part."
+            return " Clip tool ready! Select the start and end points in the Recordings tab to extract just the good part."
         case "attach_recording_to_set":
-            return "🔗 Recording attached to the set list! Now you can compare what you wrote to what you actually said on stage."
+            return " Recording attached to the set list! Now you can compare what you wrote to what you actually said on stage."
         case "review_set_from_recording":
-            return "📊 Reviewing your set recording... I'll look for strong moments, improv additions, and spots where the energy dipped."
+            return " Reviewing your set recording... I'll look for strong moments, improv additions, and spots where the energy dipped."
             
         // ═══════════════════════════════════════════
         // BITBUDDY
@@ -224,70 +224,89 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         case "suggest_unexplored_topics":
             return suggestTopic()
         case "find_similar_jokes":
-            return "🔗 Scanning your joke book for similar material... Check Jokes for any overlap or repeated angles."
+            return " Scanning your joke book for similar material... Check Jokes for any overlap or repeated angles."
         case "shorten_joke":
+            let fillerList = BitBuddyResources.fillerWords.prefix(6).joined(separator: ", ")
             return """
-            ✂️ To tighten this joke:
+             **Tightening Mode — v2.3**
             • Cut the setup to the absolute minimum context needed.
-            • Remove filler words (just, really, basically, kind of).
+            • Kill these filler words: \(fillerList).
             • End on the funniest word — don't explain after the punchline.
             • If the audience can infer it, don't say it.
+            • Pro tip: The best jokes feel effortless but are surgically precise.
             """
         case "expand_joke":
+            let technique = BitBuddyResources.jokeProTechniques.randomElement() ?? "Callback"
             return """
-            📐 To expand this into a full bit:
+             **Expansion Mode — v2.3**
             • Add a second beat — what happens next?
             • Tag it: find 2–3 additional angles on the same premise.
             • Build a callback you can use later in the set.
             • Add an act-out or voice to make it physical.
+            • Try the **\(technique)** technique to find a new gear.
             """
         case "generate_tags_for_joke":
             let content = message
             let tags = inferTagsFromContent(content)
-            return "🏷️ Suggested tags: \(tags.isEmpty ? "observational, personal" : tags.joined(separator: ", ")). These help you filter and find similar material later."
+            return " Suggested tags: \(tags.isEmpty ? "observational, personal" : tags.joined(separator: ", ")). These help you filter and find similar material later."
         case "rewrite_in_my_style":
             let profileInfo = userProfile.summary.isEmpty ? "I don't have enough of your jokes yet to match your style" : "Based on your style (\(userProfile.summary))"
-            return "🎭 \(profileInfo) — try rewriting with your most-used structure and keep the word count around \(Int(userProfile.avgWordCount)) words."
+            return " \(profileInfo) — try rewriting with your most-used structure and keep the word count around \(Int(userProfile.avgWordCount)) words."
         case "crowdwork_help":
+            let nycFlavor = BitBuddyResources.vocabNYCFlavored.randomElement() ?? "subway-speed"
             return """
-            👥 Crowdwork starters:
-            • "Where are you guys from?" → Riff on the city/neighborhood.
-            • "What do you do for work?" → Find the absurd angle.
+             **Crowdwork — Master Framework v2.3**
+            • "Where are you guys from?" → Riff on the city/neighborhood. NYC? Go \(nycFlavor).
+            • "What do you do for work?" → Find the absurd angle. Exaggerate to \(BitBuddyResources.vocabExaggeration.randomElement() ?? "apocalyptic") proportions.
             • "How long have you two been together?" → The answer is always comedy gold.
             • "Who dragged who here tonight?" → Sets up a power dynamic to play with.
-            Keep it light and curious — never punching down at someone who didn't sign up for it.
+            Keep it light and curious — never punching down at someone who didn't sign up for it. Channel your inner Chappelle (story) or Carlin (observational).
             """
         case "roast_line_generation":
+            let technique = BitBuddyResources.roastTechniques.randomElement() ?? "Callback"
+            let example = BitBuddyResources.randomRoastExample(intensity: "medium") ?? ""
+            let vocabHit = BitBuddyResources.vocabPunchyAdjectives.randomElement() ?? "razor-sharp"
             return """
-            🔥 Roast formula:
-            • Observation + Exaggeration: "You look like [person] if they [absurd condition]."
-            • Comparison: "[Target] is so [trait] that [consequence]."
-            • Callback: Reference something they said/did earlier and twist it.
-            Write 5 lines, keep 2. The best roast jokes feel specific and earned.
+             **Master Roast Framework v2.3**
+            
+            **The 4-Step Structure:**
+            \(BitBuddyResources.roastStructure.joined(separator: "\n"))
+            
+            **Pro Technique to Try:** \(technique)
+            
+            **Example (\(BitBuddyResources.roastIntensityDescriptions["medium"] ?? "Medium")):**
+            "\(example)"
+            
+            **Vocab Power-Up:** Aim for "\(vocabHit)" delivery.
+            
+            Write 5 lines, keep 2. The best roast jokes feel specific and earned. Say **"light"**, **"medium"**, or **"savage"** to set the intensity.
             """
         case "compare_versions":
+            let adj = BitBuddyResources.vocabPunchyAdjectives.randomElement() ?? "razor-sharp"
             return """
-            ⚖️ To compare joke versions:
+             **Version Compare — v2.3**
             • Read both out loud — which one flows better?
-            • Check: Which setup is shorter? Shorter usually wins.
+            • Which setup is shorter? Shorter usually wins.
             • Which punchline has a harder consonant at the end? (K, T, P sounds hit harder.)
             • Which version could stand alone without context?
+            • Which feels more \(adj)?
+            • Pro tip: The best jokes feel effortless but are surgically precise.
             """
         case "extract_premises_from_notes":
-            return "📝 Mining your notes for premises... Look for any sentence that starts with an observation or frustration — those are your premises. The formula: [Thing] + [What's weird about it] = premise."
+            return " Mining your notes for premises... Look for any sentence that starts with an observation or frustration — those are your premises. The formula: [Thing] + [What's weird about it] = premise."
             
         // ═══════════════════════════════════════════
         // NOTEBOOK
         // ═══════════════════════════════════════════
         case "open_notebook":
-            return "📓 Opening Notebook! This is your scratch pad — anything goes."
+            return " Opening Notebook! This is your scratch pad — anything goes."
         case "save_notebook_text":
-            return "📓 Saved to your Notebook! Quick notes add up — review them weekly for hidden gems."
+            return " Saved to your Notebook! Quick notes add up — review them weekly for hidden gems."
         case "attach_photo_to_notebook":
-            return "📸 Photo attached to your Notebook! Great for saving set lists from the stage, whiteboard ideas, or inspiration."
+            return " Photo attached to your Notebook! Great for saving set lists from the stage, whiteboard ideas, or inspiration."
         case "search_notebook":
             let query = entities["value"] ?? "your search"
-            return "🔍 Searching Notebook for \"\(query)\"... Head to the Notebook tab to see matches."
+            return " Searching Notebook for \"\(query)\"... Head to the Notebook tab to see matches."
             
         // ═══════════════════════════════════════════
         // ROAST MODE
@@ -295,29 +314,29 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         case "toggle_roast_mode":
             let isCurrentlyRoast = dataContext.isRoastMode
             return isCurrentlyRoast
-                ? "Roast Mode OFF. Back to your regularly scheduled comedy. 🎭"
-                : "🔥 ROAST MODE ACTIVATED. Everything's darker from here. Let's write some burns."
+                ? "Roast Mode OFF. Back to your regularly scheduled comedy. "
+                : " ROAST MODE ACTIVATED. Everything's darker from here. Let's write some burns."
         case "create_roast_target":
             let target = entities["target"] ?? entities["quoted_value"] ?? "your target"
-            return "🎯 Roast target \"\(target)\" created! Start adding burns and roast material under their profile."
+            return " Roast target \"\(target)\" created! Start adding burns and roast material under their profile."
         case "add_roast_joke":
             let target = entities["target"] ?? "the target"
-            return "🔥 Burn filed under \(target)! The roast arsenal grows."
+            return " Burn filed under \(target)! The roast arsenal grows."
         case "search_roasts":
-            return "🔍 Searching your roast material... Head to Roast Mode to see the results."
+            return " Searching your roast material... Head to Roast Mode to see the results."
         case "create_roast_set":
-            return "📋 Roast set created! Add your sharpest burns and order them for maximum damage."
+            return " Roast set created! Add your sharpest burns and order them for maximum damage."
         case "present_roast_set":
-            return "📺 Roast presentation mode ready! Swipe through your burns on stage. Destroy with precision."
+            return " Roast presentation mode ready! Swipe through your burns on stage. Destroy with precision."
         case "attach_photo_to_target":
-            return "📸 Photo attached to the roast target! Now you'll never forget that face."
+            return " Photo attached to the roast target! Now you'll never forget that face."
             
         // ═══════════════════════════════════════════
         // IMPORT
         // ═══════════════════════════════════════════
         case "import_file":
             return """
-            📥 **GagGrabber — File Import**
+             **GagGrabber — File Import**
             
             Here's how to import jokes from a file:
             1. Go to **Jokes** tab → tap the **+** button (top right)
@@ -329,14 +348,14 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             4. GagGrabber will extract individual jokes automatically
             5. Review each one — accept, edit, or skip
             
-            💡 **Tips for best results:**
+             **Tips for best results:**
             • One joke per paragraph works best
             • Clear line breaks between jokes help accuracy
             • Typed text extracts better than handwritten
             """
         case "import_image":
             return """
-            📸 **GagGrabber — Image Import**
+             **GagGrabber — Image Import**
             
             Two ways to import from images:
             
@@ -352,7 +371,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             
             GagGrabber uses OCR to read the text, then extracts individual jokes.
             
-            💡 **Tips for best results:**
+             **Tips for best results:**
             • Good lighting, minimal shadows
             • Keep the page flat and square to the camera
             • Typed/printed text works best; neat handwriting works too
@@ -360,13 +379,13 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             """
         case "review_import_queue":
             return """
-            📋 **Import Review Queue**
+             **Import Review Queue**
             
             After GagGrabber extracts jokes, you'll see a card-by-card review:
-            • **Swipe right** or tap ✅ to accept a joke
-            • **Swipe left** or tap ❌ to skip it
-            • Tap ✏️ **Edit** to fix the text before saving
-            • Tap 💡 **Idea** to send it to Brainstorm instead
+            • **Swipe right** or tap  to accept a joke
+            • **Swipe left** or tap  to skip it
+            • Tap  **Edit** to fix the text before saving
+            • Tap  **Idea** to send it to Brainstorm instead
             
             High-confidence jokes are auto-accepted (you'll see a green banner).
             You can still review those by scrolling back through the dots.
@@ -374,14 +393,14 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             When you're done, tap **"Save & Finish"** to add everything to your collection.
             """
         case "approve_imported_joke":
-            return "✅ Approved! This joke will be saved to your collection when you tap \"Save & Finish\" at the end of the review."
+            return " Approved! This joke will be saved to your collection when you tap \"Save & Finish\" at the end of the review."
         case "reject_imported_joke":
-            return "❌ Skipped. This extracted joke won't be saved. You can go back to it using the dots at the top if you change your mind."
+            return " Skipped. This extracted joke won't be saved. You can go back to it using the dots at the top if you change your mind."
         case "edit_imported_joke":
             return """
-            📝 **Editing an Imported Joke**
+             **Editing an Imported Joke**
             
-            Tap the ✏️ **Edit** button on the review card to:
+            Tap the  **Edit** button on the review card to:
             • Fix the title (or add one if GagGrabber didn't detect it)
             • Clean up the joke text — merge broken lines, fix OCR errors
             • The original source text is shown below for reference
@@ -389,35 +408,35 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             When you're happy with it, tap **Done**, then accept the card.
             """
         case "check_import_limit":
-            return "📊 GagGrabber extractions are currently **unlimited**! Import as many files as you want. You can check your import history from the Jokes tab → ⋯ menu → **Import History**."
+            return " GagGrabber extractions are currently **unlimited**! Import as many files as you want. You can check your import history from the Jokes tab → ⋯ menu → **Import History**."
         case "show_import_history":
-            return "📜 To see your import history: Jokes tab → tap the **⋯** menu (top left) → **Import History**. You'll see every file you've imported, how many jokes were extracted, and any unresolved fragments."
+            return " To see your import history: Jokes tab → tap the **⋯** menu (top left) → **Import History**. You'll see every file you've imported, how many jokes were extracted, and any unresolved fragments."
             
         // ═══════════════════════════════════════════
         // SYNC
         // ═══════════════════════════════════════════
         case "check_sync_status":
-            return "☁️ Checking iCloud sync status... Head to Settings → iCloud Sync to see the latest details."
+            return " Checking iCloud sync status... Head to Settings → iCloud Sync to see the latest details."
         case "sync_now":
-            return "☁️ Manual sync triggered! Your data is being pushed to iCloud now."
+            return " Manual sync triggered! Your data is being pushed to iCloud now."
         case "toggle_icloud_sync":
-            return "☁️ You can toggle iCloud sync in Settings → iCloud Sync. This keeps your jokes, sets, and recordings synced across all your devices."
+            return " You can toggle iCloud sync in Settings → iCloud Sync. This keeps your jokes, sets, and recordings synced across all your devices."
             
         // ═══════════════════════════════════════════
         // SETTINGS
         // ═══════════════════════════════════════════
         case "export_all_jokes":
-            return "📤 Export ready! Head to Settings → Export to download your entire joke collection as a backup."
+            return " Export ready! Head to Settings → Export to download your entire joke collection as a backup."
         case "export_recordings":
-            return "📤 Recording export available in Settings. You can back up all your set audio."
+            return " Recording export available in Settings. You can back up all your set audio."
         case "clear_cache":
-            return "🧹 Cache cleared! The app should feel lighter now. No data was lost — just temporary files."
+            return " Cache cleared! The app should feel lighter now. No data was lost — just temporary files."
             
         // ═══════════════════════════════════════════
         // HELP
         // ═══════════════════════════════════════════
         case "open_help_faq":
-            return "❓ Opening Help & FAQ! You'll find guides for every feature in the app."
+            return " Opening Help & FAQ! You'll find guides for every feature in the app."
         case "explain_feature":
             return buildFeatureExplanation(from: message)
             
@@ -433,7 +452,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         
         if lower.contains("gaggrabber") || lower.contains("import") {
             return """
-            📥 **GagGrabber** is BitBinder's smart import tool.
+             **GagGrabber** is BitBinder's smart import tool.
             • Import jokes from PDFs, text files, or photos.
             • Automatically extracts individual jokes from your documents.
             • Review each one before it's saved to your collection.
@@ -442,7 +461,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         }
         if lower.contains("roast") {
             return """
-            🔥 **Roast Mode** transforms BitBinder into a roast battle prep tool.
+             **Roast Mode** transforms BitBinder into a roast battle prep tool.
             • Create targets with names and photos.
             • Write and organize burns under each target.
             • Build roast set lists for battle night.
@@ -451,7 +470,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         }
         if lower.contains("hits") || lower.contains("hit") {
             return """
-            ⭐ **The Hits** is your collection of proven material.
+             **The Hits** is your collection of proven material.
             • Mark any joke as a "Hit" when it consistently works on stage.
             • Use The Hits to quickly build strong set lists.
             • It's your highlight reel of tested material.
@@ -459,7 +478,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         }
         if lower.contains("set list") || lower.contains("sets") {
             return """
-            📋 **Set Lists** help you plan your stage time.
+             **Set Lists** help you plan your stage time.
             • Create named sets for different venues or time slots.
             • Drag to reorder jokes in your lineup.
             • Estimate total runtime.
@@ -468,7 +487,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         }
         if lower.contains("bitbuddy") || lower.contains("commands") {
             return """
-            🤖 **BitBuddy** is your comedy writing partner.
+             **BitBuddy** is your comedy writing partner.
             • Analyze jokes for structure and strengths.
             • Get rewrites, premises, and new joke ideas.
             • Summarize your comedy style.
@@ -478,7 +497,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         }
         if lower.contains("brainstorm") {
             return """
-            💡 **Brainstorm** is your sticky note wall for raw ideas.
+             **Brainstorm** is your sticky note wall for raw ideas.
             • Capture ideas as text or voice.
             • Group by topic to find patterns.
             • Promote ideas to full jokes when ready.
@@ -486,7 +505,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         }
         if lower.contains("icloud") || lower.contains("sync") {
             return """
-            ☁️ **iCloud Sync** keeps your data safe across devices.
+             **iCloud Sync** keeps your data safe across devices.
             • Toggle sync in Settings.
             • Force a manual sync anytime.
             • All jokes, sets, recordings, and notes stay in sync.
@@ -494,7 +513,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         }
         if lower.contains("recording") {
             return """
-            🎙️ **Recordings** let you capture and review your sets.
+             **Recordings** let you capture and review your sets.
             • Record audio of your performances.
             • Transcribe recordings to searchable text.
             • Clip and trim the best moments.
@@ -503,7 +522,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         }
         if lower.contains("notebook") {
             return """
-            📓 **Notebook** is your freeform scratch pad.
+             **Notebook** is your freeform scratch pad.
             • Quick text capture — no formatting needed.
             • Attach photos for visual inspiration.
             • Search across all your notes.
@@ -520,17 +539,17 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         return """
         Hey \(userName)! I didn't quite catch that. Here's what I can do:
         
-        🎭 **Jokes**: save, edit, tag, search, share, organize into folders
-        💡 **Brainstorm**: capture ideas, voice notes, promote to jokes
-        📋 **Set Lists**: create, reorder, shuffle, estimate time, present
-        🎙️ **Recordings**: record, play, transcribe, clip, attach to sets
-        🤖 **Writing Help**: analyze, improve, punch up, generate premises, crowdwork
-        📓 **Notebook**: save notes, attach photos, search
-        🔥 **Roast Mode**: targets, burns, roast sets, battle prep
-        📥 **Import**: PDF/image import, review queue, daily limits
-        ☁️ **Sync**: iCloud status, manual sync, toggle
-        ⚙️ **Settings**: export, clear cache
-        ❓ **Help**: explain any feature
+         **Jokes**: save, edit, tag, search, share, organize into folders
+         **Brainstorm**: capture ideas, voice notes, promote to jokes
+         **Set Lists**: create, reorder, shuffle, estimate time, present
+         **Recordings**: record, play, transcribe, clip, attach to sets
+         **Writing Help**: analyze, improve, punch up, generate premises, crowdwork
+         **Notebook**: save notes, attach photos, search
+         **Roast Mode**: targets, burns, roast sets, battle prep
+         **Import**: PDF/image import, review queue, daily limits
+         **Sync**: iCloud status, manual sync, toggle
+         **Settings**: export, clear cache
+         **Help**: explain any feature
         
         Try something like: "analyze this joke" or "create a set list for tonight"
         """
@@ -542,15 +561,19 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         guard !text.isEmpty else { return "Please provide text to analyze." }
         
         let structure = JokeAnalyzer.structure(text)
-        // Detect strengths based on structure and content
+        
+        // Step 1: Acknowledge & Quote
+        let preview = text.count > 80 ? String(text.prefix(80)) + "..." : text
+        var response = " **Viewing your joke:**\n\"\(preview)\"\n\n"
+        
+        // Step 2: Breakdown
         var strengths: [String] = []
         if structure != .unknown { strengths.append(structure.rawValue) }
         
         if let topic = JokeAnalyzer.detectTopic(text) {
-             strengths.append("clear topic (\(topic))")
+            strengths.append("clear topic (\(topic))")
         }
         
-        // Detect twist/reversal patterns in the joke
         let twistPatterns = [
             "\\bbut\\b", "\\bactually\\b", "\\bturns out\\b", "\\bplot twist\\b",
             "\\binstead\\b", "\\bexcept\\b", "\\bunless\\b", "\\buntil\\b",
@@ -562,18 +585,68 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         if twistCount >= 1 { strengths.append("twist") }
         if twistCount >= 2 { strengths.append("double reversal") }
         
+        // Detect pro techniques used
+        var detectedTechniques: [String] = []
+        if lower.contains("I ") || lower.contains("my ") { detectedTechniques.append("Self-Deprecation") }
+        if twistCount >= 1 { detectedTechniques.append("Misdirection") }
+        let words = text.split(separator: " ")
+        if words.count < 20 { detectedTechniques.append("Concise Punch") }
+        if words.count > 50 { detectedTechniques.append("Story / Long-Form") }
+        
         if strengths.isEmpty { strengths.append("concise") }
-
-        let suggestions = JokeAnalyzer.suggestEdits(text)
         
-        var response = "Structure: \(structure.rawValue).\n"
-        response += "Strengths: \(strengths.joined(separator: ", ")).\n"
-        
-        if !suggestions.isEmpty {
-           response += "Edits:\n\(suggestions.joined(separator: "\n"))"
-        } else {
-           response += "Edits: None specific found."
+        response += "**Breakdown:**\n"
+        response += "• Structure: \(structure.rawValue)\n"
+        response += "• Strengths: \(strengths.joined(separator: ", "))\n"
+        if !detectedTechniques.isEmpty {
+            response += "• Techniques spotted: \(detectedTechniques.joined(separator: ", "))\n"
         }
+        
+        // Step 3: Rating
+        let wordCount = words.count
+        let hasSetup = lower.contains("why") || lower.contains("what") || lower.contains("I ")
+        let hasPunch = twistCount >= 1 || lower.contains("because") || lower.contains("turns out")
+        let originalityScore = min(10, max(4, 6 + (detectedTechniques.count > 1 ? 2 : 0) + (twistCount >= 2 ? 1 : 0)))
+        let punchDensity = min(10, max(3, wordCount < 30 ? 7 : wordCount < 50 ? 6 : 4) + twistCount)
+        let surpriseScore = min(10, max(3, 5 + twistCount * 2))
+        let deliveryScore = min(10, max(4, (hasSetup ? 2 : 0) + (hasPunch ? 3 : 0) + (wordCount < 40 ? 2 : 0) + 3))
+        
+        response += "\n**Rating:**\n"
+        response += "• Originality: \(originalityScore)/10\n"
+        response += "• Punch density: \(punchDensity)/10\n"
+        response += "• Surprise factor: \(surpriseScore)/10\n"
+        response += "• Delivery potential: \(deliveryScore)/10\n"
+        
+        // Step 4: Creative Vocabulary Upgrades
+        let vocabSuggestions = BitBuddyResources.randomVocabSuggestions(count: 3)
+        response += "\n**Vocabulary Glow-Up:**\n"
+        
+        // Try to find actual word upgrades from the joke text
+        var foundUpgrades: [String] = []
+        for word in words {
+            let w = String(word).lowercased().trimmingCharacters(in: .punctuationCharacters)
+            if let upgrade = BitBuddyResources.vocabularyUpgrade(for: w) {
+                foundUpgrades.append("• \(upgrade)")
+            }
+            if foundUpgrades.count >= 3 { break }
+        }
+        if !foundUpgrades.isEmpty {
+            response += foundUpgrades.joined(separator: "\n") + "\n"
+        }
+        for suggestion in vocabSuggestions.prefix(max(0, 3 - foundUpgrades.count)) {
+            response += "• \(suggestion)\n"
+        }
+        
+        // Step 5: Improvement suggestions
+        let editSuggestions = JokeAnalyzer.suggestEdits(text)
+        if !editSuggestions.isEmpty {
+            response += "\n**Pro Edits:**\n"
+            for edit in editSuggestions {
+                response += "• \(edit)\n"
+            }
+        }
+        
+        response += "\nSay **\"improve this\"** and I'll rewrite it sharper. Or **\"roast version\"** to turn it into a burn."
         
         return response
     }
@@ -582,13 +655,50 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         guard !text.isEmpty else { return "Please provide a joke to improve." }
         let suggestions = JokeAnalyzer.suggestEdits(text)
         
+        var response = " **Improvement Mode — v2.3 Framework**\n\n"
+        
+        // Core structural suggestions
         if suggestions.isEmpty {
-             return """
-             • Tighten setup: Remove context not needed for the punchline.
-             • Swap punchline: Try ending on a harder consonant sound.
-             """
+            response += "**Structure:**\n"
+            response += "• Tighten setup: Remove context not needed for the punchline.\n"
+            response += "• Swap punchline: Try ending on a harder consonant sound (K, T, P hit harder).\n"
+            response += "• Cut filler words — if the audience can infer it, don't say it.\n"
+        } else {
+            response += "**Structure Edits:**\n"
+            response += suggestions.map { "• \($0)" }.joined(separator: "\n") + "\n"
         }
-        return suggestions.map { "• \($0)" }.joined(separator: "\n")
+        
+        // Vocabulary upgrades from the joke text
+        let words = text.split(separator: " ")
+        var upgrades: [String] = []
+        for word in words {
+            let w = String(word).lowercased().trimmingCharacters(in: .punctuationCharacters)
+            if let upgrade = BitBuddyResources.vocabularyUpgrade(for: w) {
+                upgrades.append(upgrade)
+            }
+            if upgrades.count >= 4 { break }
+        }
+        
+        if !upgrades.isEmpty {
+            response += "\n**Word Swaps:**\n"
+            for upgrade in upgrades {
+                response += "• \(upgrade)\n"
+            }
+        }
+        
+        // Creative suggestions from the vocab bank
+        let vocabHits = BitBuddyResources.randomVocabSuggestions(count: 3)
+        response += "\n**Creative Ammo:**\n"
+        for hit in vocabHits {
+            response += "• \(hit)\n"
+        }
+        
+        // Suggest a technique to try
+        if let technique = BitBuddyResources.jokeProTechniques.randomElement() {
+            response += "\n **Try this technique:** \(technique) — it could give this joke a whole new gear."
+        }
+        
+        return response
     }
     
     private func premise(_ topic: String) -> String {
@@ -637,8 +747,16 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         joke = joke.replacingOccurrences(of: "[Analogy]", with: analogies.randomElement()!)
         joke = joke.replacingOccurrences(of: "[Trait]", with: traits.randomElement()!)
         joke = joke.replacingOccurrences(of: "[Opposite Trait]", with: opposites.randomElement()!)
+        
+        // v2.3: Enrich with framework reference
+        let technique = BitBuddyResources.jokeProTechniques.randomElement() ?? "Misdirection"
+        let twist = BitBuddyResources.vocabTwistPhrases.randomElement() ?? "except the plot twist is"
+        var response = " **Generated using: \(technique)**\n\n"
+        response += "\"\(joke)\"\n\n"
+        response += " **Upgrade idea:** Try adding a tag line — \(twist)...\n"
+        response += "Say **\"expand this\"** to build it into a full bit, or **\"analyze this\"** for a full breakdown."
 
-        return joke
+        return response
     }
 
     private func style() -> String {

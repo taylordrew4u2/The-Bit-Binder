@@ -15,124 +15,110 @@ struct JokeCardView: View {
     let joke: Joke
     var scale: CGFloat = 1.0
     var roastMode: Bool = false
-    @AppStorage("expandAllJokes") private var expandAllJokes = false
+    var showFullContent: Bool = true
     
     private var isHit: Bool { joke.isHit }
-    private var hasFolder: Bool { !joke.folders.isEmpty }
     private var hasTags: Bool { !joke.tags.isEmpty }
     
+    private var titleSize: CGFloat { max(11, 15 * scale) }
+    private var metaSize: CGFloat { max(8, 10 * scale) }
+    
+    // Adapt font size so all content fits the card
+    private var contentFontSize: CGFloat {
+        let length = joke.content.count
+        let base: CGFloat = 13 * scale
+        if length > 300 { return max(9, base * 0.65) }
+        if length > 150 { return max(10, base * 0.78) }
+        return max(11, base)
+    }
+    
     var body: some View {
-        GeometryReader { geometry in
-            let size = geometry.size.width
-            let padding = max(10, size * 0.08)
-            let titleSize = max(11, size * 0.095)
-            let bodySize = max(10, size * 0.08)
-            let metaSize = max(8, size * 0.06)
-            let spacing = max(6, size * 0.05)
-            
-            VStack(alignment: .leading, spacing: spacing) {
-                // Header: Title + Hit badge
-                HStack(alignment: .top, spacing: 6) {
-                    Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
-                        .font(.system(size: titleSize, weight: .bold, design: .serif))
-                        .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                    
-                    Spacer(minLength: 4)
-                    
-                    // Hit star badge (top right)
-                    if isHit {
-                        HitStarBadge(size: max(14, size * 0.1), showBackground: false, roastMode: roastMode)
-                    }
-                }
+        VStack(alignment: .leading, spacing: max(4, 5 * scale)) {
+            // Header: Title + Hit badge
+            HStack(alignment: .top, spacing: 6) {
+                Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
+                    .font(.system(size: titleSize, weight: .bold, design: .serif))
+                    .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                    .minimumScaleFactor(0.8)
                 
-                // Content preview
-                Text(joke.content)
-                    .font(.system(size: bodySize))
-                    .foregroundColor(roastMode ? .white.opacity(0.75) : AppTheme.Colors.textSecondary)
-                    .lineLimit(expandAllJokes ? nil : max(3, Int(size / 28)))
-                    .lineSpacing(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Spacer(minLength: 4)
                 
-                Spacer(minLength: 0)
-                
-                // Footer: Tags, folder, date
-                VStack(alignment: .leading, spacing: 4) {
-                    // Tags row (if any)
-                    if hasTags && size > 120 {
-                        HStack(spacing: 4) {
-                            ForEach(joke.tags.prefix(2), id: \.self) { tag in
-                                Text(tag)
-                                    .font(.system(size: max(7, metaSize - 1), weight: .medium))
-                                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent.opacity(0.8) : AppTheme.Colors.primaryAction.opacity(0.8))
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(
-                                        Capsule()
-                                            .fill((roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction).opacity(0.12))
-                                    )
-                            }
-                            if joke.tags.count > 2 {
-                                Text("+\(joke.tags.count - 2)")
-                                    .font(.system(size: max(7, metaSize - 1)))
-                                    .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
-                            }
-                        }
-                    }
-                    
-                    // Folder + date row
-                    HStack(spacing: 6) {
-                        if !joke.folders.isEmpty {
-                            HStack(spacing: 3) {
-                                Image(systemName: "folder.fill")
-                                    .font(.system(size: max(7, metaSize - 1)))
-                                if joke.folders.count == 1 {
-                                    Text(joke.folders[0].name)
-                                        .font(.system(size: metaSize, weight: .medium))
-                                        .lineLimit(1)
-                                } else {
-                                    Text("\(joke.folders.count) folders")
-                                        .font(.system(size: metaSize, weight: .medium))
-                                        .lineLimit(1)
-                                }
-                            }
-                            .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.primaryAction.opacity(0.7))
-                        }
-                        
-                        Spacer()
-                        
-                        Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
-                            .font(.system(size: metaSize))
-                            .foregroundColor(roastMode ? .white.opacity(0.35) : AppTheme.Colors.textTertiary)
-                    }
+                if isHit {
+                    HitStarBadge(size: max(14, 18 * scale), showBackground: false, roastMode: roastMode)
                 }
             }
-            .padding(padding)
-            .frame(width: size, height: size)
-            .background(
-                RoundedRectangle(cornerRadius: AppTheme.Radius.large, style: .continuous)
-                    .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-            )
-            .overlay(
-                // Subtle hit glow border
-                RoundedRectangle(cornerRadius: AppTheme.Radius.large, style: .continuous)
-                    .strokeBorder(
-                        isHit
-                            ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.hitsGold).opacity(0.4)
-                            : Color.clear,
-                        lineWidth: 1.5
-                    )
-            )
-            .shadow(
-                color: isHit
-                    ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.hitsGold).opacity(0.15)
-                    : Color.black.opacity(0.05),
-                radius: isHit ? 8 : 4,
-                y: 2
-            )
+            
+            // Content — shown when full content mode is on
+            if showFullContent {
+                Text(joke.content)
+                    .font(.system(size: contentFontSize))
+                    .foregroundColor(roastMode ? .white.opacity(0.75) : AppTheme.Colors.textSecondary)
+                    .lineSpacing(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            
+            // Footer: Tags, folder, date
+            VStack(alignment: .leading, spacing: 4) {
+                if hasTags {
+                    HStack(spacing: 4) {
+                        ForEach(joke.tags.prefix(2), id: \.self) { tag in
+                            Text(tag)
+                                .font(.system(size: max(7, metaSize - 1), weight: .medium))
+                                .foregroundColor(roastMode ? AppTheme.Colors.roastAccent.opacity(0.8) : AppTheme.Colors.primaryAction.opacity(0.8))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule()
+                                        .fill((roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction).opacity(0.12))
+                                )
+                        }
+                        if joke.tags.count > 2 {
+                            Text("+\(joke.tags.count - 2)")
+                                .font(.system(size: max(7, metaSize - 1)))
+                                .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
+                        }
+                    }
+                }
+                
+                HStack(spacing: 6) {
+                    if !(joke.folders ?? []).isEmpty {
+                        HStack(spacing: 3) {
+                            Image(systemName: "folder.fill")
+                                .font(.system(size: max(7, metaSize - 1)))
+                            if (joke.folders ?? []).count == 1 {
+                                Text((joke.folders ?? []).first?.name ?? "")
+                                    .font(.system(size: metaSize, weight: .medium))
+                                    .lineLimit(1)
+                            } else {
+                                Text("\((joke.folders ?? []).count) folders")
+                                    .font(.system(size: metaSize, weight: .medium))
+                                    .lineLimit(1)
+                            }
+                        }
+                        .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.primaryAction.opacity(0.7))
+                    }
+                    
+                    Spacer()
+                    
+                    Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
+                        .font(.system(size: metaSize))
+                        .foregroundColor(roastMode ? .white.opacity(0.35) : AppTheme.Colors.textTertiary)
+                }
+            }
         }
-        .aspectRatio(1, contentMode: .fit)
+        .padding(max(6, 8 * scale))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
+        .overlay(
+            Rectangle()
+                .stroke(
+                    isHit
+                        ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.hitsGold).opacity(0.4)
+                        : Color.black.opacity(0.08),
+                    lineWidth: isHit ? 1.5 : 0.5
+                )
+        )
     }
 }
 
@@ -141,7 +127,7 @@ struct JokeCardView: View {
 struct JokeRowView: View {
     let joke: Joke
     var roastMode: Bool = false
-    @AppStorage("expandAllJokes") private var expandAllJokes = false
+    var showFullContent: Bool = true
     
     private var isHit: Bool { joke.isHit }
     
@@ -167,12 +153,13 @@ struct JokeRowView: View {
                     .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
                     .lineLimit(1)
                 
-                // Content preview
-                Text(joke.content)
-                    .font(.system(size: 14))
-                    .foregroundColor(roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
-                    .lineLimit(expandAllJokes ? nil : 2)
-                    .lineSpacing(2)
+                // Content — shown when full content mode is on
+                if showFullContent {
+                    Text(joke.content)
+                        .font(.system(size: 14))
+                        .foregroundColor(roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
+                        .lineSpacing(2)
+                }
                 
                 // Metadata row
                 HStack(spacing: 8) {
@@ -194,15 +181,15 @@ struct JokeRowView: View {
                     }
                     
                     // Folder(s)
-                    if !joke.folders.isEmpty {
+                    if !(joke.folders ?? []).isEmpty {
                         HStack(spacing: 3) {
                             Image(systemName: "folder.fill")
                                 .font(.system(size: 9))
-                            if joke.folders.count == 1 {
-                                Text(joke.folders[0].name)
+                            if (joke.folders ?? []).count == 1 {
+                                Text((joke.folders ?? []).first?.name ?? "")
                                     .font(.system(size: 11, weight: .medium))
                             } else {
-                                Text("\(joke.folders.count) folders")
+                                Text("\((joke.folders ?? []).count) folders")
                                     .font(.system(size: 11, weight: .medium))
                             }
                         }
@@ -394,12 +381,12 @@ struct ImportProgressCard: View {
     @State private var tipIndex = 0
     
     private static let importTips = [
-        "💡 Typed text extracts better than handwriting",
-        "💡 One joke per paragraph gets the best results",
-        "💡 PDFs with clear text work great",
-        "💡 Good lighting helps photo imports",
-        "💡 GagGrabber gets smarter with each import",
-        "💡 High-contrast pages scan best",
+        " Typed text extracts better than handwriting",
+        " One joke per paragraph gets the best results",
+        " PDFs with clear text work great",
+        " Good lighting helps photo imports",
+        " GagGrabber gets smarter with each import",
+        " High-contrast pages scan best",
     ]
     
     /// Infers the current pipeline stage from the status message.

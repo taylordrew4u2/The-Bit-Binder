@@ -29,7 +29,7 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     }
 
     /// Model used by default for each provider.
-    /// ⚠️  Free OpenRouter models rotate frequently. If a model 404s,
+    ///   Free OpenRouter models rotate frequently. If a model 404s,
     /// update it here. `openrouter/free` auto-routes to whatever is live.
     var defaultModel: String {
         switch self {
@@ -75,14 +75,17 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// UserDefaults key for storing user-entered API keys
-    var userDefaultsKey: String {
+    /// Keychain account key for storing user-entered API keys.
+    var keychainKey: String {
         switch self {
         case .openAI:      return "ai_key_openai"
         case .arceeAI:     return "ai_key_arceeai"
         case .openRouter:  return "ai_key_openrouter"
         }
     }
+    
+    /// Legacy UserDefaults key (for migration only).
+    var userDefaultsKey: String { keychainKey }
 }
 
 // MARK: - Provider Errors
@@ -97,7 +100,7 @@ enum AIProviderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .keyNotConfigured(let provider):
-            return "\(provider.displayName) is not configured. Add your API key in Settings → API Keys."
+            return "\(provider.displayName) is not configured. Add your API key in Settings  API Keys."
         case .rateLimited(_, let retry):
             let retryStr = retry.map { " Try again in \($0 / 60) minutes." } ?? " Try again in a bit."
             return "GagGrabber needs a breather.\(retryStr)"
@@ -121,7 +124,7 @@ protocol AIJokeExtractionProvider {
     func isConfigured() -> Bool
 
     /// Extract jokes from raw text. Throws `AIProviderError` on failure.
-    func extractJokes(from text: String) async throws -> [GeminiExtractedJoke]
+    func extractJokes(from text: String) async throws -> [AIExtractedJoke]
 }
 
 // MARK: - Shared Prompt
@@ -138,9 +141,9 @@ enum JokeExtractionPrompt {
         1. DO NOT drop, skip, summarise, or omit any text. Every sentence, phrase, or
            fragment from the file must appear as its own entry in your response.
         2. Give each entry a confidence score:
-           - 0.8–1.0 → clearly a joke / bit / punchline
-           - 0.5–0.79 → possibly a joke, premise, tag, or crowd-work line
-           - 0.0–0.49 → not a joke (title, note, header, metadata, random word, etc.)
+           - 0.8–1.0  clearly a joke / bit / punchline
+           - 0.5–0.79  possibly a joke, premise, tag, or crowd-work line
+           - 0.0–0.49  not a joke (title, note, header, metadata, random word, etc.)
              but STILL include it — the user will decide.
         3. Never combine unrelated material into one entry.
         4. Split on blank lines, "---", "***", "===", "//", "NEXT JOKE", "NEW BIT",
@@ -158,7 +161,7 @@ enum JokeExtractionPrompt {
         """
     }
 
-    /// Parse the raw string response into `[GeminiExtractedJoke]`.
+    /// Parse the raw string response into `[AIExtractedJoke]`.
     ///
     /// Handles the most common model output shapes in order:
     ///  1. Markdown code fences (```json … ```)
@@ -172,10 +175,10 @@ enum JokeExtractionPrompt {
     /// - Parameters:
     ///   - raw: The raw string content from the model's message.
     ///   - provider: Used only to construct error messages.
-    static func parseResponse(_ raw: String, provider: AIProviderType = .openAI) throws -> [GeminiExtractedJoke] {
+    static func parseResponse(_ raw: String, provider: AIProviderType = .openAI) throws -> [AIExtractedJoke] {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // ── 1. Strip markdown code fences ────────────────────────────────────
+        //  1. Strip markdown code fences 
         // Handles ```json\n...\n``` and ```\n...\n```
         if s.hasPrefix("```") {
             var lines = s.components(separatedBy: .newlines)
@@ -188,7 +191,7 @@ enum JokeExtractionPrompt {
             s = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        // ── 2. Unwrap JSON object wrapper ─────────────────────────────────────
+        //  2. Unwrap JSON object wrapper 
         // OpenAI's json_schema structured-outputs mode requires a root JSON object.
         // Our schema enforces { "jokes": [...] }.  Arcee/OpenRouter free-text models
         // may also wrap spontaneously with keys like "jokes", "data", "results", etc.
@@ -207,32 +210,32 @@ enum JokeExtractionPrompt {
             }
         }
 
-        // ── 3. Extract array bounds (strip leading/trailing prose) ────────────
+        //  3. Extract array bounds (strip leading/trailing prose) 
         if let start = s.firstIndex(of: "["),
            let end   = s.lastIndex(of: "]"),
            start <= end {
             s = String(s[start...end])
         }
 
-        // ── 4. First parse attempt — clean JSON ───────────────────────────────
+        //  4. First parse attempt — clean JSON 
         if let data = s.data(using: .utf8),
-           let jokes = try? JSONDecoder().decode([GeminiExtractedJoke].self, from: data) {
+           let jokes = try? JSONDecoder().decode([AIExtractedJoke].self, from: data) {
             return jokes
         }
 
-        // ── 5. Truncation repair ──────────────────────────────────────────────
+        //  5. Truncation repair 
         // When finish_reason=length the array is cut off mid-object, e.g.:
         //   [..., {"jokeText":"text", "confidence":0.
         // Strategy: find the last complete object (ends with }) inside the array,
         // close the array after it, and decode whatever we recovered.
         let repaired = repairTruncatedArray(s)
         if let data = repaired.data(using: .utf8),
-           let jokes = try? JSONDecoder().decode([GeminiExtractedJoke].self, from: data) {
-            print("⚠️ [\(provider.displayName)] Recovered \(jokes.count) joke(s) from truncated response")
+           let jokes = try? JSONDecoder().decode([AIExtractedJoke].self, from: data) {
+            print(" [\(provider.displayName)] Recovered \(jokes.count) joke(s) from truncated response")
             return jokes
         }
 
-        // ── 6. Hard failure — nothing worked ─────────────────────────────────
+        //  6. Hard failure — nothing worked 
         let preview = String(raw.prefix(200))
         throw AIProviderError.apiError(
             provider,
@@ -277,10 +280,19 @@ enum JokeExtractionPrompt {
 
 enum AIKeyLoader {
     /// Loads the API key for a given provider.
-    /// Checks: 1) UserDefaults (user-entered), 2) Per-provider plist, 3) Secrets.plist, 4) environment variable.
+    /// Checks: 1) Keychain (user-entered), 2) Per-provider plist, 3) Secrets.plist, 4) environment variable.
+    /// Automatically migrates legacy keys from UserDefaults to Keychain on first access.
     static func loadKey(for provider: AIProviderType) -> String? {
-        // 1. User-entered key (stored in UserDefaults)
-        if let key = UserDefaults.standard.string(forKey: provider.userDefaultsKey),
+        // 1a. Migrate from UserDefaults to Keychain if needed
+        if let legacyKey = UserDefaults.standard.string(forKey: provider.userDefaultsKey),
+           !legacyKey.isEmpty {
+            KeychainHelper.save(legacyKey, forKey: provider.keychainKey)
+            UserDefaults.standard.removeObject(forKey: provider.userDefaultsKey)
+            print(" [AIKeyLoader] Migrated \(provider.displayName) key from UserDefaults to Keychain")
+        }
+        
+        // 1b. User-entered key (stored in Keychain)
+        if let key = KeychainHelper.load(forKey: provider.keychainKey),
            !key.isEmpty {
             return key
         }
@@ -313,17 +325,21 @@ enum AIKeyLoader {
         return nil
     }
 
-    /// Save a user-entered API key.
+    /// Save a user-entered API key securely in the Keychain.
     static func saveKey(_ key: String, for provider: AIProviderType) {
-        if key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            UserDefaults.standard.removeObject(forKey: provider.userDefaultsKey)
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            KeychainHelper.delete(forKey: provider.keychainKey)
         } else {
-            UserDefaults.standard.set(key.trimmingCharacters(in: .whitespacesAndNewlines), forKey: provider.userDefaultsKey)
+            KeychainHelper.save(trimmed, forKey: provider.keychainKey)
         }
+        // Clean up any legacy UserDefaults entry
+        UserDefaults.standard.removeObject(forKey: provider.userDefaultsKey)
     }
 
-    /// Clear the user-entered API key.
+    /// Clear the user-entered API key from the Keychain.
     static func clearKey(for provider: AIProviderType) {
+        KeychainHelper.delete(forKey: provider.keychainKey)
         UserDefaults.standard.removeObject(forKey: provider.userDefaultsKey)
     }
 
@@ -336,7 +352,7 @@ enum AIKeyLoader {
 // MARK: - AI Extracted Joke Model
 
 /// Represents a joke extracted by an AI provider (OpenAI, Arcee, OpenRouter, etc.)
-struct GeminiExtractedJoke: Codable, Identifiable, Equatable {
+struct AIExtractedJoke: Codable, Identifiable, Equatable {
     let id: UUID
     let jokeText: String
     let humorMechanism: String?
@@ -385,7 +401,7 @@ struct GeminiExtractedJoke: Codable, Identifiable, Equatable {
         self.tags = tags
     }
     
-    static func == (lhs: GeminiExtractedJoke, rhs: GeminiExtractedJoke) -> Bool {
+    static func == (lhs: AIExtractedJoke, rhs: AIExtractedJoke) -> Bool {
         lhs.jokeText == rhs.jokeText &&
         lhs.humorMechanism == rhs.humorMechanism &&
         abs(lhs.confidence - rhs.confidence) < 0.01 &&
@@ -401,17 +417,17 @@ struct GeminiExtractedJoke: Codable, Identifiable, Equatable {
         orderInFile: Int,
         importTimestamp: Date
     ) -> ImportedJoke {
-        // ── Confidence mapping ────────────────────────────────────────────────
+        //  Confidence mapping 
         // The AI returns a Float 0.0–1.0. We map it to three ImportConfidence
         // tiers which control whether the joke auto-saves or goes to review:
         //
-        //   ≥ 0.8  (.high)   → validationResult: .singleJoke
-        //                       needsReview = false → auto-saved
-        //   0.6–0.79 (.medium) → validationResult: .singleJoke
-        //                       needsReview = false → auto-saved (correct: medium
+        //    0.8  (.high)    validationResult: .singleJoke
+        //                       needsReview = false  auto-saved
+        //   0.6–0.79 (.medium)  validationResult: .singleJoke
+        //                       needsReview = false  auto-saved (correct: medium
         //                       confidence is the AI saying "pretty sure it's a joke")
-        //   < 0.6  (.low)    → validationResult: .requiresReview
-        //                       needsReview = true  → goes to review queue
+        //   < 0.6  (.low)     validationResult: .requiresReview
+        //                       needsReview = true   goes to review queue
         //
         // Low-confidence items (headers, notes, random words — AI scores < 0.5)
         // always land in the review queue so the user sees every fragment.
@@ -463,13 +479,4 @@ struct GeminiExtractedJoke: Codable, Identifiable, Equatable {
             extractionMethod: .documentText
         )
     }
-}
-
-// MARK: - Rate Limit Error (legacy stub — kept for any remaining references)
-// NOTE: AIProviderError.rateLimited is the canonical rate-limit error.
-// GeminiRateLimitError is dead code and should not be used in new code.
-// Keeping the struct stub prevents compile errors if any external code references it.
-struct GeminiRateLimitError: Error {
-    let provider: AIProviderType
-    let retryAfterSeconds: Int?
 }

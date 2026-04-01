@@ -12,8 +12,9 @@ struct AddJokesToSetListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var jokes: [Joke]
-    @Query private var folders: [JokeFolder]
+    @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }) private var folders: [JokeFolder]
     @AppStorage("roastModeEnabled") private var roastMode = false
+    @AppStorage("showFullContent") private var showFullContent = true
     
     @Bindable var setList: SetList
     var currentJokeIDs: [UUID]
@@ -93,10 +94,11 @@ struct AddJokesToSetListView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(joke.title)
                                             .font(.headline)
-                                        Text(joke.content)
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                            .lineLimit(2)
+                                        if showFullContent {
+                                            Text(joke.content)
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
                                     Spacer()
                                     if selectedJokeIDs.contains(joke.id) {
@@ -112,7 +114,7 @@ struct AddJokesToSetListView: View {
                 }
             }
             .background(roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
-            .navigationTitle(roastMode ? "🔥 Add Jokes" : "Add Jokes")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
             .searchable(text: $searchText, prompt: "Search jokes")

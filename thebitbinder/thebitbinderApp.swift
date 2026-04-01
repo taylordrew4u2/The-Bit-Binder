@@ -37,11 +37,11 @@ struct thebitbinderApp: App {
         // all existing user data invisible. Always use "default.store".
         let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
         
-        // 🛡️ NOTE: Emergency backups are now performed AFTER launch in
+        //  NOTE: Emergency backups are now performed AFTER launch in
         // performDeferredBackup() to avoid watchdog timeout (code 9).
         // The ModelContainer closure must be fast.
 
-        // 1️⃣ Persistent + CloudKit (single container, full schema)
+        // 1⃣ Persistent + CloudKit (single container, full schema)
         do {
             let config = ModelConfiguration(
                 schema: schema,
@@ -50,18 +50,18 @@ struct thebitbinderApp: App {
                 cloudKitDatabase: .private("iCloud.The-BitBinder.thebitbinder")
             )
             let container = try ModelContainer(for: schema, configurations: [config])
-            print("✅ [ModelContainer] Persistent + CloudKit ready")
+            print(" [ModelContainer] Persistent + CloudKit ready")
             
             // Log successful container creation
             DataOperationLogger.shared.logSuccess("ModelContainer created with CloudKit")
             
             return container
         } catch {
-            print("⚠️ [ModelContainer] CloudKit failed (\(error)) — local-only fallback (same file, data preserved)")
+            print(" [ModelContainer] CloudKit failed (\(error)) — local-only fallback (same file, data preserved)")
             DataOperationLogger.shared.logError(error, operation: "ModelContainer_CloudKit_Creation")
         }
 
-        // 2️⃣ Same file, no CloudKit — all data preserved, just no sync
+        // 2⃣ Same file, no CloudKit — all data preserved, just no sync
         do {
             let config = ModelConfiguration(
                 schema: schema,
@@ -70,32 +70,32 @@ struct thebitbinderApp: App {
                 cloudKitDatabase: .none
             )
             let container = try ModelContainer(for: schema, configurations: [config])
-            print("✅ [ModelContainer] Persistent local-only ready")
+            print(" [ModelContainer] Persistent local-only ready")
             
             DataOperationLogger.shared.logSuccess("ModelContainer created (local-only fallback)")
             
             return container
         } catch {
-            print("❌ [ModelContainer] Local store failed (\(error)) — attempting data preservation backup")
+            print(" [ModelContainer] Local store failed (\(error)) — attempting data preservation backup")
             DataOperationLogger.shared.logError(error, operation: "ModelContainer_Local_Creation")
             
-            // 🛡️ CRITICAL: Back up corrupted store with more detail before wiping
+            //  CRITICAL: Back up corrupted store with more detail before wiping
             let timestamp = Int(Date().timeIntervalSince1970)
             let backupURL = URL.applicationSupportDirectory
                 .appending(path: "corrupted_store_backup_\(timestamp).store")
             
             do {
                 try FileManager.default.copyItem(at: storeURL, to: backupURL)
-                print("✅ [ModelContainer] Corrupted store backed up to: \(backupURL.lastPathComponent)")
+                print(" [ModelContainer] Corrupted store backed up to: \(backupURL.lastPathComponent)")
                 DataOperationLogger.shared.logCritical("Corrupted store backed up before cleanup")
             } catch {
-                print("❌ [ModelContainer] Could not backup corrupted store: \(error)")
+                print(" [ModelContainer] Could not backup corrupted store: \(error)")
                 DataOperationLogger.shared.logError(error, operation: "Corrupted_Store_Backup")
             }
         }
 
-        // 3️⃣ Last resort: wipe corrupted files at same URL (backup already saved above)
-        print("🔧 [ModelContainer] Cleaning corrupted store files...")
+        // 3⃣ Last resort: wipe corrupted files at same URL (backup already saved above)
+        print(" [ModelContainer] Cleaning corrupted store files...")
         DataOperationLogger.shared.logCritical("Cleaning corrupted store files as last resort")
         
         for ext in ["", "-shm", "-wal"] {
@@ -118,14 +118,14 @@ struct thebitbinderApp: App {
                 cloudKitDatabase: .none
             )
             let container = try ModelContainer(for: schema, configurations: [config])
-            print("⚠️ [ModelContainer] Fresh store at same URL (corrupted store was backed up)")
+            print(" [ModelContainer] Fresh store at same URL (corrupted store was backed up)")
             
             DataOperationLogger.shared.logCritical("Fresh store created after corruption cleanup - data may be lost but backups available")
             
             return container
         } catch {
-            // 🚨 CATASTROPHIC FAILURE - Log everything possible
-            print("❌ [ModelContainer] CATASTROPHIC FAILURE: Cannot create any persistent store: \(error)")
+            //  CATASTROPHIC FAILURE - Log everything possible
+            print(" [ModelContainer] CATASTROPHIC FAILURE: Cannot create any persistent store: \(error)")
             DataOperationLogger.shared.logCritical("CATASTROPHIC FAILURE: Cannot create ModelContainer - \(error.localizedDescription)")
             
             // Try to create in-memory as absolute last resort to prevent app crash
@@ -135,13 +135,13 @@ struct thebitbinderApp: App {
                     isStoredInMemoryOnly: true
                 )
                 let container = try ModelContainer(for: schema, configurations: [config])
-                print("🆘 [ModelContainer] EMERGENCY: Created in-memory container - DATA WILL BE LOST ON APP CLOSE")
+                print(" [ModelContainer] EMERGENCY: Created in-memory container - DATA WILL BE LOST ON APP CLOSE")
                 DataOperationLogger.shared.logCritical("EMERGENCY: Created in-memory container - all data will be lost")
                 
                 return container
             } catch {
                 DataOperationLogger.shared.logCritical("TOTAL FAILURE: Cannot create any ModelContainer - app will crash")
-                fatalError("❌ [ModelContainer] TOTAL FAILURE: Cannot create any ModelContainer: \(error)")
+                fatalError(" [ModelContainer] TOTAL FAILURE: Cannot create any ModelContainer: \(error)")
             }
         }
     }()
@@ -178,16 +178,16 @@ struct thebitbinderApp: App {
                 // Complete data protection with model context
                 await startup.completeDataProtectionWithContext(sharedModelContainer.mainContext)
                 
-                // 🛡️ Deferred heavy work — runs AFTER UI is visible
+                //  Deferred heavy work — runs AFTER UI is visible
                 await performDeferredBackup()
                 
                 // CloudKit cleanup runs after backup so UI is already showing
                 await performAggressiveCloudKitCleanup()
             }
             .environmentObject(userPreferences)
-            .alert("⚠️ Data Issue Detected", isPresented: $startup.showDataLossAlert) {
+            .alert(" Data Issue Detected", isPresented: $startup.showDataLossAlert) {
                 Button("Open Data Safety") {
-                    // User will navigate to Settings → Data Safety manually
+                    // User will navigate to Settings  Data Safety manually
                 }
                 Button("Dismiss", role: .cancel) { }
             } message: {
@@ -200,7 +200,7 @@ struct thebitbinderApp: App {
                 do {
                     try sharedModelContainer.mainContext.save()
                 } catch {
-                    print("❌ [AppLifecycle] Failed to save on background: \(error)")
+                    print(" [AppLifecycle] Failed to save on background: \(error)")
                     DataOperationLogger.shared.logError(error, operation: "BackgroundSave")
                 }
                 iCloudKeyValueStore.shared.pushToCloud()
@@ -209,7 +209,7 @@ struct thebitbinderApp: App {
                 do {
                     try sharedModelContainer.mainContext.save()
                 } catch {
-                    print("❌ [AppLifecycle] Failed to save on foreground: \(error)")
+                    print(" [AppLifecycle] Failed to save on foreground: \(error)")
                     DataOperationLogger.shared.logError(error, operation: "ForegroundSave")
                 }
                 iCloudKeyValueStore.shared.pullFromCloud()
@@ -244,10 +244,10 @@ struct thebitbinderApp: App {
                         try FileManager.default.copyItem(at: src, to: dst)
                     }
                 }
-                print("🛡️ [DataProtection] Deferred emergency backup created")
+                print(" [DataProtection] Deferred emergency backup created")
                 UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastEmergencyBackupKey)
             } catch {
-                print("⚠️ [DataProtection] Could not create emergency backup: \(error)")
+                print(" [DataProtection] Could not create emergency backup: \(error)")
             }
             
             // Clean up old backups — file I/O only, safe off main thread
@@ -260,17 +260,17 @@ struct thebitbinderApp: App {
     private func performAggressiveCloudKitCleanup() async {
         let key = CloudKitResetUtility.cleanupVersionKey
         guard !UserDefaults.standard.bool(forKey: key) else {
-            print("✅ [CloudKit] Schema cleanup already completed (\(key))")
+            print(" [CloudKit] Schema cleanup already completed (\(key))")
             return
         }
         
-        print("🚨 [CloudKit] Starting schema-mismatch repair...")
+        print(" [CloudKit] Starting schema-mismatch repair...")
         
         do {
             try await CloudKitResetUtility.repairCorruptedZone()
-            print("✅ [CloudKit] Schema repair succeeded")
+            print(" [CloudKit] Schema repair succeeded")
         } catch {
-            print("⚠️ [CloudKit] Repair error (will retry next launch): \(error.localizedDescription)")
+            print(" [CloudKit] Repair error (will retry next launch): \(error.localizedDescription)")
         }
     }
 }

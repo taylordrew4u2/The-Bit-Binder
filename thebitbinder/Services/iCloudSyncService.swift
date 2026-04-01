@@ -88,7 +88,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
     @objc private func processRemoteChange() {
         Task { @MainActor in
             guard Date().timeIntervalSince(lastSyncCompletionDate) >= syncCooldown else {
-                print("🔄 [iCloud] Sync request ignored due to cooldown.")
+                print(" [iCloud] Sync request ignored due to cooldown.")
                 return
             }
             
@@ -106,10 +106,10 @@ final class iCloudSyncService: NSObject, ObservableObject {
                         try ctx.save()
                     }
                 } catch {
-                    print("⚠️ [iCloud] Context save during remote merge failed: \(error.localizedDescription)")
+                    print(" [iCloud] Context save during remote merge failed: \(error.localizedDescription)")
                 }
             } else {
-                print("⚠️ [iCloud] Remote changes received but modelContext is nil — cannot refresh")
+                print(" [iCloud] Remote changes received but modelContext is nil — cannot refresh")
             }
             
             lastSyncDate = Date()
@@ -118,7 +118,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
             
             // Post a notification so any listening views can refresh their queries
             NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
-            print("🔄 [iCloud] Remote changes received and merged — UI will refresh")
+            print(" [iCloud] Remote changes received and merged — UI will refresh")
         }
     }
     
@@ -127,7 +127,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
             let available = await checkiCloudAvailability()
             if available && isSyncEnabled {
                 await performFullSync()
-                print("🔄 [iCloud] Account changed — re-synced")
+                print(" [iCloud] Account changed — re-synced")
             }
         }
     }
@@ -253,9 +253,9 @@ final class iCloudSyncService: NSObject, ObservableObject {
             record["timestamp"] = Date()
             
             _ = try await database.save(record)
-            print("✅ Thoughts synced to iCloud")
+            print(" Thoughts synced to iCloud")
         } catch {
-            print("❌ Failed to sync thoughts: \(error)")
+            print(" Failed to sync thoughts: \(error)")
         }
     }
     
@@ -272,7 +272,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
                 return latestRecord["content"] as? String
             }
         } catch {
-            print("❌ Failed to fetch thoughts: \(error)")
+            print(" Failed to fetch thoughts: \(error)")
         }
         
         return nil
@@ -301,27 +301,27 @@ final class iCloudSyncService: NSObject, ObservableObject {
             let status = try await container.accountStatus()
             switch status {
             case .available:
-                print("✅ [iCloud] Account available")
+                print(" [iCloud] Account available")
                 return true
             case .noAccount:
-                print("❌ [iCloud] No account — user not signed into iCloud")
-                errorMessage = "Sign in to iCloud in Settings → [Your Name] → iCloud"
+                print(" [iCloud] No account — user not signed into iCloud")
+                errorMessage = "Sign in to iCloud in Settings  [Your Name]  iCloud"
             case .restricted:
-                print("❌ [iCloud] Account restricted (parental controls or MDM)")
+                print(" [iCloud] Account restricted (parental controls or MDM)")
                 errorMessage = "iCloud is restricted on this device"
             case .couldNotDetermine:
-                print("❌ [iCloud] Could not determine account status")
+                print(" [iCloud] Could not determine account status")
                 errorMessage = "Could not check iCloud status — try again later"
             case .temporarilyUnavailable:
-                print("⚠️ [iCloud] Temporarily unavailable")
+                print(" [iCloud] Temporarily unavailable")
                 errorMessage = "iCloud is temporarily unavailable — try again later"
             @unknown default:
-                print("❌ [iCloud] Unknown account status: \(status)")
+                print(" [iCloud] Unknown account status: \(status)")
                 errorMessage = "Unknown iCloud status"
             }
             return false
         } catch {
-            print("❌ [iCloud] Account check error: \(error)")
+            print(" [iCloud] Account check error: \(error)")
             errorMessage = "iCloud check failed: \(error.localizedDescription)"
             return false
         }
@@ -334,16 +334,16 @@ final class iCloudSyncService: NSObject, ObservableObject {
         // 1. iCloud account
         do {
             let status = try await container.accountStatus()
-            results.append("iCloud Account: \(status == .available ? "✅ Available" : "❌ \(status)")")
+            results.append("iCloud Account: \(status == .available ? " Available" : " \(status)")")
         } catch {
-            results.append("iCloud Account: ❌ Error — \(error.localizedDescription)")
+            results.append("iCloud Account:  Error — \(error.localizedDescription)")
         }
         
         // 2. Container ID
         results.append("Container: iCloud.The-BitBinder.thebitbinder")
         
         // 3. Sync enabled
-        results.append("Sync Enabled: \(isSyncEnabled ? "✅ Yes" : "❌ No")")
+        results.append("Sync Enabled: \(isSyncEnabled ? " Yes" : " No")")
         
         // 4. Last sync
         if let lastSync = lastSyncDate {
@@ -363,9 +363,9 @@ final class iCloudSyncService: NSObject, ObservableObject {
                 ownerName: CKCurrentUserDefaultName
             )
             let zone = try await database.recordZone(for: zoneID)
-            results.append("CloudKit Fetch Test: ✅ Connected (zone: \(zone.zoneID.zoneName))")
+            results.append("CloudKit Fetch Test:  Connected (zone: \(zone.zoneID.zoneName))")
         } catch {
-            results.append("CloudKit Fetch Test: ❌ \(error.localizedDescription)")
+            results.append("CloudKit Fetch Test:  \(error.localizedDescription)")
         }
         
         return results

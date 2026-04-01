@@ -40,8 +40,8 @@ final class DataProtectionService: ObservableObject {
         )
         
         // Log initialization
-        print("📦 [DataProtection] Service initialized")
-        print("📦 [DataProtection] Backup directory: \(backupDirectory.path)")
+        print(" [DataProtection] Service initialized")
+        print(" [DataProtection] Backup directory: \(backupDirectory.path)")
     }
     
     // MARK: - Version Tracking
@@ -51,10 +51,10 @@ final class DataProtectionService: ObservableObject {
         let previousVersion = UserDefaults.standard.string(forKey: previousVersionKey)
         let currentVersion = currentAppVersion
         
-        print("📦 [DataProtection] Version check - Previous: \(previousVersion ?? "none"), Current: \(currentVersion)")
+        print(" [DataProtection] Version check - Previous: \(previousVersion ?? "none"), Current: \(currentVersion)")
         
         if previousVersion != currentVersion {
-            print("📦 [DataProtection] App version change detected - creating safety backup")
+            print(" [DataProtection] App version change detected - creating safety backup")
             await createUpdateBackup(from: previousVersion, to: currentVersion)
             
             // Update stored version
@@ -82,7 +82,7 @@ final class DataProtectionService: ObservableObject {
             // Create backup directory
             try fileManager.createDirectory(at: backupURL, withIntermediateDirectories: true)
             
-            print("📦 [DataProtection] Creating backup: \(backupName)")
+            print(" [DataProtection] Creating backup: \(backupName)")
             
             // Backup SwiftData store files
             await backupSwiftDataStore(to: backupURL)
@@ -96,13 +96,13 @@ final class DataProtectionService: ObservableObject {
             // Create backup manifest
             createBackupManifest(at: backupURL, reason: reason)
             
-            print("✅ [DataProtection] Backup created successfully: \(backupName)")
+            print(" [DataProtection] Backup created successfully: \(backupName)")
             
             // Clean up old backups
             cleanupOldBackups()
             
         } catch {
-            print("❌ [DataProtection] Failed to create backup: \(error)")
+            print(" [DataProtection] Failed to create backup: \(error)")
         }
     }
     
@@ -122,7 +122,7 @@ final class DataProtectionService: ObservableObject {
                 
                 if fileManager.fileExists(atPath: sourceURL.path) {
                     try fileManager.copyItem(at: sourceURL, to: destURL)
-                    print("📦 [DataProtection] Backed up: default.store\(ext)")
+                    print(" [DataProtection] Backed up: default.store\(ext)")
                 }
             }
             
@@ -132,12 +132,12 @@ final class DataProtectionService: ObservableObject {
             if fileManager.fileExists(atPath: externalStorageURL.path) {
                 let destExternalURL = storeDirectory.appending(path: "default.store_Files")
                 try fileManager.copyItem(at: externalStorageURL, to: destExternalURL)
-                print("📦 [DataProtection] External storage directory backed up")
+                print(" [DataProtection] External storage directory backed up")
             }
             
-            print("📦 [DataProtection] SwiftData store backed up")
+            print(" [DataProtection] SwiftData store backed up")
         } catch {
-            print("⚠️ [DataProtection] Failed to backup SwiftData store: \(error)")
+            print(" [DataProtection] Failed to backup SwiftData store: \(error)")
         }
     }
     
@@ -160,9 +160,9 @@ final class DataProtectionService: ObservableObject {
             let plistData = try PropertyListSerialization.data(fromPropertyList: appDict, format: .xml, options: 0)
             try plistData.write(to: preferencesURL)
             
-            print("📦 [DataProtection] UserDefaults backed up (\(appKeys.count) app keys)")
+            print(" [DataProtection] UserDefaults backed up (\(appKeys.count) app keys)")
         } catch {
-            print("⚠️ [DataProtection] Failed to backup UserDefaults: \(error)")
+            print(" [DataProtection] Failed to backup UserDefaults: \(error)")
         }
     }
     
@@ -191,9 +191,9 @@ final class DataProtectionService: ObservableObject {
                 try fileManager.copyItem(at: fileURL, to: destURL)
             }
             
-            print("📦 [DataProtection] App-specific files backed up")
+            print(" [DataProtection] App-specific files backed up")
         } catch {
-            print("⚠️ [DataProtection] Failed to backup app files: \(error)")
+            print(" [DataProtection] Failed to backup app files: \(error)")
         }
     }
     
@@ -212,7 +212,7 @@ final class DataProtectionService: ObservableObject {
             let data = try JSONEncoder().encode(manifest)
             try data.write(to: manifestURL)
         } catch {
-            print("⚠️ [DataProtection] Failed to create manifest: \(error)")
+            print(" [DataProtection] Failed to create manifest: \(error)")
         }
     }
     
@@ -233,11 +233,11 @@ final class DataProtectionService: ObservableObject {
                 let backupsToDelete = Array(backups.dropFirst(maxBackups))
                 for backup in backupsToDelete {
                     try fileManager.removeItem(at: backup)
-                    print("📦 [DataProtection] Cleaned up old backup: \(backup.lastPathComponent)")
+                    print(" [DataProtection] Cleaned up old backup: \(backup.lastPathComponent)")
                 }
             }
         } catch {
-            print("⚠️ [DataProtection] Failed to cleanup old backups: \(error)")
+            print(" [DataProtection] Failed to cleanup old backups: \(error)")
         }
     }
     
@@ -289,10 +289,10 @@ final class DataProtectionService: ObservableObject {
             
             if deletedCount > 0 {
                 let freedMB = ByteCountFormatter.string(fromByteCount: freedBytes, countStyle: .file)
-                print("🧹 [DataProtection] Cleaned up \(deletedCount) emergency backup(s), freed \(freedMB)")
+                print(" [DataProtection] Cleaned up \(deletedCount) emergency backup(s), freed \(freedMB)")
             }
         } catch {
-            print("⚠️ [DataProtection] Failed to cleanup emergency backups: \(error)")
+            print(" [DataProtection] Failed to cleanup emergency backups: \(error)")
         }
     }
     
@@ -332,7 +332,7 @@ final class DataProtectionService: ObservableObject {
             
             return backups.sorted { $0.createdAt > $1.createdAt }
         } catch {
-            print("❌ [DataProtection] Failed to list backups: \(error)")
+            print(" [DataProtection] Failed to list backups: \(error)")
             return []
         }
     }
@@ -355,7 +355,7 @@ final class DataProtectionService: ObservableObject {
     
     /// Recovers data from a backup (use with extreme caution)
     func recoverFromBackup(_ backupInfo: BackupInfo) async throws {
-        print("🚨 [DataProtection] EMERGENCY RECOVERY: Restoring from backup \(backupInfo.name)")
+        print(" [DataProtection] EMERGENCY RECOVERY: Restoring from backup \(backupInfo.name)")
         
         // Create a backup of current state before recovery
         await createBackup(named: "PreRecovery_\(ISO8601DateFormatter().string(from: Date()))", reason: .preRecovery)
@@ -379,7 +379,7 @@ final class DataProtectionService: ObservableObject {
             try restoreAppFiles(from: appFilesSource)
         }
         
-        print("✅ [DataProtection] Recovery completed from backup \(backupInfo.name)")
+        print(" [DataProtection] Recovery completed from backup \(backupInfo.name)")
     }
     
     private func restoreSwiftDataStore(from sourceURL: URL) async throws {
@@ -394,7 +394,7 @@ final class DataProtectionService: ObservableObject {
             let destFile = URL(fileURLWithPath: storeURL.path + ext)
             if fileManager.fileExists(atPath: destFile.path) {
                 try fileManager.removeItem(at: destFile)
-                print("📦 [DataProtection] Removed existing: default.store\(ext)")
+                print(" [DataProtection] Removed existing: default.store\(ext)")
             }
         }
         
@@ -403,7 +403,7 @@ final class DataProtectionService: ObservableObject {
         let externalStorageURL = URL(fileURLWithPath: storeURL.path + "_Files")
         if fileManager.fileExists(atPath: externalStorageURL.path) {
             try fileManager.removeItem(at: externalStorageURL)
-            print("📦 [DataProtection] Removed existing external storage directory")
+            print(" [DataProtection] Removed existing external storage directory")
         }
         
         // Step 2: Copy backup files into place
@@ -413,7 +413,7 @@ final class DataProtectionService: ObservableObject {
             
             if fileManager.fileExists(atPath: sourceFile.path) {
                 try fileManager.copyItem(at: sourceFile, to: destFile)
-                print("📦 [DataProtection] Restored: default.store\(ext)")
+                print(" [DataProtection] Restored: default.store\(ext)")
             }
         }
         
@@ -421,10 +421,10 @@ final class DataProtectionService: ObservableObject {
         let sourceExternalStorage = sourceURL.appending(path: "default.store_Files")
         if fileManager.fileExists(atPath: sourceExternalStorage.path) {
             try fileManager.copyItem(at: sourceExternalStorage, to: externalStorageURL)
-            print("📦 [DataProtection] Restored external storage directory")
+            print(" [DataProtection] Restored external storage directory")
         }
         
-        print("✅ [DataProtection] SwiftData store fully restored — app must restart to load")
+        print(" [DataProtection] SwiftData store fully restored — app must restart to load")
     }
     
     private func restoreUserDefaults(from sourceURL: URL) throws {

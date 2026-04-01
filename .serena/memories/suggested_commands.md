@@ -38,7 +38,7 @@ xcrun devicectl device install app --device [DEVICE_ID] [APP_PATH]
 xcodebuild -resolvePackageDependencies -project thebitbinder.xcodeproj
 
 # Update packages to latest versions
-# (Use Xcode Package Manager UI: File → Package Dependencies → Update to Latest Package Versions)
+# (Use Xcode Package Manager UI: File  Package Dependencies  Update to Latest Package Versions)
 ```
 
 ## Code Quality
@@ -59,7 +59,7 @@ swiftlint lint --path thebitbinder/Models/
 ```
 
 ## Testing
-- ⚠️ No automated tests currently configured
+-  No automated tests currently configured
 - Manual testing through Xcode simulator and device testing
 - CloudKit testing requires actual iCloud account
 

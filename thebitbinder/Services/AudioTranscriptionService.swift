@@ -124,31 +124,70 @@ class AudioTranscriptionService {
         
         // Create recognition request
         let request = SFSpeechURLRecognitionRequest(url: url)
-        request.shouldReportPartialResults = false
-        request.addsPunctuation = true
+        request.shouldReportPartialResults = true
+        if #available(iOS 16, *) {
+            request.addsPunctuation = true
+        }
         
         // Perform recognition
+        // We keep a reference to the task so we can cancel it on timeout.
+        // We also retain the last non-empty partial result so that the terminal
+        // nil-result / nil-error callback does not incorrectly throw noSpeechDetected.
         let result = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<SFSpeechRecognitionResult, Error>) in
+            // Serial queue guards all mutable state shared between the timeout
+            // DispatchWorkItem (global queue) and the recognitionTask callback
+            // (internal SFSpeechRecognizer queue). Without this, concurrent access
+            // to `completed` / `lastResult` is a data race that can double-resume
+            // the continuation.
+            let guard_queue = DispatchQueue(label: "com.thebitbinder.transcription-guard")
             var completed = false
+            var lastResult: SFSpeechRecognitionResult?
+            var task: SFSpeechRecognitionTask?
             
-            recognizer.recognitionTask(with: request) { result, error in
-                guard !completed else { return }
-                
-                if let error = error {
+            // 60-second hard timeout – SFSpeechRecognizer can hang on some files
+            let timeoutWork = DispatchWorkItem {
+                guard_queue.sync {
+                    guard !completed else { return }
                     completed = true
-                    continuation.resume(throwing: AudioTranscriptionError.transcriptionFailed(error.localizedDescription))
-                    return
+                    task?.cancel()
+                    if let best = lastResult {
+                        continuation.resume(returning: best)
+                    } else {
+                        continuation.resume(throwing: AudioTranscriptionError.transcriptionFailed("Transcription timed out"))
+                    }
                 }
-                
-                guard let result = result else {
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 60, execute: timeoutWork)
+            
+            task = recognizer.recognitionTask(with: request) { result, error in
+                guard_queue.sync {
+                    guard !completed else { return }
+                    
+                    if let result = result {
+                        lastResult = result
+                        if result.isFinal {
+                            timeoutWork.cancel()
+                            completed = true
+                            continuation.resume(returning: result)
+                        }
+                        return
+                    }
+                    
+                    // Terminal callback: result == nil
+                    timeoutWork.cancel()
                     completed = true
-                    continuation.resume(throwing: AudioTranscriptionError.noSpeechDetected)
-                    return
-                }
-                
-                if result.isFinal {
-                    completed = true
-                    continuation.resume(returning: result)
+                    if let error = error {
+                        // If we already have a good partial result, use it rather than throwing
+                        if let best = lastResult, !best.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            continuation.resume(returning: best)
+                        } else {
+                            continuation.resume(throwing: AudioTranscriptionError.transcriptionFailed(error.localizedDescription))
+                        }
+                    } else if let best = lastResult {
+                        continuation.resume(returning: best)
+                    } else {
+                        continuation.resume(throwing: AudioTranscriptionError.noSpeechDetected)
+                    }
                 }
             }
         }

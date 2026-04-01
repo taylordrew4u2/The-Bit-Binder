@@ -28,9 +28,9 @@
 
 ## Error Handling
 - Comprehensive logging with `DataOperationLogger.shared`
-- Graceful fallbacks (CloudKit → local storage → in-memory)
+- Graceful fallbacks (CloudKit  local storage  in-memory)
 - User-facing error alerts for critical issues
-- Print statements with emoji prefixes (`✅`, `⚠️`, `❌`, `🛡️`)
+- Print statements with emoji prefixes (``, ``, ``, ``)
 
 ## Data Protection Philosophy
 - **Never lose data**: Multiple backup strategies

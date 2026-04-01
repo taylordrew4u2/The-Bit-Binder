@@ -41,7 +41,7 @@ final class DataOperationLogger {
         logOperation(.info, message)
         
         // Log to system logger as well
-        logger.info("📝 \(message)")
+        logger.info(" \(message)")
     }
     
     func logDataUpdate<T: PersistentModel>(_ entity: T, context: ModelContext, changes: [String] = []) {
@@ -50,7 +50,7 @@ final class DataOperationLogger {
         let message = "UPDATED \(entityName)\(changesStr)"
         logOperation(.info, message)
         
-        logger.info("✏️ \(message)")
+        logger.info(" \(message)")
     }
     
     func logDataDeletion<T: PersistentModel>(_ entity: T, context: ModelContext, soft: Bool = false) {
@@ -59,21 +59,21 @@ final class DataOperationLogger {
         let message = "\(deleteType) \(entityName)"
         logOperation(.warning, message)
         
-        logger.notice("🗑️ \(message)")
+        logger.notice(" \(message)")
     }
     
     func logBulkOperation(_ operation: String, entityType: String, count: Int, context: ModelContext) {
         let message = "BULK_\(operation.uppercased()) \(count) \(entityType) entities"
         logOperation(.notice, message)
         
-        logger.notice("📊 \(message)")
+        logger.notice(" \(message)")
     }
     
     func logMigration(_ fromVersion: Int?, _ toVersion: Int, result: String) {
         let message = "MIGRATION from v\(fromVersion ?? 0) to v\(toVersion): \(result)"
         logOperation(.critical, message)
         
-        logger.critical("🔄 \(message)")
+        logger.critical(" \(message)")
     }
     
     func logBackup(_ backupName: String, reason: String, success: Bool) {
@@ -82,9 +82,9 @@ final class DataOperationLogger {
         logOperation(success ? .notice : .error, message)
         
         if success {
-            logger.notice("💾 \(message)")
+            logger.notice(" \(message)")
         } else {
-            logger.error("❌ \(message)")
+            logger.error(" \(message)")
         }
     }
     
@@ -93,9 +93,9 @@ final class DataOperationLogger {
         logOperation(result.isHealthy ? .info : .error, message)
         
         if result.isHealthy {
-            logger.info("✅ \(message)")
+            logger.info(" \(message)")
         } else {
-            logger.error("⚠️ \(message)")
+            logger.error(" \(message)")
             
             // Log individual issues
             for issue in result.issues {
@@ -107,7 +107,7 @@ final class DataOperationLogger {
         if result.significantDataLoss {
             let lossMessage = "SIGNIFICANT_DATA_LOSS_DETECTED"
             logOperation(.critical, lossMessage)
-            logger.critical("🚨 \(lossMessage)")
+            logger.critical(" \(lossMessage)")
         }
     }
     
@@ -116,12 +116,12 @@ final class DataOperationLogger {
         let message = "ERROR in \(operation)\(contextStr): \(error.localizedDescription)"
         logOperation(.error, message)
         
-        logger.error("❌ \(message)")
+        logger.error(" \(message)")
     }
     
     func logCritical(_ message: String) {
         logOperation(.critical, "CRITICAL: \(message)")
-        logger.critical("🚨 CRITICAL: \(message)")
+        logger.critical(" CRITICAL: \(message)")
     }
     
     // MARK: - Internal Logging
@@ -135,7 +135,7 @@ final class DataOperationLogger {
         
         // Also print to console in debug builds
         #if DEBUG
-        print("🗂️ [DataLog] \(logLine.trimmingCharacters(in: .newlines))")
+        print(" [DataLog] \(logLine.trimmingCharacters(in: .newlines))")
         #endif
     }
     
@@ -284,6 +284,6 @@ extension DataOperationLogger {
     
     func logSuccess(_ message: String) {
         logOperation(.notice, "SUCCESS: \(message)")
-        logger.notice("✅ SUCCESS: \(message)")
+        logger.notice(" SUCCESS: \(message)")
     }
 }

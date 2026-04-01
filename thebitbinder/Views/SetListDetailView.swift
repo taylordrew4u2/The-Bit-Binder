@@ -14,7 +14,7 @@ struct SetListDetailView: View {
     @Query private var jokes: [Joke]
     @Query private var roastJokes: [RoastJoke]
     @AppStorage("roastModeEnabled") private var roastMode = false
-    @AppStorage("expandAllJokes") private var expandAllJokes = false
+    @AppStorage("showFullContent") private var showFullContent = true
     
     @Bindable var setList: SetList
     @State private var showingAddJokes = false
@@ -140,7 +140,7 @@ struct SetListDetailView: View {
                 } else {
                     List {
                         ForEach(setListJokes) { joke in
-                            JokeRowView(joke: joke)
+                            JokeRowView(joke: joke, showFullContent: showFullContent)
                         }
                         .onMove(perform: moveJokes)
                         .onDelete(perform: deleteJokes)
@@ -149,7 +149,7 @@ struct SetListDetailView: View {
                 }
             }
         }
-        .navigationTitle(setList.name)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -158,8 +158,8 @@ struct SetListDetailView: View {
                         Label(roastMode ? "Add Roast Jokes" : "Add Jokes", systemImage: "plus")
                     }
                     
-                    Button(action: { expandAllJokes.toggle() }) {
-                        Label(expandAllJokes ? "Collapse Content" : "Expand Content", systemImage: expandAllJokes ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
+                    Button(action: { showFullContent.toggle() }) {
+                        Label(showFullContent ? "Show Titles Only" : "Show Full Content", systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
                     }
                     
                     Button(action: { isEditing.toggle() }) {
@@ -233,7 +233,7 @@ struct SetListDetailView: View {
         }
         let recording = Recording(
             title: recordingName.isEmpty ? "Recording \(Date())" : recordingName,
-            fileURL: fileURL.path,
+            fileURL: fileURL.lastPathComponent,
             duration: recordingDuration
         )
         modelContext.insert(recording)
@@ -242,11 +242,11 @@ struct SetListDetailView: View {
         do {
             try modelContext.save()
             #if DEBUG
-            print("✅ Recording saved successfully: \(recording.title)")
+            print(" Recording saved successfully: \(recording.title)")
             #endif
         } catch {
             #if DEBUG
-            print("❌ Failed to save recording: \(error)")
+            print(" Failed to save recording: \(error)")
             #endif
         }
         
@@ -280,10 +280,16 @@ struct SetListDetailView: View {
                 .padding(.top, 3)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(joke.content)
-                    .font(.system(size: 15))
-                    .foregroundColor(.primary)
-                    .lineLimit(expandAllJokes ? nil : 3)
+                if showFullContent {
+                    Text(joke.content)
+                        .font(.system(size: 15))
+                        .foregroundColor(.primary)
+                } else {
+                    Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
                 
                 if let targetName = joke.target?.name {
                     Text("for \(targetName)")

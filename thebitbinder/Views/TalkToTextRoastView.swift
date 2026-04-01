@@ -316,12 +316,12 @@ struct TalkToTextRoastView: View {
         do {
             try modelContext.save()
             #if DEBUG
-            print("✅ [TalkToTextRoastView] Roast saved for '\(target.name)' (id: \(newJoke.id))")
+            print(" [TalkToTextRoastView] Roast saved for '\(target.name)' (id: \(newJoke.id))")
             #endif
             dismiss()
         } catch {
             #if DEBUG
-            print("❌ [TalkToTextRoastView] Failed to save: \(error)")
+            print(" [TalkToTextRoastView] Failed to save: \(error)")
             #endif
             errorMessage = "Could not save roast: \(error.localizedDescription)"
         }

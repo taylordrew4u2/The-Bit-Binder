@@ -32,7 +32,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         registerBackgroundTasks()
         
         // Initialize iCloud Drive ubiquity container — this registers BitBinder
-        // in Settings → iCloud → iCloud Drive so users can see it and toggle sync.
+        // in Settings  iCloud  iCloud Drive so users can see it and toggle sync.
         // Must be called on a background thread per Apple docs.
         DispatchQueue.global(qos: .utility).async {
             if let containerURL = FileManager.default.url(forUbiquityContainerIdentifier: "iCloud.The-BitBinder.thebitbinder") {
@@ -40,14 +40,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 if !FileManager.default.fileExists(atPath: documentsURL.path) {
                     do {
                         try FileManager.default.createDirectory(at: documentsURL, withIntermediateDirectories: true)
-                        print("✅ [iCloud Drive] Created Documents folder at: \(documentsURL.path)")
+                        print(" [iCloud Drive] Created Documents folder at: \(documentsURL.path)")
                     } catch {
-                        print("⚠️ [iCloud Drive] Could not create Documents folder: \(error)")
+                        print(" [iCloud Drive] Could not create Documents folder: \(error)")
                     }
                 }
-                print("✅ [iCloud Drive] Ubiquity container initialized: \(containerURL.path)")
+                print(" [iCloud Drive] Ubiquity container initialized: \(containerURL.path)")
             } else {
-                print("⚠️ [iCloud Drive] Ubiquity container not available (iCloud may be disabled)")
+                print(" [iCloud Drive] Ubiquity container not available (iCloud may be disabled)")
             }
         }
         
@@ -57,20 +57,20 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 let status = try await CKContainer(identifier: "iCloud.The-BitBinder.thebitbinder").accountStatus()
                 switch status {
                 case .available:
-                    print("✅ [CloudKit] iCloud account available — sync enabled")
+                    print(" [CloudKit] iCloud account available — sync enabled")
                 case .noAccount:
-                    print("⚠️ [CloudKit] No iCloud account — sync disabled")
+                    print(" [CloudKit] No iCloud account — sync disabled")
                 case .restricted:
-                    print("⚠️ [CloudKit] iCloud restricted — sync disabled")
+                    print(" [CloudKit] iCloud restricted — sync disabled")
                 case .couldNotDetermine:
-                    print("⚠️ [CloudKit] Could not determine iCloud status")
+                    print(" [CloudKit] Could not determine iCloud status")
                 case .temporarilyUnavailable:
-                    print("⚠️ [CloudKit] iCloud temporarily unavailable")
+                    print(" [CloudKit] iCloud temporarily unavailable")
                 @unknown default:
-                    print("⚠️ [CloudKit] Unknown iCloud status: \(status.rawValue)")
+                    print(" [CloudKit] Unknown iCloud status: \(status.rawValue)")
                 }
             } catch {
-                print("❌ [CloudKit] Error checking account: \(error)")
+                print(" [CloudKit] Error checking account: \(error)")
             }
         }
         
@@ -81,12 +81,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        print("✅ [CloudKit] Registered for remote notifications")
+        print(" [CloudKit] Registered for remote notifications")
     }
     
     func application(_ application: UIApplication,
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("⚠️ [CloudKit] Failed to register for remote notifications: \(error.localizedDescription)")
+        print(" [CloudKit] Failed to register for remote notifications: \(error.localizedDescription)")
     }
     
     // THIS IS THE KEY METHOD — CloudKit sends a silent push when another device
@@ -109,7 +109,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 object: nil,
                 userInfo: userInfo
             )
-            print("🔄 [CloudKit] Remote notification received — merging changes")
+            print(" [CloudKit] Remote notification received — merging changes")
             completionHandler(.newData)
         } else {
             completionHandler(.noData)
@@ -129,12 +129,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     // MARK: - Background Task Registration
     
     private func registerBackgroundTasks() {
-        // App refresh task — lightweight periodic check (≤30s runtime)
+        // App refresh task — lightweight periodic check (30s runtime)
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: Self.refreshTaskIdentifier,
             using: nil
         ) { task in
-            self.handleAppRefresh(task as! BGAppRefreshTask)
+            guard let refreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            self.handleAppRefresh(refreshTask)
         }
         
         // Processing task — heavier iCloud sync work (minutes of runtime, requires power + network)
@@ -142,17 +146,21 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             forTaskWithIdentifier: Self.syncTaskIdentifier,
             using: nil
         ) { task in
-            self.handleBackgroundSync(task as! BGProcessingTask)
+            guard let processingTask = task as? BGProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            self.handleBackgroundSync(processingTask)
         }
         
-        print("✅ [BGTask] Registered background tasks: refresh, sync")
+        print(" [BGTask] Registered background tasks: refresh, sync")
     }
     
     // MARK: - Background Task Handlers
     
     private func handleAppRefresh(_ task: BGAppRefreshTask) {
         let startTime = Date()
-        print("🔄 [BGTask] App refresh STARTED at \(startTime.formatted(date: .omitted, time: .standard))")
+        print(" [BGTask] App refresh STARTED at \(startTime.formatted(date: .omitted, time: .standard))")
         self.isRefreshTaskScheduled = false
         // Schedule the next refresh before doing work
         scheduleBackgroundRefresh()
@@ -163,13 +171,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 BackgroundDownloadScheduler.shared.refresh()
             }
             let elapsed = Date().timeIntervalSince(startTime)
-            print("🔄 [BGTask] App refresh COMPLETED in \(String(format: "%.1f", elapsed))s")
+            print(" [BGTask] App refresh COMPLETED in \(String(format: "%.1f", elapsed))s")
             task.setTaskCompleted(success: true)
         }
         
         task.expirationHandler = {
             let elapsed = Date().timeIntervalSince(startTime)
-            print("⚠️ [BGTask] App refresh EXPIRED after \(String(format: "%.1f", elapsed))s — cancelling")
+            print(" [BGTask] App refresh EXPIRED after \(String(format: "%.1f", elapsed))s — cancelling")
             refreshTask.cancel()
             self.isRefreshTaskScheduled = false
             task.setTaskCompleted(success: false)
@@ -178,7 +186,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     private func handleBackgroundSync(_ task: BGProcessingTask) {
         let startTime = Date()
-        print("🔄 [BGTask] Background sync STARTED at \(startTime.formatted(date: .omitted, time: .standard))")
+        print(" [BGTask] Background sync STARTED at \(startTime.formatted(date: .omitted, time: .standard))")
         self.isSyncTaskScheduled = false
         // Schedule the next sync before doing work
         scheduleBackgroundSync()
@@ -197,13 +205,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
             
             let elapsed = Date().timeIntervalSince(startTime)
-            print("🔄 [BGTask] Background sync COMPLETED in \(String(format: "%.1f", elapsed))s")
+            print(" [BGTask] Background sync COMPLETED in \(String(format: "%.1f", elapsed))s")
             task.setTaskCompleted(success: true)
         }
         
         task.expirationHandler = {
             let elapsed = Date().timeIntervalSince(startTime)
-            print("⚠️ [BGTask] Background sync EXPIRED after \(String(format: "%.1f", elapsed))s — cancelling")
+            print(" [BGTask] Background sync EXPIRED after \(String(format: "%.1f", elapsed))s — cancelling")
             syncTask.cancel()
             self.isSyncTaskScheduled = false
             // Mark success: true since partial sync is still useful
@@ -215,7 +223,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     private func scheduleBackgroundRefresh() {
         if isRefreshTaskScheduled {
-            print("⏭️ [BGTask] Refresh already scheduled, skipping")
+            print(" [BGTask] Refresh already scheduled, skipping")
             return
         }
         let request = BGAppRefreshTaskRequest(identifier: Self.refreshTaskIdentifier)
@@ -223,15 +231,15 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         do {
             try BGTaskScheduler.shared.submit(request)
             isRefreshTaskScheduled = true
-            print("📅 [BGTask] Scheduled background refresh")
+            print(" [BGTask] Scheduled background refresh")
         } catch {
-            print("⚠️ [BGTask] Could not schedule refresh: \(error.localizedDescription)")
+            print(" [BGTask] Could not schedule refresh: \(error.localizedDescription)")
             isRefreshTaskScheduled = false
         }
     }
     private func scheduleBackgroundSync() {
         if isSyncTaskScheduled {
-            print("⏭️ [BGTask] Sync already scheduled, skipping")
+            print(" [BGTask] Sync already scheduled, skipping")
             return
         }
         let request = BGProcessingTaskRequest(identifier: Self.syncTaskIdentifier)
@@ -241,9 +249,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         do {
             try BGTaskScheduler.shared.submit(request)
             isSyncTaskScheduled = true
-            print("📅 [BGTask] Scheduled background sync")
+            print(" [BGTask] Scheduled background sync")
         } catch {
-            print("⚠️ [BGTask] Could not schedule sync: \(error.localizedDescription)")
+            print(" [BGTask] Could not schedule sync: \(error.localizedDescription)")
             isSyncTaskScheduled = false
         }
     }
@@ -265,9 +273,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 ]
             )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-            print("✅ [Audio] Audio session configured for playback and recording")
+            print(" [Audio] Audio session configured for playback and recording")
         } catch {
-            print("❌ [Audio] Failed to configure audio session: \(error.localizedDescription)")
+            print(" [Audio] Failed to configure audio session: \(error.localizedDescription)")
         }
     }
 }

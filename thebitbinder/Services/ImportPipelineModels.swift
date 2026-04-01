@@ -178,7 +178,8 @@ struct ImportSourceMetadata {
 
 // MARK: - Pipeline Result
 
-struct ImportPipelineResult {
+struct ImportPipelineResult: Identifiable {
+    let id = UUID()
     let sourceFile: String
     let autoSavedJokes: [ImportedJoke]
     let reviewQueueJokes: [ImportedJoke]

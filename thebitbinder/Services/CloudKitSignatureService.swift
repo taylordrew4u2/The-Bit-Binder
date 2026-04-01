@@ -25,16 +25,16 @@ final class CloudKitSignatureService {
     /// Loads the public key from configuration
     private func loadPublicKey() {
         guard let keyData = CloudKitPublicKey.keyData else {
-            print("❌ [Signature] Failed to decode public key data")
+            print(" [Signature] Failed to decode public key data")
             return
         }
         
         do {
             // Parse the SPKI format to get the raw EC key
             cachedPublicKey = try parseECPublicKey(from: keyData)
-            print("✅ [Signature] Public key loaded successfully")
+            print(" [Signature] Public key loaded successfully")
         } catch {
-            print("❌ [Signature] Failed to parse public key: \(error)")
+            print(" [Signature] Failed to parse public key: \(error)")
         }
     }
     
@@ -79,10 +79,10 @@ final class CloudKitSignatureService {
         let status = SecItemAdd(addQuery as CFDictionary, nil)
         
         if status == errSecSuccess {
-            print("✅ [Signature] Public key stored in Keychain")
+            print(" [Signature] Public key stored in Keychain")
             return true
         } else {
-            print("⚠️ [Signature] Failed to store key in Keychain: \(status)")
+            print(" [Signature] Failed to store key in Keychain: \(status)")
             return false
         }
     }
@@ -96,7 +96,7 @@ final class CloudKitSignatureService {
     /// - Returns: True if signature is valid
     func verifySignature(_ signature: Data, for data: Data) -> Bool {
         guard let publicKey = cachedPublicKey else {
-            print("❌ [Signature] No public key available")
+            print(" [Signature] No public key available")
             return false
         }
         
@@ -109,7 +109,7 @@ final class CloudKitSignatureService {
                 let ecdsaSignature = try P256.Signing.ECDSASignature(rawRepresentation: signature)
                 return publicKey.isValidSignature(ecdsaSignature, for: SHA256.hash(data: data))
             } catch {
-                print("❌ [Signature] Invalid signature format: \(error)")
+                print(" [Signature] Invalid signature format: \(error)")
                 return false
             }
         }
@@ -202,11 +202,11 @@ extension CloudKitSignatureService {
         var description: String {
             switch self {
             case .valid(let version):
-                return "✅ Schema verified (v\(version))"
+                return " Schema verified (v\(version))"
             case .invalid(let reason):
-                return "❌ Schema invalid: \(reason)"
+                return " Schema invalid: \(reason)"
             case .failed(let reason):
-                return "⚠️ Verification failed: \(reason)"
+                return " Verification failed: \(reason)"
             }
         }
     }
@@ -223,7 +223,7 @@ extension CloudKitSignatureService {
               Identifier: \(identifier)
               Algorithm: \(algorithm)
               Schema Version: \(schemaVersion)
-              Status: \(isLoaded ? "✅ Loaded" : "❌ Not Loaded")
+              Status: \(isLoaded ? " Loaded" : " Not Loaded")
             """
         }
     }

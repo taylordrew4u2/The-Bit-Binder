@@ -17,6 +17,8 @@ struct RecordingsView: View {
     @State private var searchText = ""
     @State private var showingQuickRecord = false
     @State private var showingTrash = false
+    @State private var persistenceError: String?
+    @State private var showingPersistenceError = false
     
     var filteredRecordings: [Recording] {
         if searchText.isEmpty {
@@ -55,15 +57,24 @@ struct RecordingsView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle(roastMode ? "🔥 Burn Recordings" : "Recordings")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: roastMode ? "Search recordings" : "Search recordings")
             .bitBinderToolbar(roastMode: roastMode)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    NavigationLink(destination: RecordingTrashView()) {
-                        Image(systemName: "trash")
-                            .font(.body)
+                ToolbarItem(placement: .principal) {
+                    Menu {
+                        Button {
+                            showingQuickRecord = true
+                        } label: {
+                            Label("Quick Recording", systemImage: "mic.circle.fill")
+                        }
+                        Divider()
+                        Button { showingTrash = true } label: {
+                            Label("Trash", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                             .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.recordingsAccent)
                     }
                 }
@@ -77,8 +88,16 @@ struct RecordingsView: View {
                     }
                 }
             }
+            .navigationDestination(isPresented: $showingTrash) {
+                RecordingTrashView()
+            }
             .sheet(isPresented: $showingQuickRecord) {
                 StandaloneRecordingView()
+            }
+            .alert("Error", isPresented: $showingPersistenceError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(persistenceError ?? "An unknown error occurred")
             }
         }
     }
@@ -92,21 +111,17 @@ struct RecordingsView: View {
         do {
             try modelContext.save()
         } catch {
-            print("❌ [RecordingsView] Failed to save after soft-delete: \(error)")
+            print(" [RecordingsView] Failed to save after soft-delete: \(error)")
+            persistenceError = "Could not move recording to trash: \(error.localizedDescription)"
+            showingPersistenceError = true
         }
     }
 
     /// Permanently deletes a recording: removes the audio file, then removes the DB record.
     /// Only call this when the user explicitly confirms permanent deletion (e.g. from a trash view).
     static func permanentlyDelete(_ recording: Recording, context: ModelContext) {
-        // Resolve audio file URL
-        let fileURL: URL
-        if recording.fileURL.hasPrefix("/") {
-            fileURL = URL(fileURLWithPath: recording.fileURL)
-        } else {
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            fileURL = documentsPath.appendingPathComponent(recording.fileURL)
-        }
+        // Resolve audio file URL (handles stale absolute paths)
+        let fileURL = recording.resolvedURL
 
         // Delete the audio file first, then the DB record
         if FileManager.default.fileExists(atPath: fileURL.path) {
@@ -114,7 +129,7 @@ struct RecordingsView: View {
                 try FileManager.default.removeItem(at: fileURL)
             } catch {
                 // Log but don't abort — the DB record should still be removed
-                print("⚠️ [RecordingsView] Failed to delete audio file '\(fileURL.lastPathComponent)': \(error)")
+                print(" [RecordingsView] Failed to delete audio file '\(fileURL.lastPathComponent)': \(error)")
             }
         }
 
@@ -122,7 +137,7 @@ struct RecordingsView: View {
         do {
             try context.save()
         } catch {
-            print("❌ [RecordingsView] Failed to save after permanent recording deletion: \(error)")
+            print(" [RecordingsView] Failed to save after permanent recording deletion: \(error)")
         }
     }
 }

@@ -19,22 +19,22 @@ struct AppTheme {
 
     // MARK: - Colors
     struct Colors {
-        // ── Primary Action (Blue - trust, confidence, primary interactions) ──
+        //  Primary Action (Blue - trust, confidence, primary interactions) 
         static let primaryAction     = Color(red: 0.20, green: 0.40, blue: 0.70)  // Trustworthy blue
         static let primaryActionDeep = Color(red: 0.14, green: 0.30, blue: 0.55)
         static let primaryActionLight = Color(red: 0.45, green: 0.62, blue: 0.85)
         
-        // ── Core brand (legacy compatibility) ───────────────────────────────
+        //  Core brand (legacy compatibility) 
         static let brand      = primaryAction
         static let brandDeep  = primaryActionDeep
         static let brandLight = primaryActionLight
 
-        // ── Ink ──────────────────────────────────────────────
+        //  Ink 
         static let inkBlack = Color(red: 0.11, green: 0.09, blue: 0.09)
         static let inkBlue  = primaryAction
         static let inkRed   = Color(red: 0.72, green: 0.20, blue: 0.16)
 
-        // ── Paper ────────────────────────────────────────────
+        //  Paper 
         static let paperCream    = Color(red: 0.975, green: 0.960, blue: 0.920)
         static let paperAged     = Color(red: 0.950, green: 0.930, blue: 0.885)
         static let paperDeep     = Color(red: 0.920, green: 0.900, blue: 0.855)
@@ -42,28 +42,28 @@ struct AppTheme {
         static let marginRed     = Color(red: 0.80, green: 0.28, blue: 0.24).opacity(0.32)
         static let coffeeStain   = Color(red: 0.68, green: 0.54, blue: 0.34).opacity(0.07)
 
-        // ── Surfaces ─────────────────────────────────────────
+        //  Surfaces 
         static let surface         = paperCream
         static let surfaceElevated = Color(red: 0.99, green: 0.975, blue: 0.940)
         static let surfaceTertiary = Color(red: 0.75, green: 0.71, blue: 0.64)
         static let divider         = Color(red: 0.82, green: 0.78, blue: 0.70).opacity(0.50)
 
-        // ── Text ─────────────────────────────────────────────
+        //  Text 
         static let textPrimary   = inkBlack
         static let textSecondary = Color(red: 0.36, green: 0.33, blue: 0.30)
         static let textTertiary  = Color(red: 0.55, green: 0.52, blue: 0.47)
 
-        // ── Semantic (evidence-based color roles) ────────────
+        //  Semantic (evidence-based color roles) 
         static let success = Color(red: 0.18, green: 0.55, blue: 0.34)      // Green - completion, synced, ready
         static let warning = Color(red: 0.82, green: 0.58, blue: 0.12)      // Amber - attention needed
         static let error   = inkRed                                          // Red - destructive, errors only
         static let info    = primaryAction                                   // Blue - informational
         
-        // ── The Hits (gold/star - perfected jokes) ───────────
+        //  The Hits (gold/star - perfected jokes) 
         static let hitsGold      = Color(red: 0.90, green: 0.72, blue: 0.20)
         static let hitsGoldLight = Color(red: 0.95, green: 0.85, blue: 0.50)
 
-        // ── Unified Section Accent (use primary blue consistently) ──
+        //  Unified Section Accent (use primary blue consistently) 
         // All sections now use primaryAction for consistency
         // Legacy names maintained for compatibility but map to unified colors
         static let notepadAccent    = primaryAction
@@ -76,7 +76,7 @@ struct AppTheme {
         static let aiAccent         = primaryAction
         static let roastAccent      = Color(red: 0.92, green: 0.28, blue: 0.12)
 
-        // ── Roast mode surfaces ──────────────────────────────
+        //  Roast mode surfaces 
         static let roastBackground = Color(red: 0.09, green: 0.07, blue: 0.07)
         static let roastSurface    = Color(red: 0.13, green: 0.10, blue: 0.09)
         static let roastCard       = Color(red: 0.17, green: 0.13, blue: 0.11)
@@ -91,7 +91,7 @@ struct AppTheme {
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
 
-        // ── Gradients ────────────────────────────────────────
+        //  Gradients 
         static let brandGradient = LinearGradient(colors: [brand, brandDeep], startPoint: .topLeading, endPoint: .bottomTrailing)
         static let surfaceGradient = LinearGradient(colors: [paperCream, paperAged], startPoint: .top, endPoint: .bottom)
         static let heroGradient    = LinearGradient(colors: [paperCream, surface], startPoint: .top, endPoint: .bottom)

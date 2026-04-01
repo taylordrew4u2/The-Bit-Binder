@@ -20,6 +20,10 @@ struct NotebookTrashView: View {
     ) private var trashedPhotos: [NotebookPhotoRecord]
 
     @State private var showingEmptyTrashAlert = false
+    @State private var photoToDelete: NotebookPhotoRecord?
+    @State private var showingDeleteOneAlert = false
+    @State private var persistenceError: String?
+    @State private var showingErrorAlert = false
 
     var body: some View {
         Group {
@@ -40,23 +44,14 @@ struct NotebookTrashView: View {
                             }
                             .contextMenu {
                                 Button {
-                                    photo.restoreFromTrash()
-                                    do {
-                                        try modelContext.save()
-                                    } catch {
-                                        print("❌ [NotebookTrashView] Failed to restore photo: \(error)")
-                                    }
+                                    restorePhoto(photo)
                                 } label: {
                                     Label("Restore", systemImage: "arrow.uturn.backward")
                                 }
 
                                 Button(role: .destructive) {
-                                    modelContext.delete(photo)
-                                    do {
-                                        try modelContext.save()
-                                    } catch {
-                                        print("❌ [NotebookTrashView] Failed to permanently delete photo: \(error)")
-                                    }
+                                    photoToDelete = photo
+                                    showingDeleteOneAlert = true
                                 } label: {
                                     Label("Delete Forever", systemImage: "trash.fill")
                                 }
@@ -67,7 +62,7 @@ struct NotebookTrashView: View {
                 }
             }
         }
-        .navigationTitle("Photo Trash")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             if !trashedPhotos.isEmpty {
@@ -80,20 +75,66 @@ struct NotebookTrashView: View {
                 }
             }
         }
-        .alert("Empty Photo Trash?", isPresented: $showingEmptyTrashAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Empty", role: .destructive) {
-                for photo in trashedPhotos {
-                    modelContext.delete(photo)
-                }
-                do {
-                    try modelContext.save()
-                } catch {
-                    print("❌ [NotebookTrashView] Failed to save after empty trash: \(error)")
+        .alert("Delete Forever?", isPresented: $showingDeleteOneAlert) {
+            Button("Cancel", role: .cancel) { photoToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let photo = photoToDelete {
+                    permanentlyDelete(photo)
+                    photoToDelete = nil
                 }
             }
         } message: {
+            Text("This photo will be permanently deleted. This cannot be undone.")
+        }
+        .alert("Empty Photo Trash?", isPresented: $showingEmptyTrashAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Empty", role: .destructive) {
+                emptyTrash()
+            }
+        } message: {
             Text("This permanently deletes all \(trashedPhotos.count) photo\(trashedPhotos.count == 1 ? "" : "s") and their image data. This cannot be undone.")
+        }
+        .alert("Error", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(persistenceError ?? "An unknown error occurred")
+        }
+    }
+
+    // MARK: - Actions
+
+    private func restorePhoto(_ photo: NotebookPhotoRecord) {
+        photo.restoreFromTrash()
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [NotebookTrashView] Failed to restore: \(error)")
+            persistenceError = "Could not restore photo: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
+
+    private func permanentlyDelete(_ photo: NotebookPhotoRecord) {
+        modelContext.delete(photo)
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [NotebookTrashView] Failed to delete: \(error)")
+            persistenceError = "Could not delete photo: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
+
+    private func emptyTrash() {
+        for photo in trashedPhotos {
+            modelContext.delete(photo)
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [NotebookTrashView] Failed to empty trash: \(error)")
+            persistenceError = "Could not empty trash: \(error.localizedDescription)"
+            showingErrorAlert = true
         }
     }
 }

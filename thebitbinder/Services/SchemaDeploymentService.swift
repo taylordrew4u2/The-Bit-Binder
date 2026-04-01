@@ -44,7 +44,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     
     /// Verifies that all required record types exist in CloudKit
     func verifySchemaDeployment() async {
-        print("📋 [Schema] Verifying CloudKit schema deployment (v\(schemaVersion))...")
+        print(" [Schema] Verifying CloudKit schema deployment (v\(schemaVersion))...")
         
         let database = container.privateCloudDatabase
         // CoreData+CloudKit stores records in this zone, NOT the default zone
@@ -65,35 +65,35 @@ final class SchemaDeploymentService: @unchecked Sendable {
                     resultsLimit: 1
                 )
                 _ = results // Silence unused warning
-                print("  ✅ \(recordType) - OK")
+                print("   \(recordType) - OK")
             } catch let error as CKError {
                 handleCloudKitError(error, for: recordType)
             } catch {
-                print("  ❌ \(recordType) - Error: \(error.localizedDescription)")
+                print("   \(recordType) - Error: \(error.localizedDescription)")
             }
         }
         
-        print("📋 [Schema] Verification complete")
+        print(" [Schema] Verification complete")
     }
     
     /// Handles CloudKit errors during schema verification
     private func handleCloudKitError(_ error: CKError, for recordType: String) {
         switch error.code {
         case .unknownItem:
-            print("  ⚠️ \(recordType) - Not deployed yet (will auto-create on first save)")
+            print("   \(recordType) - Not deployed yet (will auto-create on first save)")
         case .invalidArguments:
             // This can happen if the record type doesn't exist yet
-            print("  ⚠️ \(recordType) - Schema not yet created (will auto-create on first save)")
+            print("   \(recordType) - Schema not yet created (will auto-create on first save)")
         case .networkFailure, .networkUnavailable:
-            print("  ⚠️ \(recordType) - Network unavailable, skipping verification")
+            print("   \(recordType) - Network unavailable, skipping verification")
         case .serverRejectedRequest:
-            print("  ⚠️ \(recordType) - Server rejected request (may need schema update)")
+            print("   \(recordType) - Server rejected request (may need schema update)")
         case .zoneBusy:
-            print("  ⚠️ \(recordType) - Zone busy, try again later")
+            print("   \(recordType) - Zone busy, try again later")
         case .quotaExceeded:
-            print("  ❌ \(recordType) - Quota exceeded")
+            print("   \(recordType) - Quota exceeded")
         default:
-            print("  ❌ \(recordType) - Error (\(error.code.rawValue)): \(error.localizedDescription)")
+            print("   \(recordType) - Error (\(error.code.rawValue)): \(error.localizedDescription)")
         }
     }
     
@@ -101,10 +101,10 @@ final class SchemaDeploymentService: @unchecked Sendable {
     func logSchemaFields() {
         print("""
         
-        ═══════════════════════════════════════════════════════════════
+        
         BitBinder CloudKit Schema v\(schemaVersion)
         Q = QUERYABLE, S = SORTABLE
-        ═══════════════════════════════════════════════════════════════
+        
         
         CD_Joke:
           - CD_id [Q], CD_content, CD_title [Q]
@@ -210,7 +210,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
           - CD_isUser, CD_timestamp [Q,S]
           - CD_conversationId [Q]
         
-        ═══════════════════════════════════════════════════════════════
+        
         
         """)
     }
@@ -220,7 +220,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     /// Creates a test record to ensure schema is deployed
     @MainActor
     func ensureSchemaDeployed(context: ModelContext) async {
-        print("📋 [Schema] Ensuring schema is deployed to CloudKit...")
+        print(" [Schema] Ensuring schema is deployed to CloudKit...")
         
         // The schema will be auto-deployed when SwiftData syncs
         // We just need to ensure all model types are registered
@@ -274,9 +274,9 @@ final class SchemaDeploymentService: @unchecked Sendable {
             chatDescriptor.fetchLimit = 1
             let _: [ChatMessage] = try context.fetch(chatDescriptor)
             
-            print("📋 [Schema] Schema sync triggered for all \(recordTypes.count) record types")
+            print(" [Schema] Schema sync triggered for all \(recordTypes.count) record types")
         } catch {
-            print("⚠️ [Schema] Error during schema sync: \(error.localizedDescription)")
+            print(" [Schema] Error during schema sync: \(error.localizedDescription)")
         }
     }
     
@@ -340,8 +340,8 @@ final class SchemaDeploymentService: @unchecked Sendable {
     func verifySchemaIntegrity() -> Bool {
         let schemaHash = signatureService.generateSchemaHash(recordTypes: recordTypes)
         
-        print("📋 [Schema] Generated schema hash: \(schemaHash.prefix(16))...")
-        print("📋 [Schema] Key info: \(signatureService.getKeyInfo().description)")
+        print(" [Schema] Generated schema hash: \(schemaHash.prefix(16))...")
+        print(" [Schema] Key info: \(signatureService.getKeyInfo().description)")
         
         // Store key in keychain for additional security
         _ = signatureService.storeKeyInKeychain()
@@ -356,7 +356,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     
     /// Performs full schema verification including signature check
     func performFullVerification() async -> SchemaVerificationReport {
-        print("📋 [Schema] Starting full schema verification...")
+        print(" [Schema] Starting full schema verification...")
         
         var report = SchemaVerificationReport()
         report.schemaVersion = schemaVersion
@@ -367,14 +367,14 @@ final class SchemaDeploymentService: @unchecked Sendable {
         report.signatureServiceReady = keyInfo.isLoaded
         
         if keyInfo.isLoaded {
-            print("  ✅ Signature service ready")
+            print("   Signature service ready")
         } else {
-            print("  ❌ Signature service not ready")
+            print("   Signature service not ready")
         }
         
         // 2. Generate and store schema hash
         report.schemaHash = signatureService.generateSchemaHash(recordTypes: recordTypes)
-        print("  ✅ Schema hash generated")
+        print("   Schema hash generated")
         
         // 3. Verify CloudKit deployment
         await verifySchemaDeployment()
@@ -383,7 +383,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
         // 4. Store key in keychain
         report.keychainStored = signatureService.storeKeyInKeychain()
         
-        print("📋 [Schema] Full verification complete")
+        print(" [Schema] Full verification complete")
         return report
     }
 }
@@ -404,20 +404,20 @@ struct SchemaVerificationReport: Sendable {
     
     var summary: String {
         """
-        ═══════════════════════════════════════════════════════════════
+        
         Schema Verification Report
-        ═══════════════════════════════════════════════════════════════
+        
         Version: \(schemaVersion)
         Timestamp: \(timestamp)
         
         Status:
-          • Signature Service: \(signatureServiceReady ? "✅ Ready" : "❌ Not Ready")
+          • Signature Service: \(signatureServiceReady ? " Ready" : " Not Ready")
           • Schema Hash: \(schemaHash.prefix(32))...
-          • CloudKit Verified: \(cloudKitVerified ? "✅ Yes" : "❌ No")
-          • Keychain Stored: \(keychainStored ? "✅ Yes" : "⚠️ No")
+          • CloudKit Verified: \(cloudKitVerified ? " Yes" : " No")
+          • Keychain Stored: \(keychainStored ? " Yes" : " No")
         
-        Overall: \(isFullyVerified ? "✅ VERIFIED" : "⚠️ INCOMPLETE")
-        ═══════════════════════════════════════════════════════════════
+        Overall: \(isFullyVerified ? " VERIFIED" : " INCOMPLETE")
+        
         """
     }
 }

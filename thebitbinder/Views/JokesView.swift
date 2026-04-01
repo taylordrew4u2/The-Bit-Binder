@@ -16,9 +16,9 @@ struct ImportErrorMessage: LocalizedError {
 
 struct JokesView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var jokes: [Joke]
-    @Query private var folders: [JokeFolder]
-    @Query(sort: \RoastTarget.dateModified, order: .reverse) private var roastTargets: [RoastTarget]
+    @Query(filter: #Predicate<Joke> { !$0.isDeleted }, sort: \Joke.dateModified, order: .reverse) private var jokes: [Joke]
+    @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }) private var folders: [JokeFolder]
+    @Query(filter: #Predicate<RoastTarget> { !$0.isDeleted }, sort: \RoastTarget.dateModified, order: .reverse) private var roastTargets: [RoastTarget]
     @Query(sort: \BrainstormIdea.dateCreated, order: .reverse) private var brainstormIdeas: [BrainstormIdea]
     
     // Roast mode — toggled from Settings
@@ -31,18 +31,48 @@ struct JokesView: View {
     
     @AppStorage("jokesViewMode") private var viewMode: JokesViewMode = .grid
     @AppStorage("roastViewMode") private var roastViewMode: JokesViewMode = .list
-    @AppStorage("expandAllJokes") private var expandAllJokes = false
+    @AppStorage("showFullContent") private var showFullContent = true
     @AppStorage("jokesGridScale") private var jokesGridScale: Double = 1.0
     @AppStorage("roastGridScale") private var roastGridScale: Double = 1.0
+    @GestureState private var jokesPinchMagnification: CGFloat = 1.0
+    @GestureState private var roastPinchMagnification: CGFloat = 1.0
+
+    // Pinch-to-zoom
+    private var effectiveJokesScale: CGFloat {
+        min(max(CGFloat(jokesGridScale) * jokesPinchMagnification, 0.5), 2.0)
+    }
+    private var effectiveRoastScale: CGFloat {
+        min(max(CGFloat(roastGridScale) * roastPinchMagnification, 0.5), 2.0)
+    }
+    private var jokesPinchGesture: some Gesture {
+        MagnifyGesture()
+            .updating($jokesPinchMagnification) { value, state, _ in
+                state = value.magnification
+            }
+            .onEnded { value in
+                let newScale = CGFloat(jokesGridScale) * value.magnification
+                jokesGridScale = Double(min(max(newScale, 0.5), 2.0))
+            }
+    }
+    private var roastPinchGesture: some Gesture {
+        MagnifyGesture()
+            .updating($roastPinchMagnification) { value, state, _ in
+                state = value.magnification
+            }
+            .onEnded { value in
+                let newScale = CGFloat(roastGridScale) * value.magnification
+                roastGridScale = Double(min(max(newScale, 0.5), 2.0))
+            }
+    }
 
     // Grid columns derived from scale
     private var jokesColumns: [GridItem] {
-        let count = max(2, Int(4 / jokesGridScale))
-        return Array(repeating: GridItem(.flexible(), spacing: 10), count: count)
+        let count = max(2, Int(4 / effectiveJokesScale))
+        return Array(repeating: GridItem(.flexible(), spacing: 0), count: count)
     }
     private var roastColumns: [GridItem] {
-        let count = max(2, Int(4 / roastGridScale))
-        return Array(repeating: GridItem(.flexible(), spacing: 10), count: count)
+        let count = max(2, Int(4 / effectiveRoastScale))
+        return Array(repeating: GridItem(.flexible(), spacing: 0), count: count)
     }
     
     @State private var showingAddJoke = false
@@ -82,13 +112,16 @@ struct JokesView: View {
     
     // Smart import review
     @State private var smartImportResult: ImportPipelineResult?
-    @State private var showingSmartImportReview = false
     @State private var importError: Error? = nil
     @State private var showingImportError = false
     
     // Batch select/delete mode
     @State private var isSelectMode = false
     @State private var selectedJokeIDs: Set<UUID> = []
+    
+    // Persistence error surfacing
+    @State private var persistenceError: String?
+    @State private var showingPersistenceError = false
     
     // Performance: Debounced search and cached filtered results
     @State private var debouncedSearchText = ""
@@ -98,7 +131,7 @@ struct JokesView: View {
     // MARK: - The Hits Button
     // This computed property returns the count for the chips
     private var hitsCount: Int {
-        jokes.filter { $0.isHit && !$0.isDeleted }.count
+        jokes.filter { $0.isHit }.count
     }
     // State for showing The Hits filter
     @State private var showingHitsFilter = false
@@ -207,50 +240,26 @@ struct JokesView: View {
             )
         } else {
             if roastViewMode == .grid {
-                VStack(spacing: 0) {
-                    // Zoom slider
-                    HStack(spacing: 16) {
-                        Image(systemName: "minus.magnifyingglass")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppTheme.Colors.roastAccent.opacity(0.7))
-                        Slider(value: $roastGridScale, in: 0.5...2.0, step: 0.1)
-                            .tint(AppTheme.Colors.roastAccent)
-                        Image(systemName: "plus.magnifyingglass")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(AppTheme.Colors.roastAccent.opacity(0.7))
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(AppTheme.Colors.surfaceElevated)
-                            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-
-                    ScrollView {
-                        LazyVGrid(columns: roastColumns, spacing: 10) {
-                            ForEach(roastTargets) { target in
-                                NavigationLink(destination: RoastTargetDetailView(target: target)) {
-                                    RoastTargetGridCard(target: target, scale: CGFloat(roastGridScale))
-                                }
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        roastTargetToDelete = target
-                                        showingDeleteRoastAlert = true
-                                    } label: {
-                                        Label("Delete Target", systemImage: "trash")
-                                    }
+                ScrollView {
+                    LazyVGrid(columns: roastColumns, spacing: 0) {
+                        ForEach(roastTargets) { target in
+                            NavigationLink(destination: RoastTargetDetailView(target: target)) {
+                                RoastTargetGridCard(target: target, scale: effectiveRoastScale)
+                            }
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    roastTargetToDelete = target
+                                    showingDeleteRoastAlert = true
+                                } label: {
+                                    Label("Delete Target", systemImage: "trash")
                                 }
                             }
                         }
-                        .padding(12)
-                        .animation(.easeOut(duration: 0.2), value: roastGridScale)
                     }
-                    .scrollContentBackground(.hidden)
+                    .animation(.easeOut(duration: 0.2), value: effectiveRoastScale)
                 }
+                .scrollContentBackground(.hidden)
+                .simultaneousGesture(roastPinchGesture)
             } else {
                 List {
                     // Roast target list
@@ -290,16 +299,15 @@ struct JokesView: View {
     private func rebuildFilteredJokes() {
         let base: [Joke]
         if showingHitsFilter {
-            base = jokes.filter { $0.isHit && !$0.isDeleted }
+            base = jokes.filter { $0.isHit }
         } else if showRecentlyAdded {
             let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-            base = jokes.filter { !$0.isDeleted && $0.dateCreated >= sevenDaysAgo }
+            base = jokes.filter { $0.dateCreated >= sevenDaysAgo }
         } else if let folder = selectedFolder {
             let folderId = folder.id
-            // Filter jokes that contain this folder in their folders array
-            base = jokes.filter { !$0.isDeleted && $0.folders.contains(where: { $0.id == folderId }) }
+            base = jokes.filter { ($0.folders ?? []).contains(where: { $0.id == folderId }) }
         } else {
-            base = jokes.filter { !$0.isDeleted }
+            base = jokes
         }
 
         let trimmed = debouncedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -321,7 +329,7 @@ struct JokesView: View {
                     (roastMode ? AppTheme.Colors.roastBackground : Color.clear)
                         .ignoresSafeArea()
                 )
-                .navigationTitle(roastMode ? "🔥 Roasts" : "Jokes")
+                .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
                 .searchable(text: $searchText, prompt: roastMode ? "Search targets" : "Search jokes")
                 .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -357,17 +365,14 @@ struct JokesView: View {
                 .sheet(isPresented: $showingImportHistory) {
                     ImportBatchHistoryView()
                 }
-                .fullScreenCover(isPresented: $showingSmartImportReview) {
-                    if let result = smartImportResult {
-                        SmartImportReviewView(
-                            importResult: result,
-                            selectedFolder: selectedFolder,
-                            onComplete: {
-                                showingSmartImportReview = false
-                                smartImportResult = nil
-                            }
-                        )
-                    }
+                .fullScreenCover(item: $smartImportResult) { result in
+                    SmartImportReviewView(
+                        importResult: result,
+                        selectedFolder: selectedFolder,
+                        onComplete: {
+                            smartImportResult = nil
+                        }
+                    )
                 }
                 .alert("Import Couldn't Complete", isPresented: $showingImportError) {
                     Button("OK", role: .cancel) { }
@@ -395,6 +400,11 @@ struct JokesView: View {
                     removeJokesFromFolderAndDelete: removeJokesFromFolderAndDelete,
                     modelContext: modelContext
                 ))
+                .alert("Error", isPresented: $showingPersistenceError) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(persistenceError ?? "An unknown error occurred")
+                }
                 .overlay { importOverlay }
                 // Rebuild filtered list whenever filter inputs change
                 .task(id: filterKey) {
@@ -432,39 +442,15 @@ struct JokesView: View {
                     emptyState
                 } else {
                     if viewMode == .grid {
-                        VStack(spacing: 0) {
-                            // Zoom slider
-                            HStack(spacing: 16) {
-                                Image(systemName: "minus.magnifyingglass")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(AppTheme.Colors.jokesAccent.opacity(0.7))
-                                Slider(value: $jokesGridScale, in: 0.5...2.0, step: 0.1)
-                                    .tint(AppTheme.Colors.jokesAccent)
-                                Image(systemName: "plus.magnifyingglass")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(AppTheme.Colors.jokesAccent.opacity(0.7))
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(AppTheme.Colors.surfaceElevated)
-                                    .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-                            )
-                            .padding(.horizontal, 16)
-                            .padding(.top, 8)
-                            .padding(.bottom, 4)
-
-                            ScrollView {
-                                LazyVGrid(columns: jokesColumns, spacing: 10) {
+                        ScrollView {
+                                LazyVGrid(columns: jokesColumns, spacing: 0) {
                                     ForEach(filteredJokes) { joke in
                                         if isSelectMode {
                                             jokeGridSelectableCard(joke: joke)
                                         } else {
                                             NavigationLink(destination: JokeDetailView(joke: joke)) {
-                                                JokeCardView(joke: joke, scale: CGFloat(jokesGridScale), roastMode: roastMode)
+                                                JokeCardView(joke: joke, scale: effectiveJokesScale, roastMode: roastMode, showFullContent: showFullContent)
                                             }
-                                            .aspectRatio(1, contentMode: .fit)
                                             .contextMenu {
                                                 if joke.isHit {
                                                     Button {
@@ -486,6 +472,13 @@ struct JokesView: View {
                                                 
                                                 Button(role: .destructive) {
                                                     joke.moveToTrash()
+                                                    do {
+                                                        try modelContext.save()
+                                                    } catch {
+                                                        print(" [JokesView] Failed to save after trash: \(error)")
+                                                        persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
+                                                        showingPersistenceError = true
+                                                    }
                                                 } label: {
                                                     Label("Move to Trash", systemImage: "trash")
                                                 }
@@ -493,11 +486,10 @@ struct JokesView: View {
                                         }
                                     }
                                 }
-                                .padding(12)
-                                .animation(.easeOut(duration: 0.2), value: jokesGridScale)
-                            }
-                            .scrollContentBackground(.hidden)
+                                .animation(.easeOut(duration: 0.2), value: effectiveJokesScale)
                         }
+                        .scrollContentBackground(.hidden)
+                        .simultaneousGesture(jokesPinchGesture)
                     } else {
                         List {
                             ForEach(filteredJokes) { joke in
@@ -505,7 +497,7 @@ struct JokesView: View {
                                     jokeListSelectableRow(joke: joke)
                                 } else {
                                     NavigationLink(destination: JokeDetailView(joke: joke)) {
-                                        JokeRowView(joke: joke, roastMode: roastMode)
+                                        JokeRowView(joke: joke, roastMode: roastMode, showFullContent: showFullContent)
                                             .id(joke.id)
                                     }
                                     .listRowSeparator(.hidden)
@@ -514,6 +506,13 @@ struct JokesView: View {
                                         Button(role: .destructive) {
                                             HapticEngine.shared.delete()
                                             joke.moveToTrash()
+                                            do {
+                                                try modelContext.save()
+                                            } catch {
+                                                print(" [JokesView] Failed to save after swipe trash: \(error)")
+                                                persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
+                                                showingPersistenceError = true
+                                            }
                                         } label: {
                                             Label("Trash", systemImage: "trash")
                                         }
@@ -522,6 +521,11 @@ struct JokesView: View {
                                             HapticEngine.shared.starToggle(!joke.isHit)
                                             joke.isHit.toggle()
                                             joke.dateModified = Date()
+                                            do {
+                                                try modelContext.save()
+                                            } catch {
+                                                print(" [JokesView] Failed to save hit toggle: \(error)")
+                                            }
                                         } label: {
                                             Label(joke.isHit ? "Remove Hit" : "Add Hit", systemImage: joke.isHit ? "star.slash" : "star.fill")
                                         }
@@ -564,7 +568,7 @@ struct JokesView: View {
             toggleSelection(joke)
         } label: {
             ZStack(alignment: .topTrailing) {
-                JokeCardView(joke: joke, scale: CGFloat(jokesGridScale))
+                JokeCardView(joke: joke, scale: effectiveJokesScale, showFullContent: showFullContent)
                     .opacity(isSelected ? 0.7 : 1.0)
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -588,7 +592,7 @@ struct JokesView: View {
                     .font(.system(size: 22))
                     .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
                 
-                JokeRowView(joke: joke)
+                JokeRowView(joke: joke, showFullContent: showFullContent)
             }
         }
         .listRowSeparator(.hidden)
@@ -649,7 +653,7 @@ struct JokesView: View {
         let jokesToTrash = jokes.filter { selectedJokeIDs.contains($0.id) }
         
         guard !jokesToTrash.isEmpty else {
-            print("⚠️ [JokesView] No jokes matched selectedJokeIDs for batch trash")
+            print(" [JokesView] No jokes matched selectedJokeIDs for batch trash")
             selectedJokeIDs.removeAll()
             isSelectMode = false
             return
@@ -665,9 +669,11 @@ struct JokesView: View {
         
         do {
             try modelContext.save()
-            print("✅ [JokesView] Batch trashed \(count) joke(s)")
+            print(" [JokesView] Batch trashed \(count) joke(s)")
         } catch {
-            print("❌ [JokesView] Failed to save after batch trash: \(error)")
+            print(" [JokesView] Failed to save after batch trash: \(error)")
+            persistenceError = "Could not move \(count) joke(s) to trash: \(error.localizedDescription)"
+            showingPersistenceError = true
         }
         
         NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
@@ -676,13 +682,18 @@ struct JokesView: View {
     @ToolbarContentBuilder
     private var combinedToolbarContent: some ToolbarContent {
         if roastMode {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        roastViewMode = roastViewMode == .grid ? .list : .grid
+            ToolbarItem(placement: .principal) {
+                Menu {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            roastViewMode = roastViewMode == .grid ? .list : .grid
+                        }
+                    } label: {
+                        Label(roastViewMode == .grid ? "List View" : "Grid View",
+                              systemImage: roastViewMode.icon)
                     }
                 } label: {
-                    Image(systemName: roastViewMode.icon)
+                    Image(systemName: "ellipsis.circle")
                         .foregroundColor(AppTheme.Colors.roastAccent)
                 }
             }
@@ -694,12 +705,23 @@ struct JokesView: View {
                 }
             }
         } else {
-            // Split the leading HStack into two separate ToolbarItems.
-            // A single ToolbarItem wrapping an HStack causes UIKit's
-            // _UIButtonBarButton wrapper to collapse to width==0 during
-            // the first layout pass, producing an unsatisfiable constraint warning.
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .principal) {
                 Menu {
+                    Section(header: Text("View")) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                viewMode = viewMode == .grid ? .list : .grid
+                            }
+                        } label: {
+                            Label(viewMode == .grid ? "List View" : "Grid View",
+                                  systemImage: viewMode.icon)
+                        }
+                        Button(action: { showFullContent.toggle() }) {
+                            Label(showFullContent ? "Show Titles Only" : "Show Full Content",
+                                  systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
+                        }
+                    }
+                    Divider()
                     Section(header: Text("Organization")) {
                         Button(action: { showingCreateFolder = true }) {
                             Label("New Folder", systemImage: "folder.badge.plus")
@@ -709,10 +731,6 @@ struct JokesView: View {
                         }
                         Button(action: { showingImportHistory = true }) {
                             Label("Import History", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                        }
-                        Button(action: { expandAllJokes.toggle() }) {
-                            Label(expandAllJokes ? "Collapse All Jokes" : "Expand All Jokes",
-                                  systemImage: expandAllJokes ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
                         }
                     }
                     Divider()
@@ -740,17 +758,6 @@ struct JokesView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .accessibilityLabel("More Actions")
-                }
-            }
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewMode = viewMode == .grid ? .list : .grid
-                    }
-                } label: {
-                    Image(systemName: viewMode.icon)
-                        .foregroundColor(AppTheme.Colors.jokesAccent)
-                        .accessibilityLabel(viewMode == .grid ? "Switch to List View" : "Switch to Grid View")
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -810,50 +817,58 @@ struct JokesView: View {
         do {
             try modelContext.save()
         } catch {
-            print("❌ [JokesView] Failed to save after delete: \(error)")
+            print(" [JokesView] Failed to save after delete: \(error)")
+            persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
+            showingPersistenceError = true
         }
         NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
     }
     
     private func moveJokes(from sourceFolder: JokeFolder, to destinationFolder: JokeFolder?) {
-        let jokesInFolder = jokes.filter { $0.folders.contains(where: { $0.id == sourceFolder.id }) }
+        let jokesInFolder = jokes.filter { ($0.folders ?? []).contains(where: { $0.id == sourceFolder.id }) }
         for joke in jokesInFolder {
             // Remove from source folder
-            joke.folders.removeAll(where: { $0.id == sourceFolder.id })
+            var current = joke.folders ?? []
+            current.removeAll(where: { $0.id == sourceFolder.id })
             // Add to destination folder if specified
             if let dest = destinationFolder {
-                if !joke.folders.contains(where: { $0.id == dest.id }) {
-                    joke.folders.append(dest)
+                if !current.contains(where: { $0.id == dest.id }) {
+                    current.append(dest)
                 }
             }
+            joke.folders = current
         }
         do {
             try modelContext.save()
         } catch {
-            print("❌ Failed to move jokes: \(error)")
+            print(" Failed to move jokes: \(error)")
         }
     }
     
     private func removeJokesFromFolderAndDelete(_ folder: JokeFolder) {
-        let jokesInFolder = jokes.filter { $0.folders.contains(where: { $0.id == folder.id }) }
+        let jokesInFolder = jokes.filter { ($0.folders ?? []).contains(where: { $0.id == folder.id }) }
         for joke in jokesInFolder {
-            joke.folders.removeAll(where: { $0.id == folder.id })
+            var current = joke.folders ?? []
+            current.removeAll(where: { $0.id == folder.id })
+            joke.folders = current
         }
         deleteFolder(folder)
     }
     
     private func deleteFolder(_ folder: JokeFolder) {
-        // Remove jokes from this folder before deleting
-        let jokesInFolder = jokes.filter { $0.folders.contains(where: { $0.id == folder.id }) }
+        // Remove jokes from this folder before trashing
+        let jokesInFolder = jokes.filter { ($0.folders ?? []).contains(where: { $0.id == folder.id }) }
         for joke in jokesInFolder {
-            joke.folders.removeAll(where: { $0.id == folder.id })
+            var current = joke.folders ?? []
+            current.removeAll(where: { $0.id == folder.id })
+            joke.folders = current
         }
         
-        modelContext.delete(folder)
+        folder.moveToTrash()
         do {
             try modelContext.save()
         } catch {
-            print("❌ Failed to delete folder: \(error)")
+            print(" Failed to delete folder: \(error)")
         }
     }
     
@@ -905,12 +920,12 @@ struct JokesView: View {
                         importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in scan \(importFileIndex)!"
                     }
                 } catch {
-                    print("❌ SCANNER: Pipeline failed for image \(idx + 1): \(error)")
+                    print(" SCANNER: Pipeline failed for image \(idx + 1): \(error)")
                     failedMessages.append("Image \(idx + 1): \(error.localizedDescription)")
                 }
             }
 
-            let providerSummary = providersUsed.count == 1 ? providersUsed.first! : (providersUsed.isEmpty ? "Unknown" : "Multiple")
+            let providerSummary = providersUsed.count == 1 ? (providersUsed.first ?? "Unknown") : (providersUsed.isEmpty ? "Unknown" : "Multiple")
             let combinedResult = ImportPipelineResult(
                 sourceFile: "Scanned Image",
                 autoSavedJokes: combinedAutoSaved,
@@ -941,7 +956,6 @@ struct JokesView: View {
                 let total = combinedAutoSaved.count + combinedReview.count
                 if total > 0 {
                     self.smartImportResult = combinedResult
-                    self.showingSmartImportReview = true
                     // Surface partial-failure info even when some files succeeded
                     if !failedMessages.isEmpty {
                         self.importError = ImportErrorMessage(message: "Some scans failed:\n" + failedMessages.joined(separator: "\n"))
@@ -1004,12 +1018,12 @@ struct JokesView: View {
                     importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in photo \(importFileIndex)!"
                 }
             } catch {
-                print("❌ PHOTOS: Pipeline failed for photo \(idx + 1): \(error)")
+                print(" PHOTOS: Pipeline failed for photo \(idx + 1): \(error)")
                 failedMessages.append("Photo \(idx + 1): \(error.localizedDescription)")
             }
         }
 
-        let providerSummary = providersUsed.count == 1 ? providersUsed.first! : (providersUsed.isEmpty ? "Unknown" : "Multiple")
+        let providerSummary = providersUsed.count == 1 ? (providersUsed.first ?? "Unknown") : (providersUsed.isEmpty ? "Unknown" : "Multiple")
         let combinedResult = ImportPipelineResult(
             sourceFile: "Photo Library",
             autoSavedJokes: combinedAutoSaved,
@@ -1041,7 +1055,6 @@ struct JokesView: View {
             let total = combinedAutoSaved.count + combinedReview.count
             if total > 0 {
                 self.smartImportResult = combinedResult
-                self.showingSmartImportReview = true
                 // Surface partial-failure info even when some photos succeeded
                 if !failedMessages.isEmpty {
                     self.importError = ImportErrorMessage(message: "Some photos failed:\n" + failedMessages.joined(separator: "\n"))
@@ -1059,7 +1072,7 @@ struct JokesView: View {
     }
     
     private func processDocuments(_ urls: [URL]) {
-        print("📂📂📂 SMART IMPORT START: \(urls.count) files selected")
+        print(" SMART IMPORT START: \(urls.count) files selected")
         isProcessingImages = true
         importedJokeNames = []
         importStatusMessage = "Analyzing \(urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files")..."
@@ -1094,7 +1107,7 @@ struct JokesView: View {
                         importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in \(url.lastPathComponent)!"
                     }
                 } catch {
-                    print("❌ IMPORT: AI extraction failed for \(url.lastPathComponent): \(error)")
+                    print(" IMPORT: AI extraction failed for \(url.lastPathComponent): \(error)")
                     failedMessages.append("\(url.lastPathComponent): \(error.localizedDescription)")
                     // Do not fall back to local extraction — surface the error below.
                     // Continue looping so other selected files can still be processed.
@@ -1140,7 +1153,6 @@ struct JokesView: View {
                 if totalJokes > 0 {
                     // Show the Smart Import Review for all AI-reviewed fragments
                     self.smartImportResult = combinedResult
-                    self.showingSmartImportReview = true
                     // Surface partial-failure info even when some files succeeded
                     if !failedMessages.isEmpty {
                         self.importError = ImportErrorMessage(message: "Some files failed:\n" + failedMessages.joined(separator: "\n"))
@@ -1217,21 +1229,25 @@ struct JokesView: View {
     
     private func checkPendingVoiceMemoImports() {
         // Use App Group shared defaults for extension communication
-        guard let sharedDefaults = UserDefaults(suiteName: "group.The-BitBinder.thebitbinder") else {
-            print("⚠️ [VoiceMemo] App Group not available")
+        let appGroupIdentifier = "group.The-BitBinder.thebitbinder"
+        guard FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) != nil else {
+            print(" [VoiceMemo] App Group container unavailable")
+            return
+        }
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
+            print(" [VoiceMemo] App Group not available")
             return
         }
         guard let pendingImports = sharedDefaults.array(forKey: "pendingVoiceMemoImports") as? [[String: String]],
               !pendingImports.isEmpty else { return }
         
-        print("📥 [VoiceMemo] Found \(pendingImports.count) pending voice memo imports")
+        print(" [VoiceMemo] Found \(pendingImports.count) pending voice memo imports")
         
         var importedCount = 0
         for importData in pendingImports {
             guard let transcription = importData["transcription"],
                   !transcription.isEmpty else { continue }
             
-            _ = importData["filename"] ?? "Voice Memo"
             let title = AudioTranscriptionService.generateTitle(from: transcription)
             
             // Check for duplicates
@@ -1250,11 +1266,11 @@ struct JokesView: View {
             do {
                 try modelContext.save()
             } catch {
-                print("❌ [JokesView] Failed to save imported voice memos: \(error)")
+                print(" [JokesView] Failed to save imported voice memos: \(error)")
             }
             importSummary = (importedCount, 0)
             showingImportSummary = true
-            print("✅ [VoiceMemo] Imported \(importedCount) voice memos")
+            print(" [VoiceMemo] Imported \(importedCount) voice memos")
         }
     }
     
@@ -1326,10 +1342,10 @@ struct RoastTargetGridCard: View {
     private var nameFontSize: CGFloat { max(9, 13 * scale) }
     private var badgeFontSize: CGFloat { max(7, 10 * scale) }
     private var iconSize: CGFloat { max(6, 8 * scale) }
-    private var verticalPadding: CGFloat { max(12, 18 * scale) }
+    private var verticalPadding: CGFloat { max(6, 10 * scale) }
 
     var body: some View {
-        VStack(spacing: max(8, 12 * scale)) {
+        VStack(spacing: max(4, 6 * scale)) {
             // Avatar — async background decode
             AsyncAvatarView(
                 photoData: target.photoData,
@@ -1358,15 +1374,11 @@ struct RoastTargetGridCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, verticalPadding)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
-        )
+        .padding(.horizontal, 6)
+        .background(Color(.systemBackground))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(accentColor.opacity(0.15), lineWidth: 1)
+            Rectangle()
+                .stroke(accentColor.opacity(0.15), lineWidth: 0.5)
         )
     }
 }

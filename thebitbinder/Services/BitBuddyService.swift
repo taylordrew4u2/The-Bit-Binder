@@ -332,7 +332,7 @@ final class BitBuddyService: NSObject, ObservableObject {
             // Send the actual transcribed text for analysis
             return try await sendMessage("Analyze this idea I just recorded: \(transcript)")
         } catch {
-            print("⚠️ [BitBuddy] Transcription failed: \(error.localizedDescription)")
+            print(" [BitBuddy] Transcription failed: \(error.localizedDescription)")
             // Fall back gracefully — the user still gets a response
             return try await sendMessage("I recorded an audio note but transcription wasn't available. Can you help me brainstorm some ideas?")
         }
@@ -344,12 +344,12 @@ final class BitBuddyService: NSObject, ObservableObject {
     /// - Parameter rawResponse: The raw response string from the LLM
     /// - Returns: The cleaned response text to display in the chat UI
     func handleBitBuddyResponse(_ rawResponse: String) -> String {
-        print("🤖 [BitBuddy] Raw response: \(rawResponse)")
+        print(" [BitBuddy] Raw response: \(rawResponse)")
         
         // Try to parse as JSON
         guard let jsonData = rawResponse.data(using: .utf8),
               let jsonObject = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-            print("⚠️ [BitBuddy] Failed to parse JSON, returning raw response")
+            print(" [BitBuddy] Failed to parse JSON, returning raw response")
             return rawResponse
         }
         
@@ -375,11 +375,11 @@ final class BitBuddyService: NSObject, ObservableObject {
     /// - Parameter action: Dictionary containing action type and parameters
     private func executeBitBuddyAction(_ action: [String: Any]) {
         guard let actionType = action["type"] as? String else {
-            print("❌ [BitBuddy] Invalid action - missing type")
+            print(" [BitBuddy] Invalid action - missing type")
             return
         }
         
-        print("🎬 [BitBuddy] Executing action: \(actionType)")
+        print(" [BitBuddy] Executing action: \(actionType)")
         
         // Build a structured action for downstream consumers
         var params: [String: String] = [:]
@@ -392,236 +392,236 @@ final class BitBuddyService: NSObject, ObservableObject {
         // Dispatch by intent category
         switch actionType {
 
-        // ── Jokes ──────────────────────────────────
+        //  Jokes 
         case "add_joke", "save_joke":
             handleAddJokeAction(action)
         case "save_joke_in_folder":
             handleAddJokeAction(action) // folder param handled inside
         case "edit_joke":
-            print("📝 [BitBuddy] edit_joke routed — UI will present editor")
+            print(" [BitBuddy] edit_joke routed — UI will present editor")
         case "rename_joke":
-            print("📝 [BitBuddy] rename_joke routed")
+            print(" [BitBuddy] rename_joke routed")
         case "delete_joke":
-            print("🗑️ [BitBuddy] delete_joke routed")
+            print(" [BitBuddy] delete_joke routed")
         case "restore_deleted_joke":
-            print("♻️ [BitBuddy] restore_deleted_joke routed")
+            print(" [BitBuddy] restore_deleted_joke routed")
         case "mark_hit":
-            print("⭐ [BitBuddy] mark_hit routed")
+            print(" [BitBuddy] mark_hit routed")
         case "unmark_hit":
-            print("⭐ [BitBuddy] unmark_hit routed")
+            print(" [BitBuddy] unmark_hit routed")
         case "add_tags":
-            print("🏷️ [BitBuddy] add_tags routed")
+            print(" [BitBuddy] add_tags routed")
         case "remove_tags":
-            print("🏷️ [BitBuddy] remove_tags routed")
+            print(" [BitBuddy] remove_tags routed")
         case "move_joke_folder":
-            print("📂 [BitBuddy] move_joke_folder routed")
+            print(" [BitBuddy] move_joke_folder routed")
         case "create_folder":
-            print("📁 [BitBuddy] create_folder routed")
+            print(" [BitBuddy] create_folder routed")
         case "rename_folder":
-            print("📁 [BitBuddy] rename_folder routed")
+            print(" [BitBuddy] rename_folder routed")
         case "delete_folder":
-            print("📁 [BitBuddy] delete_folder routed")
+            print(" [BitBuddy] delete_folder routed")
         case "search_jokes":
-            print("🔍 [BitBuddy] search_jokes routed")
+            print(" [BitBuddy] search_jokes routed")
         case "filter_jokes_recent", "filter_jokes_by_folder", "filter_jokes_by_tag":
-            print("🔍 [BitBuddy] filter routed: \(actionType)")
+            print(" [BitBuddy] filter routed: \(actionType)")
         case "list_hits":
-            print("⭐ [BitBuddy] list_hits routed")
+            print(" [BitBuddy] list_hits routed")
         case "share_joke":
-            print("📤 [BitBuddy] share_joke routed")
+            print(" [BitBuddy] share_joke routed")
         case "duplicate_joke":
-            print("📋 [BitBuddy] duplicate_joke routed")
+            print(" [BitBuddy] duplicate_joke routed")
         case "merge_jokes":
-            print("🔀 [BitBuddy] merge_jokes routed")
+            print(" [BitBuddy] merge_jokes routed")
 
-        // ── Brainstorm ─────────────────────────────
+        //  Brainstorm 
         case "add_brainstorm_note":
-            print("💡 [BitBuddy] add_brainstorm_note routed")
+            print(" [BitBuddy] add_brainstorm_note routed")
         case "voice_capture_idea":
-            print("🎙️ [BitBuddy] voice_capture_idea routed")
+            print(" [BitBuddy] voice_capture_idea routed")
         case "edit_brainstorm_note":
-            print("📝 [BitBuddy] edit_brainstorm_note routed")
+            print(" [BitBuddy] edit_brainstorm_note routed")
         case "delete_brainstorm_note":
-            print("🗑️ [BitBuddy] delete_brainstorm_note routed")
+            print(" [BitBuddy] delete_brainstorm_note routed")
         case "promote_idea_to_joke":
-            print("🎭 [BitBuddy] promote_idea_to_joke routed")
+            print(" [BitBuddy] promote_idea_to_joke routed")
         case "search_brainstorm":
-            print("🔍 [BitBuddy] search_brainstorm routed")
+            print(" [BitBuddy] search_brainstorm routed")
         case "group_brainstorm_topics":
-            print("📊 [BitBuddy] group_brainstorm_topics routed")
+            print(" [BitBuddy] group_brainstorm_topics routed")
 
-        // ── Set Lists ──────────────────────────────
+        //  Set Lists 
         case "create_set_list":
-            print("📋 [BitBuddy] create_set_list routed")
+            print(" [BitBuddy] create_set_list routed")
         case "rename_set_list":
-            print("📝 [BitBuddy] rename_set_list routed")
+            print(" [BitBuddy] rename_set_list routed")
         case "delete_set_list":
-            print("🗑️ [BitBuddy] delete_set_list routed")
+            print(" [BitBuddy] delete_set_list routed")
         case "add_joke_to_set":
-            print("➕ [BitBuddy] add_joke_to_set routed")
+            print(" [BitBuddy] add_joke_to_set routed")
         case "remove_joke_from_set":
-            print("➖ [BitBuddy] remove_joke_from_set routed")
+            print(" [BitBuddy] remove_joke_from_set routed")
         case "reorder_set":
-            print("↕️ [BitBuddy] reorder_set routed")
+            print(" [BitBuddy] reorder_set routed")
         case "estimate_set_time":
-            print("⏱️ [BitBuddy] estimate_set_time routed")
+            print(" [BitBuddy] estimate_set_time routed")
         case "shuffle_set":
-            print("🔀 [BitBuddy] shuffle_set routed")
+            print(" [BitBuddy] shuffle_set routed")
         case "suggest_set_opener":
-            print("🎤 [BitBuddy] suggest_set_opener routed")
+            print(" [BitBuddy] suggest_set_opener routed")
         case "suggest_set_closer":
-            print("🎤 [BitBuddy] suggest_set_closer routed")
+            print(" [BitBuddy] suggest_set_closer routed")
         case "present_set":
-            print("📺 [BitBuddy] present_set routed")
+            print(" [BitBuddy] present_set routed")
         case "find_set_list":
-            print("🔍 [BitBuddy] find_set_list routed")
+            print(" [BitBuddy] find_set_list routed")
 
-        // ── Recordings ─────────────────────────────
+        //  Recordings 
         case "start_recording":
-            print("🔴 [BitBuddy] start_recording routed")
+            print(" [BitBuddy] start_recording routed")
         case "stop_recording":
-            print("⏹️ [BitBuddy] stop_recording routed")
+            print(" [BitBuddy] stop_recording routed")
         case "rename_recording":
-            print("📝 [BitBuddy] rename_recording routed")
+            print(" [BitBuddy] rename_recording routed")
         case "delete_recording":
-            print("🗑️ [BitBuddy] delete_recording routed")
+            print(" [BitBuddy] delete_recording routed")
         case "play_recording":
-            print("▶️ [BitBuddy] play_recording routed")
+            print(" [BitBuddy] play_recording routed")
         case "transcribe_recording":
-            print("📝 [BitBuddy] transcribe_recording routed")
+            print(" [BitBuddy] transcribe_recording routed")
         case "search_transcripts":
-            print("🔍 [BitBuddy] search_transcripts routed")
+            print(" [BitBuddy] search_transcripts routed")
         case "clip_recording":
-            print("✂️ [BitBuddy] clip_recording routed")
+            print(" [BitBuddy] clip_recording routed")
         case "attach_recording_to_set":
-            print("🔗 [BitBuddy] attach_recording_to_set routed")
+            print(" [BitBuddy] attach_recording_to_set routed")
         case "review_set_from_recording":
-            print("📊 [BitBuddy] review_set_from_recording routed")
+            print(" [BitBuddy] review_set_from_recording routed")
 
-        // ── BitBuddy Writing ────────────────────────────
+        //  BitBuddy Writing 
         case "analyze_joke":
-            print("🔬 [BitBuddy] analyze_joke — handled by backend")
+            print(" [BitBuddy] analyze_joke — handled by backend")
         case "improve_joke":
-            print("💪 [BitBuddy] improve_joke — handled by backend")
+            print(" [BitBuddy] improve_joke — handled by backend")
         case "generate_premise":
-            print("💡 [BitBuddy] generate_premise — handled by backend")
+            print(" [BitBuddy] generate_premise — handled by backend")
         case "generate_joke":
-            print("✍️ [BitBuddy] generate_joke — handled by backend")
+            print(" [BitBuddy] generate_joke — handled by backend")
         case "summarize_style":
-            print("🎨 [BitBuddy] summarize_style — handled by backend")
+            print(" [BitBuddy] summarize_style — handled by backend")
         case "suggest_unexplored_topics":
-            print("🗺️ [BitBuddy] suggest_unexplored_topics — handled by backend")
+            print(" [BitBuddy] suggest_unexplored_topics — handled by backend")
         case "find_similar_jokes":
-            print("🔗 [BitBuddy] find_similar_jokes — handled by backend")
+            print(" [BitBuddy] find_similar_jokes — handled by backend")
         case "shorten_joke":
-            print("✂️ [BitBuddy] shorten_joke — handled by backend")
+            print(" [BitBuddy] shorten_joke — handled by backend")
         case "expand_joke":
-            print("📐 [BitBuddy] expand_joke — handled by backend")
+            print(" [BitBuddy] expand_joke — handled by backend")
         case "generate_tags_for_joke":
-            print("🏷️ [BitBuddy] generate_tags_for_joke — handled by backend")
+            print(" [BitBuddy] generate_tags_for_joke — handled by backend")
         case "rewrite_in_my_style":
-            print("🎭 [BitBuddy] rewrite_in_my_style — handled by backend")
+            print(" [BitBuddy] rewrite_in_my_style — handled by backend")
         case "crowdwork_help":
-            print("👥 [BitBuddy] crowdwork_help — handled by backend")
+            print(" [BitBuddy] crowdwork_help — handled by backend")
         case "roast_line_generation":
-            print("🔥 [BitBuddy] roast_line_generation — handled by backend")
+            print(" [BitBuddy] roast_line_generation — handled by backend")
         case "compare_versions":
-            print("⚖️ [BitBuddy] compare_versions — handled by backend")
+            print(" [BitBuddy] compare_versions — handled by backend")
         case "extract_premises_from_notes":
-            print("📝 [BitBuddy] extract_premises_from_notes — handled by backend")
+            print(" [BitBuddy] extract_premises_from_notes — handled by backend")
 
-        // ── Notebook ───────────────────────────────
+        //  Notebook 
         case "open_notebook":
-            print("📓 [BitBuddy] open_notebook routed")
+            print(" [BitBuddy] open_notebook routed")
             // Navigation handled centrally in sendMessage via routeResult
         case "save_notebook_text":
-            print("📓 [BitBuddy] save_notebook_text routed")
+            print(" [BitBuddy] save_notebook_text routed")
         case "attach_photo_to_notebook":
-            print("📸 [BitBuddy] attach_photo_to_notebook routed")
+            print(" [BitBuddy] attach_photo_to_notebook routed")
         case "search_notebook":
-            print("🔍 [BitBuddy] search_notebook routed")
+            print(" [BitBuddy] search_notebook routed")
 
-        // ── Roast Mode ─────────────────────────────
+        //  Roast Mode 
         case "toggle_roast_mode":
             let current = UserDefaults.standard.bool(forKey: "roastModeEnabled")
             UserDefaults.standard.set(!current, forKey: "roastModeEnabled")
-            print("🔥 [BitBuddy] toggle_roast_mode → \(!current)")
+            print(" [BitBuddy] toggle_roast_mode  \(!current)")
         case "create_roast_target":
-            print("🎯 [BitBuddy] create_roast_target routed")
+            print(" [BitBuddy] create_roast_target routed")
         case "add_roast_joke":
-            print("🔥 [BitBuddy] add_roast_joke routed")
+            print(" [BitBuddy] add_roast_joke routed")
         case "search_roasts":
-            print("🔍 [BitBuddy] search_roasts routed")
+            print(" [BitBuddy] search_roasts routed")
         case "create_roast_set":
-            print("📋 [BitBuddy] create_roast_set routed")
+            print(" [BitBuddy] create_roast_set routed")
         case "present_roast_set":
-            print("📺 [BitBuddy] present_roast_set routed")
+            print(" [BitBuddy] present_roast_set routed")
         case "attach_photo_to_target":
-            print("📸 [BitBuddy] attach_photo_to_target routed")
+            print(" [BitBuddy] attach_photo_to_target routed")
 
-        // ── Import ─────────────────────────────────
+        //  Import 
         case "import_file":
-            print("📥 [BitBuddy] import_file routed")
+            print(" [BitBuddy] import_file routed")
         case "import_image":
-            print("📸 [BitBuddy] import_image routed")
+            print(" [BitBuddy] import_image routed")
         case "review_import_queue":
-            print("📋 [BitBuddy] review_import_queue routed")
+            print(" [BitBuddy] review_import_queue routed")
         case "approve_imported_joke":
-            print("✅ [BitBuddy] approve_imported_joke routed")
+            print(" [BitBuddy] approve_imported_joke routed")
         case "reject_imported_joke":
-            print("❌ [BitBuddy] reject_imported_joke routed")
+            print(" [BitBuddy] reject_imported_joke routed")
         case "edit_imported_joke":
-            print("📝 [BitBuddy] edit_imported_joke routed")
+            print(" [BitBuddy] edit_imported_joke routed")
         case "check_import_limit":
-            print("📊 [BitBuddy] check_import_limit routed")
+            print(" [BitBuddy] check_import_limit routed")
         case "show_import_history":
-            print("📜 [BitBuddy] show_import_history routed")
+            print(" [BitBuddy] show_import_history routed")
 
-        // ── Sync ───────────────────────────────────
+        //  Sync 
         case "check_sync_status":
-            print("☁️ [BitBuddy] check_sync_status routed")
+            print(" [BitBuddy] check_sync_status routed")
         case "sync_now":
-            print("☁️ [BitBuddy] sync_now — triggering manual sync")
+            print(" [BitBuddy] sync_now — triggering manual sync")
             Task { await iCloudSyncService.shared.syncNow() }
         case "toggle_icloud_sync":
-            print("☁️ [BitBuddy] toggle_icloud_sync routed")
+            print(" [BitBuddy] toggle_icloud_sync routed")
 
-        // ── Settings ───────────────────────────────
+        //  Settings 
         case "export_all_jokes":
-            print("📤 [BitBuddy] export_all_jokes routed")
+            print(" [BitBuddy] export_all_jokes routed")
         case "export_recordings":
-            print("📤 [BitBuddy] export_recordings routed")
+            print(" [BitBuddy] export_recordings routed")
         case "clear_cache":
-            print("🧹 [BitBuddy] clear_cache — clearing temp files")
+            print(" [BitBuddy] clear_cache — clearing temp files")
             clearTempFiles()
 
-        // ── Help ───────────────────────────────────
+        //  Help 
         case "open_help_faq":
-            print("❓ [BitBuddy] open_help_faq routed")
+            print(" [BitBuddy] open_help_faq routed")
             // Navigation handled centrally in sendMessage via routeResult
         case "explain_feature":
-            print("❓ [BitBuddy] explain_feature — handled by backend")
+            print(" [BitBuddy] explain_feature — handled by backend")
 
         default:
-            print("⚠️ [BitBuddy] Unknown action type: \(actionType)")
+            print(" [BitBuddy] Unknown action type: \(actionType)")
         }
     }
     
     /// Handles the add_joke action — publishes the joke text so the UI layer
     /// can create a proper SwiftData `Joke` with the active `ModelContext`.
     ///
-    /// ⚠️  This used to write a `.txt` file to Documents/Jokes, which was
+    ///   This used to write a `.txt` file to Documents/Jokes, which was
     /// invisible to the SwiftData-backed UI. Fixed to publish via
     /// `NotificationCenter` so any listening view can persist it correctly.
     private func handleAddJokeAction(_ action: [String: Any]) {
         guard let jokeText = action["joke"] as? String, !jokeText.isEmpty else {
-            print("❌ [BitBuddy] add_joke action missing joke text")
+            print(" [BitBuddy] add_joke action missing joke text")
             return
         }
 
         let folder = action["folder"] as? String
-        print("✅ [BitBuddy] Publishing add_joke for UI persistence")
-        print("💾 [BitBuddy] Joke content: \(jokeText.prefix(50))...")
+        print(" [BitBuddy] Publishing add_joke for UI persistence")
+        print(" [BitBuddy] Joke content: \(jokeText.prefix(50))...")
 
         NotificationCenter.default.post(
             name: .bitBuddyAddJoke,
@@ -651,7 +651,7 @@ final class BitBuddyService: NSObject, ObservableObject {
                 // Temp files in use — skip silently
             }
         }
-        print("🧹 [BitBuddy] Cleared \(removed) temp file(s)")
+        print(" [BitBuddy] Cleared \(removed) temp file(s)")
     }
     
     private func appendTurn(_ turn: BitBuddyTurn, conversationId: String) {

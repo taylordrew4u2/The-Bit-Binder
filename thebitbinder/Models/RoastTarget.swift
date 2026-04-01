@@ -15,9 +15,14 @@ final class RoastTarget: Identifiable {
     var id: UUID = UUID()
     var name: String = ""
     var notes: String = ""
+    var traits: [String] = []
     @Attribute(.externalStorage) var photoData: Data?
     var dateCreated: Date = Date()
     var dateModified: Date = Date()
+
+    // Soft-delete (trash) support
+    var isDeleted: Bool = false
+    var deletedDate: Date?
 
     @Relationship(deleteRule: .cascade, inverse: \RoastJoke.target)
     var jokes: [RoastJoke]? = []
@@ -33,13 +38,28 @@ final class RoastTarget: Identifiable {
         (jokes ?? []).filter { !$0.isDeleted }.count
     }
 
-    init(name: String, notes: String = "", photoData: Data? = nil) {
+    init(name: String, notes: String = "", traits: [String] = [], photoData: Data? = nil) {
         self.id = UUID()
         self.name = name
         self.notes = notes
+        self.traits = traits
         self.photoData = photoData
         self.dateCreated = Date()
         self.dateModified = Date()
         self.jokes = []
+    }
+
+    // MARK: - Trash Helpers
+
+    func moveToTrash() {
+        isDeleted = true
+        deletedDate = Date()
+        dateModified = Date()
+    }
+
+    func restoreFromTrash() {
+        isDeleted = false
+        deletedDate = nil
+        dateModified = Date()
     }
 }

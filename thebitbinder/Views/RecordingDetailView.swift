@@ -8,7 +8,6 @@
 import SwiftUI
 import AVFoundation
 import SwiftData
-import Combine
 
 struct RecordingDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -45,7 +44,7 @@ struct RecordingDetailView: View {
                                 .multilineTextAlignment(.center)
                             
                             Button("Try Again") {
-                                audioPlayer.loadAudio(from: recording.fileURL)
+                                audioPlayer.loadAudio(from: recording.resolvedURL)
                             }
                             .buttonStyle(.borderedProminent)
                         }
@@ -199,12 +198,12 @@ struct RecordingDetailView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Recording")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             // Small delay to ensure audio session is ready
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                audioPlayer.loadAudio(from: recording.fileURL)
+                audioPlayer.loadAudio(from: recording.resolvedURL)
             }
         }
         .onDisappear {
@@ -220,7 +219,7 @@ struct RecordingDetailView: View {
     private func togglePlayback() {
         // Don't try to play if there's a load error
         guard audioPlayer.loadError == nil else {
-            audioPlayer.loadAudio(from: recording.fileURL)
+            audioPlayer.loadAudio(from: recording.resolvedURL)
             return
         }
         
@@ -237,18 +236,25 @@ struct RecordingDetailView: View {
         
         Task {
             do {
-                // Construct the proper file URL from Documents directory
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                let url = documentsPath.appendingPathComponent(recording.fileURL)
+                let url = recording.resolvedURL
+                
+                print(" [Transcribe] Attempting transcription of: \(url.path)")
+                print(" [Transcribe] File exists: \(FileManager.default.fileExists(atPath: url.path))")
+                print(" [Transcribe] Speech auth: \(AudioTranscriptionService.authorizationStatus.rawValue)")
                 
                 let result = try await AudioTranscriptionService.shared.transcribe(audioURL: url)
+                print(" [Transcribe] Success — \(result.transcription.count) chars, confidence: \(String(format: "%.0f", result.confidencePercentage))%")
                 
                 await MainActor.run {
                     recording.transcription = result.transcription
                     do {
                         try modelContext.save()
                     } catch {
-                        print("❌ [RecordingDetailView] Failed to save transcription: \(error)")
+                        print(" [RecordingDetailView] Failed to save transcription: \(error)")
+                        // Surface the save failure so the user knows the
+                        // transcription won't persist across app restarts.
+                        transcriptionError = "Transcription completed but could not be saved: \(error.localizedDescription)"
+                        showingTranscriptionError = true
                     }
                     isTranscribing = false
                 }
@@ -263,17 +269,10 @@ struct RecordingDetailView: View {
     }
     
     private func shareRecording() {
-        // Determine the actual file URL (handle both relative and absolute paths)
-        var url: URL
-        if recording.fileURL.hasPrefix("/") {
-            url = URL(fileURLWithPath: recording.fileURL)
-        } else {
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            url = documentsPath.appendingPathComponent(recording.fileURL)
-        }
+        let url = recording.resolvedURL
         
         guard FileManager.default.fileExists(atPath: url.path) else {
-            print("❌ Cannot share - file not found: \(url.path)")
+            print(" Cannot share - file not found: \(url.path)")
             return
         }
         
@@ -335,9 +334,9 @@ class AudioPlayerService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             let session = AVAudioSession.sharedInstance()
             // Just ensure it's active, don't change category
             try session.setActive(true, options: .notifyOthersOnDeactivation)
-            print("✅ Audio session activated for playback")
+            print(" Audio session activated for playback")
         } catch {
-            print("❌ Failed to activate audio session: \(error)")
+            print(" Failed to activate audio session: \(error)")
             loadError = "Failed to configure audio: \(error.localizedDescription)"
         }
     }
@@ -355,55 +354,33 @@ class AudioPlayerService: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // Pause playback on memory warning
         if isPlaying {
             pause()
-            print("⚠️ Memory warning - pausing playback")
+            print(" Memory warning - pausing playback")
         }
     }
     
-    func loadAudio(from path: String) {
+    func loadAudio(from url: URL) {
         // Clean up previous audio first
         cleanup()
         loadError = nil
         
-        print("🎵 Loading audio from path: \(path)")
-        
-        // Determine the actual file URL
-        var url: URL
-        
-        // Check if it's a full path or just a filename
-        if path.hasPrefix("/") {
-            // It's an absolute path - check if file exists there
-            url = URL(fileURLWithPath: path)
-            print("📂 Trying absolute path: \(url.path)")
-            if !FileManager.default.fileExists(atPath: path) {
-                // Try extracting just the filename and look in documents
-                let filename = URL(fileURLWithPath: path).lastPathComponent
-                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                url = documentsPath.appendingPathComponent(filename)
-                print("📁 File not at original path, trying documents: \(url.path)")
-            }
-        } else {
-            // It's just a filename - look in documents directory
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            url = documentsPath.appendingPathComponent(path)
-            print("📁 Loading from documents: \(url.path)")
-        }
+        print(" Loading audio from: \(url.path)")
         
         // Check if file exists
         guard FileManager.default.fileExists(atPath: url.path) else {
             let errorMsg = "Audio file not found: \(url.lastPathComponent)"
-            print("❌ \(errorMsg)")
-            print("📂 Documents directory: \(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path)")
+            print(" \(errorMsg)")
+            print(" Documents directory: \(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path)")
             
             // List files in documents directory for debugging
             if let files = try? FileManager.default.contentsOfDirectory(atPath: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path) {
-                print("📂 Files in documents: \(files.filter { $0.hasSuffix(".m4a") })")
+                print(" Files in documents: \(files.filter { $0.hasSuffix(".m4a") })")
             }
             
             loadError = errorMsg
             return
         }
         
-        print("✅ File exists at: \(url.path)")
+        print(" File exists at: \(url.path)")
         
         // Audio session already configured app-wide in AppDelegate
         
@@ -413,17 +390,17 @@ class AudioPlayerService: NSObject, ObservableObject, AVAudioPlayerDelegate {
             audioPlayer?.prepareToPlay()
             duration = audioPlayer?.duration ?? 0
             currentTime = 0
-            print("✅ Audio loaded successfully: duration = \(duration)s")
+            print(" Audio loaded successfully: duration = \(duration)s")
         } catch {
             let errorMsg = "Error loading audio: \(error.localizedDescription)"
-            print("❌ \(errorMsg)")
+            print(" \(errorMsg)")
             loadError = errorMsg
         }
     }
     
     func play() {
         guard let player = audioPlayer else {
-            print("⚠️ Cannot play - audio player is nil")
+            print(" Cannot play - audio player is nil")
             loadError = "Audio not loaded"
             return
         }

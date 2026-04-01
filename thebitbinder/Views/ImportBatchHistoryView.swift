@@ -61,7 +61,7 @@ struct ImportBatchHistoryView: View {
                     }
                 }
             }
-            .navigationTitle("Import History")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $selectedBatch) { batch in
                 ImportBatchDetailView(batch: batch)
@@ -268,7 +268,6 @@ struct ImportBatchDetailView: View {
                                     .font(.system(size: 13, design: .serif))
                                     .foregroundColor(.secondary)
                                     .lineSpacing(2)
-                                    .lineLimit(4)
                                 
                                 if let page = record.sourcePage {
                                     HStack(spacing: 4) {
@@ -287,7 +286,7 @@ struct ImportBatchDetailView: View {
                     }
                 }
             }
-            .navigationTitle("Import Batch")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -366,7 +365,6 @@ struct UnresolvedFragmentHistoryRow: View {
                 .font(.system(size: 13, design: .serif))
                 .foregroundColor(.secondary)
                 .lineSpacing(2)
-                .lineLimit(4)
         }
         .padding(.vertical, 4)
     }

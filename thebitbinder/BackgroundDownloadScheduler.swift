@@ -72,7 +72,7 @@ final class BackgroundDownloadScheduler: ObservableObject {
         }
         pendingDownloads = pending
         
-        logger.info("📥 [BackgroundDownload] Scheduled: \(identifier, privacy: .public) — essential: \(essential)")
+        logger.info(" [BackgroundDownload] Scheduled: \(identifier, privacy: .public) — essential: \(essential)")
     }
     
     /// Cancels a previously scheduled download.
@@ -80,7 +80,7 @@ final class BackgroundDownloadScheduler: ObservableObject {
         let currentDownloads = try await BADownloadManager.shared.currentDownloads
         if let download = currentDownloads.first(where: { $0.identifier == identifier }) {
             try BADownloadManager.shared.cancel(download)
-            logger.info("🚫 [BackgroundDownload] Cancelled: \(identifier, privacy: .public)")
+            logger.info(" [BackgroundDownload] Cancelled: \(identifier, privacy: .public)")
         }
         
         // Remove from pending list
@@ -95,7 +95,7 @@ final class BackgroundDownloadScheduler: ObservableObject {
     /// Reads the latest status from the shared app group UserDefaults.
     func refresh() {
         guard let defaults = sharedDefaults else {
-            logger.warning("⚠️ [BackgroundDownload] Could not open shared UserDefaults for group: \(self.appGroupIdentifier)")
+            logger.warning(" [BackgroundDownload] Could not open shared UserDefaults for group: \(self.appGroupIdentifier)")
             return
         }
         
@@ -108,7 +108,7 @@ final class BackgroundDownloadScheduler: ObservableObject {
         lastError = defaults.string(forKey: "lastBackgroundDownloadError")
         pendingDownloads = defaults.stringArray(forKey: "pendingBackgroundDownloads") ?? []
         
-        logger.info("📊 [BackgroundDownload] Status — assets: \(self.downloadedAssetCount), pending: \(self.pendingDownloads.count), lastError: \(self.lastError ?? "none", privacy: .public)")
+        logger.info(" [BackgroundDownload] Status — assets: \(self.downloadedAssetCount), pending: \(self.pendingDownloads.count), lastError: \(self.lastError ?? "none", privacy: .public)")
     }
     
     /// URL of the shared container directory where the extension stores downloaded assets.
@@ -132,7 +132,7 @@ final class BackgroundDownloadScheduler: ObservableObject {
                 options: .skipsHiddenFiles
             )
         } catch {
-            logger.error("❌ [BackgroundDownload] Could not list assets: \(error.localizedDescription)")
+            logger.error(" [BackgroundDownload] Could not list assets: \(error.localizedDescription)")
             return []
         }
     }
@@ -146,6 +146,10 @@ final class BackgroundDownloadScheduler: ObservableObject {
     // MARK: - Private
     
     private var sharedDefaults: UserDefaults? {
-        UserDefaults(suiteName: appGroupIdentifier)
+        guard FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) != nil else {
+            logger.warning(" [BackgroundDownload] App Group container unavailable for: \(self.appGroupIdentifier, privacy: .public)")
+            return nil
+        }
+        return UserDefaults(suiteName: appGroupIdentifier)
     }
 }

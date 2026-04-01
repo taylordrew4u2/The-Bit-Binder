@@ -19,6 +19,9 @@ struct NotebookView: View {
     @State private var pickedPhotoItem: PhotosPickerItem?
     @State private var showingCamera = false
     @State private var cameraImage: UIImage?
+    @State private var showingTrash = false
+    @State private var persistenceError: String?
+    @State private var showingPersistenceError = false
     
     private func delete(_ photo: NotebookPhotoRecord) {
         // Soft-delete: imageData kept until permanently purged from NotebookTrashView
@@ -26,7 +29,9 @@ struct NotebookView: View {
         do {
             try modelContext.save()
         } catch {
-            print("❌ [NotebookView] Failed to save after photo soft-delete: \(error)")
+            print(" [NotebookView] Failed to save after photo soft-delete: \(error)")
+            persistenceError = "Could not delete photo: \(error.localizedDescription)"
+            showingPersistenceError = true
         }
     }
     
@@ -62,14 +67,17 @@ struct NotebookView: View {
                     }
                 }
             }
-            .navigationTitle(roastMode ? "🔥 Fire Notebook" : "Notebook Saver")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    NavigationLink(destination: NotebookTrashView()) {
-                        Image(systemName: "trash")
-                            .font(.body)
+                ToolbarItem(placement: .principal) {
+                    Menu {
+                        Button { showingTrash = true } label: {
+                            Label("Trash", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                             .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.notebookAccent)
                     }
                 }
@@ -85,6 +93,9 @@ struct NotebookView: View {
                         Label("Camera", systemImage: "camera")
                     }
                 }
+            }
+            .navigationDestination(isPresented: $showingTrash) {
+                NotebookTrashView()
             }
             .onChange(of: pickedPhotoItem) { oldValue, newValue in
                 Task {
@@ -111,6 +122,11 @@ struct NotebookView: View {
             .onDisappear {
                 // Memory cleanup handled by MemoryManager
             }
+            .alert("Error", isPresented: $showingPersistenceError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(persistenceError ?? "An unknown error occurred")
+            }
         }
     }
     
@@ -133,11 +149,13 @@ struct NotebookView: View {
                 do {
                     try modelContext.save()
                 } catch {
-                    print("❌ [NotebookView] Failed to save imported photo: \(error)")
+                    print(" [NotebookView] Failed to save imported photo: \(error)")
+                    persistenceError = "Could not save photo: \(error.localizedDescription)"
+                    showingPersistenceError = true
                 }
             }
         } catch {
-            print("❌ [NotebookView] importPhoto error: \(error)")
+            print(" [NotebookView] importPhoto error: \(error)")
         }
     }
     
@@ -154,7 +172,9 @@ struct NotebookView: View {
             do {
                 try modelContext.save()
             } catch {
-                print("❌ [NotebookView] Failed to save camera photo: \(error)")
+                print(" [NotebookView] Failed to save camera photo: \(error)")
+                persistenceError = "Could not save photo: \(error.localizedDescription)"
+                showingPersistenceError = true
             }
         }
     }
@@ -190,7 +210,7 @@ struct NotebookDetailView: View {
         do {
             try modelContext.save()
         } catch {
-            print("❌ [NotebookDetailView] Failed to save after photo soft-delete: \(error)")
+            print(" [NotebookDetailView] Failed to save after photo soft-delete: \(error)")
         }
         dismiss()
     }
@@ -218,7 +238,7 @@ struct NotebookDetailView: View {
                 
                 Spacer()
             }
-            .navigationTitle("Notebook Page")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {

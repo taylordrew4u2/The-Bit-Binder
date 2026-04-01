@@ -145,7 +145,7 @@ struct StandaloneRecordingView: View {
                 }
                 .padding(.top)
             }
-            .navigationTitle("Quick Recording")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -210,7 +210,7 @@ struct StandaloneRecordingView: View {
     private func saveRecording() {
         guard let fileURL = audioService.recordingURL else {
             #if DEBUG
-            print("❌ No recording URL found")
+            print(" No recording URL found")
             #endif
             dismiss()
             return
@@ -219,7 +219,7 @@ struct StandaloneRecordingView: View {
         // Verify file exists
         let fileExists = FileManager.default.fileExists(atPath: fileURL.path)
         #if DEBUG
-        print("📁 Recording file exists: \(fileExists) at \(fileURL.path)")
+        print(" Recording file exists: \(fileExists) at \(fileURL.path)")
         #endif
         
         // Store just the filename, not the full path (paths change between app launches)
@@ -232,7 +232,7 @@ struct StandaloneRecordingView: View {
         )
         
         #if DEBUG
-        print("✅ Saving standalone recording: \(fileName) with duration: \(recordingDuration)s")
+        print(" Saving standalone recording: \(fileName) with duration: \(recordingDuration)s")
         #endif
         modelContext.insert(recording)
         
@@ -240,11 +240,11 @@ struct StandaloneRecordingView: View {
         do {
             try modelContext.save()
             #if DEBUG
-            print("✅ Recording saved to database")
+            print(" Recording saved to database")
             #endif
         } catch {
             #if DEBUG
-            print("❌ Failed to save recording to database: \(error)")
+            print(" Failed to save recording to database: \(error)")
             #endif
         }
         

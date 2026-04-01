@@ -48,7 +48,7 @@ struct AddRoastJokeView: View {
             }
             .scrollContentBackground(.hidden)
             .background(AppTheme.Colors.roastBackground)
-            .navigationTitle("🔥 New Roast")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: true)
             .toolbar {
@@ -87,12 +87,12 @@ struct AddRoastJokeView: View {
         do {
             try modelContext.save()
             #if DEBUG
-            print("✅ [AddRoastJokeView] Roast saved for '\(target.name)' (id: \(joke.id))")
+            print(" [AddRoastJokeView] Roast saved for '\(target.name)' (id: \(joke.id))")
             #endif
             dismiss()
         } catch {
             #if DEBUG
-            print("❌ [AddRoastJokeView] Failed to save: \(error)")
+            print(" [AddRoastJokeView] Failed to save: \(error)")
             #endif
             saveErrorMessage = "Could not save roast: \(error.localizedDescription)"
             showSaveError = true

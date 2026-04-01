@@ -66,7 +66,7 @@ struct JokesSheetsModifier: ViewModifier {
                 AddRoastTargetView()
                     .onAppear {
                         #if DEBUG
-                        print("✅ [JokesViewModifiers] AddRoastTargetView sheet appeared")
+                        print(" [JokesViewModifiers] AddRoastTargetView sheet appeared")
                         #endif
                     }
             }
@@ -120,7 +120,7 @@ struct JokesAlertsModifier: ViewModifier {
                 Text("Your jokes have been exported to a PDF file.")
             }
             .alert(
-                importSummary.added > 0 ? "Import Complete! 🎉" : "No Jokes Found",
+                importSummary.added > 0 ? "Import Complete! " : "No Jokes Found",
                 isPresented: $showingImportSummary
             ) {
                 Button("OK") {}
@@ -154,7 +154,8 @@ struct JokesAlertsModifier: ViewModifier {
                         do {
                             try modelContext.save()
                         } catch {
-                            print("❌ [JokesViewModifiers] Failed to delete roast target: \(error)")
+                            print(" [JokesViewModifiers] Failed to delete roast target: \(error)")
+                            // SwiftData will retry on next save cycle; log for diagnostics
                         }
                         roastTargetToDelete = nil
                     }
@@ -205,7 +206,7 @@ struct MoveJokesSheet: View {
                     }
                 }
             }
-            .navigationTitle("Move Jokes To…")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -270,7 +271,6 @@ struct ReviewImportsSheet: View {
                                             .foregroundColor(AppTheme.Colors.warning)
                                         Text(dup)
                                             .font(.system(size: 14))
-                                            .lineLimit(2)
                                     }
                                 }
                             } header: {
@@ -303,7 +303,6 @@ struct ReviewImportsSheet: View {
                                         Text(cand.content)
                                             .font(.caption)
                                             .foregroundColor(.secondary)
-                                            .lineLimit(6)
                                     }
                                 }
                             } header: {
@@ -329,7 +328,7 @@ struct ReviewImportsSheet: View {
                     }
                 }
             }
-            .navigationTitle("Review Imports")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -340,9 +339,12 @@ struct ReviewImportsSheet: View {
     }
     
     private func saveFragmentAsJoke(_ fragment: UnresolvedImportFragment) {
-        let title = fragment.titleCandidate?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            ? fragment.titleCandidate!
-            : String(fragment.text.prefix(40))
+        let title: String
+        if let candidate = fragment.titleCandidate?.trimmingCharacters(in: .whitespacesAndNewlines), !candidate.isEmpty {
+            title = candidate
+        } else {
+            title = String(fragment.text.prefix(40))
+        }
         let joke = Joke(content: fragment.text, title: title, folder: selectedFolder)
         joke.tags = fragment.tags
         modelContext.insert(joke)
@@ -350,7 +352,7 @@ struct ReviewImportsSheet: View {
         do {
             try modelContext.save()
         } catch {
-            print("❌ [JokesViewModifiers] Failed to save fragment as joke: \(error)")
+            print(" [JokesViewModifiers] Failed to save fragment as joke: \(error)")
         }
     }
     
@@ -359,7 +361,7 @@ struct ReviewImportsSheet: View {
         do {
             try modelContext.save()
         } catch {
-            print("❌ [JokesViewModifiers] Failed to save resolved state: \(error)")
+            print(" [JokesViewModifiers] Failed to save resolved state: \(error)")
         }
     }
 }
@@ -413,12 +415,11 @@ struct UnresolvedFragmentRow: View {
                     )
             }
             
-            // Fragment text preview
+            // Fragment text
             Text(fragment.text)
                 .font(.system(size: 13, design: .serif))
                 .foregroundColor(.secondary)
                 .lineSpacing(2)
-                .lineLimit(6)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
                 .background(

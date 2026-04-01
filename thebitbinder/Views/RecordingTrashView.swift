@@ -20,6 +20,8 @@ struct RecordingTrashView: View {
 
     @State private var searchText = ""
     @State private var showingEmptyTrashAlert = false
+    @State private var persistenceError: String?
+    @State private var showingErrorAlert = false
 
     private var filtered: [Recording] {
         let t = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -65,7 +67,9 @@ struct RecordingTrashView: View {
                                 do {
                                     try modelContext.save()
                                 } catch {
-                                    print("❌ [RecordingTrashView] Failed to restore recording: \(error)")
+                                    print(" [RecordingTrashView] Failed to restore recording: \(error)")
+                                    persistenceError = "Could not restore recording: \(error.localizedDescription)"
+                                    showingErrorAlert = true
                                 }
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
@@ -78,7 +82,9 @@ struct RecordingTrashView: View {
                                 do {
                                     try modelContext.save()
                                 } catch {
-                                    print("❌ [RecordingTrashView] Failed to restore recording: \(error)")
+                                    print(" [RecordingTrashView] Failed to restore recording: \(error)")
+                                    persistenceError = "Could not restore recording: \(error.localizedDescription)"
+                                    showingErrorAlert = true
                                 }
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
@@ -95,7 +101,7 @@ struct RecordingTrashView: View {
                 .listStyle(.insetGrouped)
             }
         }
-        .navigationTitle("Recording Trash")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, prompt: "Search trash")
         .toolbar {
@@ -118,6 +124,11 @@ struct RecordingTrashView: View {
             }
         } message: {
             Text("This permanently deletes all \(trashedRecordings.count) recording\(trashedRecordings.count == 1 ? "" : "s") and their audio files. This cannot be undone.")
+        }
+        .alert("Error", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(persistenceError ?? "An unknown error occurred")
         }
     }
 

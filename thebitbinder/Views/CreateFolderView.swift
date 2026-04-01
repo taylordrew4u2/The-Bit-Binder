@@ -26,7 +26,7 @@ struct CreateFolderView: View {
             }
             .scrollContentBackground(roastMode ? .hidden : .visible)
             .background(roastMode ? AppTheme.Colors.roastBackground : Color.clear)
-            .navigationTitle(roastMode ? "🔥 New Folder" : "New Folder")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
             .toolbar {
@@ -61,7 +61,7 @@ struct CreateFolderView: View {
             try modelContext.save()
             dismiss()
         } catch {
-            print("❌ [CreateFolderView] Failed to save folder: \(error)")
+            print(" [CreateFolderView] Failed to save folder: \(error)")
             saveErrorMessage = "Could not create folder: \(error.localizedDescription)"
             showSaveError = true
         }

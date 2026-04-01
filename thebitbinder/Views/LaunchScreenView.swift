@@ -16,7 +16,7 @@ struct LaunchScreenView: View {
 
     var body: some View {
         ZStack {
-            // ── Paper background ─────────────────────────────
+            //  Paper background 
             AppTheme.Colors.paperCream.ignoresSafeArea()
 
             // Faint rules
@@ -42,7 +42,7 @@ struct LaunchScreenView: View {
             }
             .ignoresSafeArea()
 
-            // ── Center mark ──────────────────────────────────
+            //  Center mark 
             VStack(spacing: 28) {
                 // Book mark — spine + pages
                 ZStack {

@@ -135,7 +135,7 @@ final class LineNormalizer {
         // Common page elements to filter out
         let pageElements = [
             "page", "continued", "end", "start", "header", "footer",
-            "copyright", "©", "all rights reserved", "confidential"
+            "copyright", "", "all rights reserved", "confidential"
         ]
         
         return pageElements.contains { lowercased.contains($0) }
@@ -148,7 +148,7 @@ final class LineNormalizer {
         let characters = Array(text.filter { !$0.isWhitespace })
         guard !characters.isEmpty else { return false }
         
-        let firstChar = characters.first!
+        guard let firstChar = characters.first else { return false }
         let sameCharCount = characters.filter { $0 == firstChar }.count
         
         return Float(sameCharCount) / Float(characters.count) > 0.8
@@ -229,7 +229,7 @@ final class LineNormalizer {
         let text = line.normalizedText.lowercased()
         
         // Common footer patterns
-        if text.contains("page") || text.contains("copyright") || text.contains("©") {
+        if text.contains("page") || text.contains("copyright") || text.contains("") {
             return true
         }
         

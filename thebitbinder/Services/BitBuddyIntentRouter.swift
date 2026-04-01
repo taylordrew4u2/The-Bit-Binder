@@ -224,9 +224,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
     // swiftlint:disable function_body_length
     private static func buildIntentCatalog() -> [BitBuddyIntent] {
         [
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: JOKES (21 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "save_joke",
@@ -470,9 +470,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: BRAINSTORM (7 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "add_brainstorm_note",
@@ -559,9 +559,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: SET LISTS (12 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "create_set_list",
@@ -705,9 +705,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: RECORDINGS (10 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "start_recording",
@@ -826,9 +826,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: BITBUDDY (16 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "analyze_joke",
@@ -1010,9 +1010,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: NOTEBOOK (4 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "open_notebook",
@@ -1063,9 +1063,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: ROAST MODE (7 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "toggle_roast_mode",
@@ -1152,9 +1152,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: IMPORT (7 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "import_file",
@@ -1253,9 +1253,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: SYNC (3 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "check_sync_status",
@@ -1294,9 +1294,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: SETTINGS (3 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "export_all_jokes",
@@ -1335,9 +1335,9 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 ]
             ),
 
-            // ═══════════════════════════════════════════
+            // 
             // SECTION: HELP (2 intents)
-            // ═══════════════════════════════════════════
+            // 
 
             BitBuddyIntent(
                 id: "open_help_faq",

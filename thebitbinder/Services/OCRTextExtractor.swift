@@ -205,7 +205,7 @@ final class OCRTextExtractor {
     private func convertPDFPageToImage(_ page: PDFPage) -> UIImage? {
         let pageSize = page.bounds(for: .mediaBox).size
         // 2× is sufficient for accurate OCR and halves peak memory vs 3×.
-        // A standard A4 page at 2× ≈ 1240×1754 px (~8 MB) vs ~35 MB at 3×.
+        // A standard A4 page at 2×  1240×1754 px (~8 MB) vs ~35 MB at 3×.
         let scale: CGFloat = 2.0
         let scaledSize = CGSize(width: pageSize.width * scale, height: pageSize.height * scale)
         
@@ -329,10 +329,10 @@ final class OCRCustomWordsProvider {
         // For now, return default comedy terms
         
         return OCRCustomWords(
-            jokeTitle: [], // TODO: Load from existing joke titles in the app
-            venueName: [], // TODO: Load from user's venue history
+            jokeTitle: [],
+            venueName: [],
             comedyTerms: OCRCustomWords.defaultComedyTerms,
-            userSlang: []  // TODO: Extract from user's existing content
+            userSlang: []
         )
     }
 }

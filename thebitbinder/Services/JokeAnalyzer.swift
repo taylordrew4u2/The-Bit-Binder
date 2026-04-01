@@ -54,7 +54,7 @@ struct JokeAnalyzer {
         for (word, replacements) in BitBuddyResources.synonyms {
             if lower.range(of: "\\b\(word)\\b", options: .regularExpression) != nil {
                 let randomReplacement = replacements.randomElement() ?? word
-                suggestions.append("Swap \"\(word)\" → \"\(randomReplacement)\" for impact.")
+                suggestions.append("Swap \"\(word)\"  \"\(randomReplacement)\" for impact.")
             }
         }
         

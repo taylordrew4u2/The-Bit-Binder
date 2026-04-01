@@ -14,7 +14,7 @@ enum KeywordTitleGenerator {
 
     /// Returns a short keyword snippet (2-4 words) from the content,
     /// suitable for display as a fallback title.
-    /// Example: "crowd work parking lot" → "Crowd Work Parking"
+    /// Example: "crowd work parking lot"  "Crowd Work Parking"
     static func title(from content: String) -> String {
         let words = significantWords(from: content)
         guard !words.isEmpty else { return "" }

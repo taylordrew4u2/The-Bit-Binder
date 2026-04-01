@@ -51,14 +51,14 @@ final class ImportPipelineCoordinator {
         let startTime = Date()
         var debugInfo: [String] = []
 
-        // ── Stage 0: Upfront Validation ────────────────────────────────────────
+        //  Stage 0: Upfront Validation 
         // Check file type FIRST — before touching the file data, before OCR, before AI.
         // This prevents code/.swift files from reaching the image extraction path.
         let fileType = await router.detectFileType(url: url)
 
         if fileType == .unsupported {
             let ext = url.pathExtension.isEmpty ? "unknown" : url.pathExtension
-            print("🚫 [ImportPipeline] Rejected unsupported file type: .\(ext) (\(url.lastPathComponent))")
+            print(" [ImportPipeline] Rejected unsupported file type: .\(ext) (\(url.lastPathComponent))")
             throw ImportValidationError.unsupportedFileType(extension: ext)
         }
 
@@ -72,19 +72,19 @@ final class ImportPipelineCoordinator {
             throw ImportValidationError.emptyFile(url)
         }
 
-        // ── Stage 1: File Type Detection ─────────────────────────────────────
+        //  Stage 1: File Type Detection 
         debugInfo.append("=== Stage 1: File Type Detection ===")
         let extractionMethod = router.getExtractionMethod(for: fileType)
         debugInfo.append("Detected file type: \(fileType)")
         debugInfo.append("Selected extraction method: \(extractionMethod)")
 
-        // ── Stage 2: Text / Image Extraction ─────────────────────────────────
+        //  Stage 2: Text / Image Extraction 
         debugInfo.append("\n=== Stage 2: Text Extraction ===")
         let extractedPages = try await extractText(from: url, fileType: fileType, method: extractionMethod)
         debugInfo.append("Extracted \(extractedPages.count) pages")
         debugInfo.append("Total lines: \(extractedPages.flatMap(\.lines).count)")
 
-        // ── Stage 3: Line Normalization ───────────────────────────────────────
+        //  Stage 3: Line Normalization 
         debugInfo.append("\n=== Stage 3: Line Normalization ===")
         let normalizedPages = lineNormalizer.normalizePages(extractedPages)
         let cleanedPages = normalizedPages.map { page in
@@ -100,7 +100,7 @@ final class ImportPipelineCoordinator {
         }
         debugInfo.append("Clean lines: \(cleanedPages.flatMap(\.lines).count)")
 
-        // ── Stage 4: Reassemble plain text for extraction ─────────────────────────
+        //  Stage 4: Reassemble plain text for extraction 
         // We merge all clean pages back into one text string so extraction providers
         // can see the full document context rather than fragmented chunks.
         let fullText = cleanedPages
@@ -111,9 +111,9 @@ final class ImportPipelineCoordinator {
         debugInfo.append("\n=== Stage 4: Joke Extraction (AI — no local fallback) ===")
         let availableAI = AIJokeExtractionManager.shared.availableProviders
         debugInfo.append("Sending \(fullText.count) chars to extraction")
-        debugInfo.append("Available providers: \(availableAI.map(\.displayName).joined(separator: " → "))")
+        debugInfo.append("Available providers: \(availableAI.map(\.displayName).joined(separator: "  "))")
 
-        // ── Stage 5: AI extraction — throws AIExtractionFailedError if every provider fails ──
+        //  Stage 5: AI extraction — throws AIExtractionFailedError if every provider fails 
         // There is NO local fallback. If this throws, the caller must surface an error to the user.
         //
         // Large files (>40k chars) are split into ~30k-char chunks to keep each
@@ -122,24 +122,24 @@ final class ImportPipelineCoordinator {
         // and the results are concatenated before mapping to ImportedJoke objects.
         // The chunk boundary is on a newline so we never cut mid-sentence.
         let importToken = AIExtractionToken(caller: "ImportPipelineCoordinator")
-        var geminiJokes: [GeminiExtractedJoke]
+        var extractedJokes: [AIExtractedJoke]
         var providerUsed: String
         let textChunks = splitIntoExtractionChunks(fullText)
         var aiExtractionFailed = false
         if textChunks.count == 1 {
             do {
                 let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: textChunks[0], token: importToken)
-                geminiJokes  = result.jokes
+                extractedJokes = result.jokes
                 providerUsed = result.providerUsed
             } catch {
                 aiExtractionFailed = true
-                geminiJokes = []
+                extractedJokes = []
                 providerUsed = "AI Extraction Failed"
             }
         } else {
-            var allJokes: [GeminiExtractedJoke] = []
+            var allJokes: [AIExtractedJoke] = []
             var lastProvider = "Unknown"
-            debugInfo.append("⚡ Large file split into \(textChunks.count) chunks for extraction")
+            debugInfo.append(" Large file split into \(textChunks.count) chunks for extraction")
             for (chunkIndex, chunk) in textChunks.enumerated() {
                 do {
                     debugInfo.append("  Chunk \(chunkIndex + 1)/\(textChunks.count): \(chunk.count) chars")
@@ -150,30 +150,30 @@ final class ImportPipelineCoordinator {
                     aiExtractionFailed = true
                 }
             }
-            geminiJokes  = allJokes
+            extractedJokes = allJokes
             providerUsed = lastProvider
         }
         // Fallback: If AI extraction failed or returned 0, split every word as a bit
-        if aiExtractionFailed || geminiJokes.isEmpty {
-            debugInfo.append("⚠️ AI extraction failed or returned 0 results. Falling back to word-split bits.")
+        if aiExtractionFailed || extractedJokes.isEmpty {
+            debugInfo.append(" AI extraction failed or returned 0 results. Falling back to word-split bits.")
             let words = fullText.components(separatedBy: CharacterSet.whitespacesAndNewlines).filter { !$0.isEmpty }
-            geminiJokes = words.map { word in
-                GeminiExtractedJoke(jokeText: word, humorMechanism: nil, confidence: 0.0, explanation: nil, title: nil, tags: [])
+            extractedJokes = words.map { word in
+                AIExtractedJoke(jokeText: word, humorMechanism: nil, confidence: 0.0, explanation: nil, title: nil, tags: [])
             }
             providerUsed = aiExtractionFailed ? "Fallback: AI Error" : "Fallback: 0 Results"
         }
 
-        debugInfo.append("✅ Extracted \(geminiJokes.count) fragment(s) via \(providerUsed)")
+        debugInfo.append(" Extracted \(extractedJokes.count) fragment(s) via \(providerUsed)")
 
-        // ── Stage 6: Map into ImportedJoke ────────────────────────────────────
-        // Fragments with confidence ≥ 0.8 go to auto-save; everything else goes
+        //  Stage 6: Map into ImportedJoke 
+        // Fragments with confidence  0.8 go to auto-save; everything else goes
         // to the review queue so the user sees and decides on every single fragment.
         let importTimestamp = Date()
         var autoSavedJokes:   [ImportedJoke] = []
         var reviewQueueJokes: [ImportedJoke] = []
 
-        for (index, geminiJoke) in geminiJokes.enumerated() {
-            let imported = geminiJoke.toImportedJoke(
+        for (index, extractedJoke) in extractedJokes.enumerated() {
+            let imported = extractedJoke.toImportedJoke(
                 sourceFile: url.lastPathComponent,
                 pageNumber: 1,
                 orderInFile: index,
@@ -188,14 +188,14 @@ final class ImportPipelineCoordinator {
 
         debugInfo.append("Auto-save: \(autoSavedJokes.count), Review queue: \(reviewQueueJokes.count)")
 
-        // ── Stats ─────────────────────────────────────────────────────────────
+        //  Stats 
         let processingTime = Date().timeIntervalSince(startTime)
         let totalLines     = extractedPages.flatMap(\.lines).count
 
         let stats = PipelineStats(
             totalPagesProcessed:  extractedPages.count,
             totalLinesExtracted:  totalLines,
-            totalBlocksCreated:   geminiJokes.count,
+            totalBlocksCreated:   extractedJokes.count,
             autoSavedCount:       autoSavedJokes.count,
             reviewQueueCount:     reviewQueueJokes.count,
             rejectedCount:        0,
@@ -209,10 +209,10 @@ final class ImportPipelineCoordinator {
             extractionDetails:      "Pages: \(extractedPages.count), Lines: \(totalLines)",
             blockSplittingDecisions: [],
             validationDecisions:    [],
-            confidenceCalculations: geminiJokes.map { "Confidence: \($0.confidence)" }
+            confidenceCalculations: extractedJokes.map { "Confidence: \($0.confidence)" }
         )
 
-        print("📊 IMPORT (\(providerUsed)): \(autoSavedJokes.count + reviewQueueJokes.count) jokes processed from \(url.lastPathComponent)")
+        print(" IMPORT (\(providerUsed)): \(autoSavedJokes.count + reviewQueueJokes.count) jokes processed from \(url.lastPathComponent)")
 
         return ImportPipelineResult(
             sourceFile:       url.lastPathComponent,
@@ -235,7 +235,7 @@ final class ImportPipelineCoordinator {
         
         // Check memory before starting extraction
         if isUnderMemoryPressure {
-            print("⚠️ [ImportPipeline] High memory pressure (\(Int(memoryPressure() * 100))%) before extraction — proceeding cautiously")
+            print(" [ImportPipeline] High memory pressure (\(Int(memoryPressure() * 100))%) before extraction — proceeding cautiously")
         }
 
         switch method {
@@ -294,7 +294,7 @@ final class ImportPipelineCoordinator {
         
         // After extraction, check if memory is critically high
         if isUnderMemoryPressure {
-            print("⚠️ [ImportPipeline] High memory after OCR extraction (\(Int(memoryPressure() * 100))%) — consider reducing page count")
+            print(" [ImportPipeline] High memory after OCR extraction (\(Int(memoryPressure() * 100))%) — consider reducing page count")
         }
         
         return pages
@@ -387,7 +387,7 @@ final class ImportPipelineCoordinator {
 
     /// Maximum characters per extraction chunk.
     ///
-    /// 30 000 chars ≈ 7 500 tokens of input text.  At a 3:1 output/input ratio
+    /// 30 000 chars  7 500 tokens of input text.  At a 3:1 output/input ratio
     /// the model would need ~22 500 output tokens — well within gpt-4o-mini's
     /// 16 384 output token limit per call.  We stay conservative at 30k chars
     /// so even very wordy files don't risk truncation mid-joke.

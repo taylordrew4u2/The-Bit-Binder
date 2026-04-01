@@ -26,7 +26,7 @@ struct CreateSetListView: View {
             }
             .scrollContentBackground(roastMode ? .hidden : .visible)
             .background(roastMode ? AppTheme.Colors.roastBackground : Color.clear)
-            .navigationTitle(roastMode ? "🔥 New Set List" : "New Set List")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
             .toolbar {
@@ -61,7 +61,7 @@ struct CreateSetListView: View {
             try modelContext.save()
             dismiss()
         } catch {
-            print("❌ [CreateSetListView] Failed to save set list: \(error)")
+            print(" [CreateSetListView] Failed to save set list: \(error)")
             saveErrorMessage = "Could not create set list: \(error.localizedDescription)"
             showSaveError = true
         }

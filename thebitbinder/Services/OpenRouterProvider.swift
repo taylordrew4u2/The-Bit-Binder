@@ -32,7 +32,7 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
         AIKeyLoader.loadKey(for: .openRouter) != nil
     }
 
-    func extractJokes(from text: String) async throws -> [GeminiExtractedJoke] {
+    func extractJokes(from text: String) async throws -> [AIExtractedJoke] {
         guard let apiKey = AIKeyLoader.loadKey(for: .openRouter) else {
             throw AIProviderError.keyNotConfigured(.openRouter)
         }
@@ -88,7 +88,7 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
         if let c = message["content"] as? String, !c.isEmpty {
             content = c
         } else if let r = message["reasoning"] as? String, !r.isEmpty {
-            print("⚠️ [OpenRouter] Model returned reasoning instead of content — extracting from reasoning field")
+            print(" [OpenRouter] Model returned reasoning instead of content — extracting from reasoning field")
             content = r
         } else {
             let raw = String(data: data, encoding: .utf8) ?? "<empty>"
@@ -97,7 +97,7 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
 
         let finishReason = firstChoice["finish_reason"] as? String ?? ""
         if finishReason == "length" {
-            print("⚠️ [OpenRouter] Response truncated (finish_reason=length) — attempting partial JSON repair")
+            print(" [OpenRouter] Response truncated (finish_reason=length) — attempting partial JSON repair")
         }
 
         return try JokeExtractionPrompt.parseResponse(content, provider: .openRouter)

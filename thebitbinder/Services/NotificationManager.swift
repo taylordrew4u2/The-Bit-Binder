@@ -142,9 +142,9 @@ final class NotificationManager: NSObject, ObservableObject, UNUserNotificationC
 
         UNUserNotificationCenter.current().add(request) { error in
             if let error {
-                print("❌ [Notifications] schedule failed: \(error)")
+                print(" [Notifications] schedule failed: \(error)")
             } else {
-                print("✅ [Notifications] scheduled for \(hour):\(String(format: "%02d", minute)) tomorrow")
+                print(" [Notifications] scheduled for \(hour):\(String(format: "%02d", minute)) tomorrow")
             }
         }
     }

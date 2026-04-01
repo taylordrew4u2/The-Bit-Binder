@@ -4,17 +4,17 @@ Welcome to **BitBinder** — your professional comedy notebook, designed by come
 
 ## What You Can Do
 
-✅ **Jot down ideas** instantly (like a real notebook)  
-✅ **Organize jokes** into folders and set lists  
-✅ **Record yourself** performing (audio + auto-transcription)  
-✅ **Scan your notebooks** for digital backup  
-✅ **Sync to iCloud** across all your devices  
-✅ **Switch to Roast Mode** for targeted comedy writing  
+ **Jot down ideas** instantly (like a real notebook)  
+ **Organize jokes** into folders and set lists  
+ **Record yourself** performing (audio + auto-transcription)  
+ **Scan your notebooks** for digital backup  
+ **Sync to iCloud** across all your devices  
+ **Switch to Roast Mode** for targeted comedy writing  
 
 ## 30-Second Quickstart
 
-1. **Tap Notepad** (top of menu) → Type a joke idea → Auto-saves
-2. **Tap Jokes** → See your joke library (Grid or List view)
+1. **Tap Notepad** (top of menu)  Type a joke idea  Auto-saves
+2. **Tap Jokes**  See your joke library (Grid or List view)
 3. **Create a folder** to organize by topic
 4. **Record yourself** in Recordings section
 5. **Enable iCloud Sync** in Settings to protect everything
@@ -25,7 +25,7 @@ That's it! You're ready.
 
 ## Your First 5 Minutes
 
-### 1️⃣ Open the Notepad (30 seconds)
+### 1⃣ Open the Notepad (30 seconds)
 - Tap **Notepad** in the menu
 - Type a joke you've been thinking about
 - Close when done (auto-saves)
@@ -33,25 +33,25 @@ That's it! You're ready.
 - Notice the **red margin line** (at 52pt—authentic!)
 - Notice the **punch holes** (left edge—real notebook feel)
 
-### 2️⃣ Check Your Jokes (30 seconds)
+### 2⃣ Check Your Jokes (30 seconds)
 - Tap **Jokes** in the menu
 - Tap the **Grid/List toggle** (top-left) to switch views
 - Grid = beautiful cards, List = compact
 - Use whichever you prefer
 
-### 3️⃣ Create Your First Folder (30 seconds)
+### 3⃣ Create Your First Folder (30 seconds)
 - In Jokes section, tap "+" next to the folder chips
 - Name it something like "Observational"
 - You can create as many as you want
 
-### 4️⃣ Add a Joke (1 minute)
+### 4⃣ Add a Joke (1 minute)
 - Tap "+" button (top-right in Jokes)
 - Enter a **Title** (the punchline or topic)
 - Enter **Content** (full joke or details)
 - Choose a **Folder** (or leave blank)
 - Tap **Save**
 
-### 5️⃣ Enable iCloud Sync (1 minute)
+### 5⃣ Enable iCloud Sync (1 minute)
 - Go to **Settings** (bottom of menu)
 - Tap **iCloud Sync** under "Cloud" section
 - Toggle **"Enable iCloud Sync"** ON
@@ -62,7 +62,7 @@ That's it! You're ready.
 
 ## The Five Sections
 
-### 📝 Notepad
+###  Notepad
 Your quick-capture area. Like the back of a napkin, but digital.
 - Open it anytime
 - Type freely
@@ -70,7 +70,7 @@ Your quick-capture area. Like the back of a napkin, but digital.
 - Syncs to iCloud
 - Keyboard dismisses when you open menu
 
-### 🎭 Jokes
+###  Jokes
 Your organized joke library.
 - Add, edit, delete jokes
 - Organize with folders
@@ -78,7 +78,7 @@ Your organized joke library.
 - Search for specific jokes
 - In Roast Mode, shows roasts instead
 
-### 📋 Set Lists
+###  Set Lists
 Create performance sets from your jokes.
 - Create a set for each gig
 - Add jokes to sets
@@ -86,7 +86,7 @@ Create performance sets from your jokes.
 - Read on stage
 - Swipe to next joke during performance
 
-### 🎙️ Recordings
+###  Recordings
 Record yourself performing.
 - Tap to record
 - Automatically transcribes
@@ -94,14 +94,14 @@ Record yourself performing.
 - Edit transcriptions
 - Syncs to iCloud
 
-### 📸 Notebook
+###  Notebook
 Scan your physical notebooks.
 - Take photo of notebook page
 - Photo saves to app
 - Grid view of all pages
 - Perfect backup for handwritten material
 
-### ⚙️ Settings
+###  Settings
 Customize your experience.
 - Enable iCloud Sync
 - Switch to Roast Mode
@@ -134,7 +134,7 @@ A complete theme change for writing targeted comedy about specific people.
 
 ### How to Use It
 
-1. **Enable**: Settings → Mode → Toggle "Roast Mode" ON
+1. **Enable**: Settings  Mode  Toggle "Roast Mode" ON
 2. **Entire app goes dark** with fire/flame accents
 3. **Menu changes**: 
    - Jokes becomes "Roasts"
@@ -166,7 +166,7 @@ A complete theme change for writing targeted comedy about specific people.
 
 ### How to Enable
 
-1. **Settings** → **Cloud** section
+1. **Settings**  **Cloud** section
 2. Tap **iCloud Sync**
 3. Toggle **"Enable iCloud Sync"** ON
 4. Wait a few seconds (initial sync)
@@ -174,11 +174,11 @@ A complete theme change for writing targeted comedy about specific people.
 
 ### What Syncs
 
-- ✅ Notepad (thoughts & ideas)
-- ✅ Jokes & Roasts
-- ✅ Set Lists
-- ✅ Recordings (audio + transcriptions)
-- ✅ Notebook Photos
+-  Notepad (thoughts & ideas)
+-  Jokes & Roasts
+-  Set Lists
+-  Recordings (audio + transcriptions)
+-  Notebook Photos
 
 ### More Details
 
@@ -188,7 +188,7 @@ See **iCLOUD_SYNC_GUIDE.md** for complete information.
 
 ## Tips for New Users
 
-### ✅ Do These Things
+###  Do These Things
 
 1. **Enable iCloud Sync** right away
 2. **Create folders** (organize by topic, style, venue)
@@ -197,7 +197,7 @@ See **iCLOUD_SYNC_GUIDE.md** for complete information.
 5. **Scan your notebooks** for backup
 6. **Create set lists** before gigs (builds confidence)
 
-### ❌ Avoid These Things
+###  Avoid These Things
 
 1. **Don't** assume data is synced immediately (enable iCloud)
 2. **Don't** write a huge joke then close without saving
@@ -294,12 +294,12 @@ A: Free! iCloud Sync uses your existing iCloud storage.
 
 ## Next Steps
 
-1. ✅ **Explore the Notepad** - Type a joke
-2. ✅ **Check your Jokes view** - Add your first joke
-3. ✅ **Create a Folder** - Organize a bit
-4. ✅ **Enable iCloud Sync** - Protect your work
-5. ✅ **Try Recording** - Record yourself
-6. ✅ **Create a Set List** - Prepare for a gig
+1.  **Explore the Notepad** - Type a joke
+2.  **Check your Jokes view** - Add your first joke
+3.  **Create a Folder** - Organize a bit
+4.  **Enable iCloud Sync** - Protect your work
+5.  **Try Recording** - Record yourself
+6.  **Create a Set List** - Prepare for a gig
 
 That's your foundation. Everything else is refining your workflow!
 
@@ -318,11 +318,11 @@ That's your foundation. Everything else is refining your workflow!
 
 BitBinder is designed to **feel like a real notebook**:
 
-✍️ **Loose-leaf paper** with ruled lines (32pt)  
-✏️ **Red margin line** (at 52pt, like real legal pads)  
-📍 **Punch holes** (left edge, authentic)  
-💭 **No distractions** (just your material)  
-🎭 **Professional feel** (designed for comedians)  
+ **Loose-leaf paper** with ruled lines (32pt)  
+ **Red margin line** (at 52pt, like real legal pads)  
+ **Punch holes** (left edge, authentic)  
+ **No distractions** (just your material)  
+ **Professional feel** (designed for comedians)  
 
 When you use BitBinder, it should feel like you're using the best physical notebook ever invented—but with superpowers (syncing, transcription, backups).
 
@@ -346,6 +346,6 @@ You've got everything you need. Now go write some great material.
 
 ---
 
-**Happy writing! You've got this. 🎭**
+**Happy writing! You've got this. **
 
 *— The BitBinder Team*

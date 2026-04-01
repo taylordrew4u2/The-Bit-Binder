@@ -18,7 +18,7 @@ final class DataValidationService: ObservableObject {
     private let countsKey = "DataValidation_Counts"
     
     init() {
-        print("🔍 [DataValidation] Service initialized")
+        print(" [DataValidation] Service initialized")
     }
     
     // MARK: - Data Integrity Checks
@@ -27,7 +27,7 @@ final class DataValidationService: ObservableObject {
     func validateDataIntegrity(context: ModelContext) async -> DataValidationResult {
         var result = DataValidationResult()
         
-        print("🔍 [DataValidation] Starting data integrity check...")
+        print(" [DataValidation] Starting data integrity check...")
         
         // Count active (non-soft-deleted) entities for types with soft-delete.
         // Using active-only counts prevents false data-loss alerts after trash
@@ -58,18 +58,18 @@ final class DataValidationService: ObservableObject {
         
         result.validationDate = Date()
         
-        print("🔍 [DataValidation] Validation completed")
-        print("🔍 [DataValidation] Total entities: \(result.totalEntities)")
+        print(" [DataValidation] Validation completed")
+        print(" [DataValidation] Total entities: \(result.totalEntities)")
         
         if !result.issues.isEmpty {
-            print("⚠️ [DataValidation] Found \(result.issues.count) issues")
+            print(" [DataValidation] Found \(result.issues.count) issues")
             for issue in result.issues {
                 print("   - \(issue)")
             }
         }
         
         if result.significantDataLoss {
-            print("🚨 [DataValidation] SIGNIFICANT DATA LOSS DETECTED!")
+            print(" [DataValidation] SIGNIFICANT DATA LOSS DETECTED!")
         }
         
         return result
@@ -81,7 +81,7 @@ final class DataValidationService: ObservableObject {
             let entities = try context.fetch(descriptor)
             return entities.count
         } catch {
-            print("❌ [DataValidation] Failed to count \(type): \(error)")
+            print(" [DataValidation] Failed to count \(type): \(error)")
             return 0
         }
     }
@@ -172,14 +172,8 @@ final class DataValidationService: ObservableObject {
                     continue
                 }
                 
-                // Resolve file URL — recordings may store absolute or relative paths
-                let fileURL: URL
-                if recording.fileURL.hasPrefix("/") {
-                    fileURL = URL(fileURLWithPath: recording.fileURL)
-                } else {
-                    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                    fileURL = docs.appendingPathComponent(recording.fileURL)
-                }
+                // Resolve file URL (handles absolute, stale, and relative paths)
+                let fileURL = recording.resolvedURL
                 
                 if !FileManager.default.fileExists(atPath: fileURL.path) {
                     missingFiles += 1
@@ -342,12 +336,12 @@ final class DataValidationService: ObservableObject {
             
             if repairedCount > 0 {
                 try context.save()
-                print("✅ [DataValidation] Repaired \(repairedCount) jokes with invalid dates")
+                print(" [DataValidation] Repaired \(repairedCount) jokes with invalid dates")
             }
             
             return repairedCount > 0
         } catch {
-            print("❌ [DataValidation] Failed to repair invalid dates: \(error)")
+            print(" [DataValidation] Failed to repair invalid dates: \(error)")
             return false
         }
     }
@@ -371,10 +365,10 @@ final class DataValidationService: ObservableObject {
             
             if repairedCount > 0 {
                 try context.save()
-                print("✅ [DataValidation] Repaired \(repairedCount) broken folder relationships")
+                print(" [DataValidation] Repaired \(repairedCount) broken folder relationships")
             }
             
-            // Repair RoastJoke → RoastTarget relationships
+            // Repair RoastJoke  RoastTarget relationships
             let roastJokes = try context.fetch(FetchDescriptor<RoastJoke>())
             let roastTargets = try context.fetch(FetchDescriptor<RoastTarget>())
             
@@ -409,7 +403,7 @@ final class DataValidationService: ObservableObject {
                         roastJoke.target = onlyTarget
                         roastRepaired += 1
                     }
-                    print("✅ [DataValidation] Re-assigned \(orphanedRoastJokes.count) orphaned roast jokes to '\(onlyTarget.name)'")
+                    print(" [DataValidation] Re-assigned \(orphanedRoastJokes.count) orphaned roast jokes to '\(onlyTarget.name)'")
                 } else {
                     // Multiple targets — assign to most recently modified as recovery
                     // User can manually move them later
@@ -418,18 +412,18 @@ final class DataValidationService: ObservableObject {
                         roastJoke.target = recoveryTarget
                         roastRepaired += 1
                     }
-                    print("⚠️ [DataValidation] Re-assigned \(orphanedRoastJokes.count) orphaned roast jokes to '\(recoveryTarget.name)' for recovery — user should verify")
+                    print(" [DataValidation] Re-assigned \(orphanedRoastJokes.count) orphaned roast jokes to '\(recoveryTarget.name)' for recovery — user should verify")
                 }
             }
             
             if roastRepaired > 0 {
                 try context.save()
-                print("✅ [DataValidation] Repaired \(roastRepaired) broken roast relationships")
+                print(" [DataValidation] Repaired \(roastRepaired) broken roast relationships")
             }
             
             return (repairedCount + roastRepaired) > 0
         } catch {
-            print("❌ [DataValidation] Failed to repair relationships: \(error)")
+            print(" [DataValidation] Failed to repair relationships: \(error)")
             return false
         }
     }

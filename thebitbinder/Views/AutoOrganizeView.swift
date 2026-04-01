@@ -13,7 +13,7 @@ struct AutoOrganizeView: View {
     @Environment(\.dismiss) var dismiss
     
     @Query private var jokes: [Joke]
-    @Query private var folders: [JokeFolder]
+    @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }) private var folders: [JokeFolder]
     
     private let categorizationService = BitBuddyService.shared
     
@@ -21,7 +21,6 @@ struct AutoOrganizeView: View {
     @State private var showOrganizationSummary = false
     @State private var organizationStats: (organized: Int, suggested: Int) = (0, 0)
     @State private var selectedJoke: Joke?
-    @State private var showCategoryDetails = false
     @State private var isAnalyzing = false
     @State private var analysisProgress = 0
     @State private var analysisTotal = 0
@@ -43,7 +42,7 @@ struct AutoOrganizeView: View {
     @State private var hasPopulatedCategorizationResults = false
     
     var unorganizedJokes: [Joke] {
-        jokes.filter { $0.folders.isEmpty && !$0.isDeleted }
+        jokes.filter { ($0.folders ?? []).isEmpty && !$0.isDeleted }
     }
     
     var body: some View {
@@ -176,7 +175,6 @@ struct AutoOrganizeView: View {
                                         joke: joke,
                                         onTap: {
                                             selectedJoke = joke
-                                            showCategoryDetails = true
                                         },
                                         onAccept: { category in
                                             assignJokeToFolder(joke, category: category)
@@ -260,7 +258,7 @@ struct AutoOrganizeView: View {
                     .padding(.vertical)
                 }
             }
-            .navigationTitle("Smart Auto-Organize")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -324,16 +322,14 @@ struct AutoOrganizeView: View {
             } message: {
                 Text(errorMessage ?? "An unknown error occurred during analysis.")
             }
-            .sheet(isPresented: $showCategoryDetails) {
-                if let joke = selectedJoke {
-                    CategorySuggestionDetail(
-                        joke: joke,
-                        onSelectCategory: { category in
-                            assignJokeToFolder(joke, category: category)
-                            showCategoryDetails = false
-                        }
-                    )
-                }
+            .sheet(item: $selectedJoke) { joke in
+                CategorySuggestionDetail(
+                    joke: joke,
+                    onSelectCategory: { category in
+                        assignJokeToFolder(joke, category: category)
+                        selectedJoke = nil
+                    }
+                )
             }
             .sheet(isPresented: $showFolderSetup) {
                 FolderSetupView(
@@ -346,7 +342,7 @@ struct AutoOrganizeView: View {
             .alert("Organization Complete", isPresented: $showOrganizationSummary) {
                 Button("Done") { }
             } message: {
-                Text("✅ Organized: \(organizationStats.organized) jokes\n📂 Folder assignments: \(organizationStats.suggested)")
+                Text(" Organized: \(organizationStats.organized) jokes\n Folder assignments: \(organizationStats.suggested)")
             }
             .confirmationDialog(
                 "Reorganize All Jokes",
@@ -363,7 +359,7 @@ struct AutoOrganizeView: View {
                 }
                 Button("Cancel", role: .cancel) { }
             } message: {
-                Text("This will remove all jokes from their current folders and reorganize them into new categories.\n\n⚠️ No jokes will be deleted — only folder assignments will change.")
+                Text("This will remove all jokes from their current folders and reorganize them into new categories.\n\n No jokes will be deleted — only folder assignments will change.")
             }
             .onAppear {
                 // Pre-populate categorization results for all unorganized jokes
@@ -375,7 +371,7 @@ struct AutoOrganizeView: View {
                             let matches = AutoOrganizeService.categorize(content: joke.content)
                             joke.categorizationResults = matches
                             #if DEBUG
-                            print("🎭 [AutoOrganize] Pre-populated \(matches.count) suggestions for: \(joke.title.prefix(30))")
+                            print(" [AutoOrganize] Pre-populated \(matches.count) suggestions for: \(joke.title.prefix(30))")
                             #endif
                         }
                     }
@@ -400,7 +396,7 @@ struct AutoOrganizeView: View {
         Task {
             do {
                 #if DEBUG
-                print("🎭 [AutoOrganize] Starting analysis of \(jokesToOrganize.count) jokes...")
+                print(" [AutoOrganize] Starting analysis of \(jokesToOrganize.count) jokes...")
                 #endif
                 
                 let availableFolders = customFolders.isEmpty ? nil : customFolders
@@ -470,17 +466,19 @@ struct AutoOrganizeView: View {
                                 modelContext.insert(newFolder)
                                 targetFolder = newFolder
                                 #if DEBUG
-                                print("🎭 [AutoOrganize] Created new folder: \(match.category)")
+                                print(" [AutoOrganize] Created new folder: \(match.category)")
                                 #endif
                             }
                             
                             // Add joke to this folder (if not already in it)
-                            if let folder = targetFolder, !joke.folders.contains(where: { $0.id == folder.id }) {
-                                joke.folders.append(folder)
+                            if let folder = targetFolder, !(joke.folders ?? []).contains(where: { $0.id == folder.id }) {
+                                var current = joke.folders ?? []
+                                current.append(folder)
+                                joke.folders = current
                                 assignedFolderNames.insert(match.category)
                                 totalFolderAssignments += 1
                                 #if DEBUG
-                                print("🎭 [AutoOrganize] Assigned joke '\(joke.title.prefix(20))' → folder '\(folder.name)'")
+                                print(" [AutoOrganize] Assigned joke '\(joke.title.prefix(20))'  folder '\(folder.name)'")
                                 #endif
                             }
                         }
@@ -496,14 +494,14 @@ struct AutoOrganizeView: View {
                     do {
                         try modelContext.save()
                         #if DEBUG
-                        print("✅ [AutoOrganize] Saved \(organizedCount) jokes to \(totalFolderAssignments) folder assignments")
+                        print(" [AutoOrganize] Saved \(organizedCount) jokes to \(totalFolderAssignments) folder assignments")
                         #endif
                         organizationStats = (organizedCount, totalFolderAssignments)
                         showOrganizationSummary = true
                         isAnalyzing = false
                     } catch {
                         #if DEBUG
-                        print("❌ [AutoOrganize] Save failed: \(error)")
+                        print(" [AutoOrganize] Save failed: \(error)")
                         #endif
                         errorMessage = "Failed to save: \(error.localizedDescription)"
                         showError = true
@@ -513,7 +511,7 @@ struct AutoOrganizeView: View {
             } catch {
                 await MainActor.run {
                     #if DEBUG
-                    print("❌ [AutoOrganize] Analysis failed: \(error)")
+                    print(" [AutoOrganize] Analysis failed: \(error)")
                     #endif
                     errorMessage = error.localizedDescription
                     showError = true
@@ -594,7 +592,7 @@ struct AutoOrganizeView: View {
     
     private func assignJokeToFolder(_ joke: Joke, category: String) {
         #if DEBUG
-        print("🎭 [AutoOrganize] Assigning joke '\(joke.title.prefix(20))' to folder '\(category)'")
+        print(" [AutoOrganize] Assigning joke '\(joke.title.prefix(20))' to folder '\(category)'")
         #endif
         
         // Find existing folder or create a new one
@@ -605,13 +603,15 @@ struct AutoOrganizeView: View {
             modelContext.insert(newFolder)
             targetFolder = newFolder
             #if DEBUG
-            print("🎭 [AutoOrganize] Created new folder: \(category)")
+            print(" [AutoOrganize] Created new folder: \(category)")
             #endif
         }
         
         // Add to folders array (not replace) - prevents duplicates
-        if let folder = targetFolder, !joke.folders.contains(where: { $0.id == folder.id }) {
-            joke.folders.append(folder)
+        if let folder = targetFolder, !(joke.folders ?? []).contains(where: { $0.id == folder.id }) {
+            var current = joke.folders ?? []
+            current.append(folder)
+            joke.folders = current
         }
         
         // Set primary category if not already set
@@ -623,10 +623,10 @@ struct AutoOrganizeView: View {
         do {
             try modelContext.save()
             #if DEBUG
-            print("✅ [AutoOrganize] Saved joke to folder '\(category)' (now in \(joke.folders.count) folders)")
+            print(" [AutoOrganize] Saved joke to folder '\(category)' (now in \((joke.folders ?? []).count) folders)")
             #endif
         } catch {
-            print("❌ [AutoOrganizeView] Failed to save folder assignment: \(error)")
+            print(" [AutoOrganizeView] Failed to save folder assignment: \(error)")
         }
     }
     
@@ -648,8 +648,8 @@ struct AutoOrganizeView: View {
         }
         
         #if DEBUG
-        print("🔄 [Reorganize] Starting reorganization of \(allActiveJokes.count) jokes...")
-        print("🔄 [Reorganize] Delete empty folders after: \(deleteOldFoldersOnReorganize)")
+        print(" [Reorganize] Starting reorganization of \(allActiveJokes.count) jokes...")
+        print(" [Reorganize] Delete empty folders after: \(deleteOldFoldersOnReorganize)")
         #endif
         
         Task {
@@ -657,7 +657,7 @@ struct AutoOrganizeView: View {
                 // STEP 1: Clear all folder assignments from all jokes
                 await MainActor.run {
                     #if DEBUG
-                    print("🔄 [Reorganize] Step 1: Clearing all folder assignments...")
+                    print(" [Reorganize] Step 1: Clearing all folder assignments...")
                     #endif
                     
                     for joke in allActiveJokes {
@@ -672,10 +672,10 @@ struct AutoOrganizeView: View {
                     do {
                         try modelContext.save()
                         #if DEBUG
-                        print("✅ [Reorganize] Cleared folder assignments from \(allActiveJokes.count) jokes")
+                        print(" [Reorganize] Cleared folder assignments from \(allActiveJokes.count) jokes")
                         #endif
                     } catch {
-                        print("❌ [Reorganize] Failed to clear assignments: \(error)")
+                        print(" [Reorganize] Failed to clear assignments: \(error)")
                     }
                 }
                 
@@ -684,11 +684,11 @@ struct AutoOrganizeView: View {
                     await MainActor.run {
                         let emptyFolders = folders.filter { folder in
                             // A folder is empty if no jokes reference it
-                            !allActiveJokes.contains(where: { $0.folders.contains(where: { $0.id == folder.id }) })
+                            !allActiveJokes.contains(where: { ($0.folders ?? []).contains(where: { $0.id == folder.id }) })
                         }
                         
                         #if DEBUG
-                        print("🗑️ [Reorganize] Deleting \(emptyFolders.count) empty folders...")
+                        print(" [Reorganize] Deleting \(emptyFolders.count) empty folders...")
                         #endif
                         
                         for folder in emptyFolders {
@@ -698,10 +698,10 @@ struct AutoOrganizeView: View {
                         do {
                             try modelContext.save()
                             #if DEBUG
-                            print("✅ [Reorganize] Deleted empty folders")
+                            print(" [Reorganize] Deleted empty folders")
                             #endif
                         } catch {
-                            print("❌ [Reorganize] Failed to delete folders: \(error)")
+                            print(" [Reorganize] Failed to delete folders: \(error)")
                         }
                     }
                 }
@@ -765,8 +765,10 @@ struct AutoOrganizeView: View {
                                 targetFolder = newFolder
                             }
                             
-                            if let folder = targetFolder, !joke.folders.contains(where: { $0.id == folder.id }) {
-                                joke.folders.append(folder)
+                            if let folder = targetFolder, !(joke.folders ?? []).contains(where: { $0.id == folder.id }) {
+                                var current = joke.folders ?? []
+                                current.append(folder)
+                                joke.folders = current
                                 assignedFolderNames.insert(match.category)
                                 totalFolderAssignments += 1
                             }
@@ -783,14 +785,14 @@ struct AutoOrganizeView: View {
                     do {
                         try modelContext.save()
                         #if DEBUG
-                        print("✅ [Reorganize] Complete! Organized \(organizedCount) jokes into \(totalFolderAssignments) folder assignments")
+                        print(" [Reorganize] Complete! Organized \(organizedCount) jokes into \(totalFolderAssignments) folder assignments")
                         #endif
                         organizationStats = (organizedCount, totalFolderAssignments)
                         showOrganizationSummary = true
                         isAnalyzing = false
                         hasPopulatedCategorizationResults = false // Reset so cards refresh
                     } catch {
-                        print("❌ [Reorganize] Failed to save: \(error)")
+                        print(" [Reorganize] Failed to save: \(error)")
                         errorMessage = "Failed to save: \(error.localizedDescription)"
                         showError = true
                         isAnalyzing = false
@@ -798,7 +800,7 @@ struct AutoOrganizeView: View {
                 }
             } catch {
                 await MainActor.run {
-                    print("❌ [Reorganize] Failed: \(error)")
+                    print(" [Reorganize] Failed: \(error)")
                     errorMessage = error.localizedDescription
                     showError = true
                     isAnalyzing = false
@@ -826,12 +828,10 @@ struct JokeOrganizationCard: View {
             Text(joke.title)
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .lineLimit(2)
             
             Text(joke.content)
                 .font(.caption)
                 .foregroundColor(.secondary)
-                .lineLimit(3)
             
             if let suggestion = topSuggestion {
                 VStack(alignment: .leading, spacing: 8) {
@@ -1058,7 +1058,7 @@ struct CategorySuggestionDetail: View {
                 
                 Spacer()
             }
-            .navigationTitle("Choose Category")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -1278,7 +1278,7 @@ struct FolderSetupView: View {
                          : "BitBuddy may create new folders if jokes don't fit existing ones.")
                 }
             }
-            .navigationTitle("Setup Folders")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

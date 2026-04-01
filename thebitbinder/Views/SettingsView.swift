@@ -226,7 +226,7 @@ struct SettingsView: View {
                     Text("About")
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showReorderSheet) {
                 ReorderLayoutView()
@@ -332,7 +332,7 @@ struct ReorderLayoutView: View {
                 }
             }
             .environment(\.editMode, .constant(.active))
-            .navigationTitle("Reorder Layout")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -374,7 +374,7 @@ struct ReorderLayoutView: View {
 struct DailyNotificationSection: View {
     @ObservedObject private var manager = NotificationManager.shared
 
-    // Convert minutes-from-midnight ↔ Date for the DatePicker
+    // Convert minutes-from-midnight  Date for the DatePicker
     private var startDate: Binding<Date> {
         Binding(
             get: { dateFromMinutes(manager.startMinute) },

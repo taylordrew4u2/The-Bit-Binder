@@ -81,7 +81,7 @@ final class MemoryManager {
         isClearing = true
         clearingLock.unlock()
         
-        print("⚠️ [MemoryManager] Memory warning received - clearing caches")
+        print(" [MemoryManager] Memory warning received - clearing caches")
         
         // Clear caches on main thread
         DispatchQueue.main.async { [weak self] in
@@ -103,7 +103,7 @@ final class MemoryManager {
             self?.reportMemoryUsage()
             #endif
             
-            print("✅ [MemoryManager] Caches cleared")
+            print(" [MemoryManager] Caches cleared")
             
             self?.clearingLock.lock()
             self?.isClearing = false
@@ -113,7 +113,7 @@ final class MemoryManager {
     
     /// Called when app enters background
     func handleBackgroundTransition() {
-        print("📱 [MemoryManager] App entering background - reducing memory footprint")
+        print(" [MemoryManager] App entering background - reducing memory footprint")
         
         // Clear URL caches
         URLCache.shared.removeAllCachedResponses()
@@ -144,7 +144,7 @@ final class MemoryManager {
         
         if kerr == KERN_SUCCESS {
             let usedMB = Double(info.resident_size) / 1024.0 / 1024.0
-            print("📊 [MemoryManager] Memory usage: \(String(format: "%.1f", usedMB)) MB")
+            print(" [MemoryManager] Memory usage: \(String(format: "%.1f", usedMB)) MB")
         }
     }
     

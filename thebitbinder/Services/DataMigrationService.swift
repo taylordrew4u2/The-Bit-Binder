@@ -22,35 +22,35 @@ final class DataMigrationService: ObservableObject {
     private let currentMigrationVersion = 1
     
     init() {
-        print("🔄 [DataMigration] Service initialized")
+        print(" [DataMigration] Service initialized")
     }
     
     // MARK: - Migration Management
     
     /// Performs safe migration with automatic backup and rollback
     func performSafeMigration(context: ModelContext) async -> MigrationResult {
-        print("🔄 [DataMigration] Starting safe migration process...")
+        print(" [DataMigration] Starting safe migration process...")
         
         let lastMigrationVersion = UserDefaults.standard.integer(forKey: migrationVersionKey)
         
         guard lastMigrationVersion < currentMigrationVersion else {
-            print("🔄 [DataMigration] No migration needed")
+            print(" [DataMigration] No migration needed")
             return .success("No migration required")
         }
         
         // Step 1: Create pre-migration backup
-        print("🔄 [DataMigration] Creating pre-migration backup...")
+        print(" [DataMigration] Creating pre-migration backup...")
         await dataProtection.createBackup(
             named: "PreMigration_v\(lastMigrationVersion)_to_v\(currentMigrationVersion)_\(ISO8601DateFormatter().string(from: Date()))",
             reason: .preDataOperation
         )
         
         // Step 2: Validate data integrity before migration
-        print("🔄 [DataMigration] Validating data integrity...")
+        print(" [DataMigration] Validating data integrity...")
         let preValidation = await dataValidation.validateDataIntegrity(context: context)
         
         if preValidation.significantDataLoss {
-            print("🚨 [DataMigration] Pre-migration validation failed - aborting")
+            print(" [DataMigration] Pre-migration validation failed - aborting")
             return .failure("Data integrity issues detected before migration")
         }
         
@@ -58,7 +58,7 @@ final class DataMigrationService: ObservableObject {
         var migrationResult: MigrationResult = .success("Migration completed successfully")
         
         for version in (lastMigrationVersion + 1)...currentMigrationVersion {
-            print("🔄 [DataMigration] Running migration to version \(version)...")
+            print(" [DataMigration] Running migration to version \(version)...")
             
             do {
                 try await runMigration(toVersion: version, context: context)
@@ -67,15 +67,15 @@ final class DataMigrationService: ObservableObject {
                 let validation = await dataValidation.validateDataIntegrity(context: context)
                 
                 if !validation.isHealthy {
-                    print("❌ [DataMigration] Migration to v\(version) caused data issues")
+                    print(" [DataMigration] Migration to v\(version) caused data issues")
                     migrationResult = .failure("Migration to version \(version) failed validation")
                     break
                 }
                 
-                print("✅ [DataMigration] Migration to v\(version) completed successfully")
+                print(" [DataMigration] Migration to v\(version) completed successfully")
                 
             } catch {
-                print("❌ [DataMigration] Migration to v\(version) failed: \(error)")
+                print(" [DataMigration] Migration to v\(version) failed: \(error)")
                 migrationResult = .failure("Migration to version \(version) failed: \(error.localizedDescription)")
                 break
             }
@@ -90,16 +90,16 @@ final class DataMigrationService: ObservableObject {
             // Final validation
             let finalValidation = await dataValidation.validateDataIntegrity(context: context)
             if !finalValidation.isHealthy {
-                print("⚠️ [DataMigration] Final validation found issues, but migration completed")
+                print(" [DataMigration] Final validation found issues, but migration completed")
                 return .warning("Migration completed but data validation found minor issues")
             }
             
-            print("✅ [DataMigration] All migrations completed successfully")
+            print(" [DataMigration] All migrations completed successfully")
             return migrationResult
             
         case .failure, .warning:
             // Rollback on failure
-            print("🔄 [DataMigration] Migration failed, attempting rollback...")
+            print(" [DataMigration] Migration failed, attempting rollback...")
             let rollbackResult = await performRollback(to: lastMigrationVersion)
             
             if case .success = rollbackResult {
@@ -117,20 +117,20 @@ final class DataMigrationService: ObservableObject {
         case 1:
             try await migration_v1(context: context)
         default:
-            print("⚠️ [DataMigration] Unknown migration version: \(version)")
+            print(" [DataMigration] Unknown migration version: \(version)")
         }
     }
     
     /// Example migration v1: Add any necessary data transformations
     private func migration_v1(context: ModelContext) async throws {
-        print("🔄 [DataMigration] Running migration v1...")
+        print(" [DataMigration] Running migration v1...")
         
         // Example: Update any data structures that changed
         // This is where you would add specific migration logic
         
         // For now, this is a placeholder that ensures existing data is preserved
         let jokes = try context.fetch(FetchDescriptor<Joke>())
-        print("🔄 [DataMigration] Validated \(jokes.count) jokes during v1 migration")
+        print(" [DataMigration] Validated \(jokes.count) jokes during v1 migration")
         
         // Save any changes
         try context.save()
@@ -142,13 +142,13 @@ final class DataMigrationService: ObservableObject {
     /// version to `targetVersion` (the version the user was on *before* the
     /// migration attempt started).
     private func performRollback(to targetVersion: Int) async -> MigrationResult {
-        print("🔄 [DataMigration] Performing rollback to v\(targetVersion)...")
+        print(" [DataMigration] Performing rollback to v\(targetVersion)...")
         
         // Get the most recent pre-migration backup
         let backups = dataProtection.getAvailableBackups()
         
         guard let preMigrationBackup = backups.first(where: { $0.name.contains("PreMigration") }) else {
-            print("❌ [DataMigration] No pre-migration backup found for rollback")
+            print(" [DataMigration] No pre-migration backup found for rollback")
             return .failure("No pre-migration backup available")
         }
         
@@ -158,11 +158,11 @@ final class DataMigrationService: ObservableObject {
             // Reset migration version to the pre-migration state
             UserDefaults.standard.set(targetVersion, forKey: migrationVersionKey)
             
-            print("✅ [DataMigration] Rollback completed successfully")
+            print(" [DataMigration] Rollback completed successfully")
             return .success("Data rolled back to pre-migration state")
             
         } catch {
-            print("❌ [DataMigration] Rollback failed: \(error)")
+            print(" [DataMigration] Rollback failed: \(error)")
             return .failure("Rollback failed: \(error.localizedDescription)")
         }
     }
@@ -175,7 +175,7 @@ final class DataMigrationService: ObservableObject {
         let lastSchemaHash = UserDefaults.standard.string(forKey: "DataMigration_LastSchemaHash")
         
         if lastSchemaHash != nil && lastSchemaHash != currentSchemaHash {
-            print("🔄 [DataMigration] Schema change detected, creating safety backup...")
+            print(" [DataMigration] Schema change detected, creating safety backup...")
             await dataProtection.createBackup(
                 named: "SchemaChange_\(ISO8601DateFormatter().string(from: Date()))",
                 reason: .preDataOperation
@@ -217,7 +217,7 @@ final class DataMigrationService: ObservableObject {
     
     /// Attempts to recover from catastrophic data loss
     func emergencyDataRecovery() async -> MigrationResult {
-        print("🚨 [DataMigration] EMERGENCY DATA RECOVERY INITIATED")
+        print(" [DataMigration] EMERGENCY DATA RECOVERY INITIATED")
         
         // Try to find any available backup
         let backups = dataProtection.getAvailableBackups().sorted { $0.createdAt > $1.createdAt }
@@ -227,13 +227,13 @@ final class DataMigrationService: ObservableObject {
         }
         
         do {
-            print("🚨 [DataMigration] Attempting emergency recovery from backup: \(mostRecentBackup.name)")
+            print(" [DataMigration] Attempting emergency recovery from backup: \(mostRecentBackup.name)")
             try await dataProtection.recoverFromBackup(mostRecentBackup)
             
             return .success("Emergency recovery completed from backup: \(mostRecentBackup.name)")
             
         } catch {
-            print("❌ [DataMigration] Emergency recovery failed: \(error)")
+            print(" [DataMigration] Emergency recovery failed: \(error)")
             return .failure("Emergency recovery failed: \(error.localizedDescription)")
         }
     }

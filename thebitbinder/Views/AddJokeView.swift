@@ -3,7 +3,7 @@
 //  thebitbinder
 //
 //  Created by Taylor Drew on 12/2/25.
-//  ✨ Enhanced for effortless joke capture
+//   Enhanced for effortless joke capture
 //
 
 import SwiftUI
@@ -12,7 +12,7 @@ import SwiftData
 struct AddJokeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query private var folders: [JokeFolder]
+    @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }) private var folders: [JokeFolder]
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     @State private var title = ""
@@ -107,7 +107,7 @@ struct AddJokeView: View {
                     .padding(20)
                 }
             }
-            .navigationTitle("New Joke")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
             .toolbar {
@@ -179,7 +179,7 @@ struct AddJokeView: View {
             } catch {
                 isSaving = false
                 HapticEngine.shared.error()
-                print("❌ [AddJokeView] Failed to save joke: \(error)")
+                print(" [AddJokeView] Failed to save joke: \(error)")
                 saveErrorMessage = "Could not save joke: \(error.localizedDescription)"
                 showSaveError = true
             }

@@ -4,17 +4,17 @@ Welcome to the complete BitBinder documentation. Everything you need is here.
 
 ---
 
-## 📚 Documentation Files
+##  Documentation Files
 
 ### For New Users
 
-**START HERE** → [Welcome Guide](WELCOME_GUIDE.md)
+**START HERE**  [Welcome Guide](WELCOME_GUIDE.md)
 - 30-second quickstart
 - Your first 5 minutes
 - Tips for new users
 - Workflow ideas
 
-**REFERENCE** → [Quick Reference](QUICK_REFERENCE.md)
+**REFERENCE**  [Quick Reference](QUICK_REFERENCE.md)
 - One-page cheat sheet
 - All features at a glance
 - Common actions
@@ -22,14 +22,14 @@ Welcome to the complete BitBinder documentation. Everything you need is here.
 
 ### For Detailed Help
 
-**COMPLETE GUIDE** → [Help & FAQ](HELP_AND_FAQ.md)
+**COMPLETE GUIDE**  [Help & FAQ](HELP_AND_FAQ.md)
 - Feature-by-feature guide
 - 50+ common questions
 - Troubleshooting section
 - Keyboard tips
 - Performance optimization
 
-**ICLOUD SYNC** → [iCloud Sync Guide](iCLOUD_SYNC_GUIDE.md)
+**ICLOUD SYNC**  [iCloud Sync Guide](iCLOUD_SYNC_GUIDE.md)
 - How to enable iCloud Sync
 - What gets synced
 - Security & privacy
@@ -53,25 +53,25 @@ Welcome to the complete BitBinder documentation. Everything you need is here.
 
 BitBinder is your professional comedy notebook with 5 key features:
 
-### 📝 Notepad
+###  Notepad
 Quick capture area for ideas. Auto-saves. Syncs to iCloud.
 
-### 🎭 Jokes
+###  Jokes
 Organize all your material. Folders. Search. Grid or List view.
 
-### 📋 Set Lists
+###  Set Lists
 Create performance sets. Perfect for gigs. Read on stage.
 
-### 🎙️ Recordings
+###  Recordings
 Record yourself. Auto-transcription. Review & improve.
 
-### 📸 Notebook
+###  Notebook
 Scan physical notebooks. Digital backup. Searchable.
 
-### 🔥 Roast Mode
+###  Roast Mode
 Dark theme for targeted comedy. Complete theme overhaul.
 
-### ☁️ iCloud Sync
+###  iCloud Sync
 Optional cloud backup. All devices. Encrypted.
 
 ---
@@ -82,29 +82,29 @@ Optional cloud backup. All devices. Encrypted.
 - [Help & FAQ](HELP_AND_FAQ.md) — Comprehensive guide with 50+ Q&As
 
 ### Specific Topics
-- **Notepad** → [Help & FAQ > Notepad](HELP_AND_FAQ.md#-notepad-home)
-- **Jokes** → [Help & FAQ > Jokes View](HELP_AND_FAQ.md#-jokes-view-jokes-section)
-- **Set Lists** → [Help & FAQ > Set Lists](HELP_AND_FAQ.md#-set-lists)
-- **Recordings** → [Help & FAQ > Voice Recordings](HELP_AND_FAQ.md#-voice-recordings)
-- **Notebook** → [Help & FAQ > Notebook Saver](HELP_AND_FAQ.md#-notebook-saver-scanning)
-- **Roast Mode** → [Help & FAQ > Roast Mode](HELP_AND_FAQ.md#-roast-mode)
-- **iCloud Sync** → [iCloud Sync Guide](iCLOUD_SYNC_GUIDE.md)
+- **Notepad**  [Help & FAQ > Notepad](HELP_AND_FAQ.md#-notepad-home)
+- **Jokes**  [Help & FAQ > Jokes View](HELP_AND_FAQ.md#-jokes-view-jokes-section)
+- **Set Lists**  [Help & FAQ > Set Lists](HELP_AND_FAQ.md#-set-lists)
+- **Recordings**  [Help & FAQ > Voice Recordings](HELP_AND_FAQ.md#-voice-recordings)
+- **Notebook**  [Help & FAQ > Notebook Saver](HELP_AND_FAQ.md#-notebook-saver-scanning)
+- **Roast Mode**  [Help & FAQ > Roast Mode](HELP_AND_FAQ.md#-roast-mode)
+- **iCloud Sync**  [iCloud Sync Guide](iCLOUD_SYNC_GUIDE.md)
 
 ### Problem Solving
-- **Something not working?** → [Help & FAQ > Troubleshooting](HELP_AND_FAQ.md#troubleshooting)
-- **Sync issues?** → [iCloud Sync Guide > Troubleshooting](iCLOUD_SYNC_GUIDE.md#troubleshooting)
-- **Keyboard stuck?** → [Quick Reference > Keyboard Tips](QUICK_REFERENCE.md#keyboard-tips)
+- **Something not working?**  [Help & FAQ > Troubleshooting](HELP_AND_FAQ.md#troubleshooting)
+- **Sync issues?**  [iCloud Sync Guide > Troubleshooting](iCLOUD_SYNC_GUIDE.md#troubleshooting)
+- **Keyboard stuck?**  [Quick Reference > Keyboard Tips](QUICK_REFERENCE.md#keyboard-tips)
 
 ### FAQs by Category
-- **Data & Privacy** → [Help & FAQ > Data & Privacy](HELP_AND_FAQ.md#data--privacy)
-- **Syncing & Backups** → [Help & FAQ > Syncing & Backups](HELP_AND_FAQ.md#syncing--backups)
-- **Jokes & Organization** → [Help & FAQ > Jokes & Organization](HELP_AND_FAQ.md#jokes--organization)
-- **Recording & Transcription** → [Help & FAQ > Recording & Transcription](HELP_AND_FAQ.md#recording--transcription)
-- **Roast Mode** → [Help & FAQ > Roast Mode](HELP_AND_FAQ.md#roast-mode)
-- **Performance & Battery** → [Help & FAQ > Performance & Battery](HELP_AND_FAQ.md#performance--battery)
-- **Permissions** → [Help & FAQ > Permissions](HELP_AND_FAQ.md#permissions)
-- **Exporting & Sharing** → [Help & FAQ > Exporting & Sharing](HELP_AND_FAQ.md#exporting--sharing)
-- **General Questions** → [Help & FAQ > General](HELP_AND_FAQ.md#general)
+- **Data & Privacy**  [Help & FAQ > Data & Privacy](HELP_AND_FAQ.md#data--privacy)
+- **Syncing & Backups**  [Help & FAQ > Syncing & Backups](HELP_AND_FAQ.md#syncing--backups)
+- **Jokes & Organization**  [Help & FAQ > Jokes & Organization](HELP_AND_FAQ.md#jokes--organization)
+- **Recording & Transcription**  [Help & FAQ > Recording & Transcription](HELP_AND_FAQ.md#recording--transcription)
+- **Roast Mode**  [Help & FAQ > Roast Mode](HELP_AND_FAQ.md#roast-mode)
+- **Performance & Battery**  [Help & FAQ > Performance & Battery](HELP_AND_FAQ.md#performance--battery)
+- **Permissions**  [Help & FAQ > Permissions](HELP_AND_FAQ.md#permissions)
+- **Exporting & Sharing**  [Help & FAQ > Exporting & Sharing](HELP_AND_FAQ.md#exporting--sharing)
+- **General Questions**  [Help & FAQ > General](HELP_AND_FAQ.md#general)
 
 ---
 
@@ -112,16 +112,16 @@ Optional cloud backup. All devices. Encrypted.
 
 | Feature | Status | Learn More |
 |---------|--------|------------|
-| 📝 Notepad | ✅ Full | [Welcome Guide](WELCOME_GUIDE.md) or [Help & FAQ](HELP_AND_FAQ.md#-notepad-home) |
-| 🎭 Jokes | ✅ Full | [Help & FAQ > Jokes](HELP_AND_FAQ.md#-jokes-view-jokes-section) |
-| 📋 Set Lists | ✅ Full | [Help & FAQ > Set Lists](HELP_AND_FAQ.md#-set-lists) |
-| 🎙️ Recordings | ✅ Full | [Help & FAQ > Recordings](HELP_AND_FAQ.md#-voice-recordings) |
-| 📸 Notebook | ✅ Full | [Help & FAQ > Notebook](HELP_AND_FAQ.md#-notebook-saver-scanning) |
-| 🔥 Roast Mode | ✅ Full | [Help & FAQ > Roast Mode](HELP_AND_FAQ.md#-roast-mode) |
-| ☁️ iCloud Sync | ✅ Full | [iCloud Sync Guide](iCLOUD_SYNC_GUIDE.md) |
-| 🔍 Search | ✅ Full | [Help & FAQ > Jokes](HELP_AND_FAQ.md#-jokes-view-jokes-section) |
-| 📁 Folders | ✅ Full | [Help & FAQ > Jokes](HELP_AND_FAQ.md#-jokes-view-jokes-section) |
-| 📄 PDF Export | ✅ Full | [Help & FAQ > Settings](HELP_AND_FAQ.md#️-settings) |
+|  Notepad |  Full | [Welcome Guide](WELCOME_GUIDE.md) or [Help & FAQ](HELP_AND_FAQ.md#-notepad-home) |
+|  Jokes |  Full | [Help & FAQ > Jokes](HELP_AND_FAQ.md#-jokes-view-jokes-section) |
+|  Set Lists |  Full | [Help & FAQ > Set Lists](HELP_AND_FAQ.md#-set-lists) |
+|  Recordings |  Full | [Help & FAQ > Recordings](HELP_AND_FAQ.md#-voice-recordings) |
+|  Notebook |  Full | [Help & FAQ > Notebook](HELP_AND_FAQ.md#-notebook-saver-scanning) |
+|  Roast Mode |  Full | [Help & FAQ > Roast Mode](HELP_AND_FAQ.md#-roast-mode) |
+|  iCloud Sync |  Full | [iCloud Sync Guide](iCLOUD_SYNC_GUIDE.md) |
+|  Search |  Full | [Help & FAQ > Jokes](HELP_AND_FAQ.md#-jokes-view-jokes-section) |
+|  Folders |  Full | [Help & FAQ > Jokes](HELP_AND_FAQ.md#-jokes-view-jokes-section) |
+|  PDF Export |  Full | [Help & FAQ > Settings](HELP_AND_FAQ.md#-settings) |
 
 ---
 
@@ -154,16 +154,16 @@ Optional cloud backup. All devices. Encrypted.
 - **Free!** (iCloud Sync uses your existing iCloud storage)
 
 ### What Gets Synced (with iCloud)
-- ✅ Thoughts (notepad)
-- ✅ Jokes & Roasts
-- ✅ Set Lists
-- ✅ Recordings + Transcriptions
-- ✅ Notebook Photos
+-  Thoughts (notepad)
+-  Jokes & Roasts
+-  Set Lists
+-  Recordings + Transcriptions
+-  Notebook Photos
 
 ### Security
-- 🔒 **End-to-End Encrypted** (via iCloud CloudKit)
-- 🔐 **Your Data Only** (only you can access)
-- ✅ **No Ads, No Tracking** (privacy first)
+-  **End-to-End Encrypted** (via iCloud CloudKit)
+-  **Your Data Only** (only you can access)
+-  **No Ads, No Tracking** (privacy first)
 
 ---
 
@@ -180,15 +180,15 @@ More support features coming soon!
 
 ## Pro Tips
 
-✅ Enable iCloud Sync immediately (peace of mind)  
-✅ Use Folders to stay organized (saves time later)  
-✅ Record yourself often (fastest way to improve)  
-✅ Create set lists before gigs (builds confidence)  
-✅ Switch between Grid & List view as needed  
+ Enable iCloud Sync immediately (peace of mind)  
+ Use Folders to stay organized (saves time later)  
+ Record yourself often (fastest way to improve)  
+ Create set lists before gigs (builds confidence)  
+ Switch between Grid & List view as needed  
 
-❌ Don't assume data is synced (enable iCloud!)  
-❌ Don't fight the keyboard (use "Done" button)  
-❌ Don't skip scanning notebooks (backup = safe)  
+ Don't assume data is synced (enable iCloud!)  
+ Don't fight the keyboard (use "Done" button)  
+ Don't skip scanning notebooks (backup = safe)  
 
 ---
 
@@ -196,12 +196,12 @@ More support features coming soon!
 
 BitBinder feels like using the **best physical comedy notebook ever invented**—but with superpowers:
 
-- 📝 Real loose-leaf paper (ruled lines at 32pt)
-- ✏️ Authentic margins (red line at 52pt)
-- 📍 Real punch holes (left edge)
-- 🎭 Zero distractions (just your material)
-- ☁️ Automatic backup (peace of mind)
-- 🚀 Lightning fast (optimized for comedians)
+-  Real loose-leaf paper (ruled lines at 32pt)
+-  Authentic margins (red line at 52pt)
+-  Real punch holes (left edge)
+-  Zero distractions (just your material)
+-  Automatic backup (peace of mind)
+-  Lightning fast (optimized for comedians)
 
 ---
 
@@ -227,4 +227,4 @@ Whether you're an open mic veteran or just starting out, BitBinder is designed t
 **Version 9.3+**  
 *Professional comedy notebook app designed by comedians, for comedians.*
 
-**Happy writing! 🎭**
+**Happy writing! **

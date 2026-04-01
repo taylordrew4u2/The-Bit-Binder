@@ -7,7 +7,7 @@
 //  a hard error — there is NO local/rule-based fallback. The user must always
 //  get AI-reviewed results or an explicit failure message.
 //
-//  ⚠️  HARDWIRED RESTRICTION: Extraction is ONLY for file imports.
+//    HARDWIRED RESTRICTION: Extraction is ONLY for file imports.
 //  BitBuddy is 100% local/rule-based and must NEVER call extraction providers.
 //  All extraction methods require an `AIExtractionToken` that only
 //  `ImportPipelineCoordinator` can create.
@@ -38,7 +38,7 @@ struct AIExtractionToken {
 
 /// Manages extraction providers with automatic fallback for joke extraction.
 ///
-/// ⚠️  Extraction is reserved **exclusively** for the file-import pipeline.
+///   Extraction is reserved **exclusively** for the file-import pipeline.
 /// BitBuddy is local-only and must never touch these providers.
 /// Every public extraction method requires an `AIExtractionToken` that
 /// only `ImportPipelineCoordinator` should create.
@@ -59,10 +59,10 @@ final class AIJokeExtractionManager {
     private func assertAuthorised(_ token: AIExtractionToken) {
         if !Self.allowedCallers.contains(token.caller) {
             assertionFailure(
-                "🚫 [Extraction] BLOCKED: '\(token.caller)' is not allowed to use extraction. "
+                " [Extraction] BLOCKED: '\(token.caller)' is not allowed to use extraction. "
                 + "Extraction is reserved for file imports only. Allowed: \(Self.allowedCallers)"
             )
-            print("🚫 [Extraction] BLOCKED: Unauthorised caller '\(token.caller)' — extraction denied.")
+            print(" [Extraction] BLOCKED: Unauthorised caller '\(token.caller)' — extraction denied.")
         }
     }
 
@@ -188,16 +188,16 @@ final class AIJokeExtractionManager {
     /// If NO provider succeeds, this throws `AIExtractionFailedError` —
     /// there is NO local/rule-based fallback. The caller must surface the failure.
     ///
-    /// ⚠️  Requires an `AIExtractionToken`. Only the file-import pipeline may call this.
-    func extractJokes(from text: String, token: AIExtractionToken) async throws -> (jokes: [GeminiExtractedJoke], provider: AIProviderType) {
+    ///   Requires an `AIExtractionToken`. Only the file-import pipeline may call this.
+    func extractJokes(from text: String, token: AIExtractionToken) async throws -> (jokes: [AIExtractedJoke], provider: AIProviderType) {
         assertAuthorised(token)
 
-        print("🔍 [Extraction] Starting with \(text.count) chars")
-        print("🔍 [Extraction] Providers in use order: \(providerOrder.map(\.displayName).joined(separator: " → "))")
+        print(" [Extraction] Starting with \(text.count) chars")
+        print(" [Extraction] Providers in use order: \(providerOrder.map(\.displayName).joined(separator: " → "))")
 
         // If no connectivity, skip straight to throwing — don't silently degrade.
         if await !Self.hasNetworkConnectivity() {
-            print("📡 [Extraction] No network — all AI providers unreachable")
+            print(" [Extraction] No network — all AI providers unreachable")
             throw AIExtractionFailedError(
                 reason: "GagGrabber can't connect — no internet. Connect to Wi-Fi or cellular and try again.",
                 underlyingErrors: [:]
@@ -211,45 +211,45 @@ final class AIJokeExtractionManager {
             // If a previous provider hit a network error, skip the rest —
             // they will all fail the same way.
             if hitNetworkError {
-                print("⏭️ [Extraction] Skipping \(providerType.displayName) (network down)")
+                print(" [Extraction] Skipping \(providerType.displayName) (network down)")
                 continue
             }
 
             guard !disabledProviders.contains(providerType) else {
-                print("⏭️ [Extraction] Skipping \(providerType.displayName) (disabled)")
+                print(" [Extraction] Skipping \(providerType.displayName) (disabled)")
                 continue
             }
 
             guard let provider = providers[providerType], provider.isConfigured() else {
-                print("⏭️ [Extraction] Skipping \(providerType.displayName) (no API key)")
+                print(" [Extraction] Skipping \(providerType.displayName) (no API key)")
                 continue
             }
 
             guard !isRateLimited(providerType) else {
-                print("⏭️ [Extraction] Skipping \(providerType.displayName) (rate limited)")
+                print(" [Extraction] Skipping \(providerType.displayName) (rate limited)")
                 continue
             }
 
             do {
-                print("🔄 [Extraction] Trying \(providerType.displayName)…")
+                print(" [Extraction] Trying \(providerType.displayName)…")
                 let jokes = try await provider.extractJokes(from: text)
-                print("✅ [Extraction] \(providerType.displayName) returned \(jokes.count) fragment(s)")
+                print(" [Extraction] \(providerType.displayName) returned \(jokes.count) fragment(s)")
                 return (jokes, providerType)
             } catch let error as AIProviderError {
                 switch error {
                 case .rateLimited(_, let retryAfter):
-                    print("⚠️ [Extraction] \(providerType.displayName) rate limited, trying next…")
+                    print(" [Extraction] \(providerType.displayName) rate limited, trying next…")
                     markRateLimited(providerType, forSeconds: retryAfter)
                 case .keyNotConfigured:
-                    print("⚠️ [Extraction] \(providerType.displayName) key not configured, trying next…")
+                    print(" [Extraction] \(providerType.displayName) key not configured, trying next…")
                 default:
-                    print("❌ [Extraction] \(providerType.displayName) error: \(error.localizedDescription)")
+                    print(" [Extraction] \(providerType.displayName) error: \(error.localizedDescription)")
                 }
                 errors[providerType] = error
             } catch {
-                print("❌ [Extraction] \(providerType.displayName) unexpected error: \(error.localizedDescription)")
+                print(" [Extraction] \(providerType.displayName) unexpected error: \(error.localizedDescription)")
                 if Self.isNetworkError(error) {
-                    print("📡 [Extraction] Network error — skipping remaining providers")
+                    print(" [Extraction] Network error — skipping remaining providers")
                     hitNetworkError = true
                 }
                 let desc = error.localizedDescription.lowercased()
@@ -261,7 +261,7 @@ final class AIJokeExtractionManager {
         }
 
         // Every AI provider failed — surface a hard error.
-        print("❌ [Extraction] All AI providers failed — throwing error (no local fallback)")
+        print(" [Extraction] All AI providers failed — throwing error (no local fallback)")
         throw AIExtractionFailedError(
             reason: "GagGrabber struck out — none of its sources came through. Check your network and try again in a few minutes.",
             underlyingErrors: errors
@@ -271,8 +271,8 @@ final class AIJokeExtractionManager {
     /// Convenience wrapper used by `ImportPipelineCoordinator`.
     /// Returns the jokes and the provider name, or throws `AIExtractionFailedError`.
     ///
-    /// ⚠️  Requires an `AIExtractionToken`. Only file-import callers may use this.
-    func extractJokesForPipeline(from text: String, token: AIExtractionToken) async throws -> (jokes: [GeminiExtractedJoke], providerUsed: String) {
+    ///   Requires an `AIExtractionToken`. Only file-import callers may use this.
+    func extractJokesForPipeline(from text: String, token: AIExtractionToken) async throws -> (jokes: [AIExtractedJoke], providerUsed: String) {
         let result = try await extractJokes(from: text, token: token)
         return (result.jokes, result.provider.displayName)
     }

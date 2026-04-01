@@ -4,16 +4,16 @@
 
 | Icon | Screen | What You Do |
 |------|--------|-------------|
-| 📝 | **Notepad** | Quick jot ideas, thoughts, observations |
-| 🎭 | **Jokes** | View & organize all your jokes (Grid/List modes) |
-| 📋 | **Set Lists** | Create performance sets from your jokes |
-| 🎙️ | **Recordings** | Record yourself, get transcriptions |
-| 📸 | **Notebook** | Scan physical notebook pages, photo backup |
-| ⚙️ | **Settings** | Preferences, exports, iCloud Sync |
+|  | **Notepad** | Quick jot ideas, thoughts, observations |
+|  | **Jokes** | View & organize all your jokes (Grid/List modes) |
+|  | **Set Lists** | Create performance sets from your jokes |
+|  | **Recordings** | Record yourself, get transcriptions |
+|  | **Notebook** | Scan physical notebook pages, photo backup |
+|  | **Settings** | Preferences, exports, iCloud Sync |
 
 ---
 
-## Notepad (📝)
+## Notepad ()
 
 | Action | How |
 |--------|-----|
@@ -24,16 +24,16 @@
 
 ---
 
-## Jokes (🎭)
+## Jokes ()
 
 | Action | How |
 |--------|-----|
-| **Add joke** | Tap "+" → Title + Content → Save |
+| **Add joke** | Tap "+"  Title + Content  Save |
 | **Create folder** | Tap "+" next to folder chips |
-| **Switch view** | Tap icon in toolbar (Grid ↔ List) |
+| **Switch view** | Tap icon in toolbar (Grid  List) |
 | **Search** | Use search bar at top |
-| **Edit joke** | Tap joke → Edit → Save |
-| **Delete joke** | Tap joke → Delete |
+| **Edit joke** | Tap joke  Edit  Save |
+| **Delete joke** | Tap joke  Delete |
 | **Filter by folder** | Tap folder chip at top |
 
 **Keyboard Tips**:
@@ -43,57 +43,57 @@
 
 ---
 
-## Roast Mode (🔥)
+## Roast Mode ()
 
 | Action | How |
 |--------|-----|
-| **Enable** | Settings → Mode → Toggle On |
-| **Add target** | Roasts → "+" → Name + Photo → Save |
+| **Enable** | Settings  Mode  Toggle On |
+| **Add target** | Roasts  "+"  Name + Photo  Save |
 | **Add roast** | Like jokes, but in Roast Mode |
 | **See flame meter** | Shows roast count per target |
-| **Switch back** | Settings → Mode → Toggle Off |
+| **Switch back** | Settings  Mode  Toggle Off |
 
 **Important**: Jokes and roasts are completely separate!
 
 ---
 
-## Set Lists (📋)
+## Set Lists ()
 
 | Action | How |
 |--------|-----|
-| **Create set** | Tap "+" → Name → Save |
-| **Add jokes** | Open set → "+" → Select jokes → Done |
+| **Create set** | Tap "+"  Name  Save |
+| **Add jokes** | Open set  "+"  Select jokes  Done |
 | **Reorder** | Long-press drag jokes in the set |
-| **Perform** | Open set → Read jokes → Swipe next |
+| **Perform** | Open set  Read jokes  Swipe next |
 | **Delete set** | Swipe-left on set name |
 
 ---
 
-## Recordings (🎙️)
+## Recordings ()
 
 | Action | How |
 |--------|-----|
-| **Start recording** | Tap "+" (red circle) → Perform → Stop |
-| **Name it** | After recording, enter name → Save |
-| **Play back** | Tap recording → Tap play button |
-| **See transcription** | Tap recording → Read transcribed text |
-| **Edit transcription** | Tap recording → Tap edit → Modify text |
+| **Start recording** | Tap "+" (red circle)  Perform  Stop |
+| **Name it** | After recording, enter name  Save |
+| **Play back** | Tap recording  Tap play button |
+| **See transcription** | Tap recording  Read transcribed text |
+| **Edit transcription** | Tap recording  Tap edit  Modify text |
 | **Delete** | Swipe-left on recording |
 
 ---
 
-## Notebook Photos (📸)
+## Notebook Photos ()
 
 | Action | How |
 |--------|-----|
-| **Scan page** | Tap "+" → Take photo of notebook → Save |
+| **Scan page** | Tap "+"  Take photo of notebook  Save |
 | **View** | Tap photo in grid to enlarge |
-| **Delete** | Long-press photo → Delete |
-| **Share** | Tap photo → Share button (iOS) |
+| **Delete** | Long-press photo  Delete |
+| **Share** | Tap photo  Share button (iOS) |
 
 ---
 
-## Settings (⚙️)
+## Settings ()
 
 | Setting | What It Does |
 |---------|--------------|
@@ -108,13 +108,13 @@
 
 ## iCloud Sync Quick Start
 
-1. **Settings** → **iCloud Sync**
+1. **Settings**  **iCloud Sync**
 2. Toggle **"Enable iCloud Sync"** ON
 3. Wait for initial sync (usually seconds)
 4. Data syncs automatically forever
 5. (Optional) Tap **"Sync Now"** anytime
 
-✅ What syncs: Thoughts, Jokes, Roasts, Set Lists, Recordings, Photos
+ What syncs: Thoughts, Jokes, Roasts, Set Lists, Recordings, Photos
 
 ---
 
@@ -154,15 +154,15 @@
 
 | Goal | Steps |
 |------|-------|
-| **Quick jot an idea** | Tap Notepad → Type → Auto-saves |
-| **Organize jokes** | Create Folder → Add jokes to it |
-| **See all my jokes** | Tap Jokes → Switch to Grid view |
+| **Quick jot an idea** | Tap Notepad  Type  Auto-saves |
+| **Organize jokes** | Create Folder  Add jokes to it |
+| **See all my jokes** | Tap Jokes  Switch to Grid view |
 | **Find a specific joke** | Use search bar at top |
-| **Prepare a 5-min set** | Create set list → Add 8-10 jokes |
-| **Record a performance** | Tap Recordings → Record → Name it |
-| **Backup everything** | Settings → iCloud Sync → Enable |
-| **Share my jokes** | Settings → Export Jokes → Email PDF |
-| **Roast someone** | Settings → Roast Mode → Add target |
+| **Prepare a 5-min set** | Create set list  Add 8-10 jokes |
+| **Record a performance** | Tap Recordings  Record  Name it |
+| **Backup everything** | Settings  iCloud Sync  Enable |
+| **Share my jokes** | Settings  Export Jokes  Email PDF |
+| **Roast someone** | Settings  Roast Mode  Add target |
 | **Dismiss keyboard** | Tap "Done" or open menu |
 
 ---
@@ -227,11 +227,11 @@
 
 | Setting | Path |
 |---------|------|
-| **Enable iCloud Sync** | Settings → Cloud → Toggle |
-| **Roast Mode** | Settings → Mode → Toggle |
-| **Reorder menu** | Settings → Layout → Drag tabs |
-| **Export jokes** | Settings → Export → Jokes → Choose format |
-| **Export recordings** | Settings → Export → Audio → ZIP |
+| **Enable iCloud Sync** | Settings  Cloud  Toggle |
+| **Roast Mode** | Settings  Mode  Toggle |
+| **Reorder menu** | Settings  Layout  Drag tabs |
+| **Export jokes** | Settings  Export  Jokes  Choose format |
+| **Export recordings** | Settings  Export  Audio  ZIP |
 
 ---
 
@@ -247,14 +247,14 @@
 
 ## Data Safety
 
-✅ **Local storage**: Data on device by default  
-✅ **iCloud backup**: Opt-in, encrypted  
-✅ **No tracking**: No ads, no analytics  
-✅ **Your data only**: Only you can access  
+ **Local storage**: Data on device by default  
+ **iCloud backup**: Opt-in, encrypted  
+ **No tracking**: No ads, no analytics  
+ **Your data only**: Only you can access  
 
-❌ **No auto-cloud**: Must enable in Settings  
-❌ **No sharing**: Manual export only  
-❌ **No recovery**: Deleted = gone (unless iCloud backup)
+ **No auto-cloud**: Must enable in Settings  
+ **No sharing**: Manual export only  
+ **No recovery**: Deleted = gone (unless iCloud backup)
 
 ---
 
@@ -262,17 +262,17 @@
 
 | Feature | Status |
 |---------|--------|
-| 📝 Notepad | ✅ Full |
-| 🎭 Jokes (Grid/List) | ✅ Full |
-| 📋 Set Lists | ✅ Full |
-| 🎙️ Voice Recordings | ✅ Full with transcription |
-| 📸 Notebook Photos | ✅ Full with scanning |
-| 🔥 Roast Mode | ✅ Full |
-| ☁️ iCloud Sync | ✅ Full |
-| 🎯 Folder organization | ✅ Full |
-| 🔍 Search | ✅ Full |
-| 📄 PDF Export | ✅ Full |
-| 🔐 End-to-end encryption | ✅ (via iCloud) |
+|  Notepad |  Full |
+|  Jokes (Grid/List) |  Full |
+|  Set Lists |  Full |
+|  Voice Recordings |  Full with transcription |
+|  Notebook Photos |  Full with scanning |
+|  Roast Mode |  Full |
+|  iCloud Sync |  Full |
+|  Folder organization |  Full |
+|  Search |  Full |
+|  PDF Export |  Full |
+|  End-to-end encryption |  (via iCloud) |
 
 ---
 
@@ -288,4 +288,4 @@
 *BitBinder: Professional comedy notebook app*  
 *Designed by comedians, for comedians.*
 
-**Happy writing! 🎭**
+**Happy writing! **

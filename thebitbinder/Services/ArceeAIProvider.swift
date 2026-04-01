@@ -10,7 +10,7 @@
 //  (128k context, strong JSON instruction following).
 //  The same OpenRouter API key is used — no re-auth required.
 //
-//  ⚠️  Free models rotate. If this 404s, check openrouter.ai/models for
+//    Free models rotate. If this 404s, check openrouter.ai/models for
 //  current free options and update AIProviderType.defaultModel.
 //
 //  No external SDK required.
@@ -33,7 +33,7 @@ final class ArceeAIProvider: AIJokeExtractionProvider {
         AIKeyLoader.loadKey(for: .arceeAI) != nil
     }
 
-    func extractJokes(from text: String) async throws -> [GeminiExtractedJoke] {
+    func extractJokes(from text: String) async throws -> [AIExtractedJoke] {
         guard let apiKey = AIKeyLoader.loadKey(for: .arceeAI) else {
             throw AIProviderError.keyNotConfigured(.arceeAI)
         }
@@ -88,7 +88,7 @@ final class ArceeAIProvider: AIJokeExtractionProvider {
         if let c = message["content"] as? String, !c.isEmpty {
             content = c
         } else if let r = message["reasoning"] as? String, !r.isEmpty {
-            print("⚠️ [Arcee] Model returned reasoning instead of content — extracting from reasoning field")
+            print(" [Arcee] Model returned reasoning instead of content — extracting from reasoning field")
             content = r
         } else {
             let raw = String(data: data, encoding: .utf8) ?? "<empty>"
@@ -97,7 +97,7 @@ final class ArceeAIProvider: AIJokeExtractionProvider {
 
         let finishReason = firstChoice["finish_reason"] as? String ?? ""
         if finishReason == "length" {
-            print("⚠️ [Arcee] Response truncated (finish_reason=length) — attempting partial JSON repair")
+            print(" [Arcee] Response truncated (finish_reason=length) — attempting partial JSON repair")
         }
 
         return try JokeExtractionPrompt.parseResponse(content, provider: .arceeAI)

@@ -21,9 +21,17 @@ struct BitBuddyChatView: View {
     @State private var messages: [ChatBubbleMessage] = []
     @State private var inputText = ""
     @State private var conversationId = UUID().uuidString
+    @State private var isTyping = false
+    @State private var typingMessageId: UUID?
+    @State private var displayedText = ""
     
     private var accentColor: Color {
         roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue
+    }
+
+    @ViewBuilder
+    private var bitBuddyAvatar: some View {
+        BitBuddyAvatar(roastMode: roastMode, size: 100, symbolSize: 42)
     }
     
     var body: some View {
@@ -36,19 +44,35 @@ struct BitBuddyChatView: View {
                             emptyStateView
                         } else {
                             ForEach(messages) { message in
-                                ChatBubble(message: message, roastMode: roastMode)
-                                    .id(message.id)
+                                ChatBubble(
+                                    message: message,
+                                    roastMode: roastMode,
+                                    typingMessageId: typingMessageId,
+                                    displayedText: displayedText
+                                )
+                                .id(message.id)
                             }
+                        }
+                        
+                        if isTyping {
+                            TypingIndicator(roastMode: roastMode)
+                                .id("typing-indicator")
                         }
                     }
                     .padding()
                 }
                 .onChange(of: messages.count) {
-                    if let lastMessage = messages.last {
+                    scrollToBottom(proxy: proxy)
+                }
+                .onChange(of: isTyping) {
+                    if isTyping {
                         withAnimation(.easeOut(duration: 0.2)) {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            proxy.scrollTo("typing-indicator", anchor: .bottom)
                         }
                     }
+                }
+                .onChange(of: displayedText) {
+                    scrollToBottom(proxy: proxy)
                 }
             }
             .frame(maxHeight: .infinity)
@@ -57,7 +81,7 @@ struct BitBuddyChatView: View {
             inputArea
         }
         .background(roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
-        .navigationTitle(roastMode ? "🔥 BitBuddy" : "BitBuddy")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .bitBinderToolbar(roastMode: roastMode)
         .toolbar {
@@ -71,6 +95,9 @@ struct BitBuddyChatView: View {
                 Button {
                     messages.removeAll()
                     conversationId = UUID().uuidString
+                    typingMessageId = nil
+                    displayedText = ""
+                    isTyping = false
                     bitBuddy.startNewConversation()
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
@@ -106,9 +133,9 @@ struct BitBuddyChatView: View {
             modelContext.insert(newJoke)
             do {
                 try modelContext.save()
-                print("✅ [BitBuddy→SwiftData] Joke saved via action dispatch")
+                print(" [BitBuddy→SwiftData] Joke saved via action dispatch")
             } catch {
-                print("❌ [BitBuddy→SwiftData] Failed to save joke: \(error)")
+                print(" [BitBuddy→SwiftData] Failed to save joke: \(error)")
             }
         }
         .onChange(of: bitBuddy.pendingNavigation) { _, section in
@@ -133,17 +160,7 @@ struct BitBuddyChatView: View {
             Spacer()
             
             ZStack {
-                Circle()
-                    .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-                    .frame(width: 100, height: 100)
-                
-                Image(systemName: roastMode ? "flame.fill" : "sparkles")
-                    .font(.system(size: 44))
-                    .foregroundStyle(
-                        roastMode
-                        ? AppTheme.Colors.roastEmberGradient
-                        : LinearGradient(colors: [AppTheme.Colors.inkBlue, AppTheme.Colors.inkBlue.opacity(0.7)], startPoint: .top, endPoint: .bottom)
-                    )
+                bitBuddyAvatar
             }
             
             VStack(spacing: 8) {
@@ -161,16 +178,16 @@ struct BitBuddyChatView: View {
             // Suggestion chips — one per major section
             VStack(spacing: 8) {
                 if roastMode {
-                    suggestionChip("🔥 Give me roast lines for a finance bro")
-                    suggestionChip("🎯 Create a roast target")
-                    suggestionChip("📋 Build a roast set for battle night")
-                    suggestionChip("✂️ Shorten this burn")
+                    suggestionChip("Give me roast lines for a finance bro")
+                    suggestionChip("Create a roast target")
+                    suggestionChip("Build a roast set for battle night")
+                    suggestionChip("Shorten this burn")
                 } else {
-                    suggestionChip("🎭 Analyze this joke: I told my therapist I feel invisible. She said 'Next!'")
-                    suggestionChip("📋 Create a set list for tonight")
-                    suggestionChip("💡 Give me a premise about dating apps")
-                    suggestionChip("⭐ Show me The Hits")
-                    suggestionChip("🎙️ How do recordings work?")
+                    suggestionChip("Analyze this joke: I told my therapist I feel invisible. She said 'Next!'")
+                    suggestionChip("Create a set list for tonight")
+                    suggestionChip("Give me a premise about dating apps")
+                    suggestionChip("Show me The Hits")
+                    suggestionChip("How do recordings work?")
                 }
             }
             .padding(.top, 16)
@@ -273,6 +290,14 @@ struct BitBuddyChatView: View {
         }
     }
     
+    private func scrollToBottom(proxy: ScrollViewProxy) {
+        if let lastMessage = messages.last {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+            }
+        }
+    }
+    
     private func sendMessage() {
         let message = inputText.trimmingCharacters(in: .whitespaces)
         guard !message.isEmpty else { return }
@@ -281,17 +306,37 @@ struct BitBuddyChatView: View {
         let userMessage = ChatBubbleMessage(text: message, isUser: true, conversationId: conversationId)
         messages.append(userMessage)
         inputText = ""
+        isTyping = true
         
         Task {
             do {
                 let response = try await bitBuddy.sendMessage(message)
-                let aiMessage = ChatBubbleMessage(text: response, isUser: false, conversationId: conversationId)
                 await MainActor.run {
+                    isTyping = false
+                    let aiMessage = ChatBubbleMessage(text: response, isUser: false, conversationId: conversationId)
                     messages.append(aiMessage)
+                    typingMessageId = aiMessage.id
+                    displayedText = ""
+                }
+                // Typewriter: reveal word by word
+                let words = response.split(separator: " ", omittingEmptySubsequences: false)
+                for (index, word) in words.enumerated() {
+                    try? await Task.sleep(nanoseconds: 35_000_000) // 35ms per word
+                    await MainActor.run {
+                        if index == 0 {
+                            displayedText = String(word)
+                        } else {
+                            displayedText += " " + String(word)
+                        }
+                    }
+                }
+                await MainActor.run {
+                    typingMessageId = nil
                 }
             } catch {
-                let errorMsg = ChatBubbleMessage(text: "Sorry, I encountered an error. Please try again.", isUser: false, conversationId: conversationId)
                 await MainActor.run {
+                    isTyping = false
+                    let errorMsg = ChatBubbleMessage(text: "Sorry, I encountered an error. Please try again.", isUser: false, conversationId: conversationId)
                     messages.append(errorMsg)
                 }
             }
@@ -321,40 +366,53 @@ struct BitBuddyChatView: View {
 struct ChatBubble: View {
     let message: ChatBubbleMessage
     let roastMode: Bool
+    var typingMessageId: UUID? = nil
+    var displayedText: String = ""
+    
+    private var isBeingTyped: Bool {
+        typingMessageId == message.id
+    }
+    
+    private var visibleText: String {
+        if isBeingTyped {
+            return displayedText
+        }
+        return message.text
+    }
     
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             if message.isUser {
                 Spacer(minLength: 60)
             } else {
-                // BitBuddy Avatar
-                ZStack {
-                    Circle()
-                        .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-                        .frame(width: 32, height: 32)
-                    
-                    Image(systemName: roastMode ? "flame.fill" : "sparkles")
-                        .font(.system(size: 14))
-                        .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
-                }
+                BitBuddyAvatar(roastMode: roastMode, size: 32, symbolSize: 14)
             }
             
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
-                Text(message.text)
-                    .font(.system(size: 15, design: .serif))
-                    .padding(12)
-                    .background(
-                        message.isUser
-                        ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
-                        : (roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-                    )
-                    .foregroundColor(
-                        message.isUser
-                        ? .white
-                        : (roastMode ? .white.opacity(0.9) : AppTheme.Colors.inkBlack)
-                    )
-                    .cornerRadius(16)
-                    .cornerRadius(message.isUser ? 16 : 4, corners: message.isUser ? [.topLeft, .bottomLeft, .bottomRight] : [.topRight, .bottomLeft, .bottomRight])
+                HStack(spacing: 0) {
+                    Text(visibleText)
+                        .font(.system(size: 15, design: .serif))
+                    
+                    if isBeingTyped {
+                        Text("|")
+                            .font(.system(size: 15, weight: .light, design: .serif))
+                            .opacity(0.6)
+                            .blinking()
+                    }
+                }
+                .padding(12)
+                .background(
+                    message.isUser
+                    ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
+                    : (roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
+                )
+                .foregroundColor(
+                    message.isUser
+                    ? .white
+                    : (roastMode ? .white.opacity(0.9) : AppTheme.Colors.inkBlack)
+                )
+                .cornerRadius(16)
+                .cornerRadius(message.isUser ? 16 : 4, corners: message.isUser ? [.topLeft, .bottomLeft, .bottomRight] : [.topRight, .bottomLeft, .bottomRight])
                 
                 Text(message.timestamp, style: .time)
                     .font(.system(size: 11))
@@ -389,6 +447,95 @@ struct RoundedCorner: Shape {
             cornerRadii: CGSize(width: radius, height: radius)
         )
         return Path(path.cgPath)
+    }
+}
+
+// MARK: - Typing Indicator
+
+struct TypingIndicator: View {
+    let roastMode: Bool
+    @State private var dotOffset: [CGFloat] = [0, 0, 0]
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            BitBuddyAvatar(roastMode: roastMode, size: 32, symbolSize: 14)
+            
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
+                        .frame(width: 7, height: 7)
+                        .offset(y: dotOffset[index])
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(
+                roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated
+            )
+            .cornerRadius(16)
+            .cornerRadius(4, corners: [.topRight, .bottomLeft, .bottomRight])
+            .onAppear {
+                for i in 0..<3 {
+                    withAnimation(
+                        .easeInOut(duration: 0.4)
+                        .repeatForever(autoreverses: true)
+                        .delay(Double(i) * 0.15)
+                    ) {
+                        dotOffset[i] = -5
+                    }
+                }
+            }
+            
+            Spacer(minLength: 60)
+        }
+    }
+}
+
+struct BitBuddyAvatar: View {
+    let roastMode: Bool
+    let size: CGFloat
+    let symbolSize: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
+                .overlay(
+                    Circle()
+                        .stroke(
+                            roastMode ? AppTheme.Colors.roastAccent.opacity(0.35) : AppTheme.Colors.primaryAction.opacity(0.2),
+                            lineWidth: 1
+                        )
+                )
+
+            Image(systemName: roastMode ? "flame.fill" : "sparkles")
+                .font(.system(size: symbolSize, weight: .semibold))
+                .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+// MARK: - Blinking Cursor Modifier
+
+struct BlinkingModifier: ViewModifier {
+    @State private var visible = true
+    
+    func body(content: Content) -> some View {
+        content
+            .opacity(visible ? 1 : 0)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+                    visible = false
+                }
+            }
+    }
+}
+
+extension View {
+    func blinking() -> some View {
+        modifier(BlinkingModifier())
     }
 }
 

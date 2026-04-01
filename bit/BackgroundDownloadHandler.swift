@@ -59,7 +59,7 @@ struct DownloaderExtension: BADownloaderExtension {
     /// Called when the extension launches. Return any downloads that should be enqueued.
     /// The system calls this on first install, app update, and periodically.
     func extensionWillTerminate() {
-        logger.info("🔌 [BackgroundDownload] Extension will terminate")
+        logger.info("[BackgroundDownload] Extension will terminate")
     }
     
     // MARK: - BADownloaderExtension — Download Events
@@ -68,7 +68,7 @@ struct DownloaderExtension: BADownloaderExtension {
     func download(_ download: BADownload,
                   didWriteTo path: URL,
                   fileSize: Int) {
-        logger.info("✅ [BackgroundDownload] Completed: \(download.identifier, privacy: .public) — \(fileSize) bytes")
+        logger.info("[BackgroundDownload] Completed: \(download.identifier, privacy: .public) — \(fileSize) bytes")
         
         // Move the downloaded file into the shared app group container
         ensureSharedAssetsDirectory()
@@ -85,9 +85,9 @@ struct DownloaderExtension: BADownloaderExtension {
                     try FileManager.default.removeItem(at: destinationURL)
                 }
                 try FileManager.default.moveItem(at: path, to: destinationURL)
-                logger.info("📁 [BackgroundDownload] Saved to: \(destinationURL.lastPathComponent, privacy: .public)")
+                logger.info("[BackgroundDownload] Saved to: \(destinationURL.lastPathComponent, privacy: .public)")
             } catch {
-                logger.error("❌ [BackgroundDownload] Failed to move file: \(error.localizedDescription, privacy: .public)")
+                logger.error("[BackgroundDownload] Failed to move file: \(error.localizedDescription, privacy: .public)")
             }
         }
         
@@ -104,12 +104,12 @@ struct DownloaderExtension: BADownloaderExtension {
         // Remove from pending list
         removePendingDownload(download.identifier)
         
-        logger.info("📊 [BackgroundDownload] Total assets downloaded: \(previousCount + 1)")
+        logger.info("[BackgroundDownload] Total assets downloaded: \(previousCount + 1)")
     }
     
     /// Called when a download fails.
     func download(_ download: BADownload, failedWithError error: Error) {
-        logger.error("❌ [BackgroundDownload] Failed: \(download.identifier, privacy: .public) — \(error.localizedDescription, privacy: .public)")
+        logger.error("[BackgroundDownload] Failed: \(download.identifier, privacy: .public) — \(error.localizedDescription, privacy: .public)")
         
         // Record the error in shared UserDefaults so the main app can surface it
         let defaults = sharedDefaults
@@ -133,7 +133,7 @@ struct DownloaderExtension: BADownloaderExtension {
     /// Creates the shared assets directory if it doesn't already exist.
     private func ensureSharedAssetsDirectory() {
         guard let containerURL = sharedContainerURL else {
-            logger.warning("⚠️ [BackgroundDownload] Could not access shared container")
+            logger.warning("[BackgroundDownload] Could not access shared container")
             return
         }
         
@@ -145,9 +145,9 @@ struct DownloaderExtension: BADownloaderExtension {
         if !FileManager.default.fileExists(atPath: assetsDir.path) {
             do {
                 try FileManager.default.createDirectory(at: assetsDir, withIntermediateDirectories: true)
-                logger.info("📁 [BackgroundDownload] Created shared assets directory")
+                logger.info("[BackgroundDownload] Created shared assets directory")
             } catch {
-                logger.error("❌ [BackgroundDownload] Failed to create assets directory: \(error.localizedDescription, privacy: .public)")
+                logger.error("[BackgroundDownload] Failed to create assets directory: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -160,4 +160,3 @@ struct DownloaderExtension: BADownloaderExtension {
         defaults.set(pending, forKey: BackgroundDownloadConstants.pendingDownloadsKey)
     }
 }
-

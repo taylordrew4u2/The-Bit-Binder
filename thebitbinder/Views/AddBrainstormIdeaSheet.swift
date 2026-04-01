@@ -58,7 +58,7 @@ struct AddBrainstormIdeaSheet: View {
                     Spacer()
                 }
             }
-            .navigationTitle(roastMode ? "🔥 New Fire Thought" : "New Thought")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
             .toolbar {
@@ -95,7 +95,7 @@ struct AddBrainstormIdeaSheet: View {
             try modelContext.save()
             dismiss()
         } catch {
-            print("❌ [AddBrainstormIdeaSheet] Failed to save idea: \(error)")
+            print(" [AddBrainstormIdeaSheet] Failed to save idea: \(error)")
             saveErrorMessage = "Could not save thought: \(error.localizedDescription)"
             showSaveError = true
         }

@@ -4,12 +4,11 @@
 //
 //  Refactored for cleaner, writer-focused experience
 //  Progressive disclosure, distraction-free editing, clear hierarchy
-//  ✨ Now with auto-save and effortless interactions
+//   Now with auto-save and effortless interactions
 //
 
 import SwiftUI
 import SwiftData
-import Combine
 
 struct JokeDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -27,6 +26,8 @@ struct JokeDetailView: View {
     // Auto-save state
     @StateObject private var autoSave = AutoSaveManager.shared
     @State private var showSavedToast = false
+    @State private var saveError: String?
+    @State private var showingSaveError = false
     
     // Accent color based on mode
     private var accentColor: Color {
@@ -72,12 +73,25 @@ struct JokeDetailView: View {
                 ? "Restore this joke from Trash?"
                 : "Are you sure? You can restore it from Trash later.")
         }
+        .alert("Save Failed", isPresented: $showingSaveError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveError ?? "Your changes might not be saved. Try editing again.")
+        }
         .sheet(isPresented: $showingFolderPicker) {
-            MultiFolderPickerView(selectedFolders: $joke.folders, allFolders: folders)
+            MultiFolderPickerView(
+                selectedFolders: Binding(
+                    get: { joke.folders ?? [] },
+                    set: { joke.folders = $0 }
+                ),
+                allFolders: folders
+            )
         }
         .onChange(of: showingFolderPicker) { _, isOpen in
             if isOpen {
-                folders = (try? modelContext.fetch(FetchDescriptor<JokeFolder>())) ?? []
+                var descriptor = FetchDescriptor<JokeFolder>(predicate: #Predicate { !$0.isDeleted })
+                descriptor.sortBy = [SortDescriptor(\JokeFolder.name)]
+                folders = (try? modelContext.fetch(descriptor)) ?? []
             }
         }
         // Auto-save on content changes (debounced)
@@ -97,17 +111,29 @@ struct JokeDetailView: View {
     // MARK: - Auto-Save
     
     private func scheduleAutoSave() {
-        autoSave.scheduleSave {
+        autoSave.scheduleSave { [self] in
             joke.dateModified = Date()
             joke.updateWordCount()
-            try? modelContext.save()
+            do {
+                try modelContext.save()
+            } catch {
+                print(" [JokeDetailView] Auto-save failed: \(error)")
+                saveError = "Your changes couldn't be saved: \(error.localizedDescription)"
+                showingSaveError = true
+            }
         }
     }
     
     private func saveJokeNow() {
         joke.dateModified = Date()
         joke.updateWordCount()
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [JokeDetailView] Save failed: \(error)")
+            saveError = "Your changes couldn't be saved: \(error.localizedDescription)"
+            showingSaveError = true
+        }
     }
     
     // MARK: - Title Section
@@ -147,7 +173,7 @@ struct JokeDetailView: View {
                         .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
                 }
                 
-                if !joke.folders.isEmpty {
+                if !(joke.folders ?? []).isEmpty {
                     Button {
                         HapticEngine.shared.tap()
                         showingFolderPicker = true
@@ -155,11 +181,11 @@ struct JokeDetailView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "folder.fill")
                                 .font(.system(size: 10))
-                            if joke.folders.count == 1 {
-                                Text(joke.folders[0].name)
+                            if (joke.folders ?? []).count == 1 {
+                                Text((joke.folders ?? []).first?.name ?? "")
                                     .font(.system(size: 12, weight: .medium))
                             } else {
-                                Text("\(joke.folders.count) folders")
+                                Text("\((joke.folders ?? []).count) folders")
                                     .font(.system(size: 12, weight: .medium))
                             }
                         }
@@ -266,8 +292,14 @@ struct JokeDetailView: View {
                 }
                 HapticEngine.shared.starToggle(joke.isHit)
                 
-                // Auto-save after toggle
-                try? modelContext.save()
+                // Save after toggle
+                do {
+                    try modelContext.save()
+                } catch {
+                    print(" [JokeDetailView] Hit toggle save failed: \(error)")
+                    saveError = "Couldn't save hit status: \(error.localizedDescription)"
+                    showingSaveError = true
+                }
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: roastMode ? (joke.isHit ? "flame.fill" : "flame") : (joke.isHit ? "star.fill" : "star"))
@@ -302,14 +334,14 @@ struct JokeDetailView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "folder.fill")
                         .font(.system(size: 14))
-                    if joke.folders.isEmpty {
+                    if (joke.folders ?? []).isEmpty {
                         Text("Add Folders")
                             .font(.system(size: 14, weight: .medium))
-                    } else if joke.folders.count == 1 {
-                        Text(joke.folders[0].name)
+                    } else if (joke.folders ?? []).count == 1 {
+                        Text((joke.folders ?? []).first?.name ?? "")
                             .font(.system(size: 14, weight: .medium))
                     } else {
-                        Text("\(joke.folders.count) folders")
+                        Text("\((joke.folders ?? []).count) folders")
                             .font(.system(size: 14, weight: .medium))
                     }
                 }
@@ -502,7 +534,7 @@ struct FolderPickerView: View {
                     }
                 }
             }
-            .navigationTitle("Select Folder")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -591,7 +623,7 @@ struct MultiFolderPickerView: View {
                     Text("Available Folders")
                 }
             }
-            .navigationTitle("Select Folders")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

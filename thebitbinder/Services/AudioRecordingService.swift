@@ -57,7 +57,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     @objc private func handleMemoryWarning() {
         // Stop recording if memory is low
         if isRecording {
-            print("⚠️ Memory warning during recording - consider stopping")
+            print(" Memory warning during recording - consider stopping")
         }
     }
     
@@ -65,7 +65,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         // Check if another app is playing audio and warn
         let audioSession = AVAudioSession.sharedInstance()
         if audioSession.isOtherAudioPlaying {
-            print("⚠️ [Audio] Another app is currently playing audio — session may conflict")
+            print(" [Audio] Another app is currently playing audio — session may conflict")
         }
         
         // Retry loop: attempt up to maxAudioSessionRetries times with retryDelay between attempts
@@ -83,12 +83,12 @@ class AudioRecordingService: NSObject, ObservableObject {
                     ]
                 )
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-                print("✅ [Audio] Audio session configured + activated for recording (attempt \(attempt))")
+                print(" [Audio] Audio session configured + activated for recording (attempt \(attempt))")
                 audioSessionError = nil
                 return // success
             } catch {
                 lastError = error
-                print("⚠️ [Audio] Audio session setup attempt \(attempt)/\(maxAudioSessionRetries) failed: \(error.localizedDescription)")
+                print(" [Audio] Audio session setup attempt \(attempt)/\(maxAudioSessionRetries) failed: \(error.localizedDescription)")
                 if attempt < maxAudioSessionRetries {
                     Thread.sleep(forTimeInterval: retryDelay)
                 }
@@ -102,7 +102,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         } else {
             errorMsg = "Could not configure audio for recording: \(lastError?.localizedDescription ?? "unknown error"). Please restart the app."
         }
-        print("❌ [Audio] Audio session setup failed after \(maxAudioSessionRetries) attempts: \(errorMsg)")
+        print(" [Audio] Audio session setup failed after \(maxAudioSessionRetries) attempts: \(errorMsg)")
         audioSessionError = errorMsg
     }
     
@@ -203,7 +203,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         recordingStartTime = nil
         pausedDuration = 0
         
-        print("🎙️ Stopped recording: \(url?.lastPathComponent ?? "unknown") duration: \(duration)s")
+        print(" Stopped recording: \(url?.lastPathComponent ?? "unknown") duration: \(duration)s")
         
         return (url, duration)
     }
@@ -234,7 +234,7 @@ class AudioRecordingService: NSObject, ObservableObject {
 extension AudioRecordingService: AVAudioRecorderDelegate {
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
         if !flag {
-            print("❌ Recording failed")
+            print(" Recording failed")
         }
         // Don't cleanup here - let the caller handle it
         // The URL needs to remain available after stopping

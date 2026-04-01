@@ -58,7 +58,7 @@ class CloudKitResetUtility {
     ///  - After zone deletion CoreData re-exports every local record
     ///    with correct REFERENCE types on its next export cycle.
     static func repairCorruptedZone() async throws {
-        print("🔧 [CloudKit] Starting schema-mismatch repair (v4 — adds soft-delete fields + CD_wordCount)...")
+        print(" [CloudKit] Starting schema-mismatch repair (v4 — adds soft-delete fields + CD_wordCount)...")
 
         let container = CKContainer(identifier: containerID)
         let database  = container.privateCloudDatabase
@@ -74,11 +74,11 @@ class CloudKitResetUtility {
             let rid = CKRecord.ID(recordName: name, zoneID: zoneID)
             do {
                 try await database.deleteRecord(withID: rid)
-                print("  ✅ Deleted known corrupt record \(name)")
+                print("   Deleted known corrupt record \(name)")
             } catch let e as CKError where e.code == .unknownItem {
-                print("  ℹ️ Record \(name) already gone")
+                print("   Record \(name) already gone")
             } catch {
-                print("  ⚠️ Could not delete \(name): \(error.localizedDescription)")
+                print("   Could not delete \(name): \(error.localizedDescription)")
                 // Continue — zone delete below will catch everything
             }
         }
@@ -91,17 +91,17 @@ class CloudKitResetUtility {
         //     letting CoreData re-create it with correct field types.
         do {
             try await database.deleteRecordZone(withID: zoneID)
-            print("  ✅ Zone deleted — CoreData will re-export local data")
+            print("   Zone deleted — CoreData will re-export local data")
         } catch let e as CKError where e.code == .zoneNotFound {
-            print("  ℹ️ Zone already deleted — nothing to do")
+            print("   Zone already deleted — nothing to do")
         } catch {
-            print("  ❌ Zone deletion failed: \(error.localizedDescription)")
+            print("   Zone deletion failed: \(error.localizedDescription)")
             throw error
         }
 
         // ── Step 3: Mark success ───────────────────────────────────────
         UserDefaults.standard.set(true, forKey: cleanupVersionKey)
-        print("✅ [CloudKit] Schema-mismatch repair complete")
+        print(" [CloudKit] Schema-mismatch repair complete")
     }
 
     // MARK: - Helpers
@@ -112,16 +112,16 @@ class CloudKitResetUtility {
         do {
             let status = try await container.accountStatus()
             switch status {
-            case .available:            print("✅ CloudKit account available")
-            case .noAccount:            print("⚠️ No iCloud account")
-            case .restricted:           print("⚠️ iCloud account restricted")
-            case .couldNotDetermine:    print("⚠️ Could not determine iCloud status")
-            case .temporarilyUnavailable: print("⚠️ iCloud temporarily unavailable")
-            @unknown default:           print("❓ Unknown iCloud status: \(status.rawValue)")
+            case .available:            print(" CloudKit account available")
+            case .noAccount:            print(" No iCloud account")
+            case .restricted:           print(" iCloud account restricted")
+            case .couldNotDetermine:    print(" Could not determine iCloud status")
+            case .temporarilyUnavailable: print(" iCloud temporarily unavailable")
+            @unknown default:           print(" Unknown iCloud status: \(status.rawValue)")
             }
             return status
         } catch {
-            print("❌ CloudKit error: \(error.localizedDescription)")
+            print(" CloudKit error: \(error.localizedDescription)")
             return .couldNotDetermine
         }
     }
@@ -129,10 +129,10 @@ class CloudKitResetUtility {
     /// Logs CloudKit container configuration for debugging
     static func logContainerInfo() {
         let container = CKContainer(identifier: containerID)
-        print("📦 CloudKit Container ID: \(container.containerIdentifier ?? "unknown")")
-        print("🔧 Environment: Development")
+        print(" CloudKit Container ID: \(container.containerIdentifier ?? "unknown")")
+        print(" Environment: Development")
         let _ = container.privateCloudDatabase
-        print("🔒 Private database configured")
+        print(" Private database configured")
 
         Task { _ = await checkCloudKitStatus() }
     }
@@ -143,17 +143,17 @@ class CloudKitResetUtility {
         let database  = container.privateCloudDatabase
         let rid = CKRecord.ID(recordName: recordID, zoneID: zoneID)
         try await database.deleteRecord(withID: rid)
-        print("✅ [CloudKit] Record deleted: \(recordID)")
+        print(" [CloudKit] Record deleted: \(recordID)")
     }
 
     /// Nuclear option: delete the entire CoreData CloudKit zone.
     /// CoreData will recreate the zone and re-export on next sync cycle.
     static func deleteEntireZone() async throws {
-        print("⚠️ [CloudKit] DELETING ENTIRE ZONE — all remote records will be re-exported from local store")
+        print(" [CloudKit] DELETING ENTIRE ZONE — all remote records will be re-exported from local store")
         let container = CKContainer(identifier: containerID)
         let database  = container.privateCloudDatabase
         try await database.deleteRecordZone(withID: zoneID)
-        print("✅ [CloudKit] Zone deleted. CoreData will recreate it on next sync.")
+        print(" [CloudKit] Zone deleted. CoreData will recreate it on next sync.")
     }
 }
 
@@ -164,26 +164,26 @@ extension CloudKitResetUtility {
     /// Force re-run the cleanup on next launch (for testing).
     static func forceRerunCleanup() {
         UserDefaults.standard.removeObject(forKey: cleanupVersionKey)
-        print("🔄 [CloudKit] Cleanup flag reset — will run on next app launch")
+        print(" [CloudKit] Cleanup flag reset — will run on next app launch")
     }
 
     /// Print a summary of how the SwiftData models map to CloudKit fields.
     static func verifyModelConfiguration() {
-        print("🔍 SwiftData → CloudKit field mapping:")
-        print("   ✓ Joke.folder                         → CD_Joke.CD_folder (REFERENCE)")
-        print("   ✓ JokeFolder.jokes                    → inverse of CD_folder")
-        print("   ✓ RoastJoke.target                    → CD_RoastJoke.CD_target (REFERENCE)")
-        print("   ✓ RoastTarget.jokes                   → inverse of CD_target (cascade)")
-        print("   ✓ ImportedJokeMetadata.batch           → CD_ImportedJokeMetadata.CD_batch (REFERENCE)")
-        print("   ✓ UnresolvedImportFragment.batch       → CD_UnresolvedImportFragment.CD_batch (REFERENCE)")
-        print("   ✓ ImportBatch.importedRecords          → cascade, inverse of CD_batch")
-        print("   ✓ ImportBatch.unresolvedFragments      → cascade, inverse of CD_batch")
-        print("   ✓ Joke.isDeleted / deletedDate         → soft-delete (v2.2.0)")
-        print("   ✓ Recording.isDeleted / deletedDate    → soft-delete (v2.3.0)")
-        print("   ✓ SetList.isDeleted / deletedDate      → soft-delete (v2.3.0)")
-        print("   ✓ RoastJoke.isDeleted / deletedDate    → soft-delete (v2.3.0)")
-        print("   ✓ BrainstormIdea.isDeleted / deletedDate → soft-delete (v2.3.0)")
-        print("   ✓ NotebookPhotoRecord.isDeleted / deletedDate → soft-delete (v2.3.0)")
+        print(" SwiftData → CloudKit field mapping:")
+        print("    Joke.folder                         → CD_Joke.CD_folder (REFERENCE)")
+        print("    JokeFolder.jokes                    → inverse of CD_folder")
+        print("    RoastJoke.target                    → CD_RoastJoke.CD_target (REFERENCE)")
+        print("    RoastTarget.jokes                   → inverse of CD_target (cascade)")
+        print("    ImportedJokeMetadata.batch           → CD_ImportedJokeMetadata.CD_batch (REFERENCE)")
+        print("    UnresolvedImportFragment.batch       → CD_UnresolvedImportFragment.CD_batch (REFERENCE)")
+        print("    ImportBatch.importedRecords          → cascade, inverse of CD_batch")
+        print("    ImportBatch.unresolvedFragments      → cascade, inverse of CD_batch")
+        print("    Joke.isDeleted / deletedDate         → soft-delete (v2.2.0)")
+        print("    Recording.isDeleted / deletedDate    → soft-delete (v2.3.0)")
+        print("    SetList.isDeleted / deletedDate      → soft-delete (v2.3.0)")
+        print("    RoastJoke.isDeleted / deletedDate    → soft-delete (v2.3.0)")
+        print("    BrainstormIdea.isDeleted / deletedDate → soft-delete (v2.3.0)")
+        print("    NotebookPhotoRecord.isDeleted / deletedDate → soft-delete (v2.3.0)")
     }
 }
 #endif

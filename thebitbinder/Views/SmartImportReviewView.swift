@@ -50,14 +50,13 @@ struct SmartImportReviewView: View {
                     progressSection
                     
                     // GagGrabber rate-limit banner
-                    if viewModel.rateLimitError != nil {
+                    if let rateLimitError = viewModel.rateLimitError {
                         HStack(spacing: 8) {
                             Image(systemName: "moon.zzz.fill")
                                 .foregroundColor(.white)
-                            Text(viewModel.rateLimitError!.localizedDescription)
+                            Text(rateLimitError.localizedDescription)
                                 .font(.caption)
                                 .foregroundColor(.white)
-                                .lineLimit(3)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
@@ -150,7 +149,7 @@ struct SmartImportReviewView: View {
                     }
                 }
             }
-            .navigationTitle("Review Import")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(
                 roastMode ? AnyShapeStyle(AppTheme.Colors.roastSurface) : AnyShapeStyle(AppTheme.Colors.paperCream),
@@ -169,8 +168,8 @@ struct SmartImportReviewView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button("✅ Approve All Remaining") { viewModel.approveAll() }
-                        Button("❌ Reject All Remaining") { viewModel.rejectAll() }
+                        Button(" Approve All Remaining") { viewModel.approveAll() }
+                        Button(" Reject All Remaining") { viewModel.rejectAll() }
                         Divider()
                         Button("Save & Finish") {
                             Task {
@@ -187,7 +186,7 @@ struct SmartImportReviewView: View {
                     editSheet(for: current)
                 }
             }
-            .alert("Import Complete! 🎉", isPresented: $showingSaveConfirmation) {
+            .alert("Import Complete! ", isPresented: $showingSaveConfirmation) {
                 Button("Done") {
                     onComplete?()
                     dismiss()
@@ -444,7 +443,7 @@ struct SmartImportReviewView: View {
             // Swipe feedback overlay
             let absWidth = Double(abs(dragOffset.width))
             if absWidth > 60 {
-                Text(dragOffset.width > 0 ? "✅" : "❌")
+                Text(dragOffset.width > 0 ? "" : "")
                     .font(.system(size: 60))
                     .opacity(min(absWidth / 120.0, 1.0))
             }
@@ -477,7 +476,7 @@ struct SmartImportReviewView: View {
             .onEnded { value in
                 let threshold: CGFloat = 100
                 if value.translation.width > threshold {
-                    // Swipe right → Accept
+                    // Swipe right  Accept
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     withAnimation(.easeOut(duration: 0.3)) {
                         dragOffset = CGSize(width: 500, height: 0)
@@ -487,7 +486,7 @@ struct SmartImportReviewView: View {
                         dragOffset = .zero
                     }
                 } else if value.translation.width < -threshold {
-                    // Swipe left → Reject
+                    // Swipe left  Reject
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     withAnimation(.easeOut(duration: 0.3)) {
                         dragOffset = CGSize(width: -500, height: 0)
@@ -1227,7 +1226,7 @@ struct SmartImportReviewView: View {
                 .padding(20)
             }
             .background(roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
-            .navigationTitle("Edit Joke")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -1289,14 +1288,14 @@ struct SmartImportReviewView: View {
                 showingSaveConfirmation = true
                 
                 #if DEBUG
-                print("✅ [ImportReview] Successfully saved \(savedCount) joke(s) and \(brainstormCount) brainstorm idea(s) (attempt \(attempt))")
+                print(" [ImportReview] Successfully saved \(savedCount) joke(s) and \(brainstormCount) brainstorm idea(s) (attempt \(attempt))")
                 #endif
                 return // success — exit the function
             } catch {
                 lastError = error
                 let delay = UInt64(pow(2.0, Double(attempt - 1))) * 1_000_000_000 // 1s, 2s, 4s
                 #if DEBUG
-                print("⚠️ [ImportReview] Save attempt \(attempt)/\(maxSaveRetries) failed: \(error.localizedDescription) — retrying in \(Int(pow(2.0, Double(attempt - 1))))s")
+                print(" [ImportReview] Save attempt \(attempt)/\(maxSaveRetries) failed: \(error.localizedDescription) — retrying in \(Int(pow(2.0, Double(attempt - 1))))s")
                 #endif
                 try? await Task.sleep(nanoseconds: delay)
             }
@@ -1314,7 +1313,7 @@ struct SmartImportReviewView: View {
         showingSaveError = true
         
         #if DEBUG
-        print("❌ [ImportReview] Failed to save after \(maxSaveRetries) attempts: \(errorDetail)")
+        print(" [ImportReview] Failed to save after \(maxSaveRetries) attempts: \(errorDetail)")
         if let nsError = lastError as NSError? {
             print("   Domain: \(nsError.domain), Code: \(nsError.code)")
             if let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {

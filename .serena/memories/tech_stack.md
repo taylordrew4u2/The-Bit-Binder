@@ -38,5 +38,5 @@
 - Swift: 5.0
 
 ## Known Issues
-- ⚠️ Extension deployment target inconsistency (26.2 vs 17.0)
+-  Extension deployment target inconsistency (26.2 vs 17.0)
 - Uses Mac Catalyst for macOS support

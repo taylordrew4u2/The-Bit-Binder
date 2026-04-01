@@ -11,11 +11,12 @@ import SwiftData
 
 struct AddRoastJokesToSetListView: View {
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \RoastTarget.name) private var roastTargets: [RoastTarget]
+    @Query(filter: #Predicate<RoastTarget> { !$0.isDeleted }, sort: \RoastTarget.name) private var roastTargets: [RoastTarget]
 
     @Bindable var setList: SetList
     var currentRoastJokeIDs: [UUID]
 
+    @AppStorage("showFullContent") private var showFullContent = true
     @State private var selectedIDs: Set<UUID> = []
     @State private var expandedTargets: Set<UUID> = []
     @State private var searchText = ""
@@ -57,7 +58,7 @@ struct AddRoastJokesToSetListView: View {
                     jokeList
                 }
             }
-            .navigationTitle("Add Roast Jokes")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search roast jokes")
             .toolbar {
@@ -181,10 +182,16 @@ struct AddRoastJokesToSetListView: View {
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(joke.content)
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
-                        .lineLimit(3)
+                    if showFullContent {
+                        Text(joke.content)
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    } else {
+                        Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer()
                 Image(systemName: selectedIDs.contains(joke.id) ? "checkmark.circle.fill" : "circle")

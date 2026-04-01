@@ -13,6 +13,7 @@ import SwiftData
 struct BrainstormTrashView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("roastModeEnabled") private var roastMode = false
+    @AppStorage("showFullContent") private var showFullContent = true
     @Query(
         filter: #Predicate<BrainstormIdea> { $0.isDeleted == true },
         sort: \BrainstormIdea.deletedDate,
@@ -21,6 +22,10 @@ struct BrainstormTrashView: View {
 
     @State private var searchText = ""
     @State private var showingEmptyTrashAlert = false
+    @State private var ideaToDelete: BrainstormIdea?
+    @State private var showingDeleteOneAlert = false
+    @State private var persistenceError: String?
+    @State private var showingErrorAlert = false
 
     private var filtered: [BrainstormIdea] {
         let t = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -41,9 +46,14 @@ struct BrainstormTrashView: View {
                 List {
                     ForEach(filtered) { idea in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(idea.content)
-                                .font(.subheadline)
-                                .lineLimit(3)
+                            if showFullContent {
+                                Text(idea.content)
+                                    .font(.subheadline)
+                            } else {
+                                Text(idea.content.components(separatedBy: .newlines).first ?? idea.content)
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                            }
                             if let deletedDate = idea.deletedDate {
                                 Text("Deleted \(deletedDate.formatted(date: .abbreviated, time: .shortened))")
                                     .font(.caption)
@@ -53,23 +63,14 @@ struct BrainstormTrashView: View {
                         .padding(.vertical, 4)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
-                                modelContext.delete(idea)
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [BrainstormTrashView] Failed to permanently delete idea: \(error)")
-                                }
+                                ideaToDelete = idea
+                                showingDeleteOneAlert = true
                             } label: {
                                 Label("Delete Forever", systemImage: "trash.fill")
                             }
 
                             Button {
-                                idea.restoreFromTrash()
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [BrainstormTrashView] Failed to restore idea: \(error)")
-                                }
+                                restoreIdea(idea)
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
@@ -77,23 +78,14 @@ struct BrainstormTrashView: View {
                         }
                         .contextMenu {
                             Button {
-                                idea.restoreFromTrash()
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [BrainstormTrashView] Failed to restore idea: \(error)")
-                                }
+                                restoreIdea(idea)
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
 
                             Button(role: .destructive) {
-                                modelContext.delete(idea)
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print("❌ [BrainstormTrashView] Failed to permanently delete idea: \(error)")
-                                }
+                                ideaToDelete = idea
+                                showingDeleteOneAlert = true
                             } label: {
                                 Label("Delete Forever", systemImage: "trash.fill")
                             }
@@ -103,7 +95,7 @@ struct BrainstormTrashView: View {
                 .listStyle(.insetGrouped)
             }
         }
-        .navigationTitle(roastMode ? "🔥 Thought Trash" : "Thought Trash")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, prompt: "Search trash")
         .toolbar {
@@ -117,20 +109,66 @@ struct BrainstormTrashView: View {
                 }
             }
         }
-        .alert("Empty Thought Trash?", isPresented: $showingEmptyTrashAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Empty", role: .destructive) {
-                for idea in trashedIdeas {
-                    modelContext.delete(idea)
-                }
-                do {
-                    try modelContext.save()
-                } catch {
-                    print("❌ [BrainstormTrashView] Failed to save after empty trash: \(error)")
+        .alert("Delete Forever?", isPresented: $showingDeleteOneAlert) {
+            Button("Cancel", role: .cancel) { ideaToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let idea = ideaToDelete {
+                    permanentlyDelete(idea)
+                    ideaToDelete = nil
                 }
             }
         } message: {
+            Text("This thought will be permanently deleted. This cannot be undone.")
+        }
+        .alert("Empty Thought Trash?", isPresented: $showingEmptyTrashAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Empty", role: .destructive) {
+                emptyTrash()
+            }
+        } message: {
             Text("This permanently deletes all \(trashedIdeas.count) thought\(trashedIdeas.count == 1 ? "" : "s"). This cannot be undone.")
+        }
+        .alert("Error", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(persistenceError ?? "An unknown error occurred")
+        }
+    }
+
+    // MARK: - Actions
+
+    private func restoreIdea(_ idea: BrainstormIdea) {
+        idea.restoreFromTrash()
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [BrainstormTrashView] Failed to restore: \(error)")
+            persistenceError = "Could not restore thought: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
+
+    private func permanentlyDelete(_ idea: BrainstormIdea) {
+        modelContext.delete(idea)
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [BrainstormTrashView] Failed to delete: \(error)")
+            persistenceError = "Could not delete thought: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
+
+    private func emptyTrash() {
+        for idea in trashedIdeas {
+            modelContext.delete(idea)
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [BrainstormTrashView] Failed to empty trash: \(error)")
+            persistenceError = "Could not empty trash: \(error.localizedDescription)"
+            showingErrorAlert = true
         }
     }
 }
