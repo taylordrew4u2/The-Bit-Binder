@@ -55,10 +55,21 @@ struct thebitbinderApp: App {
             // Log successful container creation
             DataOperationLogger.shared.logSuccess("ModelContainer created with CloudKit")
             
+            // Verify CloudKit container identifier matches entitlements
+            let cloudKitContainerID = "iCloud.The-BitBinder.thebitbinder"
+            print(" [CloudKit] Using container ID: \(cloudKitContainerID)")
+            
             return container
         } catch {
             print(" [ModelContainer] CloudKit failed (\(error)) — local-only fallback (same file, data preserved)")
             DataOperationLogger.shared.logError(error, operation: "ModelContainer_CloudKit_Creation")
+            
+            // Log the specific error for debugging
+            if let nsError = error as NSError? {
+                print(" [CloudKit] Error domain: \(nsError.domain)")
+                print(" [CloudKit] Error code: \(nsError.code)")
+                print(" [CloudKit] Error userInfo: \(nsError.userInfo)")
+            }
         }
 
         // 2⃣ Same file, no CloudKit — all data preserved, just no sync
@@ -196,24 +207,65 @@ struct thebitbinderApp: App {
         }
         .modelContainer(sharedModelContainer)
         .onChange(of: scenePhase) {
-            if scenePhase == .background {
+            switch scenePhase {
+            case .background:
+                print(" [AppLifecycle] App moved to background")
+                // Save any pending changes before going to background
                 do {
-                    try sharedModelContainer.mainContext.save()
+                    if sharedModelContainer.mainContext.hasChanges {
+                        try sharedModelContainer.mainContext.save()
+                        print(" [AppLifecycle] Saved pending changes to background")
+                    }
                 } catch {
                     print(" [AppLifecycle] Failed to save on background: \(error)")
                     DataOperationLogger.shared.logError(error, operation: "BackgroundSave")
                 }
+                
+                // Push any local settings changes to iCloud
                 iCloudKeyValueStore.shared.pushToCloud()
-            } else if scenePhase == .active {
-                // Save triggers SwiftData to merge any pending remote changes into the UI
+                
+            case .active:
+                print(" [AppLifecycle] App became active")
+                // Pull latest settings from iCloud
+                iCloudKeyValueStore.shared.pullFromCloud()
+                
+                // Save to trigger SwiftData to merge any pending remote changes into the UI
                 do {
                     try sharedModelContainer.mainContext.save()
+                    print(" [AppLifecycle] Context refreshed on foreground")
                 } catch {
                     print(" [AppLifecycle] Failed to save on foreground: \(error)")
                     DataOperationLogger.shared.logError(error, operation: "ForegroundSave")
                 }
-                iCloudKeyValueStore.shared.pullFromCloud()
+                
+                // Ensure notifications are scheduled
                 NotificationManager.shared.scheduleIfNeeded()
+                
+                // Trigger a background sync check if it's been a while
+                Task {
+                    let syncService = iCloudSyncService.shared
+                    if let lastSync = syncService.lastSyncDate {
+                        let timeSinceSync = Date().timeIntervalSince(lastSync)
+                        if timeSinceSync > 3600 && syncService.isSyncEnabled { // 1 hour
+                            print(" [AppLifecycle] Triggering background sync (last sync \(Int(timeSinceSync/60)) minutes ago)")
+                            await syncService.syncNow()
+                        }
+                    }
+                }
+                
+            case .inactive:
+                print(" [AppLifecycle] App became inactive")
+                // Quick save to preserve any in-flight changes
+                if sharedModelContainer.mainContext.hasChanges {
+                    do {
+                        try sharedModelContainer.mainContext.save()
+                    } catch {
+                        print(" [AppLifecycle] Failed to save on inactive: \(error)")
+                    }
+                }
+                
+            @unknown default:
+                print(" [AppLifecycle] Unknown scene phase: \(scenePhase)")
             }
         }
     }

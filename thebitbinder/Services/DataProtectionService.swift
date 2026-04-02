@@ -27,6 +27,7 @@ final class DataProtectionService: ObservableObject {
     
     // Previous app version key for UserDefaults
     private let previousVersionKey = "DataProtection_PreviousAppVersion"
+    private let pendingRestoreRestartKey = "DataProtection_PendingRestoreRestart"
     
     init() {
         // Create backup directory in Application Support
@@ -85,7 +86,12 @@ final class DataProtectionService: ObservableObject {
             print(" [DataProtection] Creating backup: \(backupName)")
             
             // Backup SwiftData store files
-            await backupSwiftDataStore(to: backupURL)
+            let didBackupStore = await backupSwiftDataStore(to: backupURL)
+            guard didBackupStore else {
+                try? fileManager.removeItem(at: backupURL)
+                print(" [DataProtection] Backup aborted: SwiftData store backup missing")
+                return
+            }
             
             // Backup UserDefaults
             backupUserDefaults(to: backupURL)
@@ -108,12 +114,13 @@ final class DataProtectionService: ObservableObject {
     
     // MARK: - Individual Backup Components
     
-    private func backupSwiftDataStore(to backupURL: URL) async {
+    private func backupSwiftDataStore(to backupURL: URL) async -> Bool {
         let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
         let storeDirectory = backupURL.appending(path: "SwiftData", directoryHint: .isDirectory)
         
         do {
             try fileManager.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+            var copiedStoreComponent = false
             
             // Backup main store file and SQLite journal files
             for ext in ["", "-shm", "-wal"] {
@@ -123,6 +130,9 @@ final class DataProtectionService: ObservableObject {
                 if fileManager.fileExists(atPath: sourceURL.path) {
                     try fileManager.copyItem(at: sourceURL, to: destURL)
                     print(" [DataProtection] Backed up: default.store\(ext)")
+                    if ext.isEmpty {
+                        copiedStoreComponent = true
+                    }
                 }
             }
             
@@ -136,8 +146,10 @@ final class DataProtectionService: ObservableObject {
             }
             
             print(" [DataProtection] SwiftData store backed up")
+            return copiedStoreComponent
         } catch {
             print(" [DataProtection] Failed to backup SwiftData store: \(error)")
+            return false
         }
     }
     
@@ -308,6 +320,7 @@ final class DataProtectionService: ObservableObject {
             
             for folder in backupFolders {
                 let manifestURL = folder.appending(path: "backup_manifest.json")
+                guard isBackupRestorable(folder) else { continue }
                 
                 var manifest: BackupManifest?
                 if fileManager.fileExists(atPath: manifestURL.path) {
@@ -356,6 +369,9 @@ final class DataProtectionService: ObservableObject {
     /// Recovers data from a backup (use with extreme caution)
     func recoverFromBackup(_ backupInfo: BackupInfo) async throws {
         print(" [DataProtection] EMERGENCY RECOVERY: Restoring from backup \(backupInfo.name)")
+        guard isBackupRestorable(backupInfo.url) else {
+            throw DataProtectionError.invalidBackup("This backup is incomplete and cannot be restored.")
+        }
         
         // Create a backup of current state before recovery
         await createBackup(named: "PreRecovery_\(ISO8601DateFormatter().string(from: Date()))", reason: .preRecovery)
@@ -379,7 +395,26 @@ final class DataProtectionService: ObservableObject {
             try restoreAppFiles(from: appFilesSource)
         }
         
+        UserDefaults.standard.set(true, forKey: pendingRestoreRestartKey)
         print(" [DataProtection] Recovery completed from backup \(backupInfo.name)")
+    }
+
+    func hasPendingRestoreRestart() -> Bool {
+        UserDefaults.standard.bool(forKey: pendingRestoreRestartKey)
+    }
+
+    func clearPendingRestoreRestart() {
+        UserDefaults.standard.removeObject(forKey: pendingRestoreRestartKey)
+    }
+
+    private func isBackupRestorable(_ backupURL: URL) -> Bool {
+        let manifestURL = backupURL.appending(path: "backup_manifest.json")
+        let swiftDataStoreURL = backupURL
+            .appending(path: "SwiftData", directoryHint: .isDirectory)
+            .appending(path: "default.store")
+
+        return fileManager.fileExists(atPath: manifestURL.path) &&
+            fileManager.fileExists(atPath: swiftDataStoreURL.path)
     }
     
     private func restoreSwiftDataStore(from sourceURL: URL) async throws {
@@ -485,3 +520,13 @@ struct BackupInfo: Identifiable {
     }
 }
 
+enum DataProtectionError: LocalizedError {
+    case invalidBackup(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidBackup(let message):
+            return message
+        }
+    }
+}

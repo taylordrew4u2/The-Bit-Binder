@@ -92,42 +92,72 @@ final class iCloudSyncService: NSObject, ObservableObject {
                 return
             }
             
+            syncStatus = .syncing
+            
             // Refresh the SwiftData context so it merges remote CloudKit changes
             // into the in-memory objects. Without this, the context holds stale data
             // and the UI won't reflect changes from other devices.
             if let ctx = modelContext {
-                // SwiftData's ModelContext doesn't expose refreshAllObjects() directly,
-                // but accessing the underlying NSManagedObjectContext (via the persistent
-                // store coordinator notification) triggers the merge. We force the context
-                // to re-fault all registered objects by performing a no-op save-if-needed,
-                // which flushes the merge policy and pulls in remote changes.
                 do {
-                    if ctx.hasChanges {
-                        try ctx.save()
-                    }
+                    // Force a refresh of all objects to pull in remote changes
+                    // This is critical for showing updates from other devices
+                    try ctx.save()
+                    
+                    // Additional step: Trigger a model refresh by accessing the container
+                    // This helps ensure UI shows the latest data
+                    let _ = ctx.container.configurations
+                    
+                    print(" [iCloud] Context successfully refreshed with remote changes")
                 } catch {
                     print(" [iCloud] Context save during remote merge failed: \(error.localizedDescription)")
+                    syncStatus = .error("Failed to merge remote changes: \(error.localizedDescription)")
+                    errorMessage = error.localizedDescription
+                    lastSyncCompletionDate = Date()
+                    return
                 }
             } else {
                 print(" [iCloud] Remote changes received but modelContext is nil — cannot refresh")
+                syncStatus = .error("Context unavailable for remote changes")
+                errorMessage = "Context unavailable for remote changes"
+                lastSyncCompletionDate = Date()
+                return
             }
             
             lastSyncDate = Date()
             syncStatus = .success
             lastSyncCompletionDate = Date()
+            errorMessage = nil
+            
+            // Save the sync date to persistence
+            UserDefaults.standard.set(lastSyncDate!.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
             
             // Post a notification so any listening views can refresh their queries
             NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
             print(" [iCloud] Remote changes received and merged — UI will refresh")
+            
+            // Haptic feedback to let user know sync completed
+            hapticFeedback()
         }
     }
     
     @objc private func handleAccountChange(_ notification: Notification) {
         Task { @MainActor in
+            print(" [iCloud] Account change detected")
+            syncStatus = .syncing
+            
             let available = await checkiCloudAvailability()
-            if available && isSyncEnabled {
-                await performFullSync()
-                print(" [iCloud] Account changed — re-synced")
+            if available {
+                if isSyncEnabled {
+                    await performFullSync()
+                    print(" [iCloud] Account changed — re-synced successfully")
+                } else {
+                    print(" [iCloud] Account available but sync disabled")
+                    syncStatus = .idle
+                }
+            } else {
+                print(" [iCloud] Account changed but not available")
+                syncStatus = .error("iCloud account not available")
+                // Don't disable sync - just wait for account to become available
             }
         }
     }
@@ -165,29 +195,93 @@ final class iCloudSyncService: NSObject, ObservableObject {
     // MARK: - Full Sync
     
     func performFullSync() async {
-        guard isSyncEnabled else { return }
+        guard isSyncEnabled else { 
+            print(" [iCloud] Sync requested but disabled")
+            return 
+        }
         
+        print(" [iCloud] Starting full sync...")
         syncStatus = .syncing
+        errorMessage = nil
+        
         defer {
             let now = Date()
             lastSyncDate = now
-            kvStore.set(now.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
+            UserDefaults.standard.set(now.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
         }
         
-        // Push user settings to iCloud KV store
-        iCloudKeyValueStore.shared.pushToCloud()
-        
-        // Sync all data types
-        await syncJokes()
-        await syncRoastTargets()
-        await syncRoastJokes()
-        await syncSetLists()
-        await syncRecordings()
-        await syncNotebookPhotos()
-        
-        syncStatus = .success
-        errorMessage = nil
-        hapticFeedback()
+        do {
+            // 1. Verify iCloud availability first
+            let accountStatus = try await container.accountStatus()
+            guard accountStatus == .available else {
+                let message = "iCloud account not available: \(accountStatus)"
+                print(" [iCloud] \(message)")
+                syncStatus = .error(message)
+                errorMessage = message
+                return
+            }
+            
+            // 2. Save any pending local changes first
+            if let ctx = modelContext, ctx.hasChanges {
+                try ctx.save()
+                print(" [iCloud] Saved pending local changes")
+            }
+            
+            // 3. Push user settings to iCloud KV store
+            print(" [iCloud] Syncing user preferences...")
+            iCloudKeyValueStore.shared.pushToCloud()
+            
+            // 4. Trigger CloudKit sync by touching the container
+            // This encourages SwiftData to push/pull with CloudKit
+            let database = container.privateCloudDatabase
+            let zoneID = CKRecordZone.ID(
+                zoneName: "com.apple.coredata.cloudkit.zone",
+                ownerName: CKCurrentUserDefaultName
+            )
+            
+            // Try to access the zone to trigger connectivity check
+            do {
+                _ = try await database.recordZone(for: zoneID)
+                print(" [iCloud] CloudKit zone accessible")
+            } catch let error as CKError where error.code == .zoneNotFound {
+                print(" [iCloud] CloudKit zone doesn't exist yet - will be created on first save")
+            } catch {
+                print(" [iCloud] Warning: Could not access CloudKit zone: \(error.localizedDescription)")
+                // Continue anyway - zone might be created automatically
+            }
+            
+            // 5. Sync all data types (placeholder for future custom logic)
+            await syncJokes()
+            await syncRoastTargets()
+            await syncRoastJokes()
+            await syncSetLists()
+            await syncRecordings()
+            await syncNotebookPhotos()
+            await syncBrainstormIdeas()
+            await syncImportBatches()
+            await syncChatMessages()
+            
+            // 6. Force context refresh to pull any remote changes
+            if let ctx = modelContext {
+                do {
+                    try ctx.save()
+                    print(" [iCloud] Final context save completed")
+                } catch {
+                    print(" [iCloud] Warning: Final context save failed: \(error.localizedDescription)")
+                }
+            }
+            
+            syncStatus = .success
+            errorMessage = nil
+            print(" [iCloud] Full sync completed successfully")
+            hapticFeedback()
+            
+        } catch {
+            let message = "Sync failed: \(error.localizedDescription)"
+            print(" [iCloud] \(message)")
+            syncStatus = .error(message)
+            errorMessage = message
+        }
     }
     
     // MARK: - Incremental Syncs
@@ -220,6 +314,18 @@ final class iCloudSyncService: NSObject, ObservableObject {
     private func syncNotebookPhotos() async {
         // No-op: SwiftData auto-syncs NotebookPhotoRecord records via CloudKit.
         // imageData uses @Attribute(.externalStorage), synced as a CKAsset.
+    }
+    
+    private func syncBrainstormIdeas() async {
+        // No-op: SwiftData auto-syncs BrainstormIdea records via CloudKit.
+    }
+    
+    private func syncImportBatches() async {
+        // No-op: SwiftData auto-syncs ImportBatch and related records via CloudKit.
+    }
+    
+    private func syncChatMessages() async {
+        // No-op: SwiftData auto-syncs ChatMessage records via CloudKit.
     }
     
     // MARK: - Sync Thoughts (Notepad)

@@ -166,7 +166,8 @@ final class iCloudKeyValueStore {
         syncDebounceWorkItem = DispatchWorkItem { [weak self] in
             self?.performSyncToCloud()
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: syncDebounceWorkItem!)
+        // Reduced debounce time for better responsiveness
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: syncDebounceWorkItem!)
     }
     
     /// Performs the actual sync to iCloud (debounced)
@@ -174,6 +175,8 @@ final class iCloudKeyValueStore {
         guard !isSyncing else { return }
         
         var changed = false
+        var changedKeys: [String] = []
+        
         for key in SyncedKeys.all {
             let localValue = local.object(forKey: key)
             let cloudValue = cloud.object(forKey: key)
@@ -182,15 +185,23 @@ final class iCloudKeyValueStore {
             if !valuesEqual(localValue, cloudValue) {
                 if let val = localValue {
                     cloud.set(val, forKey: key)
+                    print(" [iCloudKV] Updated cloud key: \(key)")
                 } else {
                     cloud.removeObject(forKey: key)
+                    print(" [iCloudKV] Removed cloud key: \(key)")
                 }
+                changedKeys.append(key)
                 changed = true
             }
         }
         
         if changed {
-            cloud.synchronize()
+            let success = cloud.synchronize()
+            if success {
+                print(" [iCloudKV] Auto-synced \(changedKeys.count) changed keys to iCloud: \(changedKeys.joined(separator: ", "))")
+            } else {
+                print(" [iCloudKV] Failed to sync \(changedKeys.count) keys to iCloud")
+            }
         }
     }
     
@@ -254,7 +265,7 @@ final class iCloudKeyValueStore {
             reasonString = "InitialSync"
         case NSUbiquitousKeyValueStoreQuotaViolationChange:
             reasonString = "QuotaViolation"
-            print(" [iCloudKV] QUOTA VIOLATION — iCloud KV store quota exceeded! Some keys may not sync.")
+            print(" ⚠️ [iCloudKV] QUOTA VIOLATION — iCloud KV store quota exceeded! Some keys may not sync.")
         case NSUbiquitousKeyValueStoreAccountChange:
             reasonString = "AccountChange"
             print(" [iCloudKV] iCloud account changed — user may have signed in/out")
@@ -270,20 +281,35 @@ final class iCloudKeyValueStore {
             defer { isSyncing = false }
             
             let changedKeys = userInfo[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] ?? []
+            let syncedChangedKeys = changedKeys.filter { SyncedKeys.all.contains($0) }
             
-            for key in changedKeys where SyncedKeys.all.contains(key) {
+            var successCount = 0
+            for key in syncedChangedKeys {
                 if let value = cloud.object(forKey: key) {
                     local.set(value, forKey: key)
+                    successCount += 1
+                } else {
+                    // Key was removed from cloud
+                    local.removeObject(forKey: key)
+                    successCount += 1
                 }
             }
-            local.synchronize()
             
-            // Post notification so views can refresh
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .iCloudKVDidChange, object: nil, userInfo: ["keys": changedKeys])
+            if successCount > 0 {
+                local.synchronize()
+                print(" [iCloudKV] Successfully synced \(successCount) keys from \(reasonString)")
+                
+                // Post notification so views can refresh
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: .iCloudKVDidChange, 
+                        object: nil, 
+                        userInfo: ["keys": syncedChangedKeys, "reason": reasonString]
+                    )
+                }
             }
             
-            print(" [iCloudKV] Received \(reasonString) for \(changedKeys.count) key(s): \(changedKeys.joined(separator: ", "))")
+            print(" [iCloudKV] Received \(reasonString) for \(changedKeys.count) key(s), \(syncedChangedKeys.count) synced: \(syncedChangedKeys.joined(separator: ", "))")
         } else {
             print(" [iCloudKV] Received \(reasonString) — no action taken")
         }

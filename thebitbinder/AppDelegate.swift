@@ -97,21 +97,46 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         
+        print(" [CloudKit] Remote notification received: \(userInfo)")
+        
         // Let CloudKit process the notification (subscription-based record changes)
         let notification = CKNotification(fromRemoteNotificationDictionary: userInfo)
         
-        if notification?.notificationType == .recordZone ||
-           notification?.notificationType == .query ||
-           notification?.notificationType == .database {
-            // Trigger SwiftData to merge remote changes
+        guard let ckNotification = notification else {
+            print(" [CloudKit] Could not create CKNotification from userInfo")
+            completionHandler(.noData)
+            return
+        }
+        
+        print(" [CloudKit] Notification type: \(ckNotification.notificationType.rawValue)")
+        
+        switch ckNotification.notificationType {
+        case .recordZone, .query, .database:
+            // This is a CloudKit data change notification
+            print(" [CloudKit] CloudKit data change notification - triggering sync")
+            
+            // Post notification to trigger iCloudSyncService remote change handler
             NotificationCenter.default.post(
                 name: .NSPersistentStoreRemoteChange,
                 object: nil,
                 userInfo: userInfo
             )
-            print(" [CloudKit] Remote notification received — merging changes")
+            
+            // Also trigger a manual sync to ensure changes are pulled
+            Task { @MainActor in
+                let syncService = iCloudSyncService.shared
+                if syncService.isSyncEnabled {
+                    // Don't await to avoid blocking the completion handler
+                    _ = Task {
+                        await syncService.syncNow()
+                    }
+                }
+            }
+            
             completionHandler(.newData)
-        } else {
+            
+        default:
+            print(" [CloudKit] Non-data notification type, ignoring")
             completionHandler(.noData)
         }
     }

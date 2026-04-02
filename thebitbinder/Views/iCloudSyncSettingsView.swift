@@ -9,11 +9,11 @@ import SwiftUI
 
 struct iCloudSyncSettingsView: View {
     @StateObject private var syncService = iCloudSyncService.shared
+    @StateObject private var diagnostics = iCloudSyncDiagnostics.shared
     @State private var showingSyncConfirmation = false
     @State private var isCheckingAvailability = false
     @State private var iCloudAvailable = true
-    @State private var diagnosticResults: [String] = []
-    @State private var showingDiagnostics = false
+    @State private var showingDetailedDiagnostics = false
     
     var body: some View {
         ScrollView {
@@ -47,10 +47,10 @@ struct iCloudSyncSettingsView: View {
                             
                             HStack(spacing: 8) {
                                 Circle()
-                                    .fill(syncService.isSyncEnabled ? AppTheme.Colors.success : Color.gray)
+                                    .fill(syncStatusColor)
                                     .frame(width: 8, height: 8)
                                 
-                                Text(syncService.isSyncEnabled ? "Syncing" : "Off")
+                                Text(syncStatusText)
                                     .font(.system(size: 15, weight: .semibold, design: .serif))
                                     .foregroundColor(AppTheme.Colors.inkBlack)
                             }
@@ -108,6 +108,41 @@ struct iCloudSyncSettingsView: View {
                         .padding(12)
                         .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.Colors.error.opacity(0.1)))
                     }
+                    
+                    // Issues Found
+                    if !diagnostics.syncIssuesFound.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text("Issues Found")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.orange)
+                            }
+                            
+                            ForEach(diagnostics.syncIssuesFound.prefix(3).indices, id: \.self) { index in
+                                let issue = diagnostics.syncIssuesFound[index]
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(issue.description)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(AppTheme.Colors.inkBlack)
+                                    Text(issue.suggestedFix)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(AppTheme.Colors.textSecondary)
+                                }
+                                .padding(.leading, 4)
+                            }
+                            
+                            if diagnostics.syncIssuesFound.count > 3 {
+                                Text("+ \(diagnostics.syncIssuesFound.count - 3) more issues")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(AppTheme.Colors.textSecondary)
+                                    .padding(.leading, 4)
+                            }
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.1)))
+                    }
                 }
                 
                 // Toggle & Actions
@@ -140,7 +175,7 @@ struct iCloudSyncSettingsView: View {
                     .padding(16)
                     .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.surfaceElevated))
                     
-                    if syncService.isSyncEnabled {
+                    HStack(spacing: 12) {
                         Button(action: {
                             Task { await syncService.syncNow() }
                         }) {
@@ -156,8 +191,24 @@ struct iCloudSyncSettingsView: View {
                             .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.brand))
                             .foregroundColor(.white)
                         }
-                        .disabled(syncService.syncStatus == .syncing)
-                        .opacity(syncService.syncStatus == .syncing ? 0.6 : 1.0)
+                        .disabled(syncService.syncStatus == .syncing || !syncService.isSyncEnabled)
+                        .opacity(syncService.syncStatus == .syncing || !syncService.isSyncEnabled ? 0.6 : 1.0)
+                        
+                        Button(action: {
+                            diagnostics.forceKeyValueSync()
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.up.arrow.down")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("Force KV Sync")
+                                    .font(.system(size: 15, weight: .semibold, design: .serif))
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(14)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(.orange))
+                            .foregroundColor(.white)
+                        }
                     }
                 }
                 
@@ -174,6 +225,8 @@ struct iCloudSyncSettingsView: View {
                         SyncItemRow(icon: "list.bullet.rectangle", label: "Set Lists", detail: "Your comedy set lists")
                         SyncItemRow(icon: "waveform", label: "Voice Recordings", detail: "All voice memos and recordings")
                         SyncItemRow(icon: "photo.on.rectangle", label: "Notebook Photos", detail: "Scanned notebook pages")
+                        SyncItemRow(icon: "brain.head.profile", label: "Brainstorm Ideas", detail: "Your brainstorming sessions")
+                        SyncItemRow(icon: "bubble.left.and.bubble.right", label: "Chat Messages", detail: "BitBuddy conversation history")
                     }
                 }
                 .padding(16)
@@ -220,14 +273,14 @@ struct iCloudSyncSettingsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Button {
                         Task {
-                            diagnosticResults = await syncService.runDiagnostics()
-                            showingDiagnostics = true
+                            await diagnostics.runComprehensiveDiagnostics()
+                            showingDetailedDiagnostics = true
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "wrench.and.screwdriver")
+                            Image(systemName: "stethoscope")
                                 .font(.system(size: 14, weight: .semibold))
-                            Text("Run Sync Diagnostics")
+                            Text("Run Comprehensive Diagnostics")
                                 .font(.system(size: 15, weight: .semibold, design: .serif))
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -238,22 +291,25 @@ struct iCloudSyncSettingsView: View {
                         .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.surfaceElevated))
                         .foregroundColor(AppTheme.Colors.inkBlack)
                     }
+                    .disabled(diagnostics.isRunningDiagnostics)
                     
-                    if showingDiagnostics {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(diagnosticResults, id: \.self) { result in
-                                Text(result)
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .foregroundColor(AppTheme.Colors.textSecondary)
-                            }
+                    if diagnostics.isRunningDiagnostics {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Running diagnostics...")
+                                .font(.system(size: 12))
+                                .foregroundColor(AppTheme.Colors.textSecondary)
                         }
                         .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                         .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.Colors.surfaceElevated))
                     }
                 }
             }
             .padding(16)
+        }
+        .sheet(isPresented: $showingDetailedDiagnostics) {
+            DiagnosticsDetailView()
         }
         .onAppear {
             Task {
@@ -261,7 +317,40 @@ struct iCloudSyncSettingsView: View {
                 if !iCloudAvailable {
                     syncService.errorMessage = "Sign in to iCloud in Settings to enable sync"
                 }
+                
+                // Run initial diagnostics if not done yet
+                if diagnostics.diagnosticResults.isEmpty {
+                    await diagnostics.runComprehensiveDiagnostics()
+                }
             }
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var syncStatusColor: Color {
+        switch syncService.syncStatus {
+        case .idle:
+            return syncService.isSyncEnabled ? .blue : .gray
+        case .syncing:
+            return .blue
+        case .success:
+            return AppTheme.Colors.success
+        case .error:
+            return AppTheme.Colors.error
+        }
+    }
+    
+    private var syncStatusText: String {
+        switch syncService.syncStatus {
+        case .idle:
+            return syncService.isSyncEnabled ? "Ready" : "Disabled"
+        case .syncing:
+            return "Syncing..."
+        case .success:
+            return "Up to date"
+        case .error:
+            return "Sync error"
         }
     }
 }
