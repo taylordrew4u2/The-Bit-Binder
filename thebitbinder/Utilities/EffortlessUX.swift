@@ -134,31 +134,32 @@ final class HapticEngine {
 }
 
 // MARK: - Effortless Animations
+// Professional, restrained animations - dependable tool feel, not playful
 
 struct EffortlessAnimation {
-    /// Snappy spring - buttons, toggles
-    static let snappy = Animation.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0)
+    /// Snappy spring - buttons, toggles (well-damped, no bounce)
+    static let snappy = Animation.spring(response: 0.25, dampingFraction: 0.85, blendDuration: 0)
     
-    /// Quick spring - chips, cards
-    static let quick = Animation.spring(response: 0.35, dampingFraction: 0.75, blendDuration: 0)
+    /// Quick spring - chips, cards (smooth, professional)
+    static let quick = Animation.spring(response: 0.3, dampingFraction: 0.88, blendDuration: 0)
     
     /// Smooth spring - sheets, larger elements
-    static let smooth = Animation.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0)
+    static let smooth = Animation.spring(response: 0.4, dampingFraction: 0.9, blendDuration: 0)
     
     /// Gentle spring - subtle feedback
-    static let gentle = Animation.spring(response: 0.5, dampingFraction: 0.9, blendDuration: 0)
+    static let gentle = Animation.spring(response: 0.45, dampingFraction: 0.92, blendDuration: 0)
     
-    /// Bouncy spring - FABs, celebration
-    static let bouncy = Animation.spring(response: 0.4, dampingFraction: 0.6, blendDuration: 0)
+    /// Standard spring - replaces bouncy, well-damped motion
+    static let bouncy = Animation.spring(response: 0.35, dampingFraction: 0.85, blendDuration: 0)
     
     /// Ultra fast - instant feedback
     static let instant = Animation.easeOut(duration: 0.1)
     
     /// Ease out - slide animations
-    static let slideOut = Animation.easeOut(duration: 0.25)
+    static let slideOut = Animation.easeOut(duration: 0.2)
     
     /// Ease in-out - transitions
-    static let transition = Animation.easeInOut(duration: 0.3)
+    static let transition = Animation.easeInOut(duration: 0.25)
 }
 
 // MARK: - Auto-Save Manager
@@ -539,12 +540,13 @@ struct ShimmerModifier: ViewModifier {
 
 // MARK: - Smooth Scale Button Style
 
-/// Enhanced button style with smooth scaling and optional haptic
+/// Enhanced button style with subtle scaling and optional haptic
+/// Designed for professional, dependable feel
 struct SmoothScaleButtonStyle: ButtonStyle {
     let scale: CGFloat
     let haptic: Bool
     
-    init(scale: CGFloat = 0.96, haptic: Bool = true) {
+    init(scale: CGFloat = 0.97, haptic: Bool = true) {
         self.scale = scale
         self.haptic = haptic
     }
@@ -552,8 +554,8 @@ struct SmoothScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? scale : 1.0)
-            .opacity(configuration.isPressed ? 0.9 : 1.0)
-            .animation(EffortlessAnimation.instant, value: configuration.isPressed)
+            .opacity(configuration.isPressed ? 0.88 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
             .onChange(of: configuration.isPressed) { _, isPressed in
                 if isPressed && haptic {
                     HapticEngine.shared.tap()

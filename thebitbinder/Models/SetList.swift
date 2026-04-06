@@ -19,6 +19,23 @@ final class SetList: Identifiable {
     // Soft-delete (trash) support
     var isDeleted: Bool = false
     var deletedDate: Date?
+    
+    // MARK: - Finalization for Live Performance
+    
+    /// When true, the set is locked for live performance - no editing, clean view
+    var isFinalized: Bool = false
+    
+    /// Date when this set was finalized for performance
+    var finalizedDate: Date?
+    
+    /// Estimated runtime in minutes (set during finalization)
+    var estimatedMinutes: Int = 0
+    
+    /// Venue/event name for this performance
+    var venueName: String = ""
+    
+    /// Performance date/time (optional - for planning)
+    var performanceDate: Date?
 
     // Store UUIDs as a comma-separated string to avoid SwiftData Array<UUID> issues
     private var jokeIDsString: String = ""
@@ -74,5 +91,29 @@ final class SetList: Identifiable {
         isDeleted = false
         deletedDate = nil
         dateModified = Date()
+    }
+    
+    // MARK: - Finalization Helpers
+    
+    /// Finalize the set for live performance. Locks editing and prepares clean view.
+    func finalize(estimatedMinutes: Int = 0, venueName: String = "", performanceDate: Date? = nil) {
+        isFinalized = true
+        finalizedDate = Date()
+        self.estimatedMinutes = estimatedMinutes
+        self.venueName = venueName
+        self.performanceDate = performanceDate
+        dateModified = Date()
+    }
+    
+    /// Unfinalize to allow editing again
+    func unfinalize() {
+        isFinalized = false
+        finalizedDate = nil
+        dateModified = Date()
+    }
+    
+    /// Check if model is valid (not deleted from context)
+    var isValid: Bool {
+        self.modelContext != nil
     }
 }

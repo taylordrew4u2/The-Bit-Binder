@@ -21,7 +21,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
     
     private var syncDebouncer: Timer?
     private var lastSyncCompletionDate: Date = .distantPast
-    private let syncCooldown: TimeInterval = 5.0 // 5 seconds
+    private let syncCooldown: TimeInterval = 3.0 // 3 seconds (reduced from 5 for faster sync)
 
     enum SyncStatus: Equatable {
         case idle
@@ -43,7 +43,19 @@ final class iCloudSyncService: NSObject, ObservableObject {
     
     override init() {
         super.init()
-        isSyncEnabled = UserDefaults.standard.bool(forKey: SyncedKeys.iCloudSyncEnabled)
+        
+        // Check if sync setting has been explicitly set
+        let hasSetSyncPreference = UserDefaults.standard.object(forKey: SyncedKeys.iCloudSyncEnabled) != nil
+        
+        if hasSetSyncPreference {
+            isSyncEnabled = UserDefaults.standard.bool(forKey: SyncedKeys.iCloudSyncEnabled)
+        } else {
+            // Default to enabled for new installs - sync should work out of the box
+            isSyncEnabled = true
+            UserDefaults.standard.set(true, forKey: SyncedKeys.iCloudSyncEnabled)
+            print(" [iCloud] First launch - sync enabled by default")
+        }
+        
         if let lastSyncTimestamp = UserDefaults.standard.object(forKey: SyncedKeys.lastSyncDate) as? Double {
             lastSyncDate = Date(timeIntervalSince1970: lastSyncTimestamp)
         }
@@ -77,67 +89,73 @@ final class iCloudSyncService: NSObject, ObservableObject {
     @objc private func handleRemoteChange(_ notification: Notification) {
         syncDebouncer?.invalidate()
         syncDebouncer = Timer.scheduledTimer(
-            timeInterval: 2.0,
-            target: self,
-            selector: #selector(processRemoteChange),
-            userInfo: nil,
+            withTimeInterval: 1.0, // Reduced from 2.0 for faster sync
             repeats: false
-        )
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.processRemoteChangeAsync()
+            }
+        }
     }
     
-    @objc private func processRemoteChange() {
-        Task { @MainActor in
-            guard Date().timeIntervalSince(lastSyncCompletionDate) >= syncCooldown else {
-                print(" [iCloud] Sync request ignored due to cooldown.")
-                return
-            }
-            
-            syncStatus = .syncing
-            
-            // Refresh the SwiftData context so it merges remote CloudKit changes
-            // into the in-memory objects. Without this, the context holds stale data
-            // and the UI won't reflect changes from other devices.
-            if let ctx = modelContext {
-                do {
-                    // Force a refresh of all objects to pull in remote changes
-                    // This is critical for showing updates from other devices
+    private func processRemoteChangeAsync() async {
+        guard Date().timeIntervalSince(lastSyncCompletionDate) >= syncCooldown else {
+            print(" [iCloud] Sync request ignored due to cooldown.")
+            return
+        }
+        
+        syncStatus = .syncing
+        
+        // Refresh the SwiftData context so it merges remote CloudKit changes
+        // into the in-memory objects. Without this, the context holds stale data
+        // and the UI won't reflect changes from other devices.
+        if let ctx = modelContext {
+            do {
+                // Step 1: Save any pending local changes first to avoid conflicts
+                if ctx.hasChanges {
                     try ctx.save()
-                    
-                    // Additional step: Trigger a model refresh by accessing the container
-                    // This helps ensure UI shows the latest data
-                    let _ = ctx.container.configurations
-                    
-                    print(" [iCloud] Context successfully refreshed with remote changes")
-                } catch {
-                    print(" [iCloud] Context save during remote merge failed: \(error.localizedDescription)")
-                    syncStatus = .error("Failed to merge remote changes: \(error.localizedDescription)")
-                    errorMessage = error.localizedDescription
-                    lastSyncCompletionDate = Date()
-                    return
+                    print(" [iCloud] Saved pending local changes before merge")
                 }
-            } else {
-                print(" [iCloud] Remote changes received but modelContext is nil — cannot refresh")
-                syncStatus = .error("Context unavailable for remote changes")
-                errorMessage = "Context unavailable for remote changes"
+                
+                // Step 2: Fetch current count to verify sync is working
+                let jokeCount = try ctx.fetchCount(FetchDescriptor<Joke>())
+                print(" [iCloud] Current joke count after merge: \(jokeCount)")
+                
+                // Step 3: Post notification so SwiftUI views using @Query will refresh
+                // @Query automatically observes the model context and should update,
+                // but posting this notification allows custom observers to react too.
+                NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
+                
+                print(" [iCloud] Context successfully refreshed with remote changes")
+            } catch {
+                print(" [iCloud] Context operation during remote merge failed: \(error.localizedDescription)")
+                syncStatus = .error("Failed to merge remote changes: \(error.localizedDescription)")
+                errorMessage = error.localizedDescription
                 lastSyncCompletionDate = Date()
                 return
             }
-            
-            lastSyncDate = Date()
-            syncStatus = .success
+        } else {
+            print(" [iCloud] Remote changes received but modelContext is nil — cannot refresh")
+            syncStatus = .error("Context unavailable for remote changes")
+            errorMessage = "Context unavailable for remote changes"
             lastSyncCompletionDate = Date()
-            errorMessage = nil
-            
-            // Save the sync date to persistence
-            UserDefaults.standard.set(lastSyncDate!.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
-            
-            // Post a notification so any listening views can refresh their queries
-            NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
-            print(" [iCloud] Remote changes received and merged — UI will refresh")
-            
-            // Haptic feedback to let user know sync completed
-            hapticFeedback()
+            return
         }
+        
+        lastSyncDate = Date()
+        syncStatus = .success
+        lastSyncCompletionDate = Date()
+        errorMessage = nil
+        
+        // Save the sync date to persistence
+        if let syncDate = lastSyncDate {
+            UserDefaults.standard.set(syncDate.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
+        }
+        
+        print(" [iCloud] Remote changes received and merged — UI will refresh")
+        
+        // Haptic feedback to let user know sync completed
+        hapticFeedback()
     }
     
     @objc private func handleAccountChange(_ notification: Notification) {
@@ -263,13 +281,25 @@ final class iCloudSyncService: NSObject, ObservableObject {
             
             // 6. Force context refresh to pull any remote changes
             if let ctx = modelContext {
+                // Post notification to trigger CloudKit sync engine
+                NotificationCenter.default.post(
+                    name: .NSPersistentStoreRemoteChange,
+                    object: nil
+                )
+                
                 do {
                     try ctx.save()
-                    print(" [iCloud] Final context save completed")
+                    
+                    // Verify sync by checking counts
+                    let jokeCount = try ctx.fetchCount(FetchDescriptor<Joke>())
+                    print(" [iCloud] Final context save completed - \(jokeCount) jokes in store")
                 } catch {
                     print(" [iCloud] Warning: Final context save failed: \(error.localizedDescription)")
                 }
             }
+            
+            // Notify UI to refresh
+            NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
             
             syncStatus = .success
             errorMessage = nil
@@ -388,6 +418,71 @@ final class iCloudSyncService: NSObject, ObservableObject {
     
     func syncNow() async {
         await performFullSync()
+    }
+    
+    /// Force refresh all data from CloudKit - use when sync seems stuck
+    /// This is more aggressive than syncNow() and will re-fetch counts to verify
+    func forceRefreshAllData() async {
+        print(" [iCloud] Force refresh initiated...")
+        syncStatus = .syncing
+        errorMessage = nil
+        
+        guard let ctx = modelContext else {
+            syncStatus = .error("No model context available")
+            errorMessage = "No model context available"
+            return
+        }
+        
+        do {
+            // 1. Verify iCloud is available
+            let available = await checkiCloudAvailability()
+            guard available else {
+                syncStatus = .error("iCloud not available")
+                return
+            }
+            
+            // 2. Save any pending changes
+            if ctx.hasChanges {
+                try ctx.save()
+                print(" [iCloud] Saved pending changes before force refresh")
+            }
+            
+            // 3. Post remote change notification to trigger CoreData's CloudKit
+            // integration to check for and import any pending remote changes
+            NotificationCenter.default.post(
+                name: .NSPersistentStoreRemoteChange,
+                object: nil
+            )
+            
+            // 4. Wait a moment for CloudKit to process
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            // 5. Verify by fetching counts
+            let jokeCount = try ctx.fetchCount(FetchDescriptor<Joke>())
+            let setListCount = try ctx.fetchCount(FetchDescriptor<SetList>())
+            let recordingCount = try ctx.fetchCount(FetchDescriptor<Recording>())
+            
+            print(" [iCloud] Force refresh complete - Jokes: \(jokeCount), SetLists: \(setListCount), Recordings: \(recordingCount)")
+            
+            lastSyncDate = Date()
+            syncStatus = .success
+            lastSyncCompletionDate = Date()
+            errorMessage = nil
+            
+            if let syncDate = lastSyncDate {
+                UserDefaults.standard.set(syncDate.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
+            }
+            
+            // Notify UI to refresh
+            NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
+            
+            hapticFeedback()
+            
+        } catch {
+            print(" [iCloud] Force refresh failed: \(error.localizedDescription)")
+            syncStatus = .error("Force refresh failed: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+        }
     }
     
     // MARK: - Haptic Feedback

@@ -35,6 +35,9 @@ struct AddRoastJokesToSetListView: View {
     }
 
     private func availableJokes(for target: RoastTarget) -> [RoastJoke] {
+        // Safety check - return empty if target is invalid
+        guard target.isValid else { return [] }
+        
         let all = (target.jokes ?? [])
             .filter { !$0.isDeleted && !currentRoastJokeIDs.contains($0.id) }
             .sorted { $0.dateCreated > $1.dateCreated }
@@ -133,7 +136,11 @@ struct AddRoastJokesToSetListView: View {
     }
 
     private func targetHeader(_ target: RoastTarget) -> some View {
-        Button {
+        // Safe property accessors
+        let safeName = target.isValid ? target.name : ""
+        let safePhotoData = target.isValid ? target.photoData : nil
+        
+        return Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 if expandedTargets.contains(target.id) {
                     expandedTargets.remove(target.id)
@@ -145,13 +152,13 @@ struct AddRoastJokesToSetListView: View {
             HStack(spacing: 10) {
                 // Avatar — async background decode
                 AsyncAvatarView(
-                    photoData: target.photoData,
+                    photoData: safePhotoData,
                     size: 32,
-                    fallbackInitial: String(target.name.prefix(1).uppercased()),
+                    fallbackInitial: String(safeName.prefix(1).uppercased()),
                     accentColor: accent
                 )
 
-                Text(target.name)
+                Text(safeName)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.primary)
 

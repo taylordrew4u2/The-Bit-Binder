@@ -27,8 +27,8 @@
 		BA859D9B2F6CF69600B61B1B /* Embed ExtensionKit Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
-			dstSubfolderSpec = 16;
+			dstPath = Extensions;
+			dstSubfolderSpec = 1;
 			files = (
 				BAD6B2CE2F6F753E00A09B53 /* bit.appex in Embed ExtensionKit Extensions */,
 			);

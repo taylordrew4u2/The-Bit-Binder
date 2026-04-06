@@ -3,18 +3,34 @@ import SwiftData
 
 struct TrashView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Joke> { $0.isDeleted == true }, sort: \Joke.deletedDate, order: .reverse)
+    @Query(filter: #Predicate<Joke> { $0.isDeleted == true }, sort: \Joke.dateModified, order: .reverse)
     private var trashedJokes: [Joke]
+    
+    @Query(filter: #Predicate<RoastJoke> { $0.isDeleted == true }, sort: \RoastJoke.dateModified, order: .reverse)
+    private var trashedRoastJokes: [RoastJoke]
 
     @AppStorage("showFullContent") private var showFullContent = true
     @State private var searchText = ""
     @State private var showingEmptyTrashAlert = false
     @State private var jokeToDelete: Joke?
+    @State private var roastJokeToDelete: RoastJoke?
     @State private var showingDeleteOneAlert = false
+    @State private var showingDeleteRoastAlert = false
     @State private var persistenceError: String?
     @State private var showingErrorAlert = false
+    
+    // Debug: log counts on appear
+    private func logTrashCounts() {
+        #if DEBUG
+        print(" [TrashView] Jokes in trash: \(trashedJokes.count)")
+        print(" [TrashView] Roasts in trash: \(trashedRoastJokes.count)")
+        for roast in trashedRoastJokes {
+            print("   - Roast: \(roast.content.prefix(30))... deleted: \(roast.deletedDate?.description ?? "nil")")
+        }
+        #endif
+    }
 
-    private var filteredTrash: [Joke] {
+    private var filteredJokes: [Joke] {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return trashedJokes }
         let lower = trimmed.lowercased()
@@ -23,62 +39,162 @@ struct TrashView: View {
             $0.content.lowercased().contains(lower)
         }
     }
+    
+    private var filteredRoastJokes: [RoastJoke] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return trashedRoastJokes }
+        let lower = trimmed.lowercased()
+        return trashedRoastJokes.filter {
+            $0.content.lowercased().contains(lower) ||
+            ($0.target?.name.lowercased().contains(lower) ?? false)
+        }
+    }
+    
+    private var totalTrashedCount: Int {
+        trashedJokes.count + trashedRoastJokes.count
+    }
+    
+    private var isTrashEmpty: Bool {
+        filteredJokes.isEmpty && filteredRoastJokes.isEmpty
+    }
 
     var body: some View {
         Group {
-            if filteredTrash.isEmpty {
+            if isTrashEmpty {
                 BitBinderEmptyState(
                     icon: "trash",
                     title: "Trash is Empty",
-                    subtitle: "Deleted jokes appear here until you empty trash."
+                    subtitle: "Deleted jokes and roasts appear here until you empty trash."
                 )
             } else {
                 List {
-                    ForEach(filteredTrash) { joke in
-                        NavigationLink(destination: JokeDetailView(joke: joke)) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
-                                    .font(.headline)
-                                if showFullContent {
-                                    Text(joke.content)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
+                    // Regular Jokes Section
+                    if !filteredJokes.isEmpty {
+                        Section {
+                            ForEach(filteredJokes) { joke in
+                                NavigationLink(destination: JokeDetailView(joke: joke)) {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
+                                            .font(.headline)
+                                        if showFullContent {
+                                            Text(joke.content)
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if let deletedDate = joke.deletedDate {
+                                            Text("Deleted \(deletedDate.formatted(date: .abbreviated, time: .shortened))")
+                                                .font(.caption)
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                    }
+                                    .padding(.vertical, 4)
                                 }
-                                if let deletedDate = joke.deletedDate {
-                                    Text("Deleted \(deletedDate.formatted(date: .abbreviated, time: .shortened))")
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        jokeToDelete = joke
+                                        showingDeleteOneAlert = true
+                                    } label: {
+                                        Label("Delete Forever", systemImage: "trash.fill")
+                                    }
+
+                                    Button {
+                                        restoreJoke(joke)
+                                    } label: {
+                                        Label("Restore", systemImage: "arrow.uturn.backward")
+                                    }
+                                    .tint(AppTheme.Colors.success)
+                                }
+                                .contextMenu {
+                                    Button {
+                                        restoreJoke(joke)
+                                    } label: {
+                                        Label("Restore", systemImage: "arrow.uturn.backward")
+                                    }
+
+                                    Button(role: .destructive) {
+                                        jokeToDelete = joke
+                                        showingDeleteOneAlert = true
+                                    } label: {
+                                        Label("Delete Forever", systemImage: "trash.fill")
+                                    }
                                 }
                             }
-                            .padding(.vertical, 4)
+                        } header: {
+                            HStack {
+                                Image(systemName: "text.quote")
+                                Text("Jokes (\(filteredJokes.count))")
+                            }
                         }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                jokeToDelete = joke
-                                showingDeleteOneAlert = true
-                            } label: {
-                                Label("Delete Forever", systemImage: "trash.fill")
-                            }
+                    }
+                    
+                    // Roast Jokes Section
+                    if !filteredRoastJokes.isEmpty {
+                        Section {
+                            ForEach(filteredRoastJokes) { roast in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "flame.fill")
+                                            .font(.caption)
+                                            .foregroundColor(AppTheme.Colors.roastAccent)
+                                        if let targetName = roast.target?.name {
+                                            Text(targetName)
+                                                .font(.caption.bold())
+                                                .foregroundColor(AppTheme.Colors.roastAccent)
+                                        }
+                                    }
+                                    
+                                    if showFullContent {
+                                        Text(roast.content)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.primary)
+                                    } else {
+                                        Text(roast.content.components(separatedBy: .newlines).first ?? roast.content)
+                                            .font(.subheadline)
+                                            .lineLimit(1)
+                                    }
+                                    
+                                    if let deletedDate = roast.deletedDate {
+                                        Text("Deleted \(deletedDate.formatted(date: .abbreviated, time: .shortened))")
+                                            .font(.caption)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        roastJokeToDelete = roast
+                                        showingDeleteRoastAlert = true
+                                    } label: {
+                                        Label("Delete Forever", systemImage: "trash.fill")
+                                    }
 
-                            Button {
-                                restoreJoke(joke)
-                            } label: {
-                                Label("Restore", systemImage: "arrow.uturn.backward")
-                            }
-                            .tint(AppTheme.Colors.success)
-                        }
-                        .contextMenu {
-                            Button {
-                                restoreJoke(joke)
-                            } label: {
-                                Label("Restore", systemImage: "arrow.uturn.backward")
-                            }
+                                    Button {
+                                        restoreRoastJoke(roast)
+                                    } label: {
+                                        Label("Restore", systemImage: "arrow.uturn.backward")
+                                    }
+                                    .tint(AppTheme.Colors.success)
+                                }
+                                .contextMenu {
+                                    Button {
+                                        restoreRoastJoke(roast)
+                                    } label: {
+                                        Label("Restore", systemImage: "arrow.uturn.backward")
+                                    }
 
-                            Button(role: .destructive) {
-                                jokeToDelete = joke
-                                showingDeleteOneAlert = true
-                            } label: {
-                                Label("Delete Forever", systemImage: "trash.fill")
+                                    Button(role: .destructive) {
+                                        roastJokeToDelete = roast
+                                        showingDeleteRoastAlert = true
+                                    } label: {
+                                        Label("Delete Forever", systemImage: "trash.fill")
+                                    }
+                                }
+                            }
+                        } header: {
+                            HStack {
+                                Image(systemName: "flame.fill")
+                                    .foregroundColor(AppTheme.Colors.roastAccent)
+                                Text("Roasts (\(filteredRoastJokes.count))")
                             }
                         }
                     }
@@ -90,7 +206,7 @@ struct TrashView: View {
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, prompt: "Search trash")
         .toolbar {
-            if !trashedJokes.isEmpty {
+            if totalTrashedCount > 0 {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) {
                         showingEmptyTrashAlert = true
@@ -111,18 +227,32 @@ struct TrashView: View {
         } message: {
             Text("This joke will be permanently deleted. This cannot be undone.")
         }
+        .alert("Delete Roast Forever?", isPresented: $showingDeleteRoastAlert) {
+            Button("Cancel", role: .cancel) { roastJokeToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let roast = roastJokeToDelete {
+                    permanentlyDeleteRoastJoke(roast)
+                    roastJokeToDelete = nil
+                }
+            }
+        } message: {
+            Text("This roast will be permanently deleted. This cannot be undone.")
+        }
         .alert("Empty Trash?", isPresented: $showingEmptyTrashAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Empty", role: .destructive) {
                 emptyTrash()
             }
         } message: {
-            Text("This permanently deletes all \(trashedJokes.count) joke\(trashedJokes.count == 1 ? "" : "s") in trash. This cannot be undone.")
+            Text("This permanently deletes all \(totalTrashedCount) item\(totalTrashedCount == 1 ? "" : "s") in trash. This cannot be undone.")
         }
         .alert("Error", isPresented: $showingErrorAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(persistenceError ?? "An unknown error occurred")
+        }
+        .onAppear {
+            logTrashCounts()
         }
     }
 
@@ -138,6 +268,17 @@ struct TrashView: View {
             showingErrorAlert = true
         }
     }
+    
+    private func restoreRoastJoke(_ roast: RoastJoke) {
+        roast.restoreFromTrash()
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [TrashView] Failed to restore roast: \(error)")
+            persistenceError = "Could not restore roast: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
 
     private func permanentlyDeleteJoke(_ joke: Joke) {
         modelContext.delete(joke)
@@ -149,10 +290,26 @@ struct TrashView: View {
             showingErrorAlert = true
         }
     }
+    
+    private func permanentlyDeleteRoastJoke(_ roast: RoastJoke) {
+        modelContext.delete(roast)
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [TrashView] Failed to permanently delete roast: \(error)")
+            persistenceError = "Could not delete roast: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
 
     private func emptyTrash() {
+        // Delete all jokes
         for joke in trashedJokes {
             modelContext.delete(joke)
+        }
+        // Delete all roast jokes
+        for roast in trashedRoastJokes {
+            modelContext.delete(roast)
         }
         do {
             try modelContext.save()
@@ -168,5 +325,5 @@ struct TrashView: View {
     NavigationStack {
         TrashView()
     }
-    .modelContainer(for: Joke.self, inMemory: true)
+    .modelContainer(for: [Joke.self, RoastJoke.self], inMemory: true)
 }

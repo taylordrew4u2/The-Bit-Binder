@@ -8,6 +8,7 @@
 import SwiftUI
 import AVFoundation
 import SwiftData
+import Speech
 
 struct RecordingDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -17,6 +18,7 @@ struct RecordingDetailView: View {
     @State private var isTranscribing = false
     @State private var transcriptionError: String?
     @State private var showingTranscriptionError = false
+    @State private var showingPermissionAlert = false
     
     var body: some View {
         ScrollView {
@@ -28,11 +30,11 @@ struct RecordingDetailView: View {
                         VStack(spacing: 16) {
                             ZStack {
                                 Circle()
-                                    .fill(AppTheme.Colors.error.opacity(0.1))
+                                    .fill(Color.red.opacity(0.1))
                                     .frame(width: 100, height: 100)
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .font(.system(size: 40))
-                                    .foregroundColor(AppTheme.Colors.error)
+                                    .foregroundColor(.red)
                             }
                             
                             Text("Unable to Play")
@@ -52,18 +54,18 @@ struct RecordingDetailView: View {
                     } else {
                         ZStack {
                             Circle()
-                                .stroke(AppTheme.Colors.primaryAction, lineWidth: 8)
+                                .stroke(Color.accentColor, lineWidth: 8)
                                 .frame(width: 200, height: 200)
                             
                             if audioPlayer.isPlaying {
                                 Circle()
-                                    .fill(AppTheme.Colors.primaryAction.opacity(0.3))
+                                    .fill(Color.accentColor.opacity(0.3))
                                     .frame(width: 180, height: 180)
                             }
                             
                             Image(systemName: audioPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                 .font(.system(size: 80))
-                                .foregroundColor(AppTheme.Colors.primaryAction)
+                                .foregroundColor(.accentColor)
                         }
                         
                         // Progress bar
@@ -73,7 +75,7 @@ struct RecordingDetailView: View {
                                     audioPlayer.seek(to: audioPlayer.currentTime)
                                 }
                             })
-                            .tint(AppTheme.Colors.primaryAction)
+                            .tint(.accentColor)
                             
                             HStack {
                                 Text(timeString(from: audioPlayer.currentTime))
@@ -104,7 +106,7 @@ struct RecordingDetailView: View {
                                     .font(.system(size: 30))
                             }
                         }
-                        .foregroundColor(AppTheme.Colors.primaryAction)
+                        .foregroundColor(.accentColor)
                     }
                 }
                 .padding()
@@ -139,8 +141,8 @@ struct RecordingDetailView: View {
                             .foregroundColor(.primary)
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(AppTheme.Colors.surfaceElevated)
-                            .cornerRadius(AppTheme.Radius.medium)
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(10)
                     } else if isTranscribing {
                         HStack {
                             Spacer()
@@ -153,8 +155,8 @@ struct RecordingDetailView: View {
                             Spacer()
                         }
                         .padding()
-                        .background(AppTheme.Colors.surfaceElevated)
-                        .cornerRadius(AppTheme.Radius.medium)
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(10)
                     } else {
                         Text("Tap 'Transcribe' to convert this recording to text")
                             .font(.subheadline)
@@ -162,8 +164,8 @@ struct RecordingDetailView: View {
                             .italic()
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(AppTheme.Colors.surfaceElevated)
-                            .cornerRadius(AppTheme.Radius.medium)
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(10)
                     }
                 }
                 .padding(.horizontal)
@@ -177,23 +179,18 @@ struct RecordingDetailView: View {
                     InfoRow(label: "Date", value: recording.dateCreated.formatted(date: .long, time: .shortened))
                 }
                 .padding()
-                .background(AppTheme.Colors.surfaceElevated)
-                .cornerRadius(AppTheme.Radius.medium)
+                .background(Color(UIColor.secondarySystemBackground))
+                .cornerRadius(10)
                 .padding(.horizontal)
                 
                 // Share button
                 Button(action: shareRecording) {
                     Label("Share Recording", systemImage: "square.and.arrow.up")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: AppTheme.Radius.large, style: .continuous)
-                                .fill(AppTheme.Colors.primaryAction)
-                        )
                 }
-                .buttonStyle(TouchReactiveStyle(pressedScale: 0.97, hapticStyle: .light))
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .padding(.horizontal)
             }
             .padding(.vertical)
@@ -214,6 +211,16 @@ struct RecordingDetailView: View {
         } message: {
             Text(transcriptionError ?? "An unknown error occurred")
         }
+        .alert("Speech Recognition Required", isPresented: $showingPermissionAlert) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("BitBinder needs speech recognition permission to transcribe your recordings. Please enable it in Settings.")
+        }
     }
     
     private func togglePlayback() {
@@ -231,28 +238,61 @@ struct RecordingDetailView: View {
     }
     
     private func transcribeRecording() {
+        // Check permission first
+        let status = SFSpeechRecognizer.authorizationStatus()
+        
+        if status == .denied || status == .restricted {
+            showingPermissionAlert = true
+            return
+        }
+        
         isTranscribing = true
         transcriptionError = nil
         
         Task {
             do {
+                // Request permission if not determined
+                if status == .notDetermined {
+                    let newStatus = await AudioTranscriptionService.requestAuthorization()
+                    if newStatus != .authorized {
+                        await MainActor.run {
+                            isTranscribing = false
+                            showingPermissionAlert = true
+                        }
+                        return
+                    }
+                }
+                
                 let url = recording.resolvedURL
                 
+                // Verify file exists
+                guard FileManager.default.fileExists(atPath: url.path) else {
+                    await MainActor.run {
+                        transcriptionError = "Recording file not found. It may have been deleted."
+                        showingTranscriptionError = true
+                        isTranscribing = false
+                    }
+                    return
+                }
+                
+                #if DEBUG
                 print(" [Transcribe] Attempting transcription of: \(url.path)")
-                print(" [Transcribe] File exists: \(FileManager.default.fileExists(atPath: url.path))")
-                print(" [Transcribe] Speech auth: \(AudioTranscriptionService.authorizationStatus.rawValue)")
+                #endif
                 
                 let result = try await AudioTranscriptionService.shared.transcribe(audioURL: url)
+                
+                #if DEBUG
                 print(" [Transcribe] Success — \(result.transcription.count) chars, confidence: \(String(format: "%.0f", result.confidencePercentage))%")
+                #endif
                 
                 await MainActor.run {
                     recording.transcription = result.transcription
+                    recording.isProcessed = true
                     do {
                         try modelContext.save()
+                        haptic(.success)
                     } catch {
                         print(" [RecordingDetailView] Failed to save transcription: \(error)")
-                        // Surface the save failure so the user knows the
-                        // transcription won't persist across app restarts.
                         transcriptionError = "Transcription completed but could not be saved: \(error.localizedDescription)"
                         showingTranscriptionError = true
                     }
@@ -263,6 +303,7 @@ struct RecordingDetailView: View {
                     transcriptionError = error.localizedDescription
                     showingTranscriptionError = true
                     isTranscribing = false
+                    haptic(.error)
                 }
             }
         }

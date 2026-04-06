@@ -45,14 +45,14 @@ struct TalkToTextView: View {
                 VStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(isRecording ? AppTheme.Colors.recordingsAccent.opacity(0.15) : AppTheme.Colors.primaryAction.opacity(0.1))
+                            .fill(isRecording ? Color.red.opacity(0.15) : Color.accentColor.opacity(0.1))
                             .frame(width: 100, height: 100)
                             .scaleEffect(isRecording ? 1.1 : 1.0)
                             .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isRecording)
                         
                         Image(systemName: isRecording ? "waveform" : "mic.fill")
                             .font(.system(size: 40))
-                            .foregroundColor(isRecording ? AppTheme.Colors.recordingsAccent : AppTheme.Colors.primaryAction)
+                            .foregroundColor(isRecording ? .red : .accentColor)
                             .symbolEffect(.variableColor, isActive: isRecording)
                     }
                     
@@ -79,13 +79,13 @@ struct TalkToTextView: View {
                                 transcribedText = ""
                             }
                             .font(.caption)
-                            .foregroundColor(AppTheme.Colors.primaryAction)
+                            .foregroundColor(.accentColor)
                         }
                     }
                     
                     ZStack(alignment: .topLeading) {
-                        RoundedRectangle(cornerRadius: AppTheme.Radius.large)
-                            .fill(AppTheme.Colors.surfaceElevated)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(UIColor.secondarySystemBackground))
                         
                         if transcribedText.isEmpty && !isRecording {
                             Text("Your transcription will appear here...")
@@ -109,7 +109,7 @@ struct TalkToTextView: View {
                 if let error = errorMessage {
                     Text(error)
                         .font(.caption)
-                        .foregroundColor(AppTheme.Colors.error)
+                        .foregroundColor(.red)
                         .padding(.horizontal, 20)
                 }
                 
@@ -133,7 +133,7 @@ struct TalkToTextView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(isRecording ? AppTheme.Colors.recordingsAccent : AppTheme.Colors.primaryAction)
+                        .background(isRecording ? Color.red : Color.accentColor)
                         .foregroundColor(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                     }

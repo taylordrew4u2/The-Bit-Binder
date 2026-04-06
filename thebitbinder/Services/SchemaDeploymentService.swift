@@ -16,7 +16,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     static let shared = SchemaDeploymentService()
     
     private let container: CKContainer
-    private let schemaVersion = "2.4.0"  // Increment when schema changes
+    private let schemaVersion = "2.5.0"  // Increment when schema changes - Added SetList finalization & RoastJoke structure fields
     private let signatureService: CloudKitSignatureService
     
     /// All CloudKit record types managed by this schema
@@ -138,17 +138,28 @@ final class SchemaDeploymentService: @unchecked Sendable {
           - CD_jokeIDsString, CD_roastJokeIDsString
           - CD_notes
           - CD_isDeleted [Q], CD_deletedDate
+          - CD_isFinalized [Q], CD_finalizedDate
+          - CD_estimatedMinutes, CD_venueName
+          - CD_performanceDate
         
         CD_RoastTarget:
           - CD_id [Q], CD_name [Q]
           - CD_dateCreated [Q,S], CD_dateModified [Q,S]
           - CD_notes, CD_photoData (BYTES)
+          - CD_traits (LIST<STRING>)
+          - CD_isDeleted [Q], CD_deletedDate
         
         CD_RoastJoke:
           - CD_id [Q], CD_content, CD_title [Q]
           - CD_dateCreated [Q,S], CD_dateModified [Q,S]
           - CD_target (REFERENCE) [Q]
           - CD_isDeleted [Q], CD_deletedDate
+          - CD_setup, CD_punchline
+          - CD_performanceNotes
+          - CD_relatabilityScore
+          - CD_isTested [Q], CD_lastPerformedDate
+          - CD_performanceCount, CD_displayOrder
+          - CD_isKiller [Q], CD_tagsString
         
         CD_BrainstormIdea:
           - CD_id [Q], CD_content

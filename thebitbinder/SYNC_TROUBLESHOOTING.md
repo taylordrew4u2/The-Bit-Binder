@@ -1,8 +1,31 @@
 # iCloud Sync Troubleshooting Guide
 
-## What We Fixed
+## Latest Fixes (April 2026)
 
-The syncing issues across devices were likely caused by several problems that we've now addressed:
+### 1. **Faster Sync Response**
+- Reduced sync cooldown from 5 seconds to 3 seconds
+- Reduced remote change debounce from 2 seconds to 1 second
+- Result: Changes sync across devices much faster
+
+### 2. **Improved App Activation Sync**
+- App now triggers sync check EVERY time it becomes active (not just after 1 hour)
+- Posts `NSPersistentStoreRemoteChange` notification on activation to pull pending changes
+- Result: Opening the app will now immediately show changes from other devices
+
+### 3. **Force Refresh Feature**
+- New "Force Refresh" button in Settings → iCloud Sync
+- Triggers aggressive sync that verifies data counts
+- Use when sync seems stuck or data isn't appearing
+
+### 4. **Sync Enabled by Default**
+- New installations now have iCloud sync enabled automatically
+- No more need to manually enable sync on first launch
+
+### 5. **Better Context Refresh**
+- Improved `processRemoteChange()` to properly trigger SwiftUI @Query refresh
+- Added data count logging to verify sync is working
+
+## What We Fixed Previously
 
 ### 1. **Improved Remote Change Processing**
 - **Problem**: The app wasn't properly handling CloudKit remote change notifications from other devices
@@ -44,15 +67,15 @@ The syncing issues across devices were likely caused by several problems that we
 - **Fix**: Enhanced scene phase handling to:
   - Trigger sync checks when app becomes active
   - Force context refreshes to pull remote changes
-  - Auto-sync if last sync was over 1 hour ago
-- **Result**: Users will see updates from other devices more quickly when opening the app
+  - Always check for pending changes on activation
+- **Result**: Users will see updates from other devices immediately when opening the app
 
 ## How to Test the Fix
 
 1. **Open Settings → iCloud Sync**
 2. **Run Comprehensive Diagnostics** to check for any remaining issues
 3. **Enable iCloud Sync** if it's not already enabled
-4. **Use "Sync Now"** to trigger manual sync
+4. **Use "Force Refresh"** if sync seems stuck
 5. **Test cross-device sync**:
    - Add a joke on Device A
    - Open app on Device B and check if it appears

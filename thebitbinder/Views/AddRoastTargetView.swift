@@ -16,6 +16,7 @@ struct AddRoastTargetView: View {
     @State private var name = ""
     @State private var notes = ""
     @State private var traits: [String] = [""]
+    @State private var openingRoastCount: Int = 3
     @State private var showingGuidedCreation = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoData: Data?
@@ -70,19 +71,43 @@ struct AddRoastTargetView: View {
                 Section("Notes (optional)") {
                     TextField("e.g. friend, coworker, celebrity...", text: $notes)
                 }
+                
+                Section {
+                    Picker("Main Roasts", selection: $openingRoastCount) {
+                        ForEach(1...10, id: \.self) { count in
+                            Text("\(count)").tag(count)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                } header: {
+                    Text("Performance Settings")
+                } footer: {
+                    Text("Number of main opening roasts to prepare for this target during live performance.")
+                }
 
                 Section {
-                    ForEach(traits.indices, id: \.self) { index in
-                        HStack {
-                            TextField("e.g. works in finance, always late...", text: $traits[index])
-                            if traits.count > 1 {
-                                Button {
-                                    traits.remove(at: index)
-                                } label: {
-                                    Image(systemName: "minus.circle.fill")
-                                        .foregroundColor(.red.opacity(0.7))
+                    ForEach(Array(traits.enumerated()), id: \.offset) { index, _ in
+                        if index < traits.count {
+                            HStack {
+                                TextField("e.g. works in finance, always late...", text: Binding(
+                                    get: { index < traits.count ? traits[index] : "" },
+                                    set: { newValue in
+                                        if index < traits.count {
+                                            traits[index] = newValue
+                                        }
+                                    }
+                                ))
+                                if traits.count > 1 {
+                                    Button {
+                                        if index < traits.count {
+                                            traits.remove(at: index)
+                                        }
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                            .foregroundColor(.red.opacity(0.7))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -176,6 +201,7 @@ struct AddRoastTargetView: View {
             traits: cleanTraits,
             photoData: photoData
         )
+        target.openingRoastCount = openingRoastCount
         
         modelContext.insert(target)
         

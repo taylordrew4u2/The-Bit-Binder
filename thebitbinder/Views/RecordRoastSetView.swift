@@ -27,6 +27,11 @@ struct RecordRoastSetView: View {
     
     private let accentColor = AppTheme.Colors.roastAccent
     
+    /// Safe access to target name
+    private var safeTargetName: String {
+        target.isValid ? target.name : "Target"
+    }
+    
     var formattedTime: String {
         let minutes = Int(recordingTime) / 60
         let seconds = Int(recordingTime) % 60
@@ -55,7 +60,7 @@ struct RecordRoastSetView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    Text("Recording for \(target.name)")
+                    Text("Recording for \(safeTargetName)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
@@ -180,6 +185,13 @@ struct RecordRoastSetView: View {
             return
         }
         
+        // Safety check - ensure target is still valid
+        guard target.isValid else {
+            saveErrorMessage = "Target was deleted. Recording saved but not linked."
+            showSaveError = true
+            return
+        }
+        
         // Move from temp to documents for persistence
         let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let destinationURL = documentsDir.appendingPathComponent(tempURL.lastPathComponent)
@@ -201,7 +213,7 @@ struct RecordRoastSetView: View {
         
         // Create a Recording model
         let recording = Recording(
-            title: "Roast Set – \(target.name)",
+            title: "Roast Set – \(safeTargetName)",
             fileURL: destinationURL.lastPathComponent,
             duration: recordingTime
         )
@@ -267,9 +279,12 @@ struct RecordRoastSetView: View {
                     isRecording = true
                     errorMessage = nil
                     
-                    // Start timer — capture self weakly to avoid retain cycles
-                    recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak audioRecorder] _ in
-                        guard audioRecorder?.isRecording == true else { return }
+                    // Start timer — capture audioRecorder weakly to check if still recording
+                    // Note: In SwiftUI structs, we can't use weak self, but the closure
+                    // captures the @State binding which is safe because Timer is invalidated in stopRecording
+                    let recorder = audioRecorder
+                    recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak recorder] _ in
+                        guard recorder?.isRecording == true else { return }
                         recordingTime += 0.1
                     }
                 } catch {

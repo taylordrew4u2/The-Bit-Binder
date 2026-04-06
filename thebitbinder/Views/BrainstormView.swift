@@ -15,9 +15,9 @@ struct BrainstormView: View {
     @Query(filter: #Predicate<BrainstormIdea> { !$0.isDeleted }, sort: \BrainstormIdea.dateCreated, order: .reverse) private var ideas: [BrainstormIdea]
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("showFullContent") private var showFullContent = true
+    @AppStorage("brainstormGridScale") private var brainstormGridScale: Double = 1.0
     
     @State private var showAddSheet = false
-    @State private var gridScale: CGFloat = 1.0
     @GestureState private var pinchMagnification: CGFloat = 1.0
     @State private var isRecording = false
     @StateObject private var speechManager = SpeechRecognitionManager()
@@ -34,7 +34,7 @@ struct BrainstormView: View {
     
     // Pinch-to-zoom
     private var effectiveGridScale: CGFloat {
-        min(max(gridScale * pinchMagnification, 0.5), 2.0)
+        min(max(CGFloat(brainstormGridScale) * pinchMagnification, 0.5), 2.0)
     }
     
     private var pinchGesture: some Gesture {
@@ -43,7 +43,7 @@ struct BrainstormView: View {
                 state = value.magnification
             }
             .onEnded { value in
-                gridScale = min(max(gridScale * value.magnification, 0.5), 2.0)
+                brainstormGridScale = Double(min(max(CGFloat(brainstormGridScale) * value.magnification, 0.5), 2.0))
             }
     }
     
@@ -54,100 +54,65 @@ struct BrainstormView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background
-                (roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    if ideas.isEmpty {
-                        emptyState
-                    } else {
-                        ideaGrid
+        VStack(spacing: 0) {
+            if ideas.isEmpty {
+                emptyState
+            } else {
+                ideaGrid
+            }
+        }
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Menu {
+                    if !ideas.isEmpty {
+                        Button {
+                            isSelectMode.toggle()
+                            if !isSelectMode { selectedIdeaIDs.removeAll() }
+                        } label: {
+                            Label(isSelectMode ? "Cancel Select" : "Select Multiple",
+                                  systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
+                        }
                     }
+                    Button(action: { showFullContent.toggle() }) {
+                        Label(showFullContent ? "Show Titles Only" : "Show Full Content",
+                              systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
+                    }
+                    Divider()
+                    Button { showingTrash = true } label: {
+                        Label("Trash", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .bitBinderToolbar(roastMode: roastMode)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Menu {
-                        if !ideas.isEmpty {
-                            Button {
-                                isSelectMode.toggle()
-                                if !isSelectMode { selectedIdeaIDs.removeAll() }
-                            } label: {
-                                Label(isSelectMode ? "Cancel Select" : "Select Multiple",
-                                      systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
-                            }
-                        }
-                        Button(action: { showFullContent.toggle() }) {
-                            Label(showFullContent ? "Show Titles Only" : "Show Full Content",
-                                  systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
-                        }
-                        Divider()
-                        Button { showingTrash = true } label: {
-                            Label("Trash", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
-                    }
-                }
-            }
-            .navigationDestination(isPresented: $showingTrash) {
-                BrainstormTrashView()
-            }
-            .safeAreaInset(edge: .bottom) {
+        }
+        .navigationDestination(isPresented: $showingTrash) {
+            BrainstormTrashView()
+        }
+        .safeAreaInset(edge: .bottom) {
                 HStack {
                     Spacer()
                     HStack(spacing: 12) {
                         Button {
                             toggleRecording()
                         } label: {
-                            ZStack {
-                                // Pulsing ring — only while recording
-                                if isRecording {
-                                    Circle()
-                                        .stroke(AppTheme.Colors.recordingsAccent.opacity(0.4), lineWidth: 3)
-                                        .frame(width: 66, height: 66)
-                                        .scaleEffect(isRecording ? 1.2 : 1.0)
-                                        .opacity(isRecording ? 0 : 1)
-                                        .animation(.easeOut(duration: 1.0).repeatForever(autoreverses: false), value: isRecording)
-                                }
-
-                                Circle()
-                                    .fill(isRecording
-                                        ? LinearGradient(colors: [.red, .pink], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                        : (roastMode ? AppTheme.Colors.roastEmberGradient : LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                    )
-                                    .frame(width: 56, height: 56)
-
-                                Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundColor(.white)
-                            }
-                            .shadow(color: (isRecording ? AppTheme.Colors.recordingsAccent : (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)).opacity(0.35), radius: 10, y: 5)
+                            Image(systemName: isRecording ? "stop.circle.fill" : "mic.circle.fill")
+                                .font(.system(size: 44))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(isRecording ? .red : (roastMode ? .orange : .accentColor))
                         }
-                        .buttonStyle(FABButtonStyle())
+                        .buttonStyle(.plain)
 
                         Button {
                             showAddSheet = true
                         } label: {
-                            ZStack {
-                                Circle()
-                                    .fill(roastMode ? AppTheme.Colors.roastEmberGradient : AppTheme.Colors.brandGradient)
-                                    .frame(width: 56, height: 56)
-
-                                Image(systemName: "plus")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundColor(.white)
-                            }
-                            .shadow(color: (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.brand).opacity(0.35), radius: 10, y: 5)
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 44))
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(roastMode ? .orange : .accentColor)
                         }
-                        .buttonStyle(FABButtonStyle())
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.trailing, 20)
@@ -172,8 +137,7 @@ struct BrainstormView: View {
             } message: {
                 Text(persistenceError ?? "An unknown error occurred")
             }
-        }
-        .tint(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
+        .tint(roastMode ? .orange : .accentColor)
         .onChange(of: speechManager.isRecording) { oldValue, newValue in
             if oldValue && !newValue && isRecording {
                 isRecording = false
@@ -242,6 +206,83 @@ struct BrainstormView: View {
         }
     }
     
+    // MARK: - Zoom Bar
+    
+    @ViewBuilder
+    private var brainstormZoomBar: some View {
+        HStack(spacing: 12) {
+            // Zoom out button
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    brainstormGridScale = min(2.0, brainstormGridScale + 0.5)
+                }
+                haptic(.light)
+            } label: {
+                Image(systemName: "minus.magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(roastMode ? .orange : .accentColor)
+            }
+            .disabled(brainstormGridScale >= 2.0)
+            .opacity(brainstormGridScale >= 2.0 ? 0.4 : 1.0)
+            
+            // Column preset buttons
+            HStack(spacing: 6) {
+                brainstormColumnButton(columns: 4)
+                brainstormColumnButton(columns: 3)
+                brainstormColumnButton(columns: 2)
+            }
+            
+            // Zoom in button
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    brainstormGridScale = max(0.5, brainstormGridScale - 0.5)
+                }
+                haptic(.light)
+            } label: {
+                Image(systemName: "plus.magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(roastMode ? .orange : .accentColor)
+            }
+            .disabled(brainstormGridScale <= 0.5)
+            .opacity(brainstormGridScale <= 0.5 ? 0.4 : 1.0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(UIColor.secondarySystemBackground).opacity(0.95))
+        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+    
+    @ViewBuilder
+    private func brainstormColumnButton(columns: Int) -> some View {
+        let targetScale = 4.0 / Double(columns)
+        let isActive = abs(brainstormGridScale - targetScale) < 0.1
+        
+        Button {
+            withAnimation(.easeOut(duration: 0.2)) {
+                brainstormGridScale = targetScale
+            }
+            haptic(.light)
+        } label: {
+            HStack(spacing: 2) {
+                ForEach(0..<columns, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(isActive ? (roastMode ? Color.orange : Color.accentColor) : Color.secondary.opacity(0.5))
+                        .frame(width: 6, height: 10)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isActive ? (roastMode ? Color.orange : Color.accentColor).opacity(0.15) : Color.clear)
+            )
+        }
+    }
+    
     // MARK: - Batch Select Views
     
     @ViewBuilder
@@ -276,7 +317,7 @@ struct BrainstormView: View {
             
             Text("\(selectedIdeaIDs.count) selected")
                 .font(.subheadline.bold())
-                .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+                .foregroundColor(.secondary)
             
             Spacer()
             
@@ -287,7 +328,7 @@ struct BrainstormView: View {
                     .font(.subheadline.bold())
             }
             .disabled(selectedIdeaIDs.isEmpty)
-            .tint(AppTheme.Colors.error)
+            .tint(.red)
             
             Button {
                 isSelectMode = false
@@ -299,10 +340,7 @@ struct BrainstormView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(
-            (roastMode ? AppTheme.Colors.roastSurface : AppTheme.Colors.surfaceElevated)
-                .shadow(.drop(radius: 4, y: -2))
-        )
+        .background(Color(UIColor.secondarySystemBackground))
     }
     
     private func toggleIdeaSelection(_ idea: BrainstormIdea) {
@@ -538,7 +576,7 @@ class SpeechRecognitionManager: ObservableObject {
     }
 }
 
-// MARK: - Idea Card
+// MARK: - Idea Card (simplified)
 
 struct IdeaCard: View {
     let idea: BrainstormIdea
@@ -546,96 +584,48 @@ struct IdeaCard: View {
     let roastMode: Bool
     var showFullContent: Bool = true
     
-    // Refined 5-color palette (less rainbow, more cohesive)
-    private static let refinedColors: [String: Color] = [
-        "FFF9C4": Color(red: 1.0, green: 0.97, blue: 0.77),      // Soft yellow
-        "FFECB3": Color(red: 1.0, green: 0.92, blue: 0.70),      // Warm amber
-        "E3F2FD": Color(red: 0.89, green: 0.95, blue: 0.99),     // Light blue
-        "F3E5F5": Color(red: 0.95, green: 0.90, blue: 0.96),     // Soft lavender
-        "E8F5E9": Color(red: 0.91, green: 0.96, blue: 0.91),     // Mint green
-    ]
-    
-    private var cardColor: Color {
-        // Map old colors to refined palette, or use default
-        if let color = Self.refinedColors[idea.colorHex] {
-            return color
-        }
-        // Default to warm cream
-        return Color(red: 0.99, green: 0.96, blue: 0.90)
-    }
-    
-    // Adapt font size so all text fits in the card
     private var contentFontSize: CGFloat {
         let length = idea.content.count
         let base: CGFloat = 13 * scale
-        if length > 200 {
-            return max(9, base * 0.7)
-        } else if length > 100 {
-            return max(10, base * 0.82)
-        } else {
-            return max(11, base)
-        }
+        if length > 200 { return max(10, base * 0.75) }
+        return max(11, base)
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Header with voice indicator
-            HStack(spacing: 6) {
-                if idea.isVoiceNote {
-                    HStack(spacing: 3) {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: max(9, 10 * scale), weight: .medium))
-                        Text("Voice")
-                            .font(.system(size: max(8, 9 * scale), weight: .medium))
-                    }
-                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent.opacity(0.7) : AppTheme.Colors.primaryAction.opacity(0.7))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(roastMode ? AppTheme.Colors.roastAccent.opacity(0.15) : AppTheme.Colors.primaryAction.opacity(0.1))
-                    )
-                }
-                Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            // Voice indicator (subtle)
+            if idea.isVoiceNote {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: max(9, 10 * scale)))
+                    .foregroundStyle(roastMode ? .orange.opacity(0.6) : .accentColor.opacity(0.5))
             }
             
-            // Content — show all text or just the first line
+            // Content
             if showFullContent {
                 Text(idea.content)
-                    .font(.system(size: contentFontSize, weight: .regular, design: .serif))
-                    .foregroundColor(roastMode ? .white.opacity(0.92) : AppTheme.Colors.inkBlack.opacity(0.9))
+                    .font(.system(size: contentFontSize))
+                    .foregroundColor(.primary)
                     .lineSpacing(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(6)
             } else {
                 Text(idea.content.components(separatedBy: .newlines).first ?? idea.content)
-                    .font(.system(size: max(11, 13 * scale), weight: .medium, design: .serif))
-                    .foregroundColor(roastMode ? .white.opacity(0.92) : AppTheme.Colors.inkBlack.opacity(0.9))
+                    .font(.system(size: max(11, 13 * scale), weight: .medium))
+                    .foregroundColor(.primary)
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             
-            // Footer with timestamp
-            HStack {
-                Spacer()
-                Text(idea.dateCreated.formatted(.dateTime.month(.abbreviated).day().hour(.defaultDigits(amPM: .abbreviated)).minute()))
-                    .font(.system(size: max(8, 9 * scale)))
-                    .foregroundColor(roastMode ? .white.opacity(0.35) : AppTheme.Colors.textTertiary)
-            }
+            Spacer(minLength: 0)
+            
+            // Timestamp (minimal)
+            Text(idea.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
+                .font(.system(size: max(8, 9 * scale)))
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(6)
+        .padding(max(8, 10 * scale))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(roastMode ? AppTheme.Colors.roastCard : cardColor)
-        .overlay(
-            Rectangle()
-                .stroke(
-                    roastMode
-                        ? AppTheme.Colors.roastAccent.opacity(0.2)
-                        : Color.black.opacity(0.08),
-                    lineWidth: 0.5
-                )
-        )
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -648,18 +638,11 @@ struct BrainstormEmptyState: View {
     var body: some View {
         BitBinderEmptyState(
             icon: roastMode ? "flame.fill" : "lightbulb.fill",
-            title: roastMode ? "No Fire Ideas Yet" : "No Ideas Yet",
+            title: roastMode ? "No Ideas Yet" : "No Ideas Yet",
             subtitle: "Tap + to write or use the mic to capture thoughts by voice",
             actionTitle: "Add Idea",
             action: onAddIdea,
-            roastMode: roastMode,
-            iconGradient: roastMode
-                ? AppTheme.Colors.roastEmberGradient
-                : LinearGradient(
-                    colors: [AppTheme.Colors.brainstormAccent, AppTheme.Colors.brainstormAccent.opacity(0.6)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+            roastMode: roastMode
         )
     }
 }

@@ -21,9 +21,16 @@ struct RoastJokeTrashView: View {
     @State private var showingDeleteOneAlert = false
     @State private var persistenceError: String?
     @State private var showingErrorAlert = false
+    
+    /// Safe access to target name
+    private var safeTargetName: String {
+        target.isValid ? target.name : "Target"
+    }
 
     private var trashedJokes: [RoastJoke] {
-        (target.jokes ?? [])
+        // Safety check - return empty if target is invalid
+        guard target.isValid, let jokes = target.jokes else { return [] }
+        return jokes
             .filter { $0.isDeleted }
             .sorted { ($0.deletedDate ?? .distantPast) > ($1.deletedDate ?? .distantPast) }
     }
@@ -40,7 +47,7 @@ struct RoastJokeTrashView: View {
                 BitBinderEmptyState(
                     icon: "trash",
                     title: "Roast Trash is Empty",
-                    subtitle: "Deleted roasts for \(target.name) appear here for 30 days before being permanently removed.",
+                    subtitle: "Deleted roasts for \(safeTargetName) appear here for 30 days before being permanently removed.",
                     roastMode: true
                 )
             } else {
@@ -132,7 +139,7 @@ struct RoastJokeTrashView: View {
                 emptyTrash()
             }
         } message: {
-            Text("This permanently deletes all \(trashedJokes.count) trashed roast\(trashedJokes.count == 1 ? "" : "s") for \(target.name). This cannot be undone.")
+            Text("This permanently deletes all \(trashedJokes.count) trashed roast\(trashedJokes.count == 1 ? "" : "s") for \(safeTargetName). This cannot be undone.")
         }
         .alert("Error", isPresented: $showingErrorAlert) {
             Button("OK", role: .cancel) {}

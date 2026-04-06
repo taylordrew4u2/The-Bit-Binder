@@ -74,7 +74,7 @@ struct RecordingTrashView: View {
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
-                            .tint(AppTheme.Colors.success)
+                            .tint(.green)
                         }
                         .contextMenu {
                             Button {

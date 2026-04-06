@@ -230,37 +230,125 @@ class PDFExportService {
                     
                     yPosition += 10.0
                     
-                    // Draw jokes for this target
-                    for (index, joke) in jokes.enumerated() {
-                        let jokeLabel = "\(index + 1)."
-                        let jokeLabelSize = jokeLabel.size(withAttributes: jokeNumberAttributes)
-                        
-                        let jokeContentSize = joke.content.boundingRect(
-                            with: CGSize(width: contentWidth - 25.0, height: .greatestFiniteMagnitude),
-                            options: [.usesLineFragmentOrigin, .usesFontLeading],
-                            attributes: jokeContentAttributes,
-                            context: nil
-                        ).size
-                        
-                        let totalHeight = max(jokeLabelSize.height, jokeContentSize.height) + 20.0
-                        
-                        if yPosition + totalHeight > pageHeight - margin {
+                    // Draw jokes for this target - show openers first, then backups, then unassigned
+                    let openingRoasts = jokes.filter { $0.isOpeningRoast }.sorted { $0.displayOrder < $1.displayOrder }
+                    let backupRoasts = jokes.filter { !$0.isOpeningRoast && $0.parentOpeningRoastID != nil }
+                    let unassignedRoasts = jokes.filter { !$0.isOpeningRoast && $0.parentOpeningRoastID == nil }
+                    
+                    // Opening roasts label attributes
+                    let openerLabelAttrs: [NSAttributedString.Key: Any] = [
+                        .font: UIFont.boldSystemFont(ofSize: 12),
+                        .foregroundColor: UIColor(red: 0.8, green: 0.6, blue: 0.0, alpha: 1.0)
+                    ]
+                    
+                    let backupLabelAttrs: [NSAttributedString.Key: Any] = [
+                        .font: UIFont.italicSystemFont(ofSize: 11),
+                        .foregroundColor: UIColor.orange
+                    ]
+                    
+                    var jokeIndex = 1
+                    
+                    // Draw opening roasts section
+                    if !openingRoasts.isEmpty {
+                        let openersLabel = "⭐ OPENING ROASTS (\(openingRoasts.count))"
+                        let openersLabelSize = openersLabel.size(withAttributes: openerLabelAttrs)
+                        if yPosition + openersLabelSize.height + 30.0 > pageHeight - margin {
                             context.beginPage()
                             yPosition = margin
                         }
+                        openersLabel.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: openerLabelAttrs)
+                        yPosition += openersLabelSize.height + 8.0
                         
-                        // Draw joke number
-                        jokeLabel.draw(
-                            at: CGPoint(x: margin, y: yPosition),
-                            withAttributes: jokeNumberAttributes
-                        )
+                        for (i, joke) in openingRoasts.enumerated() {
+                            let jokeLabel = "\(i + 1)."
+                            let jokeLabelSize = jokeLabel.size(withAttributes: jokeNumberAttributes)
+                            
+                            let jokeContentSize = joke.content.boundingRect(
+                                with: CGSize(width: contentWidth - 25.0, height: .greatestFiniteMagnitude),
+                                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                                attributes: jokeContentAttributes,
+                                context: nil
+                            ).size
+                            
+                            let totalHeight = max(jokeLabelSize.height, jokeContentSize.height) + 20.0
+                            
+                            if yPosition + totalHeight > pageHeight - margin {
+                                context.beginPage()
+                                yPosition = margin
+                            }
+                            
+                            jokeLabel.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: jokeNumberAttributes)
+                            joke.content.draw(
+                                in: CGRect(x: margin + 25.0, y: yPosition, width: contentWidth - 25.0, height: jokeContentSize.height),
+                                withAttributes: jokeContentAttributes
+                            )
+                            yPosition += max(jokeLabelSize.height, jokeContentSize.height) + 10.0
+                            
+                            // Draw backups for this opening roast
+                            let backupsForOpener = backupRoasts.filter { $0.parentOpeningRoastID == joke.id }
+                            for backup in backupsForOpener {
+                                let backupContentSize = backup.content.boundingRect(
+                                    with: CGSize(width: contentWidth - 45.0, height: .greatestFiniteMagnitude),
+                                    options: [.usesLineFragmentOrigin, .usesFontLeading],
+                                    attributes: jokeContentAttributes,
+                                    context: nil
+                                ).size
+                                
+                                if yPosition + backupContentSize.height + 15.0 > pageHeight - margin {
+                                    context.beginPage()
+                                    yPosition = margin
+                                }
+                                
+                                "↳".draw(at: CGPoint(x: margin + 20.0, y: yPosition), withAttributes: backupLabelAttrs)
+                                backup.content.draw(
+                                    in: CGRect(x: margin + 40.0, y: yPosition, width: contentWidth - 45.0, height: backupContentSize.height),
+                                    withAttributes: jokeContentAttributes
+                                )
+                                yPosition += backupContentSize.height + 8.0
+                            }
+                            
+                            jokeIndex += 1
+                        }
+                        yPosition += 10.0
+                    }
+                    
+                    // Draw unassigned roasts section  
+                    if !unassignedRoasts.isEmpty {
+                        let unassignedLabel = "OTHER ROASTS (\(unassignedRoasts.count))"
+                        let unassignedLabelSize = unassignedLabel.size(withAttributes: jokeNumberAttributes)
+                        if yPosition + unassignedLabelSize.height + 30.0 > pageHeight - margin {
+                            context.beginPage()
+                            yPosition = margin
+                        }
+                        unassignedLabel.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: jokeNumberAttributes)
+                        yPosition += unassignedLabelSize.height + 8.0
                         
-                        // Draw joke content
-                        joke.content.draw(
-                            in: CGRect(x: margin + 25.0, y: yPosition, width: contentWidth - 25.0, height: jokeContentSize.height),
-                            withAttributes: jokeContentAttributes
-                        )
-                        yPosition += max(jokeLabelSize.height, jokeContentSize.height) + 15.0
+                        for joke in unassignedRoasts {
+                            let jokeLabel = "\(jokeIndex)."
+                            let jokeLabelSize = jokeLabel.size(withAttributes: jokeNumberAttributes)
+                            
+                            let jokeContentSize = joke.content.boundingRect(
+                                with: CGSize(width: contentWidth - 25.0, height: .greatestFiniteMagnitude),
+                                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                                attributes: jokeContentAttributes,
+                                context: nil
+                            ).size
+                            
+                            let totalHeight = max(jokeLabelSize.height, jokeContentSize.height) + 20.0
+                            
+                            if yPosition + totalHeight > pageHeight - margin {
+                                context.beginPage()
+                                yPosition = margin
+                            }
+                            
+                            jokeLabel.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: jokeNumberAttributes)
+                            joke.content.draw(
+                                in: CGRect(x: margin + 25.0, y: yPosition, width: contentWidth - 25.0, height: jokeContentSize.height),
+                                withAttributes: jokeContentAttributes
+                            )
+                            yPosition += max(jokeLabelSize.height, jokeContentSize.height) + 15.0
+                            jokeIndex += 1
+                        }
                     }
                     
                     // Divider between targets

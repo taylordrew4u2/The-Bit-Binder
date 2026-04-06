@@ -195,12 +195,12 @@ struct iCloudSyncSettingsView: View {
                         .opacity(syncService.syncStatus == .syncing || !syncService.isSyncEnabled ? 0.6 : 1.0)
                         
                         Button(action: {
-                            diagnostics.forceKeyValueSync()
+                            Task { await syncService.forceRefreshAllData() }
                         }) {
                             HStack {
-                                Image(systemName: "arrow.up.arrow.down")
+                                Image(systemName: "arrow.triangle.2.circlepath")
                                     .font(.system(size: 14, weight: .semibold))
-                                Text("Force KV Sync")
+                                Text("Force Refresh")
                                     .font(.system(size: 15, weight: .semibold, design: .serif))
                                 Spacer()
                             }
@@ -209,6 +209,24 @@ struct iCloudSyncSettingsView: View {
                             .background(RoundedRectangle(cornerRadius: 10).fill(.orange))
                             .foregroundColor(.white)
                         }
+                        .disabled(syncService.syncStatus == .syncing || !syncService.isSyncEnabled)
+                        .opacity(syncService.syncStatus == .syncing || !syncService.isSyncEnabled ? 0.6 : 1.0)
+                    }
+                    
+                    Button(action: {
+                        diagnostics.forceKeyValueSync()
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.up.arrow.down")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Force Settings Sync")
+                                .font(.system(size: 15, weight: .semibold, design: .serif))
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.surfaceElevated))
+                        .foregroundColor(AppTheme.Colors.inkBlack)
                     }
                 }
                 

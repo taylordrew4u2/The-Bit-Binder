@@ -340,7 +340,7 @@ You've got everything you need. Now go write some great material.
 
 ## Version Info
 
-- **App**: BitBinder v9.3+
+- **App**: BitBinder v10.4
 - **Release**: March 7, 2026
 - **Requirement**: iOS 17+ or iPadOS 17+
 

@@ -355,7 +355,7 @@ final class iCloudSyncDiagnostics: ObservableObject {
         diagnosticResults.append("🔄 Triggering manual sync...")
         
         let syncService = iCloudSyncService.shared
-        await syncService.syncNow()
+        await syncService.forceRefreshAllData()
         
         if syncService.syncStatus == .success {
             diagnosticResults.append("✅ Manual sync completed successfully")

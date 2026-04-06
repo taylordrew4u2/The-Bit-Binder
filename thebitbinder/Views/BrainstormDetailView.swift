@@ -384,7 +384,12 @@ struct BrainstormDetailView: View {
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
-    let container = try! ModelContainer(for: BrainstormIdea.self, Joke.self, JokeFolder.self, configurations: config)
+    let container: ModelContainer
+    do {
+        container = try ModelContainer(for: BrainstormIdea.self, Joke.self, JokeFolder.self, configurations: config)
+    } catch {
+        fatalError("Preview ModelContainer failed: \(error)")
+    }
     let idea = BrainstormIdea(content: "What if airlines charged by weight? Like, your carry-on is free but YOU cost extra. \"Sir, that's a 200-pound surcharge.\"", colorHex: "FFF9C4")
     return NavigationStack {
         BrainstormDetailView(idea: idea)

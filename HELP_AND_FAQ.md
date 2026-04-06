@@ -5,8 +5,9 @@
 ### What is BitBinder?
 
 BitBinder is a professional comedy notebook app designed for comedians and performers. It lets you:
-- **Quickly jot down jokes** with a real notebook feel
+- **Quickly capture jokes** from Home screen or via voice
 - **Organize jokes** into folders and set lists
+- **Brainstorm ideas** on a sticky-note grid
 - **Record yourself** performing (audio + transcription)
 - **Scan notebook pages** for digital backup
 - **Sync everything** to iCloud across your devices
@@ -23,8 +24,8 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 ### First Time Setup
 
 1. **Allow Permissions**: Camera, Microphone, Photos (when prompted)
-2. **Explore the Notepad**: Quick capture area at the top
-3. **Try the Grid View**: See your jokes beautifully displayed
+2. **Explore Home**: Your launchpad with quick actions
+3. **Try the Jokes View**: See your jokes in Grid or List mode
 4. **Check Settings**: Customize your experience
 5. **Enable iCloud Sync** (optional): Keep everything backed up
 
@@ -32,27 +33,42 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 ## Feature Guides
 
-###  Notepad (Home)
+### 🏠 Home Screen
 
-**What it is**: Your quick capture area - like the back of a napkin, but digital.
+**What it is**: Your command center - quick access to everything that matters.
 
 **How to use**:
-1. **Quick Entry**: Tap Notepad in the menu
-2. **Type freely**: No formatting, no pressure
-3. **Auto-saves**: Content saves automatically
-4. **Keyboard**: Tap "Done" button to dismiss keyboard
-5. **Sync**: Content automatically syncs to iCloud (if enabled)
+1. **New Joke**: Tap to add a new joke instantly
+2. **Voice**: Tap to dictate a joke using speech-to-text
+3. **My Jokes**: Quick navigation to your full joke library
+4. **Recent**: Shows your latest work for easy continuation
+5. **Set Lists**: Quick access to sets in progress
+6. **To Do**: Attention items like imports needing review
 
-**Keyboard Tips**:
-- Swipe down to dismiss keyboard quickly
-- Keyboard auto-hides when you open the menu
-- "Done" button appears in keyboard toolbar
-
-**Line Height**: 32pt ruled lines match real legal pads (authentic feel)
+**Navigation**:
+- Tap the menu icon (☰) in the top-right to access all sections
+- Use the back button (‹) when it appears to go back
 
 ---
 
-###  Jokes View (Jokes Section)
+### 💡 Brainstorm
+
+**What it is**: A sticky-note grid for capturing raw ideas before they become full jokes.
+
+**How to use**:
+1. **Add Idea**: Tap the + button (bottom-right)
+2. **Voice Capture**: Tap the mic button for speech-to-text
+3. **Edit**: Tap any idea card to open and edit
+4. **Delete**: Long-press for context menu, or use Select Multiple
+5. **Promote**: Long-press and tap "Promote to Joke"
+
+**Pinch to Zoom**: Pinch to adjust how many cards appear per row.
+
+**Batch Actions**: Tap ••• menu → Select Multiple to delete multiple ideas at once.
+
+---
+
+### 🎭 Jokes View
 
 **What it is**: Your organized joke library.
 
@@ -62,13 +78,13 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 - 2-column card layout
 - See full joke + preview
 - Great for browsing
-- Toggle: Tap icon in top-left toolbar
+- Toggle: Tap ••• menu → Grid/List
 
 **List View**
 - Compact, scannable format
 - Perfect for quick searching
-- Margin bullet (•) design
-- Toggle: Tap icon in top-left toolbar
+- Swipe left to delete
+- Toggle: Tap ••• menu → Grid/List
 
 **How to add a joke**:
 1. Tap "+" button (top-right)
@@ -79,48 +95,34 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 **How to organize**:
 - **Folders**: Click folder chips at top to filter
-- **Create Folder**: Tap "+" next to folder chips
-- **Delete Folder**: Long-press folder, tap delete
+- **The Hits**: Special chip showing stage-ready jokes (star icon)
+- **Create Folder**: Tap ••• menu → New Folder
 - **Search**: Use search bar to find jokes
 
-**Folder Tips**:
-- Folders help organize by topic (e.g., "Relationships", "Work", "Observational")
-- Unassigned jokes appear with no folder badge
-- You can delete a folder without deleting jokes
-
-**Editing a Joke**:
-1. Tap a joke to open detail view
-2. Tap "Edit" button
-3. Modify title/content
-4. Tap "Save"
+**Batch Select Mode**:
+1. Tap ••• menu → Select Multiple
+2. Tap jokes to select them
+3. Use batch actions to delete or move
+4. Tap Done when finished
 
 ---
 
-###  Roast Mode
+### 🔥 Roast Mode
 
 **What it is**: A complete theme change for writing targeted comedy about specific people.
 
 **How to enable**:
-1. **Settings**  **Mode** section
-2. Toggle **Roast Mode** on
-3. Entire app goes dark with flame accents
-4. Menu becomes "RoastBinder"
-5. Jokes section shows "Roasts" instead
-
-**Menu in Roast Mode**:
--  Roasts (instead of Jokes)
--  Roast Sets (instead of Set Lists)
--  Burn Recordings (instead of Recordings)
--  Fire Notebook (instead of Notebook)
-- Settings
+1. **Settings** → **Roast Mode** toggle
+2. Entire app goes dark with ember theme
+3. Menu shows only: Roasts, Settings
+4. Your regular jokes stay safe and separate
 
 **How to add a roast target**:
-1. In Roasts section, tap "Add First Target"
-2. Enter **Name**: Person's name
-3. Add **Photo** (optional): Tap to select from gallery
-4. Tap "Save"
-
-**Flame Meter**: Shows how many roasts you have for each target (1-5 flames)
+1. In Roast Mode, go to Roasts section
+2. Tap "+" to add a new target
+3. Enter **Name**: Person's name
+4. Add **Photo** (optional)
+5. Add roast jokes under that target
 
 **Important**: Jokes and roasts are completely separate:
 - Normal mode: Only sees regular jokes
@@ -129,7 +131,7 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 
 ---
 
-###  Set Lists
+### 📋 Set Lists
 
 **What it is**: Organize jokes into performance sets.
 
@@ -150,48 +152,36 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 2. Long-press and drag jokes to reorder
 3. Changes save automatically
 
-**Performing Your Set**:
-1. Open the set
-2. Read jokes off your screen
-3. Tap to expand each joke for details
-4. Swipe to next joke when ready
+**Finalized Sets**: Tap to mark a set as finalized (green checkmark) when you're happy with the order.
 
 ---
 
-###  Voice Recordings
+### 🎙️ Voice Recordings
 
 **What it is**: Record yourself performing and store transcriptions.
 
 **How to record**:
 1. Tap "Recordings" in menu
-2. Tap "+" button (red circle)
+2. Tap mic button (top-right) or "+" 
 3. Tap to **start recording**
 4. Perform your set
 5. Tap to **stop recording**
-6. Enter **Recording Name**: e.g., "Open Mic - March 7"
+6. Enter **Recording Name**
 7. Tap "Save"
 
 **After Recording**:
-- Audio is **automatically transcribed** using AI
-- Read transcription in detail view
+- Audio is stored locally
+- Tap transcribe button for speech-to-text
 - Edit transcription if needed
-- Delete pauses or false starts
-
-**Playing Back**:
-1. Tap recording from list
-2. Tap play button
-3. Adjust volume with device controls
-4. Timeline shows progress
 
 **Tips**:
 - Record in quiet environment for better transcription
-- Speak clearly and slowly
-- Pause between jokes for clarity
+- Speak clearly and at normal pace
 - Longer recordings take longer to transcribe
 
 ---
 
-###  Notebook Saver (Scanning)
+### 📓 Notebook Saver (Scanning)
 
 **What it is**: Digitize your physical comedy notebooks.
 
@@ -206,325 +196,171 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 - See all scanned pages
 - Tap to view larger
 - Long-press to delete
-- Photos auto-save
-
-**Why use this**:
-- **Backup**: Physical notebooks are at risk
-- **Organization**: Digital is searchable
-- **Sharing**: Easy to send to co-performers
-- **Archival**: Keep memories of your comedy journey
+- Photos auto-save and sync
 
 ---
 
-###  Settings
+### ⚙️ Settings
 
-**Layout**:
-- Reorder your tabs by dragging
-- Choose which sections appear
-- Customize your workflow
+**Mode**:
+- Toggle Roast Mode on/off
 
-**Roast Mode**:
-- Toggle on/off to switch entire theme
-- Changes visual style, not content
-- Jokes and roasts stay separate
+**Data**:
+- **iCloud Sync**: Enable cloud backup
+- **Data Protection**: Create backups, export data
+- **Trash**: View and recover deleted jokes
 
-**iCloud Sync** *(See iCloud Sync Guide)*:
-- Enable automatic cloud backup
-- Manual sync option
-- Status tracking
-- Sync all your material
+**Personalization**:
+- **Name**: Set your display name
+- **Reorder Menu**: Customize menu order
 
-**Export Jokes**:
-- Export as **PDF**: Save all jokes in readable format
-- Share via email or Notes
-- Great for backup or sharing
-
-**Export Audio**:
-- Download all recordings as ZIP
-- Great for backing up to external storage
-- Share with producers or fellow comedians
+**Support**:
+- **Help & FAQ**: This guide, in-app
 
 **About**:
 - Current app version
-- AI assistant name (BitBuddy)
 
 ---
 
-## iCloud Sync Deep Dive
+## Data Protection
 
-*(See `iCLOUD_SYNC_GUIDE.md` for complete guide)*
+### Creating Backups
+
+1. Go to Settings → Data Protection
+2. Tap "Create Backup"
+3. Backup is saved locally on your device
+
+### Restoring from Backup
+
+1. Go to Settings → Data Protection
+2. Tap "View Backups"
+3. Find the backup you want
+4. Tap "Restore"
+5. App will restart with restored data
+
+### Exporting Data
+
+**Export Jokes as PDF**:
+1. Settings → Data Protection
+2. Tap "Export All Jokes"
+3. Choose: Save to Device, Email, or Share
+
+**Export Audio Files**:
+1. Settings → Data Protection
+2. Tap "Export All Audio Files"
+3. Creates a ZIP archive of all recordings
+
+**Export Roasts** (in Roast Mode):
+1. Settings → Data Protection
+2. Tap "Export Roasts"
+3. Exports all roast targets and jokes as PDF
+
+---
+
+## Trash & Recovery
+
+### Where is Trash?
+
+- **Main Trash**: Settings → Trash (shows deleted jokes)
+- **Section Trash**: Each section (Brainstorm, Set Lists, Recordings) has its own Trash accessible via ••• menu
+
+### Recovering Deleted Items
+
+1. Go to the appropriate Trash location
+2. Find the item you want to restore
+3. Tap "Restore" to bring it back
+
+### Permanent Deletion
+
+- Items stay in Trash until you permanently delete them
+- Tap "Delete Permanently" to remove forever
+- This cannot be undone
+
+---
+
+## iCloud Sync
 
 **Quick Summary**:
-- Tap Settings  iCloud Sync
+- Tap Settings → iCloud Sync
 - Toggle on to enable
 - All data automatically backs up to iCloud
 - Access from any Apple device
 - Completely optional and encrypted
 
 **What Syncs**:
--  Thoughts (notepad)
--  Jokes & Roasts
--  Set Lists
--  Recordings (audio + transcriptions)
--  Notebook Photos
+- ✅ Jokes & Roasts
+- ✅ Set Lists
+- ✅ Recordings (audio + transcriptions)
+- ✅ Notebook Photos
+- ✅ Brainstorm Ideas
+
+**Troubleshooting**:
+- Check internet connection
+- Ensure signed into iCloud (Settings → [Your Name] → iCloud)
+- Tap "Sync Now" for manual sync
+- Check iCloud storage isn't full
 
 ---
 
-## Keyboard Management
+## BitBuddy (AI Assistant)
 
-### Making the Keyboard Go Away
+**What it is**: Your local comedy writing assistant.
 
-**In Notepad**:
-1. Tap **"Done"** button in keyboard toolbar
-2. Or swipe down from notepad area
-3. Or open the side menu (keyboard auto-dismisses)
+**How to access**: Open side menu → tap "BitBuddy"
 
-**In Other Text Fields**:
-1. Tap **"Return"** on keyboard
-2. Or tap outside the text field
-3. Or use the Done/Cancel buttons
+**Commands**:
+- `analyze: [joke]` — Get structure analysis and suggestions
+- `improve: [joke]` — Get 2-3 concrete edit suggestions
+- `premise [topic]` — Generate a premise
+- `generate [topic]` — Create a joke in your style
+- `style` — See your writing style summary
 
-**Pro Tip**: Menu button automatically dismisses keyboard, so no fighting with it!
+**Privacy**: Runs 100% on-device. Your jokes never leave your phone.
 
 ---
 
-## Performance & Optimization
+## Importing Jokes
 
-### If the App is Slow
+**Supported File Types**:
+- PDF files
+- Images (JPEG, PNG, HEIC)
+- Word docs (.doc, .docx)
+- Plain text (.txt, .rtf)
 
-**Try these steps**:
-1. **Restart the app**: Close completely, reopen
-2. **Clear cache**: Go to Settings  BitBinder  Offload App (keeps data)
-3. **Check storage**: iPhone may be running low on space
-4. **Disable effects**: If rendering is slow, reduce animations
-5. **Sync status**: Check if iCloud sync is causing delays
+**How it works**:
+1. In Jokes section, tap ••• menu
+2. Choose import option (Files, Photos, Camera)
+3. GagGrabber AI splits your file into individual jokes
+4. Review and approve in the Review Queue
+5. Approved jokes are saved to your library
 
-### View Mode Performance
-
-- **Grid Mode**: Shows beautiful cards, uses more memory
-- **List Mode**: Faster, more compact, better for large libraries
-
-Switch to List View if grid is slow!
+**Import History**: Tap ••• menu → Import History to see past imports
 
 ---
 
 ## Troubleshooting
 
-### "App Won't Open"
-- Force quit: Swipe up from bottom, hold the app
-- Wait 10 seconds
-- Reopen app
-
 ### "Data Disappeared"
 - Check if you're in Roast Mode (data is separate)
-- Try iCloud Sync's "Fetch from Cloud"
-- Contact support if data loss is critical
-
-### "Keyboard Won't Dismiss"
-- Tap "Done" button explicitly
-- Or open menu (menu auto-dismisses it)
-- Restart app if stuck
+- Try iCloud Sync's "Sync Now"
+- Check Settings → Trash for deleted items
 
 ### "iCloud Sync Not Working"
-- Check internet connection (WiFi/Cellular)
-- Ensure signed into iCloud (Settings  [Your Name]  iCloud)
+- Check internet connection
+- Ensure signed into iCloud
+- Check iCloud storage space
 - Tap "Sync Now" manually
-- See iCloud Sync Guide for detailed troubleshooting
-
-### "Transcription is Wrong"
-- Edit it manually in detail view
-- Speak clearly next time (for better recognition)
-- Record in quiet environment
-
-### "Photos Won't Upload"
-- Check storage space on device
-- Ensure permissions granted (Settings  BitBinder  Camera/Photos)
-- Try uploading again
 
 ### "Can't Find My Jokes"
 - Use **search bar** at top of Jokes section
 - Check **folder filters** (you might have a folder selected)
 - Switch **view modes** (Grid vs List)
-- Check if you're in **Roast Mode** (jokes are separate)
-
----
-
-## Common Questions (FAQ)
-
-### Data & Privacy
-
-**Q: Is my data safe?**
-A: Yes! All data is stored locally on your device. iCloud sync (optional) uses end-to-end encryption.
-
-**Q: Can anyone else see my jokes?**
-A: No. Only you can access your data. Sharing is manual (via export).
-
-**Q: What happens if I delete a joke?**
-A: It's permanently deleted. Keep backups via iCloud Sync!
-
-**Q: Can I recover deleted jokes?**
-A: Only if you have iCloud backups enabled. Enable iCloud Sync to protect against accidents.
-
----
-
-### Syncing & Backups
-
-**Q: How do I back up my material?**
-A: Enable iCloud Sync in Settings. It automatically backs up everything.
-
-**Q: Can I sync to other cloud services (Google Drive, Dropbox)?**
-A: Currently only iCloud is supported. You can export to PDF/ZIP for manual backup.
-
-**Q: Will syncing use a lot of data?**
-A: Minimal. Text is small. Audio takes more (sync over WiFi recommended).
-
-**Q: Can I use BitBinder on iPad too?**
-A: Yes! iCloud Sync keeps everything in sync across devices.
-
----
-
-### Jokes & Organization
-
-**Q: Can I have jokes in multiple folders?**
-A: Currently, each joke belongs to one folder. You can always edit the folder assignment.
-
-**Q: Can I duplicate a joke?**
-A: Edit the joke, copy the content, create new joke, paste content.
-
-**Q: How many jokes can I store?**
-A: Unlimited! Storage is limited only by your device's storage space.
-
-**Q: Can I see when I wrote each joke?**
-A: Yes, dates appear in grid view and detail view.
-
----
-
-### Recording & Transcription
-
-**Q: Is transcription accurate?**
-A: ~80-90% accurate. Depends on audio quality and clarity. Easily editable.
-
-**Q: Can I record indefinitely?**
-A: Yes, but longer recordings take longer to transcribe. Record in chunks if possible.
-
-**Q: Where do recordings go?**
-A: They're stored locally on your device (and synced to iCloud if enabled).
-
-**Q: Can I trim recordings?**
-A: Not directly in-app. Export and use a voice editor, or record again.
-
----
-
-### Roast Mode
-
-**Q: Will I lose my jokes if I enable Roast Mode?**
-A: No! Jokes and roasts are completely separate. Switching modes doesn't affect either.
-
-**Q: Can I switch between modes?**
-A: Yes, anytime. Just toggle in Settings  Mode.
-
-**Q: Can I have both jokes and roasts at the same time?**
-A: No. Roast Mode is mutually exclusive (by design—stay focused).
-
----
-
-### Performance & Battery
-
-**Q: Does syncing drain my battery?**
-A: Minimal. It's optimized to sync in background. iCloud handles the heavy lifting.
-
-**Q: Is the app slow?**
-A: No. Try List View if Grid View feels slow (uses less memory).
-
-**Q: How much storage does the app use?**
-A: Text/metadata: ~10MB. Audio recordings: 1-2MB per minute. Photos: varies.
-
----
-
-### Permissions
-
-**Q: Why does BitBinder need camera access?**
-A: To scan notebook pages. It's optional—only needed for Notebook Saver.
-
-**Q: Why does it need microphone access?**
-A: To record your performances. Optional—only for Recordings feature.
-
-**Q: Why does it need photos access?**
-A: To import photos and add them to roast targets. Optional.
-
-**Q: Can I revoke permissions?**
-A: Yes. Settings  BitBinder  toggle off. You won't be able to use those features.
-
----
-
-### Exporting & Sharing
-
-**Q: Can I export jokes as PDF?**
-A: Yes! Settings  Export All Jokes  Choose format.
-
-**Q: Can I email my jokes?**
-A: Yes! Use export feature, then mail the PDF.
-
-**Q: Can I share individual jokes?**
-A: Copy the text and share manually. Tap-hold to copy.
-
-**Q: Can I back up to a USB drive?**
-A: Export to ZIP, save to Files app, share to external storage.
-
----
-
-### Roast Targets & Photos
-
-**Q: Can I add a photo to a roast target?**
-A: Yes! Tap the roast target, tap camera icon, select photo.
-
-**Q: Will they see the photo?**
-A: Only if you show them. It's stored locally on your device.
-
-**Q: Can I change the photo later?**
-A: Yes, tap the target, tap the photo, select new one.
-
----
-
-### Set Lists
-
-**Q: Can I perform a set list on stage?**
-A: Yes! Open the set, read jokes, swipe to next.
-
-**Q: Can I have the same joke in multiple sets?**
-A: Yes! Just add it to each set independently.
-
-**Q: Can I print a set list?**
-A: Not directly, but you can export all jokes as PDF.
-
----
-
-### Keyboard & Input
-
-**Q: Why won't the keyboard go away?**
-A: Tap the "Done" button or open the menu.
-
-**Q: Can I use an external keyboard?**
-A: Yes! Works with any Bluetooth keyboard.
-
-**Q: Can I voice-type?**
-A: Yes! Long-press the spacebar to enable voice input (iOS feature).
-
----
-
-### General
-
-**Q: Is BitBinder free?**
-A: Yes! iCloud Sync is free (uses your free iCloud storage).
-
-**Q: Can I contact support?**
-A: Error messages guide you. Check Troubleshooting above. More support features coming soon!
-
-**Q: Will there be more features?**
-A: Yes! Regular updates planned with community feedback.
-
-**Q: Can I suggest a feature?**
-A: Feedback welcome! More details coming soon.
+- Check if you're in **Roast Mode**
+
+### "Recording Won't Play"
+- Check device volume
+- Ensure audio file exists (may have been moved)
+- Try exporting and re-importing
 
 ---
 
@@ -532,70 +368,38 @@ A: Feedback welcome! More details coming soon.
 
 ### Pro Tips
 
-1. **Use Folders**: Organize jokes by topic for faster access
-2. **Scan Everything**: Back up your physical notebooks immediately
-3. **Record Often**: Practice + transcription = better material
+1. **Use The Hits**: Mark your best jokes with the star icon
+2. **Voice Capture**: Use Brainstorm's mic for quick thoughts
+3. **Batch Select**: Clean up multiple items at once
 4. **Enable Sync**: Never lose work to a broken phone
-5. **Grid View**: Perfect for browsing and getting inspired
-6. **List View**: Use for quick search and editing
+5. **Create Backups**: Regular backups in Data Protection
 
 ### Workflow Ideas
 
 **Daily Comedian**:
-1. Morning: Review yesterday's jokes (Grid View)
-2. Midday: Add new ideas (Notepad)
-3. Evening: Organize into sets
-4. Night: Record yourself performing
+1. Morning: Check Home for recent work
+2. Midday: Capture ideas in Brainstorm
+3. Evening: Promote best ideas to Jokes
+4. Night: Build and refine Set Lists
 
 **Open Mic Prep**:
-1. Create "Open Mic - [Date]" set list
+1. Create a new Set List
 2. Add 5-10 solid jokes
-3. Record yourself practicing
-4. Review transcription for timing
-
-**Roast Mode**:
-1. Enable Roast Mode
-2. Add targets (people you'll roast)
-3. Write targeted jokes
-4. Practice with recordings
-5. Disable Roast Mode when done
-
----
-
-## Keyboard Shortcuts
-
-**iOS Keyboard** (with external keyboard):
-- `Cmd+S` - Save (in edit mode)
-- `Cmd+Z` - Undo (text editing)
-- `Cmd+A` - Select All (text)
-- `Cmd+C` - Copy (text)
-- `Cmd+V` - Paste (text)
-- `Cmd+X` - Cut (text)
-- `Esc` - Dismiss keyboard (some cases)
+3. Reorder based on energy flow
+4. Mark as finalized when ready
 
 ---
 
 ## Version History
 
-- **v9.3+** - iCloud Sync, Thoughts syncing
-- **v9.2** - Professional redesign, Grid/List toggle, Roast Mode
-- **v9.1** - Initial release with core features
+- **v10.4+** - Home screen redesign, Data Protection, Trash recovery
+- **v10.0** - Brainstorm section, BitBuddy AI
+- **v9.3** - iCloud Sync, improved import
+- **v9.2** - Grid/List toggle, Roast Mode
 
 ---
 
-## Contact & Support
-
-More support options coming soon!
-
-For now:
-- Check this Help guide
-- Review Troubleshooting section
-- Enable iCloud Sync for data protection
-- Restart app if experiencing issues
-
----
-
-**BitBinder v9.3+**  
+**BitBinder v10.4**  
 *Professional comedy notebook app designed by comedians, for comedians.*
 
-Happy writing! 
+Happy writing! 🎤

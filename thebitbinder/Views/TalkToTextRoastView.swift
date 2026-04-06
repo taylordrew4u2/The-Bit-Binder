@@ -22,8 +22,14 @@ struct TalkToTextRoastView: View {
     @State private var permissionStatus: PermissionStatus = .notDetermined
     @State private var showingPermissionAlert = false
     @State private var errorMessage: String?
+    @State private var targetInvalidated = false
     
     @StateObject private var speechRecognizer = SpeechRecognizer()
+    
+    /// Safe access to target name
+    private var safeTargetName: String {
+        target.isValid ? target.name : "Target"
+    }
     
     enum PermissionStatus {
         case notDetermined
@@ -61,7 +67,7 @@ struct TalkToTextRoastView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    Text("Recording for \(target.name)")
+                    Text("Recording for \(safeTargetName)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -304,6 +310,12 @@ struct TalkToTextRoastView: View {
     private func saveRoast() {
         let text = transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        
+        // Safety check - ensure target is still valid
+        guard target.isValid else {
+            errorMessage = "Target was deleted. Cannot save roast."
+            return
+        }
         
         let newJoke = RoastJoke(
             content: text,

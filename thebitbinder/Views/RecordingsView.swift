@@ -29,76 +29,70 @@ struct RecordingsView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            Group {
-                if filteredRecordings.isEmpty {
-                    BitBinderEmptyState(
-                        icon: "mic.circle.fill",
-                        title: roastMode ? "No Burn Recordings" : "No Recordings Yet",
-                        subtitle: "Record your sets to review and improve your delivery",
-                        actionTitle: "Start Recording",
-                        action: { showingQuickRecord = true },
-                        roastMode: roastMode,
-                        iconGradient: LinearGradient(
-                            colors: [AppTheme.Colors.recordingsAccent, AppTheme.Colors.recordingsAccent.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+        Group {
+            if filteredRecordings.isEmpty {
+                BitBinderEmptyState(
+                    icon: "mic.circle.fill",
+                    title: roastMode ? "No Burn Recordings" : "No Recordings Yet",
+                    subtitle: "Record your sets to review and improve your delivery",
+                    actionTitle: "Start Recording",
+                    action: { showingQuickRecord = true },
+                    roastMode: roastMode,
+                    iconGradient: LinearGradient(
+                        colors: [Color.red, Color.red.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                } else {
-                    List {
-                        ForEach(filteredRecordings) { recording in
-                            NavigationLink(destination: RecordingDetailView(recording: recording)) {
-                                RecordingRowView(recording: recording)
-                            }
+                )
+            } else {
+                List {
+                    ForEach(filteredRecordings) { recording in
+                        NavigationLink(destination: RecordingDetailView(recording: recording)) {
+                            RecordingRowView(recording: recording)
                         }
-                        .onDelete(perform: deleteRecordings)
                     }
-                    .listStyle(.plain)
+                    .onDelete(perform: deleteRecordings)
                 }
+                .listStyle(.insetGrouped)
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: roastMode ? "Search recordings" : "Search recordings")
-            .bitBinderToolbar(roastMode: roastMode)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Menu {
-                        Button {
-                            showingQuickRecord = true
-                        } label: {
-                            Label("Quick Recording", systemImage: "mic.circle.fill")
-                        }
-                        Divider()
-                        Button { showingTrash = true } label: {
-                            Label("Trash", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.recordingsAccent)
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
+        }
+        .searchable(text: $searchText, prompt: "Search recordings")
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Menu {
                     Button {
                         showingQuickRecord = true
                     } label: {
-                        Image(systemName: "mic.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.recordingsAccent)
+                        Label("Quick Recording", systemImage: "mic.circle.fill")
                     }
+                    Divider()
+                    Button { showingTrash = true } label: {
+                        Label("Trash", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
-            .navigationDestination(isPresented: $showingTrash) {
-                RecordingTrashView()
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingQuickRecord = true
+                } label: {
+                    Image(systemName: "mic.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(roastMode ? .orange : .red)
+                }
             }
-            .sheet(isPresented: $showingQuickRecord) {
-                StandaloneRecordingView()
-            }
-            .alert("Error", isPresented: $showingPersistenceError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(persistenceError ?? "An unknown error occurred")
-            }
+        }
+        .navigationDestination(isPresented: $showingTrash) {
+            RecordingTrashView()
+        }
+        .sheet(isPresented: $showingQuickRecord) {
+            StandaloneRecordingView()
+        }
+        .alert("Error", isPresented: $showingPersistenceError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(persistenceError ?? "An unknown error occurred")
         }
     }
     
@@ -147,68 +141,38 @@ struct RecordingRowView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            // Play button icon
-            ZStack {
-                Circle()
-                    .fill(
-                        roastMode
-                            ? AppTheme.Colors.roastAccent.opacity(0.15)
-                            : AppTheme.Colors.recordingsAccent.opacity(0.12)
-                    )
-                    .frame(width: 48, height: 48)
-                
-                Image(systemName: "play.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.recordingsAccent)
-                    .offset(x: 2) // Optical centering
-            }
+        HStack(spacing: 12) {
+            // Play icon
+            Image(systemName: "play.circle.fill")
+                .font(.system(size: 32))
+                .foregroundStyle(roastMode ? .orange : .red)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(recording.title)
-                    .font(.system(size: 16, weight: .semibold, design: .serif))
-                    .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                    .font(.body)
+                    .foregroundColor(.primary)
                     .lineLimit(1)
 
                 HStack(spacing: 12) {
-                    // Duration
-                    HStack(spacing: 4) {
-                        Image(systemName: "waveform")
-                            .font(.system(size: 10))
-                        Text(durationString(from: recording.duration))
-                            .font(.system(size: 12, weight: .medium))
+                    Text(durationString(from: recording.duration))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if recording.transcription != nil {
+                        Text("Transcribed")
+                            .font(.caption2)
+                            .foregroundColor(.green)
                     }
-                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent.opacity(0.8) : AppTheme.Colors.recordingsAccent.opacity(0.85))
-                    
-                    // Processing indicator
-                    if !recording.isProcessed && recording.transcription == nil {
-                        HStack(spacing: 3) {
-                            ProgressView()
-                                .scaleEffect(0.6)
-                            Text("Processing")
-                                .font(.system(size: 10))
-                        }
-                        .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
-                    } else if recording.transcription != nil {
-                        HStack(spacing: 3) {
-                            Image(systemName: "doc.text.fill")
-                                .font(.system(size: 9))
-                            Text("Transcript")
-                                .font(.system(size: 10))
-                        }
-                        .foregroundColor(AppTheme.Colors.success.opacity(0.8))
-                    }
-                    
-                    Spacer()
-                    
-                    // Date
-                    Text(recording.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
-                        .font(.system(size: 11))
-                        .foregroundColor(roastMode ? Color.white.opacity(0.4) : AppTheme.Colors.textTertiary)
                 }
             }
+            
+            Spacer()
+            
+            Text(recording.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
+                .font(.caption)
+                .foregroundColor(NativeTheme.Colors.textTertiary)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
     }
     
     private func durationString(from duration: TimeInterval) -> String {

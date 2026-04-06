@@ -10,6 +10,8 @@ import UIKit
 import Foundation
 import Combine
 
+/// Audio recording service - thread-safe via SwiftUI's @Published property dispatch.
+/// All mutating methods should be called from the main thread (SwiftUI handles this).
 class AudioRecordingService: NSObject, ObservableObject {
     
     @Published var isRecording = false

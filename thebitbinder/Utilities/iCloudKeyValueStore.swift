@@ -163,11 +163,12 @@ final class iCloudKeyValueStore {
         
         // Performance: Debounce sync operations to prevent excessive iCloud calls
         syncDebounceWorkItem?.cancel()
-        syncDebounceWorkItem = DispatchWorkItem { [weak self] in
+        let workItem = DispatchWorkItem { [weak self] in
             self?.performSyncToCloud()
         }
+        syncDebounceWorkItem = workItem
         // Reduced debounce time for better responsiveness
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: syncDebounceWorkItem!)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
     }
     
     /// Performs the actual sync to iCloud (debounced)

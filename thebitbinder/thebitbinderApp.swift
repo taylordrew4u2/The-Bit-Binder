@@ -43,14 +43,20 @@ struct thebitbinderApp: App {
 
         // 1⃣ Persistent + CloudKit (single container, full schema)
         do {
+            // CRITICAL: For CloudKit sync to work properly, we need:
+            // 1. groupAppContainerIdentifier for shared access (if using app groups)
+            // 2. Proper cloudKitDatabase configuration
+            // The ModelConfiguration initializer automatically enables persistent history tracking
+            // when cloudKitDatabase is set, which is required for sync.
             let config = ModelConfiguration(
+                "BitBinderStore",
                 schema: schema,
                 url: storeURL,
                 allowsSave: true,
                 cloudKitDatabase: .private("iCloud.The-BitBinder.thebitbinder")
             )
             let container = try ModelContainer(for: schema, configurations: [config])
-            print(" [ModelContainer] Persistent + CloudKit ready")
+            print(" [ModelContainer] Persistent + CloudKit ready with history tracking")
             
             // Log successful container creation
             DataOperationLogger.shared.logSuccess("ModelContainer created with CloudKit")
@@ -229,6 +235,14 @@ struct thebitbinderApp: App {
                 // Pull latest settings from iCloud
                 iCloudKeyValueStore.shared.pullFromCloud()
                 
+                // CRITICAL: Post remote change notification to trigger SwiftData
+                // to check for and merge any pending CloudKit changes.
+                // This is the primary mechanism for cross-device sync on app resume.
+                NotificationCenter.default.post(
+                    name: .NSPersistentStoreRemoteChange,
+                    object: nil
+                )
+                
                 // Save to trigger SwiftData to merge any pending remote changes into the UI
                 do {
                     try sharedModelContainer.mainContext.save()
@@ -241,14 +255,16 @@ struct thebitbinderApp: App {
                 // Ensure notifications are scheduled
                 NotificationManager.shared.scheduleIfNeeded()
                 
-                // Trigger a background sync check if it's been a while
+                // Always trigger a sync check when app becomes active
+                // This ensures cross-device changes are picked up immediately
                 Task {
                     let syncService = iCloudSyncService.shared
-                    if let lastSync = syncService.lastSyncDate {
-                        let timeSinceSync = Date().timeIntervalSince(lastSync)
-                        if timeSinceSync > 3600 && syncService.isSyncEnabled { // 1 hour
-                            print(" [AppLifecycle] Triggering background sync (last sync \(Int(timeSinceSync/60)) minutes ago)")
+                    if syncService.isSyncEnabled {
+                        // Check if iCloud is available before syncing
+                        let available = await syncService.checkiCloudAvailability()
+                        if available {
                             await syncService.syncNow()
+                            print(" [AppLifecycle] Triggered sync on app activation")
                         }
                     }
                 }

@@ -9,6 +9,8 @@
 import Foundation
 import UserNotifications
 
+/// Notification manager - thread-safe via SwiftUI's @Published property dispatch.
+/// UNUserNotificationCenterDelegate callbacks are already dispatched on main thread by the system.
 final class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
 
     static let shared = NotificationManager()

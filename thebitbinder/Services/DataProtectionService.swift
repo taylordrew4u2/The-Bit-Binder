@@ -168,7 +168,11 @@ final class DataProtectionService: ObservableObject {
                 !key.contains("DeviceCheck")
             }
             
-            let appDict = Dictionary(uniqueKeysWithValues: appKeys.map { ($0, dict[$0]!) })
+            // Safely map keys to their values, filtering out any nil values
+            let appDict = Dictionary(uniqueKeysWithValues: appKeys.compactMap { key -> (String, Any)? in
+                guard let value = dict[key] else { return nil }
+                return (key, value)
+            })
             let plistData = try PropertyListSerialization.data(fromPropertyList: appDict, format: .xml, options: 0)
             try plistData.write(to: preferencesURL)
             

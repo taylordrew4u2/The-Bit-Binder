@@ -20,6 +20,11 @@ struct SetListDetailView: View {
     @State private var showingAddJokes = false
     @State private var isEditing = false
     
+    // Finalize & Performance
+    @State private var showingFinalizeSheet = false
+    @State private var showingLivePerformance = false
+    @State private var showingUnfinalizeAlert = false
+    
     // Recording inline
     @StateObject private var audioService = AudioRecordingService()
     @State private var recordingName = ""
@@ -42,6 +47,14 @@ struct SetListDetailView: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // Finalized banner (when set is ready for performance)
+            if setList.isFinalized {
+                finalizedBanner
+            } else if setList.totalItemCount > 0 {
+                // Quick perform banner when NOT finalized but has jokes
+                quickPerformBanner
+            }
+            
             // Inline recording header
             VStack(spacing: 12) {
                 HStack {
@@ -152,11 +165,57 @@ struct SetListDetailView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Leading: GO LIVE button - always visible when set has jokes
+            ToolbarItem(placement: .navigationBarLeading) {
+                if setList.totalItemCount > 0 {
+                    Button {
+                        showingLivePerformance = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "play.fill")
+                            Text("GO LIVE")
+                                .fontWeight(.bold)
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(setList.isFinalized ? Color.green : Color.blue)
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    // Finalize / Unfinalize
+                    if setList.isFinalized {
+                        Button {
+                            showingLivePerformance = true
+                        } label: {
+                            Label("Start Performance", systemImage: "play.fill")
+                        }
+                        
+                        Button(role: .destructive) {
+                            showingUnfinalizeAlert = true
+                        } label: {
+                            Label("Unfinalize (Allow Edits)", systemImage: "lock.open")
+                        }
+                    } else {
+                        Button {
+                            showingFinalizeSheet = true
+                        } label: {
+                            Label("Finalize for Performance", systemImage: "checkmark.seal")
+                        }
+                        .disabled(setList.totalItemCount == 0)
+                    }
+                    
+                    Divider()
+                    
                     Button(action: { showingAddJokes = true }) {
                         Label(roastMode ? "Add Roast Jokes" : "Add Jokes", systemImage: "plus")
                     }
+                    .disabled(setList.isFinalized)
                     
                     Button(action: { showFullContent.toggle() }) {
                         Label(showFullContent ? "Show Titles Only" : "Show Full Content", systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
@@ -165,18 +224,33 @@ struct SetListDetailView: View {
                     Button(action: { isEditing.toggle() }) {
                         Label(isEditing ? "Done" : "Edit Order", systemImage: "arrow.up.arrow.down")
                     }
+                    .disabled(setList.isFinalized)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
             }
         }
-        .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+        .environment(\.editMode, .constant(isEditing && !setList.isFinalized ? .active : .inactive))
         .sheet(isPresented: $showingAddJokes) {
             if roastMode {
                 AddRoastJokesToSetListView(setList: setList, currentRoastJokeIDs: setList.roastJokeIDs)
             } else {
                 AddJokesToSetListView(setList: setList, currentJokeIDs: setList.jokeIDs)
             }
+        }
+        .sheet(isPresented: $showingFinalizeSheet) {
+            FinalizeSetSheet(setList: setList)
+        }
+        .fullScreenCover(isPresented: $showingLivePerformance) {
+            LivePerformanceView(setList: setList)
+        }
+        .alert("Unfinalize Set?", isPresented: $showingUnfinalizeAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Unfinalize") {
+                unfinalizeSet()
+            }
+        } message: {
+            Text("This will allow editing the set again. You can re-finalize anytime before your performance.")
         }
         .alert("Save Recording", isPresented: $showingSaveAlert) {
             TextField("Recording name", text: $recordingName)
@@ -321,5 +395,122 @@ struct SetListDetailView: View {
         let seconds = Int(duration) % 60
         return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
                          : String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    // MARK: - Finalized Banner
+    
+    private var finalizedBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.title2)
+                .foregroundColor(.white)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Ready to Perform")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                HStack(spacing: 8) {
+                    if setList.estimatedMinutes > 0 {
+                        Text("\(setList.estimatedMinutes) min")
+                    }
+                    if !setList.venueName.isEmpty {
+                        Text("•")
+                        Text(setList.venueName)
+                    }
+                    if let perfDate = setList.performanceDate {
+                        Text("•")
+                        Text(perfDate, format: .dateTime.month(.abbreviated).day().hour().minute())
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.8))
+            }
+            
+            Spacer()
+            
+            Button {
+                showingLivePerformance = true
+            } label: {
+                Text("GO LIVE")
+                    .font(.caption.bold())
+                    .foregroundColor(.green)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.white)
+                    .clipShape(Capsule())
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [Color.green, Color.green.opacity(0.8)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+    }
+    
+    // MARK: - Quick Perform Banner (for unfinalized sets)
+    
+    private var quickPerformBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "play.circle.fill")
+                .font(.title2)
+                .foregroundColor(.white)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(setList.totalItemCount) joke\(setList.totalItemCount == 1 ? "" : "s") ready")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                Text("Tap GO LIVE to perform • Finalize for full features")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            
+            Spacer()
+            
+            VStack(spacing: 6) {
+                Button {
+                    showingLivePerformance = true
+                } label: {
+                    Text("GO LIVE")
+                        .font(.caption.bold())
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.white)
+                        .clipShape(Capsule())
+                }
+                
+                Button {
+                    showingFinalizeSheet = true
+                } label: {
+                    Text("Finalize")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [Color.blue, Color.blue.opacity(0.8)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+    }
+    
+    private func unfinalizeSet() {
+        setList.unfinalize()
+        do {
+            try modelContext.save()
+        } catch {
+            #if DEBUG
+            print("⚠️ [SetListDetailView] Failed to unfinalize: \(error)")
+            #endif
+        }
     }
 }

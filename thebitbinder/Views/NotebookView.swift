@@ -2,6 +2,8 @@ import SwiftUI
 import PhotosUI
 import SwiftData
 import AVFoundation
+import PDFKit
+import UniformTypeIdentifiers
 
 extension FileManager {
     static var documentsDirectory: URL {
@@ -22,6 +24,9 @@ struct NotebookView: View {
     @State private var showingTrash = false
     @State private var persistenceError: String?
     @State private var showingPersistenceError = false
+    @State private var showingPDFPicker = false
+    @State private var isImportingPDF = false
+    @State private var pdfImportProgress: String = ""
     
     private func delete(_ photo: NotebookPhotoRecord) {
         // Soft-delete: imageData kept until permanently purged from NotebookTrashView
@@ -38,66 +43,88 @@ struct NotebookView: View {
     let columns = [GridItem(.adaptive(minimum: 100), spacing: 16)]
     
     var body: some View {
-        NavigationStack {
-            Group {
-                if photos.isEmpty {
-                    BitBinderEmptyState(
-                        icon: "book.fill",
-                        title: roastMode ? "No Fire Notebook Pages" : "No Pages Saved Yet",
-                        subtitle: "Take photos of your physical notebook pages to back them up in the app",
-                        roastMode: roastMode,
-                        iconGradient: LinearGradient(
-                            colors: [AppTheme.Colors.notebookAccent, AppTheme.Colors.notebookAccent.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+        Group {
+            if photos.isEmpty {
+                BitBinderEmptyState(
+                    icon: "book.fill",
+                    title: roastMode ? "No Fire Notebook Pages" : "No Pages Saved Yet",
+                    subtitle: "Take photos of your physical notebook pages or import PDFs to back them up",
+                    roastMode: roastMode,
+                    iconGradient: LinearGradient(
+                        colors: [AppTheme.Colors.notebookAccent, AppTheme.Colors.notebookAccent.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 16) {
-                            ForEach(photos, id: \.id) { photo in
-                                NotebookThumbnailCell(photo: photo) {
-                                    showingDetail = photo
-                                } onDelete: {
-                                    delete(photo)
-                                }
+                )
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(photos, id: \.id) { photo in
+                            NotebookThumbnailCell(photo: photo) {
+                                showingDetail = photo
+                            } onDelete: {
+                                delete(photo)
                             }
                         }
-                        .padding()
                     }
+                    .padding()
                 }
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .bitBinderToolbar(roastMode: roastMode)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Menu {
-                        Button { showingTrash = true } label: {
-                            Label("Trash", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.notebookAccent)
+        }
+        .overlay {
+            if isImportingPDF {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
+                        Text(pdfImportProgress)
+                            .font(.headline)
+                            .foregroundColor(.white)
                     }
-                }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    PhotosPicker(selection: $pickedPhotoItem,
-                                 matching: .images,
-                                 photoLibrary: .shared()) {
-                        Label("Add Photo", systemImage: "photo.on.rectangle")
-                    }
-                    Button {
-                        showingCamera = true
-                    } label: {
-                        Label("Camera", systemImage: "camera")
-                    }
+                    .padding(32)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                 }
             }
-            .navigationDestination(isPresented: $showingTrash) {
-                NotebookTrashView()
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Menu {
+                    Button { showingTrash = true } label: {
+                        Label("Trash", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.notebookAccent)
+                }
             }
-            .onChange(of: pickedPhotoItem) { oldValue, newValue in
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Menu {
+                    Button { showingPDFPicker = true } label: {
+                        Label("Import PDF", systemImage: "doc.fill")
+                    }
+                } label: {
+                    Label("Import PDF", systemImage: "doc.badge.plus")
+                }
+                
+                PhotosPicker(selection: $pickedPhotoItem,
+                             matching: .images,
+                             photoLibrary: .shared()) {
+                    Label("Add Photo", systemImage: "photo.on.rectangle")
+                }
+                Button {
+                    showingCamera = true
+                } label: {
+                    Label("Camera", systemImage: "camera")
+                }
+            }
+        }
+        .navigationDestination(isPresented: $showingTrash) {
+            NotebookTrashView()
+        }
+        .onChange(of: pickedPhotoItem) { oldValue, newValue in
                 Task {
                     if let item = newValue {
                         await importPhoto(from: item)
@@ -105,28 +132,36 @@ struct NotebookView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingCamera, onDismiss: {
-                if let cameraImage {
-                    Task {
-                        await saveCameraImage(cameraImage)
-                    }
-                    self.cameraImage = nil
+        .sheet(isPresented: $showingCamera, onDismiss: {
+            if let cameraImage {
+                Task {
+                    await saveCameraImage(cameraImage)
                 }
-            }) {
-                CameraView(image: $cameraImage)
+                self.cameraImage = nil
             }
-            .sheet(item: $showingDetail) { photo in
-                NotebookDetailView(photo: photo)
-                    .environment(\.modelContext, modelContext)
+        }) {
+            CameraView(image: $cameraImage)
+        }
+        .sheet(item: $showingDetail) { photo in
+            NotebookDetailView(photo: photo)
+                .environment(\.modelContext, modelContext)
+        }
+        .sheet(isPresented: $showingPDFPicker) {
+            NotebookPDFPickerView { urls in
+                if let url = urls.first {
+                    Task {
+                        await importPDF(from: url)
+                    }
+                }
             }
-            .onDisappear {
-                // Memory cleanup handled by MemoryManager
-            }
-            .alert("Error", isPresented: $showingPersistenceError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(persistenceError ?? "An unknown error occurred")
-            }
+        }
+        .onDisappear {
+            // Memory cleanup handled by MemoryManager
+        }
+        .alert("Error", isPresented: $showingPersistenceError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(persistenceError ?? "An unknown error occurred")
         }
     }
     
@@ -197,6 +232,143 @@ struct NotebookView: View {
         }
     }
     
+    // MARK: - PDF Import
+    
+    private func importPDF(from url: URL) async {
+        await MainActor.run {
+            isImportingPDF = true
+            pdfImportProgress = "Loading PDF..."
+        }
+        
+        do {
+            // Access security-scoped resource
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing { url.stopAccessingSecurityScopedResource() }
+            }
+            
+            guard let document = PDFDocument(url: url) else {
+                await MainActor.run {
+                    isImportingPDF = false
+                    persistenceError = "Could not open PDF file"
+                    showingPersistenceError = true
+                }
+                return
+            }
+            
+            let pageCount = document.pageCount
+            let pdfName = url.deletingPathExtension().lastPathComponent
+            
+            for pageIndex in 0..<pageCount {
+                await MainActor.run {
+                    pdfImportProgress = "Importing page \(pageIndex + 1) of \(pageCount)..."
+                }
+                
+                guard let page = document.page(at: pageIndex) else { continue }
+                
+                // Render PDF page to image
+                guard let jpegData = await renderPDFPageToJPEG(page: page) else { continue }
+                
+                // Create NotebookPhotoRecord for this page
+                let notes = pageCount > 1 
+                    ? "\(pdfName) (Page \(pageIndex + 1) of \(pageCount))"
+                    : pdfName
+                
+                let newPhoto = NotebookPhotoRecord(notes: notes, imageData: jpegData)
+                
+                await MainActor.run {
+                    modelContext.insert(newPhoto)
+                }
+            }
+            
+            // Save all pages
+            await MainActor.run {
+                pdfImportProgress = "Saving..."
+                do {
+                    try modelContext.save()
+                } catch {
+                    print(" [NotebookView] Failed to save PDF pages: \(error)")
+                    persistenceError = "Could not save PDF pages: \(error.localizedDescription)"
+                    showingPersistenceError = true
+                }
+                isImportingPDF = false
+            }
+            
+        } catch {
+            await MainActor.run {
+                isImportingPDF = false
+                persistenceError = "PDF import failed: \(error.localizedDescription)"
+                showingPersistenceError = true
+            }
+        }
+    }
+    
+    private func renderPDFPageToJPEG(page: PDFPage) async -> Data? {
+        await Task.detached(priority: .userInitiated) {
+            autoreleasepool {
+                let mediaBox = page.bounds(for: .mediaBox)
+                
+                // Calculate scale to fit within 1500px max dimension
+                let maxDimension: CGFloat = 1500
+                let scale = min(maxDimension / mediaBox.width, maxDimension / mediaBox.height, 2.0)
+                let scaledSize = CGSize(width: mediaBox.width * scale, height: mediaBox.height * scale)
+                
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1
+                format.opaque = true
+                
+                let renderer = UIGraphicsImageRenderer(size: scaledSize, format: format)
+                let image = renderer.image { ctx in
+                    // Fill white background
+                    UIColor.white.setFill()
+                    ctx.fill(CGRect(origin: .zero, size: scaledSize))
+                    
+                    // Apply scale transform
+                    ctx.cgContext.scaleBy(x: scale, y: scale)
+                    
+                    // Draw PDF page
+                    page.draw(with: .mediaBox, to: ctx.cgContext)
+                }
+                
+                return image.jpegData(compressionQuality: 0.85)
+            }
+        }.value
+    }
+}
+
+// MARK: - PDF Picker for Notebook
+
+struct NotebookPDFPickerView: UIViewControllerRepresentable {
+    let completion: ([URL]) -> Void
+    
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.pdf], asCopy: true)
+        picker.allowsMultipleSelection = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(completion: completion)
+    }
+    
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let completion: ([URL]) -> Void
+        
+        init(completion: @escaping ([URL]) -> Void) {
+            self.completion = completion
+        }
+        
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            completion(urls)
+        }
+        
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            completion([])
+        }
+    }
 }
 
 struct NotebookDetailView: View {

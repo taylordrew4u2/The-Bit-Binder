@@ -119,6 +119,9 @@ struct JokesView: View {
     @State private var isSelectMode = false
     @State private var selectedJokeIDs: Set<UUID> = []
     
+    // Navigation state for grid items (prevents accidental taps)
+    @State private var selectedJokeForDetail: Joke?
+    
     // Persistence error surfacing
     @State private var persistenceError: String?
     @State private var showingPersistenceError = false
@@ -139,8 +142,8 @@ struct JokesView: View {
 
     private var folderChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                // The Hits chip (prominent, first position)
+            HStack(spacing: 8) {
+                // The Hits chip
                 TheHitsChip(
                     count: hitsCount,
                     isSelected: showingHitsFilter,
@@ -153,12 +156,6 @@ struct JokesView: View {
                         }
                     }
                 )
-                
-                // Divider
-                Rectangle()
-                    .fill(roastMode ? Color.white.opacity(0.15) : AppTheme.Colors.divider)
-                    .frame(width: 1, height: 24)
-                    .padding(.horizontal, 4)
                 
                 // All Jokes
                 FolderChip(
@@ -210,8 +207,84 @@ struct JokesView: View {
             }
             .padding(.horizontal, 16)
         }
-        .padding(.vertical, 12)
-        .background(roastMode ? AppTheme.Colors.roastSurface.opacity(0.5) : AppTheme.Colors.paperAged.opacity(0.7))
+        .padding(.vertical, 10)
+    }
+    
+    // MARK: - Grid Zoom Bar
+    
+    @ViewBuilder
+    private func gridZoomBar(scale: Binding<Double>, roastMode: Bool = false) -> some View {
+        HStack(spacing: 12) {
+            // Zoom out button
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    scale.wrappedValue = min(2.0, scale.wrappedValue + 0.5)
+                }
+                haptic(.light)
+            } label: {
+                Image(systemName: "minus.magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(roastMode ? .orange : .accentColor)
+            }
+            .disabled(scale.wrappedValue >= 2.0)
+            .opacity(scale.wrappedValue >= 2.0 ? 0.4 : 1.0)
+            
+            // Column preset buttons
+            HStack(spacing: 6) {
+                gridColumnButton(columns: 4, scale: scale, roastMode: roastMode)
+                gridColumnButton(columns: 3, scale: scale, roastMode: roastMode)
+                gridColumnButton(columns: 2, scale: scale, roastMode: roastMode)
+            }
+            
+            // Zoom in button
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    scale.wrappedValue = max(0.5, scale.wrappedValue - 0.5)
+                }
+                haptic(.light)
+            } label: {
+                Image(systemName: "plus.magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(roastMode ? .orange : .accentColor)
+            }
+            .disabled(scale.wrappedValue <= 0.5)
+            .opacity(scale.wrappedValue <= 0.5 ? 0.4 : 1.0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(UIColor.secondarySystemBackground).opacity(0.95))
+        )
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+    
+    @ViewBuilder
+    private func gridColumnButton(columns: Int, scale: Binding<Double>, roastMode: Bool) -> some View {
+        let targetScale = 4.0 / Double(columns)
+        let isActive = abs(scale.wrappedValue - targetScale) < 0.1
+        
+        Button {
+            withAnimation(.easeOut(duration: 0.2)) {
+                scale.wrappedValue = targetScale
+            }
+            haptic(.light)
+        } label: {
+            HStack(spacing: 2) {
+                ForEach(0..<columns, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(isActive ? (roastMode ? Color.orange : Color.accentColor) : Color.secondary.opacity(0.5))
+                        .frame(width: 6, height: 10)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isActive ? (roastMode ? Color.orange : Color.accentColor).opacity(0.15) : Color.clear)
+            )
+        }
     }
 
     @ViewBuilder
@@ -232,11 +305,10 @@ struct JokesView: View {
             BitBinderEmptyState(
                 icon: "flame.fill",
                 title: "No Roast Targets Yet",
-                subtitle: "Add someone you want to roast and start writing jokes just for them",
-                actionTitle: "Add First Target",
+                subtitle: "Add someone to start writing jokes about them",
+                actionTitle: "Add Target",
                 action: { showingAddRoastTarget = true },
-                roastMode: true,
-                iconGradient: AppTheme.Colors.roastEmberGradient
+                roastMode: true
             )
         } else {
             if roastViewMode == .grid {
@@ -262,7 +334,6 @@ struct JokesView: View {
                 .simultaneousGesture(roastPinchGesture)
             } else {
                 List {
-                    // Roast target list
                     ForEach(roastTargets) { target in
                         NavigationLink(destination: RoastTargetDetailView(target: target)) {
                             RoastTargetListRow(target: target)
@@ -323,19 +394,12 @@ struct JokesView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            mainContent
-                .background(
-                    (roastMode ? AppTheme.Colors.roastBackground : Color.clear)
-                        .ignoresSafeArea()
-                )
-                .navigationTitle("")
-                .navigationBarTitleDisplayMode(.inline)
-                .searchable(text: $searchText, prompt: roastMode ? "Search targets" : "Search jokes")
-                .ignoresSafeArea(.keyboard, edges: .bottom)
-                .bitBinderToolbar(roastMode: roastMode)
-                .onAppear { checkPendingVoiceMemoImports() }
-                .toolbar { combinedToolbarContent }
+        mainContent
+            .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+            .searchable(text: $searchText, prompt: roastMode ? "Search targets" : "Search jokes")
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+            .onAppear { checkPendingVoiceMemoImports() }
+            .toolbar { combinedToolbarContent }
                 .photosPicker(isPresented: $showingImagePicker, selection: $selectedPhotos, matching: .images, preferredItemEncoding: .automatic)
                 .onChange(of: selectedPhotos) { oldValue, newValue in
                     Task { await processSelectedPhotos(newValue) }
@@ -421,7 +485,6 @@ struct JokesView: View {
                         }
                     }
                 }
-        }
     }
 
     // MARK: - Extracted Body Subviews
@@ -435,9 +498,6 @@ struct JokesView: View {
                 // Filter chips (includes The Hits)
                 folderChips
 
-                Divider()
-                    .opacity(0.5)
-                
                 if filteredJokes.isEmpty {
                     emptyState
                 } else {
@@ -448,48 +508,54 @@ struct JokesView: View {
                                         if isSelectMode {
                                             jokeGridSelectableCard(joke: joke)
                                         } else {
-                                            NavigationLink(destination: JokeDetailView(joke: joke)) {
-                                                JokeCardView(joke: joke, scale: effectiveJokesScale, roastMode: roastMode, showFullContent: showFullContent)
-                                            }
-                                            .contextMenu {
-                                                if joke.isHit {
-                                                    Button {
-                                                        joke.isHit = false
-                                                        joke.dateModified = Date()
-                                                    } label: {
-                                                        Label("Remove from Hits", systemImage: "star.slash")
+                                            JokeCardView(joke: joke, scale: effectiveJokesScale, roastMode: roastMode, showFullContent: showFullContent)
+                                                .contentShape(Rectangle())
+                                                .onTapGesture {
+                                                    HapticEngine.shared.tap()
+                                                    selectedJokeForDetail = joke
+                                                }
+                                                .contextMenu {
+                                                    if joke.isHit {
+                                                        Button {
+                                                            joke.isHit = false
+                                                            joke.dateModified = Date()
+                                                        } label: {
+                                                            Label("Remove from Hits", systemImage: "star.slash")
+                                                        }
+                                                    } else {
+                                                        Button {
+                                                            joke.isHit = true
+                                                            joke.dateModified = Date()
+                                                        } label: {
+                                                            Label("Add to Hits", systemImage: "star.fill")
+                                                        }
                                                     }
-                                                } else {
-                                                    Button {
-                                                        joke.isHit = true
-                                                        joke.dateModified = Date()
+                                                    
+                                                    Divider()
+                                                    
+                                                    Button(role: .destructive) {
+                                                        joke.moveToTrash()
+                                                        do {
+                                                            try modelContext.save()
+                                                        } catch {
+                                                            print(" [JokesView] Failed to save after trash: \(error)")
+                                                            persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
+                                                            showingPersistenceError = true
+                                                        }
                                                     } label: {
-                                                        Label("Add to Hits", systemImage: "star.fill")
+                                                        Label("Move to Trash", systemImage: "trash")
                                                     }
                                                 }
-                                                
-                                                Divider()
-                                                
-                                                Button(role: .destructive) {
-                                                    joke.moveToTrash()
-                                                    do {
-                                                        try modelContext.save()
-                                                    } catch {
-                                                        print(" [JokesView] Failed to save after trash: \(error)")
-                                                        persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
-                                                        showingPersistenceError = true
-                                                    }
-                                                } label: {
-                                                    Label("Move to Trash", systemImage: "trash")
-                                                }
-                                            }
                                         }
                                     }
                                 }
                                 .animation(.easeOut(duration: 0.2), value: effectiveJokesScale)
                         }
                         .scrollContentBackground(.hidden)
-                        .simultaneousGesture(jokesPinchGesture)
+                        .highPriorityGesture(jokesPinchGesture)
+                        .navigationDestination(item: $selectedJokeForDetail) { joke in
+                            JokeDetailView(joke: joke)
+                        }
                     } else {
                         List {
                             ForEach(filteredJokes) { joke in
@@ -545,9 +611,7 @@ struct JokesView: View {
                             }
                             .onDelete(perform: deleteJokes)
                         }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
-                        .background(roastMode ? AppTheme.Colors.roastBackground : Color.clear)
+                        .listStyle(.insetGrouped)
                     }
                 }
                 
@@ -612,7 +676,7 @@ struct JokesView: View {
             
             Text("\(selectedJokeIDs.count) selected")
                 .font(.subheadline.bold())
-                .foregroundColor(AppTheme.Colors.textSecondary)
+                .foregroundColor(.secondary)
             
             Spacer()
             
@@ -635,7 +699,7 @@ struct JokesView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(AppTheme.Colors.surfaceElevated.shadow(.drop(radius: 4, y: -2)))
+        .background(Color(UIColor.secondarySystemBackground))
     }
     
     private func toggleSelection(_ joke: Joke) {
@@ -679,18 +743,34 @@ struct JokesView: View {
         NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
     }
 
+    @State private var showingExportAllRoasts = false
+    @State private var roastExportURL: URL?
+    
     @ToolbarContentBuilder
     private var combinedToolbarContent: some ToolbarContent {
         if roastMode {
             ToolbarItem(placement: .principal) {
                 Menu {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            roastViewMode = roastViewMode == .grid ? .list : .grid
+                    Section {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                roastViewMode = roastViewMode == .grid ? .list : .grid
+                            }
+                        } label: {
+                            Label(roastViewMode == .grid ? "List View" : "Grid View",
+                                  systemImage: roastViewMode.icon)
                         }
-                    } label: {
-                        Label(roastViewMode == .grid ? "List View" : "Grid View",
-                              systemImage: roastViewMode.icon)
+                    }
+                    
+                    Divider()
+                    
+                    Section("Export") {
+                        Button(action: exportAllRoastsToPDF) {
+                            Label("Export All Roasts to PDF", systemImage: "doc.richtext")
+                        }
+                        Button(action: exportAllRoastsToText) {
+                            Label("Export All Roasts to Text", systemImage: "doc.text")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -1216,6 +1296,137 @@ struct JokesView: View {
         }
     }
     
+    // MARK: - Roast Export Methods
+    
+    private func exportAllRoastsToPDF() {
+        let targetsToExport = roastTargets.filter { !$0.isDeleted && $0.jokeCount > 0 }
+        guard !targetsToExport.isEmpty else { return }
+        
+        if let url = PDFExportService.exportRoastsToPDF(targets: targetsToExport, fileName: "BitBinder_AllRoasts") {
+            shareFile(url)
+        }
+    }
+    
+    private func exportAllRoastsToText() {
+        let targetsToExport = roastTargets.filter { !$0.isDeleted && $0.jokeCount > 0 }
+        guard !targetsToExport.isEmpty else { return }
+        
+        var text = "THE BITBINDER - ALL ROASTS\n"
+        text += String(repeating: "=", count: 50) + "\n"
+        text += "Exported: \(DateFormatter.localizedString(from: Date(), dateStyle: .long, timeStyle: .short))\n"
+        text += "\(targetsToExport.count) target\(targetsToExport.count == 1 ? "" : "s"), "
+        let totalRoasts = targetsToExport.reduce(0) { $0 + $1.jokeCount }
+        text += "\(totalRoasts) roast\(totalRoasts == 1 ? "" : "s")\n\n"
+        text += String(repeating: "=", count: 50) + "\n\n"
+        
+        for target in targetsToExport {
+            text += "🎯 \(target.name.uppercased())\n"
+            text += String(repeating: "-", count: 30) + "\n"
+            
+            if !target.notes.isEmpty {
+                text += "About: \(target.notes)\n"
+            }
+            
+            if !target.traits.isEmpty {
+                text += "Traits: \(target.traits.joined(separator: ", "))\n"
+            }
+            
+            text += "\n"
+            
+            let allJokes = target.sortedJokes
+            let openingRoasts = allJokes.filter { $0.isOpeningRoast }.sorted { $0.displayOrder < $1.displayOrder }
+            let backupRoasts = allJokes.filter { !$0.isOpeningRoast && $0.parentOpeningRoastID != nil }
+            let unassignedRoasts = allJokes.filter { !$0.isOpeningRoast && $0.parentOpeningRoastID == nil }
+            
+            var jokeIndex = 1
+            
+            // Opening roasts section
+            if !openingRoasts.isEmpty {
+                text += "⭐ OPENING ROASTS (\(openingRoasts.count))\n"
+                
+                for (i, joke) in openingRoasts.enumerated() {
+                    text += "\(i + 1). "
+                    if joke.isKiller { text += "🔥 " }
+                    text += "\(joke.content)\n"
+                    
+                    if joke.hasStructure {
+                        if !joke.setup.isEmpty {
+                            text += "   SETUP: \(joke.setup)\n"
+                        }
+                        if !joke.punchline.isEmpty {
+                            text += "   PUNCHLINE: \(joke.punchline)\n"
+                        }
+                    }
+                    
+                    if !joke.performanceNotes.isEmpty {
+                        text += "   NOTES: \(joke.performanceNotes)\n"
+                    }
+                    
+                    if joke.isTested {
+                        text += "   (Performed \(joke.performanceCount)x)\n"
+                    }
+                    
+                    // Show backups for this opener
+                    let backupsForOpener = backupRoasts.filter { $0.parentOpeningRoastID == joke.id }
+                    if !backupsForOpener.isEmpty {
+                        text += "   BACKUPS:\n"
+                        for backup in backupsForOpener {
+                            text += "   ↳ \(backup.content)\n"
+                        }
+                    }
+                    
+                    text += "\n"
+                    jokeIndex += 1
+                }
+            }
+            
+            // Unassigned roasts section
+            if !unassignedRoasts.isEmpty {
+                if !openingRoasts.isEmpty {
+                    text += "OTHER ROASTS (\(unassignedRoasts.count))\n"
+                }
+                
+                for joke in unassignedRoasts {
+                    text += "\(jokeIndex). "
+                    if joke.isKiller { text += "⭐️ " }
+                    text += "\(joke.content)\n"
+                    
+                    if joke.hasStructure {
+                        if !joke.setup.isEmpty {
+                            text += "   SETUP: \(joke.setup)\n"
+                        }
+                        if !joke.punchline.isEmpty {
+                            text += "   PUNCHLINE: \(joke.punchline)\n"
+                        }
+                    }
+                    
+                    if !joke.performanceNotes.isEmpty {
+                        text += "   NOTES: \(joke.performanceNotes)\n"
+                    }
+                    
+                    if joke.isTested {
+                        text += "   (Performed \(joke.performanceCount)x)\n"
+                    }
+                    
+                    text += "\n"
+                    jokeIndex += 1
+                }
+            }
+            
+            text += "\n" + String(repeating: "=", count: 50) + "\n\n"
+        }
+        
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsURL.appendingPathComponent("BitBinder_AllRoasts.txt")
+        
+        do {
+            try text.write(to: fileURL, atomically: true, encoding: .utf8)
+            shareFile(fileURL)
+        } catch {
+            print("⚠️ Failed to write roasts text export: \(error)")
+        }
+    }
+    
     private func isLikelyDuplicate(_ content: String, title: String?) -> Bool {
         let newKey = content.normalizedPrefix()
         // Check against existing jokes in current filtered set and full list
@@ -1336,6 +1547,11 @@ struct RoastTargetGridCard: View {
     let target: RoastTarget
     var scale: CGFloat = 1.0
     private let accentColor = AppTheme.Colors.roastAccent
+    
+    /// Safe property accessors to prevent crashes on invalidated models
+    private var safeName: String { target.isValid ? target.name : "" }
+    private var safeJokeCount: Int { target.isValid ? target.jokeCount : 0 }
+    private var safePhotoData: Data? { target.isValid ? target.photoData : nil }
 
     private var avatarSize: CGFloat { max(40, 70 * scale) }
     private var initialFontSize: CGFloat { max(14, 24 * scale) }
@@ -1348,15 +1564,15 @@ struct RoastTargetGridCard: View {
         VStack(spacing: max(4, 6 * scale)) {
             // Avatar — async background decode
             AsyncAvatarView(
-                photoData: target.photoData,
+                photoData: safePhotoData,
                 size: avatarSize,
-                fallbackInitial: String(target.name.prefix(1).uppercased()),
+                fallbackInitial: String(safeName.prefix(1).uppercased()),
                 accentColor: accentColor
             )
             .overlay(Circle().stroke(accentColor.opacity(0.5), lineWidth: 2))
 
             // Name
-            Text(target.name)
+            Text(safeName)
                 .font(.system(size: nameFontSize, weight: .semibold))
                 .foregroundColor(.primary)
                 .lineLimit(2)
@@ -1367,7 +1583,7 @@ struct RoastTargetGridCard: View {
                 Image(systemName: "flame.fill")
                     .font(.system(size: iconSize))
                     .foregroundColor(accentColor)
-                Text("\(target.jokeCount) roast\(target.jokeCount == 1 ? "" : "s")")
+                Text("\(safeJokeCount) roast\(safeJokeCount == 1 ? "" : "s")")
                     .font(.system(size: badgeFontSize, weight: .medium))
                     .foregroundColor(.secondary)
             }
@@ -1386,21 +1602,26 @@ struct RoastTargetGridCard: View {
 struct RoastTargetListRow: View {
     let target: RoastTarget
     private let accentColor = AppTheme.Colors.roastAccent
+    
+    /// Safe property accessors to prevent crashes on invalidated models
+    private var safeName: String { target.isValid ? target.name : "" }
+    private var safeJokeCount: Int { target.isValid ? target.jokeCount : 0 }
+    private var safePhotoData: Data? { target.isValid ? target.photoData : nil }
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             // Avatar — async background decode
             AsyncAvatarView(
-                photoData: target.photoData,
+                photoData: safePhotoData,
                 size: 50,
-                fallbackInitial: String(target.name.prefix(1).uppercased()),
+                fallbackInitial: String(safeName.prefix(1).uppercased()),
                 accentColor: accentColor
             )
             .overlay(Circle().stroke(accentColor.opacity(0.5), lineWidth: 1.5))
 
             // Target info
             VStack(alignment: .leading, spacing: 4) {
-                Text(target.name)
+                Text(safeName)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
                 
@@ -1408,7 +1629,7 @@ struct RoastTargetListRow: View {
                     Image(systemName: "flame.fill")
                         .font(.system(size: 10))
                         .foregroundColor(accentColor)
-                    Text("\(target.jokeCount) roast\(target.jokeCount == 1 ? "" : "s")")
+                    Text("\(safeJokeCount) roast\(safeJokeCount == 1 ? "" : "s")")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
