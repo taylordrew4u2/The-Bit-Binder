@@ -26,53 +26,40 @@ struct AddBrainstormIdeaSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Background
-                (roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
-                    .ignoresSafeArea()
-
-                VStack(spacing: 16) {
+            Form {
+                Section {
                     ZStack(alignment: .topLeading) {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-                            .shadow(color: .black.opacity(0.07), radius: 6, y: 3)
-
                         if content.isEmpty {
                             Text(roastMode ? "What's the burn?" : "What's on your mind?")
-                                .font(.system(size: 17, design: .serif))
-                                .foregroundColor(roastMode ? .white.opacity(0.35) : AppTheme.Colors.textTertiary)
-                                .padding(16)
+                                .font(.body)
+                                .foregroundColor(Color(UIColor.tertiaryLabel))
+                                .padding(.top, 8)
+                                .padding(.leading, 4)
                         }
-
+                        
                         TextEditor(text: $content)
                             .scrollContentBackground(.hidden)
-                            .background(Color.clear)
-                            .font(.system(size: 17, design: .serif))
-                            .foregroundColor(roastMode ? .white.opacity(0.9) : AppTheme.Colors.inkBlack)
-                            .padding(12)
+                            .font(.body)
+                            .foregroundColor(.primary)
                             .frame(minHeight: 160)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-
-                    Spacer()
                 }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { saveIdea() }
-                        .fontWeight(.semibold)
-                        .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
-                        .disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
+             .toolbar {
+                 ToolbarItem(placement: .cancellationAction) {
+                     Button("Cancel") { dismiss() }
+                         .foregroundColor(roastMode ? .orange : .accentColor)
+                 }
+                 ToolbarItem(placement: .confirmationAction) {
+                     Button("Save") { saveIdea() }
+                         .fontWeight(.semibold)
+                         .foregroundColor(roastMode ? .orange : .accentColor)
+                         .disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                 }
+             }
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)

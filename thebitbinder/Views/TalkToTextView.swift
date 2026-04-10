@@ -15,6 +15,7 @@ struct TalkToTextView: View {
     @Environment(\.openURL) private var openURL
     
     let selectedFolder: JokeFolder?
+    let saveToBrainstorm: Bool
     
     @State private var transcribedText = ""
     @State private var isRecording = false
@@ -25,6 +26,11 @@ struct TalkToTextView: View {
     @State private var isSaving = false
     
     @StateObject private var speechRecognizer = SpeechRecognizer()
+    
+    init(selectedFolder: JokeFolder?, saveToBrainstorm: Bool = false) {
+        self.selectedFolder = selectedFolder
+        self.saveToBrainstorm = saveToBrainstorm
+    }
     
     enum PermissionStatus {
         case notDetermined
@@ -41,7 +47,7 @@ struct TalkToTextView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
-                // Header
+                // Header - Mic icon with animation
                 VStack(spacing: 12) {
                     ZStack {
                         Circle()
@@ -56,172 +62,159 @@ struct TalkToTextView: View {
                             .symbolEffect(.variableColor, isActive: isRecording)
                     }
                     
-                    Text(isRecording ? "Listening..." : "Talk-to-Text Joke")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                    Text(isRecording ? "Listening..." : "Ready")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .padding(.top, 20)
                     
-                    Text("Speak your joke and it will be saved to your jokes")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 20)
-                
-                // Live transcription area
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Transcription")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                        Spacer()
-                        if !transcribedText.isEmpty {
-                            Button("Clear") {
-                                transcribedText = ""
-                            }
-                            .font(.caption)
-                            .foregroundColor(.accentColor)
-                        }
-                    }
-                    
-                    ZStack(alignment: .topLeading) {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(UIColor.secondarySystemBackground))
-                        
-                        if transcribedText.isEmpty && !isRecording {
-                            Text("Your transcription will appear here...")
-                                .font(.body)
-                                .foregroundStyle(.tertiary)
-                                .padding(14)
-                        }
-                        
-                        ScrollView {
-                            Text(transcribedText)
-                                .font(.body)
-                                .padding(14)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    .frame(minHeight: 200)
-                }
-                .padding(.horizontal, 20)
-                
-                // Error message
-                if let error = errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .padding(.horizontal, 20)
-                }
-                
-                Spacer()
-                
-                // Controls
-                VStack(spacing: 16) {
-                    // Main record button
-                    Button {
-                        if isRecording {
-                            stopRecording()
-                        } else {
-                            startRecording()
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                                .font(.system(size: 20))
-                            Text(isRecording ? "Stop" : "Start Recording")
+                    // Live transcription area
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Transcription")
+                                .font(.subheadline)
                                 .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(isRecording ? Color.red : Color.accentColor)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-                    .disabled(permissionStatus == .denied)
-                    
-                    // Save button (only show when there's text and not recording)
-                    if !transcribedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isRecording {
-                        Button {
-                            saveJoke()
-                        } label: {
-                            HStack(spacing: 10) {
-                                if isSaving {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 20))
+                            Spacer()
+                            if !transcribedText.isEmpty {
+                                Button("Clear") {
+                                    transcribedText = ""
                                 }
-                                Text("Save Joke")
-                                    .fontWeight(.semibold)
+                                .font(.caption)
+                                .foregroundColor(.accentColor)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.green)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
-                        .disabled(isSaving)
+                        
+                        ZStack(alignment: .topLeading) {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(UIColor.secondarySystemBackground))
+                            
+                            if transcribedText.isEmpty && !isRecording {
+                                Text("Your transcription will appear here...")
+                                    .font(.body)
+                                    .foregroundStyle(.tertiary)
+                                    .padding(14)
+                            }
+                            
+                            ScrollView {
+                                Text(transcribedText)
+                                    .font(.body)
+                                    .padding(14)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .frame(minHeight: 200)
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Error message
+                    if let error = errorMessage {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 20)
+                    }
+                    
+                    Spacer()
+                    
+                    // Controls
+                    VStack(spacing: 16) {
+                        // Main record button
+                        Button {
+                            if isRecording {
+                                stopRecording()
+                            } else {
+                                startRecording()
+                            }
+                        } label: {
+                            Label(isRecording ? "Stop" : "Start Recording",
+                                  systemImage: isRecording ? "stop.fill" : "mic.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(isRecording ? .red : .accentColor)
+                        .controlSize(.large)
+                        .disabled(permissionStatus == .denied)
+                        
+                        // Save button (only show when there's text and not recording)
+                        if !transcribedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isRecording {
+                            Button {
+                                saveItem()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    if isSaving {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Image(systemName: "checkmark.circle.fill")
+                                    }
+                                    Text(saveToBrainstorm ? "Save Idea" : "Save Joke")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(saveToBrainstorm ? .orange : .green)
+                            .controlSize(.large)
+                            .disabled(isSaving)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 30)
+                }
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            if isRecording {
+                                stopRecording()
+                            }
+                            dismiss()
+                        }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 30)
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        if isRecording {
-                            stopRecording()
+                .onAppear {
+                    checkPermissions()
+                }
+                .onDisappear {
+                    // Ensure audio pipeline is fully torn down when leaving this view
+                    if isRecording {
+                        isRecording = false
+                    }
+                    speechRecognizer.stopTranscribing()
+                }
+                .alert("Permissions Required", isPresented: $showingPermissionAlert) {
+                    Button("Open Settings") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            openURL(url)
                         }
+                    }
+                    Button("Cancel", role: .cancel) {
                         dismiss()
                     }
+                } message: {
+                    Text("Microphone and Speech Recognition permissions are required for Talk-to-Text Joke. Please enable them in Settings.")
                 }
-            }
-            .onAppear {
-                checkPermissions()
-            }
-            .onDisappear {
-                // Ensure audio pipeline is fully torn down when leaving this view
-                if isRecording {
-                    isRecording = false
+                .onChange(of: speechRecognizer.transcribedText) { _, newValue in
+                    transcribedText = newValue
                 }
-                speechRecognizer.stopTranscribing()
-            }
-            .alert("Permissions Required", isPresented: $showingPermissionAlert) {
-                Button("Open Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        openURL(url)
+                .onChange(of: speechRecognizer.error) { _, newValue in
+                    errorMessage = newValue
+                }
+                .overlay {
+                    if showSavedConfirmation {
+                        VStack(spacing: 12) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 48))
+                                .foregroundColor(saveToBrainstorm ? .orange : .green)
+                            Text(saveToBrainstorm ? "Idea Saved!" : "Joke Saved!")
+                                .font(.headline)
+                        }
+                        .padding(30)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .transition(.scale.combined(with: .opacity))
                     }
                 }
-                Button("Cancel", role: .cancel) {
-                    dismiss()
-                }
-            } message: {
-                Text("Microphone and Speech Recognition permissions are required for Talk-to-Text Joke. Please enable them in Settings.")
+                .animation(.easeInOut(duration: 0.3), value: showSavedConfirmation)
             }
-            .onChange(of: speechRecognizer.transcribedText) { _, newValue in
-                transcribedText = newValue
-            }
-            .onChange(of: speechRecognizer.error) { _, newValue in
-                errorMessage = newValue
-            }
-            .overlay {
-                if showSavedConfirmation {
-                    VStack(spacing: 12) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 48))
-                            .foregroundColor(.green)
-                        Text("Joke Saved!")
-                            .font(.headline)
-                    }
-                    .padding(30)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .transition(.scale.combined(with: .opacity))
-                }
-            }
-            .animation(.easeInOut(duration: 0.3), value: showSavedConfirmation)
         }
     }
     
@@ -332,6 +325,55 @@ struct TalkToTextView: View {
     private func stopRecording() {
         isRecording = false
         speechRecognizer.stopTranscribing()
+    }
+    
+    private func saveItem() {
+        if saveToBrainstorm {
+            saveBrainstormIdea()
+        } else {
+            saveJoke()
+        }
+    }
+    
+    private func saveBrainstormIdea() {
+        let text = transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            errorMessage = "Cannot save an empty idea."
+            return
+        }
+        
+        isSaving = true
+        errorMessage = nil
+        
+        // Create the brainstorm idea
+        let idea = BrainstormIdea(
+            content: text,
+            colorHex: BrainstormIdea.randomColor(),
+            isVoiceNote: true
+        )
+        
+        modelContext.insert(idea)
+        
+        do {
+            try modelContext.save()
+            #if DEBUG
+            print(" [TalkToTextView] Brainstorm idea saved — id: \(idea.id)")
+            #endif
+            
+            isSaving = false
+            showSavedConfirmation = true
+            
+            // Brief confirmation then dismiss
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                dismiss()
+            }
+        } catch {
+            isSaving = false
+            #if DEBUG
+            print(" [TalkToTextView] Failed to save brainstorm idea: \(error)")
+            #endif
+            errorMessage = "Could not save idea: \(error.localizedDescription)"
+        }
     }
     
     private func saveJoke() {
@@ -634,5 +676,5 @@ class SpeechRecognizer: ObservableObject {
 }
 
 #Preview {
-    TalkToTextView(selectedFolder: nil)
+    TalkToTextView(selectedFolder: nil, saveToBrainstorm: false)
 }

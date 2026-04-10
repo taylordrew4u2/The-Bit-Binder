@@ -15,6 +15,7 @@ struct SetListsView: View {
     
     @State private var showingCreateSetList = false
     @State private var showingTrash = false
+    @State private var showingRecording = false
     @State private var searchText = ""
     @State private var persistenceError: String?
     @State private var showingPersistenceError = false
@@ -32,9 +33,9 @@ struct SetListsView: View {
             if filteredSetLists.isEmpty && searchText.isEmpty {
                 BitBinderEmptyState(
                     icon: "list.bullet.rectangle.portrait",
-                    title: roastMode ? "No Roast Sets Yet" : "No Set Lists Yet",
-                    subtitle: "Create a set list to organize jokes for your performances",
-                    actionTitle: "Create Set List",
+                    title: roastMode ? "No Roast Sets Yet" : "No Sets Yet",
+                    subtitle: "Create a set to organize jokes for your performances",
+                    actionTitle: "Create Set",
                     action: { showingCreateSetList = true },
                     roastMode: roastMode
                 )
@@ -53,33 +54,33 @@ struct SetListsView: View {
         .navigationDestination(for: SetList.self) { setList in
             SetListDetailView(setList: setList)
         }
-        .searchable(text: $searchText, prompt: roastMode ? "Search roast sets" : "Search set lists")
+        .searchable(text: $searchText, prompt: roastMode ? "Search roast sets" : "Search sets")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button {
-                        showingCreateSetList = true
-                    } label: {
-                        Label("New Set List", systemImage: "plus")
-                    }
-                    
-                    Divider()
-                    
-                    Button {
-                        showingTrash = true
-                    } label: {
-                        Label("Trash", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-            }
-            
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     showingCreateSetList = true
                 } label: {
                     Image(systemName: "plus")
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button {
+                        showingRecording = true
+                    } label: {
+                        Label("Record Performance", systemImage: "record.circle")
+                    }
+                    
+                    Section {
+                        Button {
+                            showingTrash = true
+                        } label: {
+                            Label("Trash", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -88,6 +89,9 @@ struct SetListsView: View {
         }
         .sheet(isPresented: $showingCreateSetList) {
             CreateSetListView()
+        }
+        .sheet(isPresented: $showingRecording) {
+            StandaloneRecordingView()
         }
         .alert("Error", isPresented: $showingPersistenceError) {
             Button("OK", role: .cancel) {}
@@ -142,7 +146,7 @@ struct SetListRowView: View {
             
             Text(setList.dateModified.formatted(.dateTime.month(.abbreviated).day()))
                 .font(.caption)
-                .foregroundColor(NativeTheme.Colors.textTertiary)
+                .foregroundColor(Color(UIColor.tertiaryLabel))
         }
         .padding(.vertical, 4)
     }
@@ -151,7 +155,7 @@ struct SetListRowView: View {
 #Preview {
     NavigationStack {
         SetListsView()
-            .navigationTitle("Set Lists")
+            .navigationTitle("Sets")
     }
     .modelContainer(for: SetList.self, inMemory: true)
 }

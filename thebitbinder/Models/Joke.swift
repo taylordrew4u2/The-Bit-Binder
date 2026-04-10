@@ -39,7 +39,9 @@ final class Joke: Identifiable {
     var deletedDate: Date?
     
     // Smart categorization fields - stored as strings to avoid SwiftData array issues
-    @Attribute(.ephemeral) var categorizationResults: [CategoryMatch] = []
+    @Transient var categorizationResults: [CategoryMatch] = []
+    private var categorizationResultsData: Data?
+
     var primaryCategory: String?
     
     // Store as comma-separated string internally
@@ -131,6 +133,23 @@ final class Joke: Identifiable {
         }
     }
     
+    func loadCategorizationResults() {
+        guard let data = categorizationResultsData else { return }
+        do {
+            categorizationResults = try JSONDecoder().decode([CategoryMatch].self, from: data)
+        } catch {
+            print("Failed to decode categorization results: \(error)")
+        }
+    }
+
+    func saveCategorizationResults() {
+        do {
+            categorizationResultsData = try JSONEncoder().encode(categorizationResults)
+        } catch {
+            print("Failed to encode categorization results: \(error)")
+        }
+    }
+
     init(content: String, title: String = "", folder: JokeFolder? = nil) {
         self.id = UUID()
         self.content = content
@@ -144,6 +163,8 @@ final class Joke: Identifiable {
         // New jokes start active (not in trash)
         self.isDeleted = false
         self.deletedDate = nil
+        
+        loadCategorizationResults()
     }
     
     /// Recalculates and stores the word count. Call after editing `content`.

@@ -33,72 +33,6 @@ struct BitBinderEmptyState: View {
     }
 }
 
-// MARK: - Chip Component
-
-struct BitBinderChip: View {
-    let text: String
-    var icon: String? = nil
-    var isSelected: Bool = false
-    var style: ChipVariant = .filter
-    var roastMode: Bool = false
-    var action: (() -> Void)? = nil
-    
-    enum ChipVariant {
-        case filter, tag, status
-    }
-    
-    var body: some View {
-        Group {
-            if let action = action {
-                Button(action: action) {
-                    chipContent
-                }
-                .buttonStyle(.plain)
-            } else {
-                chipContent
-            }
-        }
-    }
-    
-    private var chipContent: some View {
-        HStack(spacing: 4) {
-            if let icon = icon, isSelected || style != .filter {
-                Image(systemName: icon)
-                    .font(.caption.weight(.semibold))
-            }
-            Text(text)
-                .font(style == .tag ? .caption : .subheadline)
-                .fontWeight(isSelected ? .semibold : .regular)
-        }
-        .foregroundColor(foregroundColor)
-        .padding(.horizontal, style == .tag ? 8 : 14)
-        .padding(.vertical, style == .tag ? 4 : 8)
-        .background(backgroundColor, in: Capsule())
-    }
-    
-    private var backgroundColor: Color {
-        if isSelected {
-            return roastMode ? .orange : .accentColor
-        }
-        switch style {
-        case .filter: return NativeTheme.Colors.fillSecondary
-        case .tag: return Color.accentColor.opacity(0.12)
-        case .status: return Color.green.opacity(0.12)
-        }
-    }
-    
-    private var foregroundColor: Color {
-        if isSelected {
-            return .white
-        }
-        switch style {
-        case .filter: return .primary
-        case .tag: return .accentColor
-        case .status: return .green
-        }
-    }
-}
-
 // MARK: - Badge Component
 
 struct BitBinderBadge: View {
@@ -113,7 +47,7 @@ struct BitBinderBadge: View {
         
         var backgroundColor: Color {
             switch self {
-            case .neutral: return NativeTheme.Colors.fillSecondary
+            case .neutral: return Color(UIColor.secondarySystemBackground)
             case .success: return Color.green.opacity(0.12)
             case .warning: return Color.orange.opacity(0.12)
             case .error: return Color.red.opacity(0.12)
@@ -158,71 +92,6 @@ struct BitBinderBadge: View {
         .padding(.horizontal, size == .small ? 6 : 8)
         .padding(.vertical, size == .small ? 3 : 4)
         .background(variant.backgroundColor, in: Capsule())
-    }
-}
-
-// MARK: - Card Container
-
-struct BitBinderCard<Content: View>: View {
-    var roastMode: Bool = false
-    @ViewBuilder let content: Content
-    
-    var body: some View {
-        content
-            .background(NativeTheme.Colors.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-}
-
-// MARK: - Section Header
-
-struct BitBinderSectionHeader: View {
-    let title: String
-    var subtitle: String? = nil
-    var trailing: AnyView? = nil
-    var roastMode: Bool = false
-    
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title.uppercased())
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-                
-                if let subtitle = subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(NativeTheme.Colors.textTertiary)
-                }
-            }
-            
-            Spacer()
-            
-            if let trailing = trailing {
-                trailing
-            }
-        }
-    }
-}
-
-// MARK: - Hit Star Badge
-
-struct HitStarBadge: View {
-    var size: CGFloat = 16
-    var showBackground: Bool = true
-    var roastMode: Bool = false
-    
-    var body: some View {
-        Image(systemName: roastMode ? "flame.fill" : "star.fill")
-            .font(.system(size: size * 0.7))
-            .foregroundColor(roastMode ? .orange : .yellow)
-            .padding(showBackground ? 2 : 0)
-            .background(
-                showBackground
-                    ? AnyShapeStyle(Color.yellow.opacity(0.15))
-                    : AnyShapeStyle(Color.clear)
-            )
-            .clipShape(Circle())
     }
 }
 
@@ -297,22 +166,6 @@ extension View {
     )
 }
 
-#Preview("Chips") {
-    VStack(spacing: 16) {
-        HStack {
-            BitBinderChip(text: "All", isSelected: true, style: .filter, action: {})
-            BitBinderChip(text: "Recent", isSelected: false, style: .filter, action: {})
-            BitBinderChip(text: "Work", isSelected: false, style: .filter, action: {})
-        }
-        
-        HStack {
-            BitBinderChip(text: "dating", icon: "tag.fill", style: .tag)
-            BitBinderChip(text: "work", icon: "tag.fill", style: .tag)
-        }
-    }
-    .padding()
-}
-
 #Preview("Badges") {
     VStack(spacing: 12) {
         HStack {
@@ -321,7 +174,6 @@ extension View {
             BitBinderBadge(text: "Error", icon: "xmark.circle.fill", variant: .error)
         }
         HStack {
-            HitStarBadge()
             ConfidenceBadge(level: .high)
             ConfidenceBadge(level: .medium)
             ConfidenceBadge(level: .low)

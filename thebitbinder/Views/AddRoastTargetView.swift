@@ -25,7 +25,7 @@ struct AddRoastTargetView: View {
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
 
-    private let accentColor = AppTheme.Colors.roastAccent
+    private let accentColor: Color = .orange
 
     var body: some View {
         NavigationStack {
@@ -146,7 +146,7 @@ struct AddRoastTargetView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(AppTheme.Colors.roastBackground)
+            .background(Color(UIColor.systemBackground))
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: true)
@@ -258,7 +258,7 @@ struct GuidedRoastTargetSheet: View {
     @State private var promptIndex = 0
     @State private var displayedPrompt = ""
     
-    private let accentColor = AppTheme.Colors.roastAccent
+    private let accentColor: Color = .orange
     
     private let traitPrompts = [
         "What's their job or what do they do?",
@@ -307,17 +307,17 @@ struct GuidedRoastTargetSheet: View {
                         HStack(alignment: .top, spacing: 10) {
                             ZStack {
                                 Circle()
-                                    .fill(AppTheme.Colors.roastCard)
+                                    .fill(Color(UIColor.tertiarySystemBackground))
                                     .frame(width: 36, height: 36)
                                 Text("")
                                     .font(.system(size: 18))
                             }
                             
                             Text(displayedPrompt)
-                                .font(.system(size: 16, design: .serif))
-                                .foregroundColor(.white.opacity(0.9))
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
                                 .padding(12)
-                                .background(AppTheme.Colors.roastCard)
+                                .background(Color(UIColor.tertiarySystemBackground))
                                 .cornerRadius(16)
                                 .cornerRadius(4, corners: [.topRight, .bottomLeft, .bottomRight])
                         }
@@ -419,7 +419,7 @@ struct GuidedRoastTargetSheet: View {
                                 }
                             }
                             .padding()
-                            .background(AppTheme.Colors.roastCard)
+                            .background(Color(UIColor.tertiarySystemBackground))
                             .cornerRadius(12)
                             
                             Button {
@@ -443,7 +443,7 @@ struct GuidedRoastTargetSheet: View {
                     .padding(.bottom, 32)
                 }
             }
-            .background(AppTheme.Colors.roastBackground)
+            .background(Color(UIColor.systemBackground))
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -469,11 +469,11 @@ struct GuidedRoastTargetSheet: View {
                     .foregroundColor(.white.opacity(0.5))
             }
             TextField(placeholder, text: text)
-                .font(.system(size: 17, design: .serif))
+                .font(.body)
                 .padding(14)
-                .background(AppTheme.Colors.roastCard)
+                .background(Color(UIColor.tertiarySystemBackground))
                 .cornerRadius(12)
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
         }
     }
     

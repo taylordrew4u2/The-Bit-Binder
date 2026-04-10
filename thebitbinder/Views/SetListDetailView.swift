@@ -1,4 +1,3 @@
-
 //  SetListDetailView.swift
 //  thebitbinder
 //
@@ -55,72 +54,65 @@ struct SetListDetailView: View {
                 quickPerformBanner
             }
             
-            // Inline recording header
-            VStack(spacing: 12) {
-                HStack {
-                    if audioService.isRecording {
-                        Circle().fill(AppTheme.Colors.recordingsAccent).frame(width: 12, height: 12)
-                            .opacity(0.8)
-                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
-                        Text("Recording").font(.headline).foregroundColor(AppTheme.Colors.recordingsAccent)
-                        Spacer()
-                        Text(timeString(from: recordingDuration))
-                            .font(.system(.title3, design: .monospaced))
-                            .foregroundColor(.primary)
-                    } else {
-                        Text("Ready to record").font(.headline)
-                        Spacer()
-                    }
-                }
-                
-                HStack(spacing: 24) {
-                    if !audioService.isRecording {
-                        Button(action: startRecording) {
-                            Label("Start Recording", systemImage: "record.circle.fill")
-                                .labelStyle(.iconOnly)
-                                .font(.system(size: 44))
-                                .foregroundColor(AppTheme.Colors.recordingsAccent)
-                        }
-                        .accessibilityLabel("Start Recording")
-                    } else {
-                        Button(action: pauseResumeRecording) {
-                            Image(systemName: audioService.isPaused ? "play.circle.fill" : "pause.circle.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor(AppTheme.Colors.primaryAction)
-                        }
-                        .accessibilityLabel(audioService.isPaused ? "Resume" : "Pause")
-                        
-                        Button(action: stopRecording) {
-                            Image(systemName: "stop.circle.fill")
-                                .font(.system(size: 40))
-                                .foregroundColor(AppTheme.Colors.recordingsAccent)
-                        }
-                        .accessibilityLabel("Stop Recording")
-                    }
-                }
-            }
+             // Inline recording header
+             VStack(spacing: 12) {
+                 HStack {
+                     if audioService.isRecording {
+                         Circle().fill(Color.red).frame(width: 12, height: 12)
+                             .opacity(0.8)
+                             .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
+                         Text("Recording").font(.headline).foregroundColor(.red)
+                         Spacer()
+                         Text(timeString(from: recordingDuration))
+                             .font(.system(.title3, design: .monospaced))
+                             .foregroundColor(.primary)
+                     } else {
+                         Text("Ready to record").font(.headline)
+                         Spacer()
+                     }
+                 }
+                 
+                 HStack(spacing: 24) {
+                     if !audioService.isRecording {
+                         Button(action: startRecording) {
+                             Label("Start Recording", systemImage: "record.circle.fill")
+                                 .labelStyle(.iconOnly)
+                                 .font(.system(size: 44))
+                                 .foregroundColor(.red)
+                         }
+                         .accessibilityLabel("Start Recording")
+                     } else {
+                         Button(action: pauseResumeRecording) {
+                             Image(systemName: audioService.isPaused ? "play.circle.fill" : "pause.circle.fill")
+                                 .font(.system(size: 40))
+                                 .foregroundColor(.accentColor)
+                         }
+                         .accessibilityLabel(audioService.isPaused ? "Resume" : "Pause")
+                         
+                         Button(action: stopRecording) {
+                             Image(systemName: "stop.circle.fill")
+                                 .font(.system(size: 40))
+                                 .foregroundColor(.red)
+                         }
+                         .accessibilityLabel("Stop Recording")
+                     }
+                 }
+             }
             .padding()
             .background(Color(.systemGray6))
             
             if roastMode {
                 // Roast mode: show roast jokes
                 if setListRoastJokes.isEmpty {
-                    VStack(spacing: 20) {
-                        Image(systemName: "flame")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        Text("No roast jokes in this set")
-                            .font(.title3)
-                            .foregroundColor(.gray)
-                        Button(action: { showingAddJokes = true }) {
-                            Label("Add Roast Jokes", systemImage: "plus")
-                                .padding()
-                                .background(AppTheme.Colors.roastAccent)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
+                    ContentUnavailableView {
+                        Label("No Roast Jokes", systemImage: "flame")
+                    } description: {
+                        Text("Add roast jokes to build your set.")
+                    } actions: {
+                        Button("Add Roast Jokes") { showingAddJokes = true }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.orange)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
                         ForEach(setListRoastJokes) { joke in
@@ -134,22 +126,14 @@ struct SetListDetailView: View {
             } else {
                 // Regular mode: show regular jokes
                 if setListJokes.isEmpty {
-                    VStack(spacing: 20) {
-                        Image(systemName: "text.bubble")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        Text("No jokes in this set list")
-                            .font(.title3)
-                            .foregroundColor(.gray)
-                        Button(action: { showingAddJokes = true }) {
-                            Label("Add Jokes", systemImage: "plus")
-                                .padding()
-                                .background(AppTheme.Colors.primaryAction)
-                                .foregroundColor(.white)
-                                .cornerRadius(AppTheme.Radius.medium)
-                        }
+                    ContentUnavailableView {
+                        Label("No Jokes Yet", systemImage: "text.quote")
+                    } description: {
+                        Text("Add jokes to build your set list.")
+                    } actions: {
+                        Button("Add Jokes") { showingAddJokes = true }
+                            .buttonStyle(.borderedProminent)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
                         ForEach(setListJokes) { joke in
@@ -316,7 +300,7 @@ struct SetListDetailView: View {
         do {
             try modelContext.save()
             #if DEBUG
-            print(" Recording saved successfully: \(recording.title)")
+            print("Recording saved successfully: \(recording.title)")
             #endif
         } catch {
             #if DEBUG
@@ -332,6 +316,13 @@ struct SetListDetailView: View {
     private func moveJokes(from source: IndexSet, to destination: Int) {
         setList.jokeIDs.move(fromOffsets: source, toOffset: destination)
         setList.dateModified = Date()
+        do {
+            try modelContext.save()
+        } catch {
+            #if DEBUG
+            print("⚠️ [SetListDetailView] Failed to save joke move: \(error)")
+            #endif
+        }
     }
     
     private func deleteJokes(at offsets: IndexSet) {
@@ -341,43 +332,57 @@ struct SetListDetailView: View {
             }
         }
         setList.dateModified = Date()
+        do {
+            try modelContext.save()
+        } catch {
+            #if DEBUG
+            print("⚠️ [SetListDetailView] Failed to save joke deletion: \(error)")
+            #endif
+        }
     }
     
     // MARK: - Roast Joke Helpers
     
     @ViewBuilder
     private func roastJokeRow(_ joke: RoastJoke) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "flame.fill")
-                .font(.system(size: 14))
-                .foregroundColor(AppTheme.Colors.roastAccent)
-                .padding(.top, 3)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                if showFullContent {
-                    Text(joke.content)
-                        .font(.system(size: 15))
-                        .foregroundColor(.primary)
-                } else {
-                    Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                }
-                
-                if let targetName = joke.target?.name {
-                    Text("for \(targetName)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppTheme.Colors.roastAccent.opacity(0.8))
-                }
-            }
-        }
+            HStack(alignment: .top, spacing: 12) {
+                 Image(systemName: "flame.fill")
+                     .font(.system(size: 14))
+                     .foregroundColor(.orange)
+                     .padding(.top, 3)
+                 
+                 VStack(alignment: .leading, spacing: 4) {
+                     if showFullContent {
+                         Text(joke.content)
+                             .font(.system(size: 15))
+                             .foregroundColor(.primary)
+                     } else {
+                         Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
+                             .font(.system(size: 15, weight: .medium))
+                             .foregroundColor(.primary)
+                             .lineLimit(1)
+                     }
+                     
+                     if let targetName = joke.target?.name {
+                         Text("for \(targetName)")
+                             .font(.system(size: 12, weight: .medium))
+                             .foregroundColor(.orange.opacity(0.8))
+                     }
+                 }
+             }
         .padding(.vertical, 4)
     }
     
     private func moveRoastJokes(from source: IndexSet, to destination: Int) {
         setList.roastJokeIDs.move(fromOffsets: source, toOffset: destination)
         setList.dateModified = Date()
+        do {
+            try modelContext.save()
+        } catch {
+            #if DEBUG
+            print("⚠️ [SetListDetailView] Failed to save roast joke move: \(error)")
+            #endif
+        }
     }
     
     private func deleteRoastJokes(at offsets: IndexSet) {
@@ -387,6 +392,13 @@ struct SetListDetailView: View {
             }
         }
         setList.dateModified = Date()
+        do {
+            try modelContext.save()
+        } catch {
+            #if DEBUG
+            print("⚠️ [SetListDetailView] Failed to save roast joke deletion: \(error)")
+            #endif
+        }
     }
     
     private func timeString(from duration: TimeInterval) -> String {
@@ -442,13 +454,7 @@ struct SetListDetailView: View {
             }
         }
         .padding()
-        .background(
-            LinearGradient(
-                colors: [Color.green, Color.green.opacity(0.8)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
+        .background(Color.green)
     }
     
     // MARK: - Quick Perform Banner (for unfinalized sets)
@@ -494,13 +500,7 @@ struct SetListDetailView: View {
             }
         }
         .padding()
-        .background(
-            LinearGradient(
-                colors: [Color.blue, Color.blue.opacity(0.8)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
+        .background(Color.blue)
     }
     
     private func unfinalizeSet() {

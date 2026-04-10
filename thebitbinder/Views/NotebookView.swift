@@ -11,9 +11,19 @@ extension FileManager {
     }
 }
 
+// MARK: - Folder Filter
+
+/// Which subset of photos to display.
+private enum NotebookFilter: Equatable, Hashable {
+    case all
+    case unfiled
+    case folder(UUID)
+}
+
 struct NotebookView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<NotebookPhotoRecord> { !$0.isDeleted }) private var photos: [NotebookPhotoRecord]
+    @Query(filter: #Predicate<NotebookPhotoRecord> { !$0.isDeleted }, sort: \NotebookPhotoRecord.sortOrder) private var allPhotos: [NotebookPhotoRecord]
+    @Query(filter: #Predicate<NotebookFolder> { !$0.isDeleted }, sort: \NotebookFolder.sortOrder) private var folders: [NotebookFolder]
     @AppStorage("roastModeEnabled") private var roastMode = false
 
     @State private var showingDetail: NotebookPhotoRecord?
@@ -27,6 +37,35 @@ struct NotebookView: View {
     @State private var showingPDFPicker = false
     @State private var isImportingPDF = false
     @State private var pdfImportProgress: String = ""
+    @State private var draggingPhoto: NotebookPhotoRecord?
+
+    // Folder state
+    @State private var selectedFilter: NotebookFilter = .all
+    @State private var showingCreateFolder = false
+    @State private var showingMoveSheet = false
+    @State private var photoToMove: NotebookPhotoRecord?
+    @State private var showingRenameFolder = false
+    @State private var folderToRename: NotebookFolder?
+    @State private var showingDeleteFolderAlert = false
+    @State private var folderToDelete: NotebookFolder?
+
+    /// Photos that match the current filter.
+    private var filteredPhotos: [NotebookPhotoRecord] {
+        switch selectedFilter {
+        case .all:
+            return allPhotos
+        case .unfiled:
+            return allPhotos.filter { $0.folder == nil }
+        case .folder(let id):
+            return allPhotos.filter { $0.folder?.id == id }
+        }
+    }
+
+    /// The currently-selected folder object (if any).
+    private var selectedFolder: NotebookFolder? {
+        guard case .folder(let id) = selectedFilter else { return nil }
+        return folders.first { $0.id == id }
+    }
     
     private func delete(_ photo: NotebookPhotoRecord) {
         // Soft-delete: imageData kept until permanently purged from NotebookTrashView
@@ -40,34 +79,67 @@ struct NotebookView: View {
         }
     }
     
+    private func move(from source: NotebookPhotoRecord, to destination: NotebookPhotoRecord) {
+        guard source.id != destination.id else { return }
+        
+        var orderedPhotos = filteredPhotos
+        guard let sourceIndex = orderedPhotos.firstIndex(where: { $0.id == source.id }),
+              let destIndex = orderedPhotos.firstIndex(where: { $0.id == destination.id }) else { return }
+        
+        // Move the item
+        let movedItem = orderedPhotos.remove(at: sourceIndex)
+        orderedPhotos.insert(movedItem, at: destIndex)
+        
+        // Update sort orders
+        for (index, photo) in orderedPhotos.enumerated() {
+            photo.sortOrder = index
+        }
+        
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [NotebookView] Failed to save reorder: \(error)")
+        }
+    }
+    
     let columns = [GridItem(.adaptive(minimum: 100), spacing: 16)]
     
     var body: some View {
-        Group {
-            if photos.isEmpty {
-                BitBinderEmptyState(
-                    icon: "book.fill",
-                    title: roastMode ? "No Fire Notebook Pages" : "No Pages Saved Yet",
-                    subtitle: "Take photos of your physical notebook pages or import PDFs to back them up",
-                    roastMode: roastMode,
-                    iconGradient: LinearGradient(
-                        colors: [AppTheme.Colors.notebookAccent, AppTheme.Colors.notebookAccent.opacity(0.7)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(photos, id: \.id) { photo in
-                            NotebookThumbnailCell(photo: photo) {
-                                showingDetail = photo
-                            } onDelete: {
-                                delete(photo)
+        VStack(spacing: 0) {
+            // MARK: - Folder Filter Bar
+            if !folders.isEmpty {
+                folderBar
+            }
+
+            // MARK: - Photo Grid
+            Group {
+                if filteredPhotos.isEmpty {
+                    emptyStateView
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 16) {
+                            ForEach(filteredPhotos, id: \.id) { photo in
+                                NotebookThumbnailCell(photo: photo, isDragging: draggingPhoto?.id == photo.id) {
+                                    showingDetail = photo
+                                } onDelete: {
+                                    delete(photo)
+                                } onMove: {
+                                    photoToMove = photo
+                                    showingMoveSheet = true
+                                }
+                                .onDrag {
+                                    draggingPhoto = photo
+                                    return NSItemProvider(object: photo.id.uuidString as NSString)
+                                }
+                                .onDrop(of: [.text], delegate: NotebookDropDelegate(
+                                    item: photo,
+                                    draggingItem: $draggingPhoto,
+                                    onMove: move
+                                ))
                             }
                         }
+                        .padding()
                     }
-                    .padding()
                 }
             }
         }
@@ -90,34 +162,48 @@ struct NotebookView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    Button { showingCamera = true } label: {
+                        Label("Take Photo", systemImage: "camera")
+                    }
+                    PhotosPicker(selection: $pickedPhotoItem,
+                                 matching: .images,
+                                 photoLibrary: .shared()) {
+                        Label("Choose from Library", systemImage: "photo.on.rectangle")
+                    }
+                    Button { showingPDFPicker = true } label: {
+                        Label("Import PDF", systemImage: "doc.fill")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button { showingCreateFolder = true } label: {
+                        Label("New Folder", systemImage: "folder.badge.plus")
+                    }
+
+                    if let folder = selectedFolder {
+                        Button { folderToRename = folder; showingRenameFolder = true } label: {
+                            Label("Rename Folder", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            folderToDelete = folder
+                            showingDeleteFolderAlert = true
+                        } label: {
+                            Label("Delete Folder", systemImage: "folder.badge.minus")
+                        }
+                    }
+
+                    Divider()
+
                     Button { showingTrash = true } label: {
                         Label("Trash", systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.notebookAccent)
-                }
-            }
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Menu {
-                    Button { showingPDFPicker = true } label: {
-                        Label("Import PDF", systemImage: "doc.fill")
-                    }
-                } label: {
-                    Label("Import PDF", systemImage: "doc.badge.plus")
-                }
-                
-                PhotosPicker(selection: $pickedPhotoItem,
-                             matching: .images,
-                             photoLibrary: .shared()) {
-                    Label("Add Photo", systemImage: "photo.on.rectangle")
-                }
-                Button {
-                    showingCamera = true
-                } label: {
-                    Label("Camera", systemImage: "camera")
                 }
             }
         }
@@ -155,6 +241,30 @@ struct NotebookView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingCreateFolder) {
+            CreateNotebookFolderSheet()
+        }
+        .sheet(isPresented: $showingRenameFolder) {
+            if let folder = folderToRename {
+                RenameNotebookFolderSheet(folder: folder)
+            }
+        }
+        .sheet(isPresented: $showingMoveSheet) {
+            if let photo = photoToMove {
+                MoveToNotebookFolderSheet(photo: photo)
+            }
+        }
+        .alert("Delete Folder?", isPresented: $showingDeleteFolderAlert) {
+            Button("Cancel", role: .cancel) { folderToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let folder = folderToDelete {
+                    deleteFolder(folder)
+                    folderToDelete = nil
+                }
+            }
+        } message: {
+            Text("The folder will be deleted but your photos will be kept as unfiled pages.")
+        }
         .onDisappear {
             // Memory cleanup handled by MemoryManager
         }
@@ -164,14 +274,134 @@ struct NotebookView: View {
             Text(persistenceError ?? "An unknown error occurred")
         }
     }
+
+    // MARK: - Folder Bar
+
+    private var folderBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // "All" chip
+                folderChip(label: "All", icon: "photo.on.rectangle.angled", isSelected: selectedFilter == .all) {
+                    selectedFilter = .all
+                }
+
+                // "Unfiled" chip
+                let unfiledCount = allPhotos.filter { $0.folder == nil }.count
+                folderChip(label: "Unfiled", icon: "tray", count: unfiledCount, isSelected: selectedFilter == .unfiled) {
+                    selectedFilter = .unfiled
+                }
+
+                // Each folder
+                ForEach(folders) { folder in
+                    folderChip(
+                        label: folder.name,
+                        icon: "folder.fill",
+                        count: folder.activePhotoCount,
+                        isSelected: selectedFilter == .folder(folder.id)
+                    ) {
+                        selectedFilter = .folder(folder.id)
+                    }
+                    .contextMenu {
+                        Button { folderToRename = folder; showingRenameFolder = true } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            folderToDelete = folder
+                            showingDeleteFolderAlert = true
+                        } label: {
+                            Label("Delete Folder", systemImage: "folder.badge.minus")
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+        }
+        .background(Color(UIColor.systemGroupedBackground))
+    }
+
+    private func folderChip(label: String, icon: String, count: Int? = nil, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                Text(label)
+                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                    .lineLimit(1)
+                if let count {
+                    Text("\(count)")
+                        .font(.caption2)
+                        .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                Capsule()
+                    .fill(isSelected
+                          ? (roastMode ? Color.orange : Color.accentColor)
+                          : Color(UIColor.secondarySystemGroupedBackground))
+            )
+            .foregroundColor(isSelected ? .white : .primary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Empty State
+
+    @ViewBuilder
+    private var emptyStateView: some View {
+        switch selectedFilter {
+        case .all:
+            BitBinderEmptyState(
+                icon: "book.fill",
+                title: roastMode ? "No Notebook Pages" : "No Pages Saved Yet",
+                subtitle: "Take photos of your physical notebook pages or import PDFs to back them up",
+                roastMode: roastMode
+            )
+        case .unfiled:
+            BitBinderEmptyState(
+                icon: "tray",
+                title: "No Unfiled Pages",
+                subtitle: "All your pages are organized into folders",
+                roastMode: roastMode
+            )
+        case .folder:
+            BitBinderEmptyState(
+                icon: "folder",
+                title: "Empty Folder",
+                subtitle: "Move pages here from All or another folder",
+                roastMode: roastMode
+            )
+        }
+    }
+
+    // MARK: - Folder Actions
+
+    private func deleteFolder(_ folder: NotebookFolder) {
+        // Nullify rule handles un-assigning photos automatically.
+        // Move the folder itself to trash (soft-delete).
+        folder.moveToTrash()
+        // Reset filter if this folder was selected
+        if case .folder(let id) = selectedFilter, id == folder.id {
+            selectedFilter = .all
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [NotebookView] Failed to delete folder: \(error)")
+            persistenceError = "Could not delete folder: \(error.localizedDescription)"
+            showingPersistenceError = true
+        }
+    }
+
+    // MARK: - Import Helpers
     
     private func importPhoto(from item: PhotosPickerItem) async {
         do {
             guard let rawData = try await item.loadTransferable(type: Data.self) else { return }
 
             // Downscale to max 1500 px long edge then compress.
-            // rawData + UIImage + full-res jpegData can be 10–30 MB simultaneously;
-            // the autoreleasepool frees them before we hit MainActor.
             guard let jpegData: Data = autoreleasepool(invoking: {
                 guard let uiImage = UIImage(data: rawData) else { return nil }
                 let scaled = NotebookView.downscaleForStorage(uiImage, maxLongEdge: 1500)
@@ -179,6 +409,10 @@ struct NotebookView: View {
             }) else { return }
 
             let newPhoto = NotebookPhotoRecord(notes: "", imageData: jpegData)
+            // Assign to current folder if viewing one
+            if let folder = selectedFolder {
+                newPhoto.folder = folder
+            }
             await MainActor.run {
                 modelContext.insert(newPhoto)
                 do {
@@ -195,13 +429,15 @@ struct NotebookView: View {
     }
     
     private func saveCameraImage(_ image: UIImage) async {
-        // Downscale then compress; releases intermediate buffers before saving.
         guard let jpegData: Data = autoreleasepool(invoking: {
             let scaled = NotebookView.downscaleForStorage(image, maxLongEdge: 1500)
             return scaled.jpegData(compressionQuality: 0.8)
         }) else { return }
 
         let newPhoto = NotebookPhotoRecord(notes: "", imageData: jpegData)
+        if let folder = selectedFolder {
+            newPhoto.folder = folder
+        }
         await MainActor.run {
             modelContext.insert(newPhoto)
             do {
@@ -215,7 +451,6 @@ struct NotebookView: View {
     }
 
     /// Scales `image` so its longest edge is at most `maxLongEdge` pixels.
-    /// Returns the original image unchanged if it is already small enough.
     static func downscaleForStorage(_ image: UIImage, maxLongEdge: CGFloat) -> UIImage {
         let size = image.size
         let longEdge = max(size.width, size.height)
@@ -240,66 +475,56 @@ struct NotebookView: View {
             pdfImportProgress = "Loading PDF..."
         }
         
-        do {
-            // Access security-scoped resource
-            let accessing = url.startAccessingSecurityScopedResource()
-            defer {
-                if accessing { url.stopAccessingSecurityScopedResource() }
-            }
-            
-            guard let document = PDFDocument(url: url) else {
-                await MainActor.run {
-                    isImportingPDF = false
-                    persistenceError = "Could not open PDF file"
-                    showingPersistenceError = true
-                }
-                return
-            }
-            
-            let pageCount = document.pageCount
-            let pdfName = url.deletingPathExtension().lastPathComponent
-            
-            for pageIndex in 0..<pageCount {
-                await MainActor.run {
-                    pdfImportProgress = "Importing page \(pageIndex + 1) of \(pageCount)..."
-                }
-                
-                guard let page = document.page(at: pageIndex) else { continue }
-                
-                // Render PDF page to image
-                guard let jpegData = await renderPDFPageToJPEG(page: page) else { continue }
-                
-                // Create NotebookPhotoRecord for this page
-                let notes = pageCount > 1 
-                    ? "\(pdfName) (Page \(pageIndex + 1) of \(pageCount))"
-                    : pdfName
-                
-                let newPhoto = NotebookPhotoRecord(notes: notes, imageData: jpegData)
-                
-                await MainActor.run {
-                    modelContext.insert(newPhoto)
-                }
-            }
-            
-            // Save all pages
-            await MainActor.run {
-                pdfImportProgress = "Saving..."
-                do {
-                    try modelContext.save()
-                } catch {
-                    print(" [NotebookView] Failed to save PDF pages: \(error)")
-                    persistenceError = "Could not save PDF pages: \(error.localizedDescription)"
-                    showingPersistenceError = true
-                }
-                isImportingPDF = false
-            }
-            
-        } catch {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessing { url.stopAccessingSecurityScopedResource() }
+        }
+        
+        guard let document = PDFDocument(url: url) else {
             await MainActor.run {
                 isImportingPDF = false
-                persistenceError = "PDF import failed: \(error.localizedDescription)"
+                persistenceError = "Could not open PDF file"
                 showingPersistenceError = true
             }
+            return
+        }
+        
+        let pageCount = document.pageCount
+        let pdfName = url.deletingPathExtension().lastPathComponent
+        let targetFolder = selectedFolder // capture for async
+        
+        for pageIndex in 0..<pageCount {
+            await MainActor.run {
+                pdfImportProgress = "Importing page \(pageIndex + 1) of \(pageCount)..."
+            }
+            
+            guard let page = document.page(at: pageIndex) else { continue }
+            guard let jpegData = await renderPDFPageToJPEG(page: page) else { continue }
+            
+            let notes = pageCount > 1 
+                ? "\(pdfName) (Page \(pageIndex + 1) of \(pageCount))"
+                : pdfName
+            
+            let newPhoto = NotebookPhotoRecord(notes: notes, imageData: jpegData)
+            if let folder = targetFolder {
+                newPhoto.folder = folder
+            }
+            
+            await MainActor.run {
+                modelContext.insert(newPhoto)
+            }
+        }
+        
+        await MainActor.run {
+            pdfImportProgress = "Saving..."
+            do {
+                try modelContext.save()
+            } catch {
+                print(" [NotebookView] Failed to save PDF pages: \(error)")
+                persistenceError = "Could not save PDF pages: \(error.localizedDescription)"
+                showingPersistenceError = true
+            }
+            isImportingPDF = false
         }
     }
     
@@ -307,11 +532,14 @@ struct NotebookView: View {
         await Task.detached(priority: .userInitiated) {
             autoreleasepool {
                 let mediaBox = page.bounds(for: .mediaBox)
+                guard mediaBox.width > 0, mediaBox.height > 0 else { return nil }
                 
-                // Calculate scale to fit within 1500px max dimension
                 let maxDimension: CGFloat = 1500
                 let scale = min(maxDimension / mediaBox.width, maxDimension / mediaBox.height, 2.0)
-                let scaledSize = CGSize(width: mediaBox.width * scale, height: mediaBox.height * scale)
+                let scaledSize = CGSize(
+                    width: (mediaBox.width * scale).rounded(),
+                    height: (mediaBox.height * scale).rounded()
+                )
                 
                 let format = UIGraphicsImageRendererFormat()
                 format.scale = 1
@@ -319,15 +547,16 @@ struct NotebookView: View {
                 
                 let renderer = UIGraphicsImageRenderer(size: scaledSize, format: format)
                 let image = renderer.image { ctx in
-                    // Fill white background
                     UIColor.white.setFill()
                     ctx.fill(CGRect(origin: .zero, size: scaledSize))
                     
-                    // Apply scale transform
-                    ctx.cgContext.scaleBy(x: scale, y: scale)
-                    
-                    // Draw PDF page
-                    page.draw(with: .mediaBox, to: ctx.cgContext)
+                    let cg = ctx.cgContext
+                    cg.saveGState()
+                    cg.translateBy(x: 0, y: scaledSize.height)
+                    cg.scaleBy(x: scale, y: -scale)
+                    cg.translateBy(x: -mediaBox.origin.x, y: -mediaBox.origin.y)
+                    page.draw(with: .mediaBox, to: cg)
+                    cg.restoreGState()
                 }
                 
                 return image.jpegData(compressionQuality: 0.85)
@@ -375,40 +604,46 @@ struct NotebookDetailView: View {
     @Bindable var photo: NotebookPhotoRecord
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Query(filter: #Predicate<NotebookPhotoRecord> { !$0.isDeleted }, sort: \NotebookPhotoRecord.sortOrder) private var allPhotos: [NotebookPhotoRecord]
+    
+    @State private var currentIndex: Int = 0
+    @State private var showingNotes = false
     
     private func deleteCurrent() {
-        // Soft-delete: imageData kept until permanently purged from NotebookTrashView
-        photo.moveToTrash()
+        guard currentIndex < allPhotos.count else { return }
+        let photoToDelete = allPhotos[currentIndex]
+        photoToDelete.moveToTrash()
         do {
             try modelContext.save()
         } catch {
             print(" [NotebookDetailView] Failed to save after photo soft-delete: \(error)")
         }
-        dismiss()
+        
+        // If we deleted the last photo, dismiss
+        if allPhotos.count <= 1 {
+            dismiss()
+        }
     }
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                // Load image from stored imageData
-                if let imageData = photo.imageData, let uiImage = UIImage(data: imageData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .cornerRadius(12)
-                        .padding()
-                } else {
-                    Color.gray
-                        .frame(height: 200)
-                        .cornerRadius(12)
-                        .overlay(Text("Image not found").foregroundColor(.white))
-                        .padding()
-                }
-                TextField("Notes", text: $photo.notes)
-                    .textFieldStyle(.roundedBorder)
-                    .padding(.horizontal)
+            ZStack {
+                Color(UIColor.systemBackground)
+                    .ignoresSafeArea()
                 
-                Spacer()
+                if allPhotos.isEmpty {
+                    Text("No photos")
+                        .foregroundColor(.secondary)
+                } else {
+                    TabView(selection: $currentIndex) {
+                        ForEach(Array(allPhotos.enumerated()), id: \.element.id) { index, photo in
+                            ZoomableImageView(photo: photo)
+                                .tag(index)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .automatic))
+                    .indexViewStyle(.page(backgroundDisplayMode: .always))
+                }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -417,15 +652,170 @@ struct NotebookDetailView: View {
                     Button(role: .destructive) {
                         deleteCurrent()
                     } label: {
-                        Label("Delete", systemImage: "trash")
+                        Image(systemName: "trash")
                     }
                 }
+                
+                ToolbarItem(placement: .principal) {
+                    if !allPhotos.isEmpty {
+                        Text("\(currentIndex + 1) of \(allPhotos.count)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 16) {
+                        Button {
+                            showingNotes = true
+                        } label: {
+                            Image(systemName: "note.text")
+                        }
+                        
+                        Button("Done") {
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingNotes) {
+                if currentIndex < allPhotos.count {
+                    NotebookNotesSheet(photo: allPhotos[currentIndex])
+                }
+            }
+            .onAppear {
+                // Find the index of the initially selected photo
+                if let index = allPhotos.firstIndex(where: { $0.id == photo.id }) {
+                    currentIndex = index
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Notes Sheet
+
+struct NotebookNotesSheet: View {
+    @Bindable var photo: NotebookPhotoRecord
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Notes") {
+                    TextEditor(text: $photo.notes)
+                        .frame(minHeight: 150)
+                }
+                
+                Section {
+                    LabeledContent("Added") {
+                        Text(photo.dateCreated, style: .date)
+                    }
+                }
+            }
+            .navigationTitle("Page Notes")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         dismiss()
                     }
                 }
             }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
+// MARK: - Zoomable Image View
+
+struct ZoomableImageView: View {
+    let photo: NotebookPhotoRecord
+    
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    
+    private let minScale: CGFloat = 1.0
+    private let maxScale: CGFloat = 5.0
+    
+    var body: some View {
+        GeometryReader { geometry in
+            if let imageData = photo.imageData, let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { value in
+                                let newScale = lastScale * value
+                                scale = min(max(newScale, minScale), maxScale)
+                            }
+                            .onEnded { _ in
+                                lastScale = scale
+                                if scale <= minScale {
+                                    withAnimation(.spring(response: 0.3)) {
+                                        offset = .zero
+                                        lastOffset = .zero
+                                    }
+                                }
+                            }
+                    )
+                    .simultaneousGesture(
+                        DragGesture()
+                            .onChanged { value in
+                                if scale > minScale {
+                                    offset = CGSize(
+                                        width: lastOffset.width + value.translation.width,
+                                        height: lastOffset.height + value.translation.height
+                                    )
+                                }
+                            }
+                            .onEnded { _ in
+                                lastOffset = offset
+                            }
+                    )
+                    .simultaneousGesture(
+                        TapGesture(count: 2)
+                            .onEnded {
+                                withAnimation(.spring(response: 0.3)) {
+                                    if scale > minScale {
+                                        scale = minScale
+                                        offset = .zero
+                                        lastScale = minScale
+                                        lastOffset = .zero
+                                    } else {
+                                        scale = 2.5
+                                        lastScale = 2.5
+                                    }
+                                }
+                            }
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            } else {
+                Color(UIColor.secondarySystemBackground)
+                    .overlay {
+                        VStack(spacing: 12) {
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.secondary)
+                            Text("Image not available")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+        }
+        .onChange(of: photo.id) { _, _ in
+            // Reset zoom when switching photos
+            scale = 1.0
+            lastScale = 1.0
+            offset = .zero
+            lastOffset = .zero
         }
     }
 }
@@ -485,8 +875,10 @@ struct CameraView: View {
 
 private struct NotebookThumbnailCell: View {
     let photo: NotebookPhotoRecord
+    var isDragging: Bool = false
     let onTap: () -> Void
     let onDelete: () -> Void
+    let onMove: () -> Void
 
     @State private var thumbnail: UIImage?
 
@@ -504,8 +896,14 @@ private struct NotebookThumbnailCell: View {
         .frame(minWidth: 100, minHeight: 100)
         .clipped()
         .cornerRadius(8)
+        .opacity(isDragging ? 0.5 : 1.0)
+        .scaleEffect(isDragging ? 1.05 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isDragging)
         .onTapGesture { onTap() }
         .contextMenu {
+            Button(action: onMove) {
+                Label("Move to Folder", systemImage: "folder")
+            }
             Button(role: .destructive, action: onDelete) {
                 Label("Delete", systemImage: "trash")
             }
@@ -537,5 +935,209 @@ private struct NotebookThumbnailCell: View {
             }
         }.value
         thumbnail = decoded
+    }
+}
+
+// MARK: - Create Notebook Folder Sheet
+
+struct CreateNotebookFolderSheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("roastModeEnabled") private var roastMode = false
+
+    @State private var folderName = ""
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Folder Name") {
+                    TextField("Enter folder name", text: $folderName)
+                }
+            }
+            .navigationTitle("New Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") { createFolder() }
+                        .disabled(folderName.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .fontWeight(.semibold)
+                }
+            }
+            .tint(roastMode ? .orange : .accentColor)
+            .alert("Save Failed", isPresented: $showSaveError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveErrorMessage)
+            }
+        }
+    }
+
+    private func createFolder() {
+        let folder = NotebookFolder(name: folderName.trimmingCharacters(in: .whitespaces))
+        modelContext.insert(folder)
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print(" [CreateNotebookFolder] Failed to save: \(error)")
+            saveErrorMessage = "Could not create folder: \(error.localizedDescription)"
+            showSaveError = true
+        }
+    }
+}
+
+// MARK: - Rename Notebook Folder Sheet
+
+struct RenameNotebookFolderSheet: View {
+    @Bindable var folder: NotebookFolder
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var newName: String = ""
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Folder Name") {
+                    TextField("Folder name", text: $newName)
+                }
+            }
+            .navigationTitle("Rename Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { renameFolder() }
+                        .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .fontWeight(.semibold)
+                }
+            }
+            .onAppear { newName = folder.name }
+            .alert("Save Failed", isPresented: $showSaveError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveErrorMessage)
+            }
+        }
+    }
+
+    private func renameFolder() {
+        folder.name = newName.trimmingCharacters(in: .whitespaces)
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print(" [RenameNotebookFolder] Failed to save: \(error)")
+            saveErrorMessage = "Could not rename folder: \(error.localizedDescription)"
+            showSaveError = true
+        }
+    }
+}
+
+// MARK: - Move to Notebook Folder Sheet
+
+struct MoveToNotebookFolderSheet: View {
+    @Bindable var photo: NotebookPhotoRecord
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @Query(filter: #Predicate<NotebookFolder> { !$0.isDeleted }, sort: \NotebookFolder.name) private var folders: [NotebookFolder]
+    @AppStorage("roastModeEnabled") private var roastMode = false
+
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // "Unfiled" option
+                Button {
+                    movePhoto(to: nil)
+                } label: {
+                    HStack {
+                        Label("Unfiled", systemImage: "tray")
+                        Spacer()
+                        if photo.folder == nil {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(.accentColor)
+                        }
+                    }
+                }
+                .tint(.primary)
+
+                // Folder options
+                ForEach(folders) { folder in
+                    Button {
+                        movePhoto(to: folder)
+                    } label: {
+                        HStack {
+                            Label(folder.name, systemImage: "folder.fill")
+                            Spacer()
+                            if photo.folder?.id == folder.id {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                    }
+                    .tint(.primary)
+                }
+            }
+            .navigationTitle("Move to Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .tint(roastMode ? .orange : .accentColor)
+            .alert("Save Failed", isPresented: $showSaveError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveErrorMessage)
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func movePhoto(to folder: NotebookFolder?) {
+        photo.folder = folder
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print(" [MoveToFolder] Failed to save: \(error)")
+            saveErrorMessage = "Could not move photo: \(error.localizedDescription)"
+            showSaveError = true
+        }
+    }
+}
+
+// MARK: - Drop Delegate for Reordering
+
+private struct NotebookDropDelegate: DropDelegate {
+    let item: NotebookPhotoRecord
+    @Binding var draggingItem: NotebookPhotoRecord?
+    let onMove: (NotebookPhotoRecord, NotebookPhotoRecord) -> Void
+    
+    func performDrop(info: DropInfo) -> Bool {
+        draggingItem = nil
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let dragging = draggingItem, dragging.id != item.id else { return }
+        onMove(dragging, item)
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
     }
 }

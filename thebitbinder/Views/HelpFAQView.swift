@@ -12,51 +12,49 @@ struct HelpFAQView: View {
     @State private var searchText = ""
     @State private var expandedItem: String? = nil
 
-    private var accent: Color { roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue }
-
     var body: some View {
-        ZStack {
-            (roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Search bar
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
-                        TextField("Search help...", text: $searchText)
-                            .font(.system(size: 15))
-                            .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+        List {
+            ForEach(filteredSections) { section in
+                Section {
+                    ForEach(section.items) { item in
+                        DisclosureGroup(
+                            isExpanded: Binding(
+                                get: { expandedItem == item.id },
+                                set: { expandedItem = $0 ? item.id : nil }
+                            )
+                        ) {
+                            Text(item.answer)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        } label: {
+                            Text(item.question)
+                                .font(.subheadline.weight(.medium))
+                        }
                     }
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                } header: {
+                    Label(section.title, systemImage: section.icon)
+                }
+            }
 
-                    // Sections
-                    ForEach(filteredSections) { section in
-                        FAQSection(section: section, expandedItem: $expandedItem, roastMode: roastMode, accent: accent)
-                    }
-
-                    // Footer
-                    VStack(spacing: 6) {
+            Section {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 4) {
                         Text("BitBinder v10.4")
-                            .font(.system(size: 12, weight: .semibold, design: .serif))
-                            .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.secondary)
                         Text("Shut up and write some jokes.")
-                            .font(.system(size: 12, design: .serif))
+                            .font(.caption)
                             .italic()
-                            .foregroundColor(roastMode ? .white.opacity(0.25) : AppTheme.Colors.textTertiary)
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
                     }
-                    .padding(.vertical, 24)
+                    Spacer()
                 }
             }
         }
-        .navigationTitle("")
+        .listStyle(.insetGrouped)
+        .searchable(text: $searchText, prompt: "Search help")
+        .navigationTitle("Help & FAQ")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -70,91 +68,6 @@ struct HelpFAQView: View {
             }
             return items.isEmpty ? nil : FAQSectionModel(title: section.title, icon: section.icon, items: items)
         }
-    }
-}
-
-// MARK: - Section View
-
-struct FAQSection: View {
-    let section: FAQSectionModel
-    @Binding var expandedItem: String?
-    let roastMode: Bool
-    let accent: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Section header
-            HStack(spacing: 10) {
-                Image(systemName: section.icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(accent)
-                Text(section.title.uppercased())
-                    .font(.system(size: 11, weight: .bold, design: .serif))
-                    .tracking(1.0)
-                    .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
-
-            VStack(spacing: 2) {
-                ForEach(section.items) { item in
-                    FAQRow(item: item, isExpanded: expandedItem == item.id, roastMode: roastMode, accent: accent) {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            expandedItem = expandedItem == item.id ? nil : item.id
-                        }
-                    }
-                }
-            }
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-            )
-            .padding(.horizontal, 20)
-        }
-    }
-}
-
-// MARK: - Row View
-
-struct FAQRow: View {
-    let item: FAQItem
-    let isExpanded: Bool
-    let roastMode: Bool
-    let accent: Color
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 12) {
-                    Text(item.question)
-                        .font(.system(size: 15, weight: .medium, design: .serif))
-                        .foregroundColor(roastMode ? .white.opacity(0.9) : AppTheme.Colors.inkBlack)
-                        .multilineTextAlignment(.leading)
-                    Spacer()
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-
-                if isExpanded {
-                    Text(item.answer)
-                        .font(.system(size: 14, design: .serif))
-                        .foregroundColor(roastMode ? .white.opacity(0.65) : AppTheme.Colors.textSecondary)
-                        .multilineTextAlignment(.leading)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 14)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-
-                    Divider()
-                        .background(roastMode ? AppTheme.Colors.roastLine : AppTheme.Colors.paperLine)
-                        .padding(.horizontal, 16)
-                }
-            }
-        }
-        .buttonStyle(.plain)
     }
 }
 

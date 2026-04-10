@@ -32,7 +32,7 @@ struct BrainstormDetailView: View {
     @State private var showPromotedToast = false
 
     private var accentColor: Color {
-        roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.brainstormAccent
+        roastMode ? .orange : .yellow
     }
 
     private var wordCount: Int {
@@ -63,7 +63,7 @@ struct BrainstormDetailView: View {
             .padding(.top, 16)
             .padding(.bottom, 40)
         }
-        .background(roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
+        .background(Color(UIColor.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
         .bitBinderToolbar(roastMode: roastMode)
         .toolbar { toolbarContent }
@@ -138,8 +138,8 @@ struct BrainstormDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
                 Text(KeywordTitleGenerator.displayTitle(from: idea.content))
-                    .font(.system(size: 24, weight: .bold, design: .serif))
-                    .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                    .font(.title2.bold())
+                    .foregroundColor(.primary)
 
                 Spacer()
 
@@ -165,8 +165,8 @@ struct BrainstormDetailView: View {
             HStack(spacing: 12) {
                 if wordCount > 0 {
                     Text("\(wordCount) words")
-                        .font(.system(size: 12))
-                        .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
 
                 Spacer()
@@ -186,26 +186,26 @@ struct BrainstormDetailView: View {
             if isEditing {
                 TextEditor(text: $idea.content)
                     .scrollContentBackground(.hidden)
-                    .font(.system(size: 17, design: .serif))
-                    .foregroundColor(roastMode ? .white.opacity(0.92) : AppTheme.Colors.inkBlack)
+                    .font(.body)
+                    .foregroundColor(.primary)
                     .lineSpacing(6)
                     .frame(minHeight: 250)
                     .padding(16)
                     .background(
-                        RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
-                            .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(UIColor.secondarySystemBackground))
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.99, anchor: .top)))
             } else {
                 Text(idea.content)
-                    .font(.system(size: 17, design: .serif))
-                    .foregroundColor(roastMode ? .white.opacity(0.9) : AppTheme.Colors.textPrimary)
+                    .font(.body)
+                    .foregroundColor(.primary)
                     .lineSpacing(6)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
                     .background(
-                        RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
-                            .fill(roastMode ? AppTheme.Colors.roastCard.opacity(0.5) : AppTheme.Colors.surfaceElevated.opacity(0.5))
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(UIColor.secondarySystemBackground).opacity(0.5))
                     )
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -228,21 +228,12 @@ struct BrainstormDetailView: View {
             HapticEngine.shared.press()
             showPromoteOptions = true
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "arrow.up.doc.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("Promote to Joke")
-                    .font(.system(size: 16, weight: .semibold))
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
-                    .fill(roastMode ? AppTheme.Colors.roastEmberGradient : AppTheme.Colors.brandGradient)
-            )
+            Label("Promote to Joke", systemImage: "arrow.up.doc.fill")
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(SmoothScaleButtonStyle(scale: 0.97))
+        .buttonStyle(.borderedProminent)
+        .tint(roastMode ? .orange : .accentColor)
+        .controlSize(.large)
         .disabled(idea.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         .padding(.bottom, 16)
     }
@@ -262,7 +253,7 @@ struct BrainstormDetailView: View {
             } label: {
                 Image(systemName: showingMetadata ? "chevron.up.circle.fill" : "info.circle")
                     .font(.system(size: 20))
-                    .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
+                    .foregroundColor(.secondary)
                     .symbolEffect(.bounce, value: showingMetadata)
             }
         }
@@ -277,8 +268,8 @@ struct BrainstormDetailView: View {
                 .padding(.bottom, 8)
 
             Text("Details")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary)
                 .textCase(.uppercase)
                 .tracking(0.5)
 
@@ -291,8 +282,8 @@ struct BrainstormDetailView: View {
             }
             .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
-                    .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(UIColor.secondarySystemBackground))
             )
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -301,12 +292,12 @@ struct BrainstormDetailView: View {
     private func metadataRow(icon: String, label: String, value: String) -> some View {
         HStack {
             Label(label, systemImage: icon)
-                .font(.system(size: 13))
-                .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+                .font(.caption)
+                .foregroundColor(.secondary)
             Spacer()
             Text(value)
-                .font(.system(size: 13))
-                .foregroundColor(roastMode ? .white : AppTheme.Colors.textPrimary)
+                .font(.caption)
+                .foregroundColor(.primary)
         }
     }
 
@@ -336,7 +327,7 @@ struct BrainstormDetailView: View {
                     showingDeleteAlert = true
                 } label: {
                     Image(systemName: "trash")
-                        .foregroundColor(AppTheme.Colors.error)
+                        .foregroundColor(.red)
                 }
             }
         }

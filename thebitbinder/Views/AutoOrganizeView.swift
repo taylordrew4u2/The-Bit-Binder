@@ -52,169 +52,15 @@ struct AutoOrganizeView: View {
                     VStack(spacing: 16) {
                         // Quick Auto-Organize Button
                         if !unorganizedJokes.isEmpty {
-                            VStack(spacing: 12) {
-                                // Setup Folders Button
-                                Button(action: { showFolderSetup = true }) {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "folder.badge.gearshape")
-                                            .font(.system(size: 16, weight: .semibold))
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Setup Folders First")
-                                                .font(.headline)
-                                            Text("Create folders or let us suggest them")
-                                                .font(.caption)
-                                                .foregroundColor(.white.opacity(0.8))
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 14, weight: .semibold))
-                                    }
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [.purple.opacity(0.8), .purple.opacity(0.6)]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .cornerRadius(10)
-                                
-                                // Auto-Organize Button
-                                Button(action: performAutoOrganize) {
-                                    if isAnalyzing {
-                                        HStack(spacing: 12) {
-                                            ProgressView()
-                                                .tint(.white)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Analyzing...")
-                                                    .font(.headline)
-                                                Text("\(analysisProgress)/\(analysisTotal) jokes analyzed")
-                                                    .font(.caption)
-                                                    .foregroundColor(.white.opacity(0.8))
-                                            }
-                                            Spacer()
-                                        }
-                                    } else {
-                                        HStack(spacing: 12) {
-                                            Image(systemName: "wand.and.stars")
-                                                .font(.system(size: 16, weight: .semibold))
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text("Smart Auto-Organize")
-                                                    .font(.headline)
-                                                Text(customFolders.isEmpty ? "Will create folders automatically" : "Using \(customFolders.count) custom folders")
-                                                    .font(.caption)
-                                                    .foregroundColor(.white.opacity(0.8))
-                                            }
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
-                                                .font(.system(size: 14, weight: .semibold))
-                                        }
-                                    }
-                                }
-                                .disabled(isAnalyzing)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [.blue.opacity(0.8), .blue.opacity(0.6)]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .cornerRadius(10)
-                                
-                                // Reorganize All Button
-                                Button(action: { showReorganizeConfirmation = true }) {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: "arrow.triangle.2.circlepath")
-                                            .font(.system(size: 16, weight: .semibold))
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Reorganize All Jokes")
-                                                .font(.headline)
-                                            Text("Clear all folders & start fresh")
-                                                .font(.caption)
-                                                .foregroundColor(.white.opacity(0.8))
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 14, weight: .semibold))
-                                    }
-                                }
-                                .disabled(isAnalyzing)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [.orange.opacity(0.8), .orange.opacity(0.6)]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .cornerRadius(10)
-                            }
+                            actionButtonsSection
                             .padding()
                         }
                         
                         // Unorganized Jokes Section
                         if !unorganizedJokes.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Suggested Categories (\(unorganizedJokes.count))")
-                                    .font(.headline)
-                                    .padding(.horizontal)
-                                
-                                ForEach(unorganizedJokes) { joke in
-                                    JokeOrganizationCard(
-                                        joke: joke,
-                                        onTap: {
-                                            selectedJoke = joke
-                                        },
-                                        onAccept: { category in
-                                            assignJokeToFolder(joke, category: category)
-                                        }
-                                    )
-                                }
-                            }
-                            .padding()
+                            unorganizedJokesSection
                         } else {
-                            VStack(spacing: 16) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(AppTheme.Colors.success)
-                                Text("All Jokes Organized!")
-                                    .font(.headline)
-                                Text("Your jokes have been sorted into categories with confidence scoring")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                                
-                                // Reorganize All option when everything is already organized
-                                Button(action: { showReorganizeConfirmation = true }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "arrow.triangle.2.circlepath")
-                                            .font(.system(size: 14, weight: .semibold))
-                                        Text("Reorganize All")
-                                            .font(.subheadline.weight(.semibold))
-                                    }
-                                    .foregroundColor(.orange)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.orange.opacity(0.1))
-                                    )
-                                }
-                                .disabled(isAnalyzing)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                            .padding()
+                            allJokesOrganizedView
                         }
                         
                         if !unorganizedJokes.isEmpty {
@@ -230,26 +76,7 @@ struct AutoOrganizeView: View {
                             
                             VStack(spacing: 8) {
                                 ForEach(categories, id: \.self) { category in
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(category)
-                                                .font(.subheadline)
-                                                .fontWeight(.semibold)
-                                            let jokeCount = jokes.filter { $0.folder?.name == category }.count
-                                            if jokeCount > 0 {
-                                                Text("\(jokeCount) jokes")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                        }
-                                        Spacer()
-                                        Image(systemName: "folder.fill")
-                                            .foregroundColor(AppTheme.Colors.primaryAction)
-                                            .opacity(0.6)
-                                    }
-                                    .padding()
-                                    .background(Color(UIColor.systemGray6))
-                                    .cornerRadius(8)
+                                    categoryRow(category)
                                 }
                             }
                         }
@@ -270,12 +97,12 @@ struct AutoOrganizeView: View {
             .sheet(isPresented: $showOrganizationSummary) {
                 VStack(spacing: 20) {
                     VStack(spacing: 12) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(AppTheme.Colors.success)
-                        
-                        Text("Auto-Organization Complete!")
-                            .font(.title2.bold())
+                         Image(systemName: "checkmark.circle.fill")
+                             .font(.system(size: 60))
+                             .foregroundColor(.green)
+                         
+                         Text("Auto-Organization Complete!")
+                             .font(.title2.bold())
                         
                         VStack(spacing: 8) {
                             HStack {
@@ -293,10 +120,10 @@ struct AutoOrganizeView: View {
                                         .fontWeight(.semibold)
                                 }
                             }
-                        }
-                        .padding()
-                        .background(AppTheme.Colors.surfaceElevated)
-                        .cornerRadius(8)
+                         }
+                         .padding()
+                         .background(Color(UIColor.secondarySystemBackground))
+                         .cornerRadius(8)
                         
                         Text("Your jokes have been analyzed and categorized automatically.")
                             .font(.subheadline)
@@ -307,13 +134,13 @@ struct AutoOrganizeView: View {
                     Spacer()
                     
                     Button(action: { showOrganizationSummary = false; dismiss() }) {
-                        Text("Done")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(AppTheme.Colors.primaryAction)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                    }
+                         Text("Done")
+                             .frame(maxWidth: .infinity)
+                             .padding()
+                             .background(Color.accentColor)
+                             .foregroundColor(.white)
+                             .cornerRadius(8)
+                     }
                 }
                 .padding()
             }
@@ -367,9 +194,11 @@ struct AutoOrganizeView: View {
                 if !hasPopulatedCategorizationResults {
                     hasPopulatedCategorizationResults = true
                     for joke in unorganizedJokes {
+                        joke.loadCategorizationResults() // Ensure results are loaded
                         if joke.categorizationResults.isEmpty {
                             let matches = AutoOrganizeService.categorize(content: joke.content)
                             joke.categorizationResults = matches
+                            joke.saveCategorizationResults() // Save the new results
                             #if DEBUG
                             print(" [AutoOrganize] Pre-populated \(matches.count) suggestions for: \(joke.title.prefix(30))")
                             #endif
@@ -378,6 +207,180 @@ struct AutoOrganizeView: View {
                 }
             }
         }
+    }
+    
+    @ViewBuilder
+    private var actionButtonsSection: some View {
+        VStack(spacing: 12) {
+            // Setup Folders Button
+            Button(action: { showFolderSetup = true }) {
+                HStack(spacing: 12) {
+                    Image(systemName: "folder.badge.gearshape")
+                        .font(.system(size: 16, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Setup Folders First")
+                            .font(.headline)
+                        Text("Create folders or let us suggest them")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.purple)
+            .cornerRadius(10)
+            
+            // Auto-Organize Button
+            Button(action: performAutoOrganize) {
+                if isAnalyzing {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                            .tint(.white)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Analyzing...")
+                                .font(.headline)
+                            Text("\(analysisProgress)/\(analysisTotal) jokes analyzed")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        Spacer()
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 16, weight: .semibold))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Smart Auto-Organize")
+                                .font(.headline)
+                            Text(customFolders.isEmpty ? "Will create folders automatically" : "Using \(customFolders.count) custom folders")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                }
+            }
+            .disabled(isAnalyzing)
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.accentColor)
+            .cornerRadius(10)
+            
+            // Reorganize All Button
+            Button(action: { showReorganizeConfirmation = true }) {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 16, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Reorganize All Jokes")
+                            .font(.headline)
+                        Text("Clear all folders & start fresh")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+            }
+            .disabled(isAnalyzing)
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.orange)
+            .cornerRadius(10)
+        }
+    }
+    
+    @ViewBuilder
+    private var unorganizedJokesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Suggested Categories (\(unorganizedJokes.count))")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            ForEach(unorganizedJokes) { joke in
+                JokeOrganizationCard(
+                    joke: joke,
+                    onTap: {
+                        selectedJoke = joke
+                    },
+                    onAccept: { category in
+                        assignJokeToFolder(joke, category: category)
+                    }
+                )
+            }
+        }
+        .padding()
+    }
+    
+    @ViewBuilder
+    private var allJokesOrganizedView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 50))
+                .foregroundColor(.green)
+            Text("All Jokes Organized!")
+                .font(.headline)
+            Text("Your jokes have been sorted into categories with confidence scoring")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            Button(action: { showReorganizeConfirmation = true }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Reorganize All")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundColor(.orange)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.orange.opacity(0.1))
+                )
+            }
+            .disabled(isAnalyzing)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding()
+    }
+    
+    @ViewBuilder
+    private func categoryRow(_ category: String) -> some View {
+        let jokeCount: Int = jokes.filter { $0.folder?.name == category }.count
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(category)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                if jokeCount > 0 {
+                    Text("\(jokeCount) jokes")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+            Image(systemName: "folder.fill")
+                .foregroundColor(.accentColor)
+                .opacity(0.6)
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(8)
     }
     
     private func performAutoOrganize() {
@@ -452,6 +455,10 @@ struct AutoOrganizeView: View {
                         // Store all categories
                         joke.allCategories = allMatches.map { $0.category }
                         
+                        // Store all categorization results for persistence
+                        joke.categorizationResults = allMatches
+                        joke.saveCategorizationResults()
+
                         // Assign joke to MULTIPLE folders (one per matching category)
                         var assignedFolderNames: Set<String> = []
                         
@@ -666,6 +673,7 @@ struct AutoOrganizeView: View {
                         joke.primaryCategory = nil
                         joke.allCategories = []
                         joke.categorizationResults = []
+                        joke.saveCategorizationResults()
                     }
                     
                     // Save the cleared state
@@ -753,6 +761,10 @@ struct AutoOrganizeView: View {
                         
                         joke.allCategories = allMatches.map { $0.category }
                         
+                        // Store all categorization results for persistence
+                        joke.categorizationResults = allMatches
+                        joke.saveCategorizationResults()
+
                         var assignedFolderNames: Set<String> = []
                         
                         for match in allMatches {
@@ -837,10 +849,10 @@ struct JokeOrganizationCard: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(suggestion.category)
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(AppTheme.Colors.primaryAction)
+                             Text(suggestion.category)
+                                 .font(.subheadline)
+                                 .fontWeight(.semibold)
+                                 .foregroundColor(.accentColor)
                             
                             Text(suggestion.reasoning)
                                 .font(.caption)
@@ -868,34 +880,34 @@ struct JokeOrganizationCard: View {
                                 Text("Accept")
                             }
                             .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(AppTheme.Colors.success)
-                            .cornerRadius(6)
+                             .fontWeight(.semibold)
+                             .foregroundColor(.white)
+                             .padding(.horizontal, 12)
+                             .padding(.vertical, 6)
+                             .background(.green)
+                             .cornerRadius(6)
                         }
                         
                         Button(action: onTap) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "pencil")
-                                Text("Choose")
-                            }
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(AppTheme.Colors.primaryAction)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(AppTheme.Colors.primaryAction.opacity(0.1))
-                            .cornerRadius(6)
-                        }
-                        
-                        Spacer()
-                    }
-                }
-                .padding(12)
-                .background(AppTheme.Colors.primaryAction.opacity(0.05))
-                .cornerRadius(8)
+                             HStack(spacing: 6) {
+                                 Image(systemName: "pencil")
+                                 Text("Choose")
+                             }
+                             .font(.caption)
+                             .fontWeight(.semibold)
+                             .foregroundColor(.accentColor)
+                             .padding(.horizontal, 12)
+                             .padding(.vertical, 6)
+                             .background(Color.accentColor.opacity(0.1))
+                             .cornerRadius(6)
+                         }
+                         
+                         Spacer()
+                     }
+                 }
+                 .padding(12)
+                 .background(Color.accentColor.opacity(0.05))
+                 .cornerRadius(8)
             } else {
                 // No suggestion available - try to generate one or show manual option
                 VStack(alignment: .leading, spacing: 8) {
@@ -906,6 +918,7 @@ struct JokeOrganizationCard: View {
                                 if joke.categorizationResults.isEmpty {
                                     let matches = AutoOrganizeService.categorize(content: joke.content)
                                     joke.categorizationResults = matches
+                                    joke.saveCategorizationResults()
                                 }
                                 hasPopulatedResults = true
                             }
@@ -915,23 +928,23 @@ struct JokeOrganizationCard: View {
                             .foregroundColor(.secondary)
                         
                         Button(action: onTap) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "folder.badge.plus")
-                                Text("Choose Category")
-                            }
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(AppTheme.Colors.primaryAction)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(AppTheme.Colors.primaryAction.opacity(0.1))
+                             HStack(spacing: 6) {
+                                 Image(systemName: "folder.badge.plus")
+                                 Text("Choose Category")
+                             }
+                             .font(.caption)
+                             .fontWeight(.semibold)
+                             .foregroundColor(.accentColor)
+                             .padding(.horizontal, 12)
+                             .padding(.vertical, 6)
+                             .background(Color.accentColor.opacity(0.1))
                             .cornerRadius(6)
-                        }
-                    }
                 }
-                .padding(12)
-                .background(AppTheme.Colors.warning.opacity(0.05))
-                .cornerRadius(8)
+            }
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.05))
+        .cornerRadius(8)
             }
         }
         .padding()
@@ -1017,10 +1030,10 @@ struct CategorySuggestionDetail: View {
                                         Wrap(match.matchedKeywords) { keyword in
                                             Text(keyword)
                                                 .font(.caption)
-                                                .foregroundColor(AppTheme.Colors.primaryAction)
+                                                .foregroundColor(.accentColor)
                                                 .padding(.horizontal, 8)
                                                 .padding(.vertical, 4)
-                                                .background(AppTheme.Colors.primaryAction.opacity(0.1))
+                                                .background(Color.accentColor.opacity(0.1))
                                                 .cornerRadius(4)
                                         }
                                     }
@@ -1047,7 +1060,7 @@ struct CategorySuggestionDetail: View {
                             }) {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.title2)
-                                    .foregroundColor(AppTheme.Colors.primaryAction)
+                                    .foregroundColor(.accentColor)
                             }
                         }
                         .padding(.horizontal)
@@ -1071,6 +1084,7 @@ struct CategorySuggestionDetail: View {
                 if joke.categorizationResults.isEmpty {
                     let matches = AutoOrganizeService.categorize(content: joke.content)
                     joke.categorizationResults = matches
+                    joke.saveCategorizationResults()
                 }
             }
         }
@@ -1153,7 +1167,7 @@ struct FolderSetupView: View {
                                 ProgressView()
                             } else {
                                 Image(systemName: "sparkles")
-                                    .foregroundColor(AppTheme.Colors.primaryAction)
+                                    .foregroundColor(.accentColor)
                             }
                             
                             VStack(alignment: .leading, spacing: 2) {
@@ -1173,12 +1187,12 @@ struct FolderSetupView: View {
                         ForEach(suggestedFolders, id: \.self) { folder in
                             HStack {
                                 Image(systemName: "folder.badge.plus")
-                                    .foregroundColor(AppTheme.Colors.primaryAction)
+                                    .foregroundColor(.accentColor)
                                 Text(folder)
                                 Spacer()
                                 if customFolders.contains(folder) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(AppTheme.Colors.success)
+                                        .foregroundColor(.green)
                                 } else {
                                     Button("Add") {
                                         if !customFolders.contains(folder) {
@@ -1198,7 +1212,7 @@ struct FolderSetupView: View {
                                 }
                             }
                         }
-                        .foregroundColor(AppTheme.Colors.primaryAction)
+                        .foregroundColor(.accentColor)
                     }
                 } header: {
                     Text("Smart Suggestions")
@@ -1212,7 +1226,7 @@ struct FolderSetupView: View {
                         TextField("New folder name...", text: $newFolderName)
                         Button(action: addCustomFolder) {
                             Image(systemName: "plus.circle.fill")
-                                .foregroundColor(AppTheme.Colors.primaryAction)
+                                .foregroundColor(.accentColor)
                         }
                         .disabled(newFolderName.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
@@ -1226,7 +1240,7 @@ struct FolderSetupView: View {
                         ForEach(customFolders, id: \.self) { folder in
                             HStack {
                                 Image(systemName: "folder.fill")
-                                    .foregroundColor(AppTheme.Colors.primaryAction)
+                                    .foregroundColor(.accentColor)
                                 Text(folder)
                                 Spacer()
                             }
@@ -1248,7 +1262,7 @@ struct FolderSetupView: View {
                                 Spacer()
                                 if customFolders.contains(folder) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(AppTheme.Colors.success)
+                                        .foregroundColor(.green)
                                 } else {
                                     Button("Use") {
                                         if !customFolders.contains(folder) {
@@ -1338,4 +1352,3 @@ struct FolderSetupView: View {
         }
     }
 }
-

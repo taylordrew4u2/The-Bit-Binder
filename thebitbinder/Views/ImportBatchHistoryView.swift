@@ -16,16 +16,16 @@ struct ImportBatchHistoryView: View {
                         
                         ZStack {
                             Circle()
-                                .fill(AppTheme.Colors.primaryAction.opacity(0.08))
+                                .fill(Color.accentColor.opacity(0.08))
                                 .frame(width: 100, height: 100)
                             Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                                 .font(.system(size: 40, weight: .medium))
-                                .foregroundColor(AppTheme.Colors.primaryAction.opacity(0.5))
+                                .foregroundColor(.accentColor.opacity(0.5))
                         }
                         
                         VStack(spacing: 8) {
                             Text("No Import History Yet")
-                                .font(.system(size: 20, weight: .bold, design: .serif))
+                                .font(.title3.weight(.bold))
                             Text("When you import jokes using GagGrabber, each import will be logged here so you can review what was extracted.")
                                 .font(.system(size: 14))
                                 .foregroundColor(.secondary)
@@ -75,7 +75,7 @@ struct ImportBatchHistoryView: View {
             HStack(alignment: .top) {
                 Image(systemName: fileIcon(for: batch.sourceFileName))
                     .font(.system(size: 18))
-                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                    .foregroundColor(roastMode ? .orange : .accentColor)
                     .frame(width: 28)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -104,7 +104,7 @@ struct ImportBatchHistoryView: View {
                     icon: "checkmark.circle.fill",
                     value: "\(batch.totalImportedRecords)",
                     label: "imported",
-                    color: AppTheme.Colors.success
+                    color: .green
                 )
                 
                 if batch.unresolvedFragmentCount > 0 {
@@ -120,7 +120,7 @@ struct ImportBatchHistoryView: View {
                     icon: "square.split.2x1.fill",
                     value: "\(batch.totalSegments)",
                     label: "segments",
-                    color: AppTheme.Colors.primaryAction
+                    color: .accentColor
                 )
             }
         }
@@ -144,7 +144,7 @@ struct ImportBatchHistoryView: View {
         VStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundColor(AppTheme.Colors.primaryAction.opacity(0.6))
+                .foregroundColor(.accentColor.opacity(0.6))
             Text(label)
                 .font(.system(size: 10))
                 .foregroundColor(.secondary)
@@ -181,9 +181,9 @@ struct ImportBatchDetailView: View {
     
     private func confidenceColor(_ confidence: String) -> Color {
         switch confidence.lowercased() {
-        case "high": return AppTheme.Colors.success
+        case "high": return .green
         case "medium": return .orange
-        default: return AppTheme.Colors.error
+        default: return .red
         }
     }
     
@@ -196,11 +196,11 @@ struct ImportBatchDetailView: View {
                         HStack(spacing: 14) {
                             ZStack {
                                 Circle()
-                                    .fill(AppTheme.Colors.primaryAction.opacity(0.1))
+                                    .fill(Color.accentColor.opacity(0.1))
                                     .frame(width: 48, height: 48)
                                 Image(systemName: "doc.text.magnifyingglass")
                                     .font(.system(size: 20))
-                                    .foregroundColor(AppTheme.Colors.primaryAction)
+                                    .foregroundColor(.accentColor)
                             }
                             
                             VStack(alignment: .leading, spacing: 4) {
@@ -218,7 +218,7 @@ struct ImportBatchDetailView: View {
                             summaryStatItem(
                                 value: "\(batch.totalImportedRecords)",
                                 label: "Imported",
-                                color: AppTheme.Colors.success
+                                color: .green
                             )
                             summaryStatItem(
                                 value: "\(batch.unresolvedFragmentCount)",
@@ -228,7 +228,7 @@ struct ImportBatchDetailView: View {
                             summaryStatItem(
                                 value: "\(batch.totalSegments)",
                                 label: "Segments",
-                                color: AppTheme.Colors.primaryAction
+                                color: .accentColor
                             )
                         }
                     }
@@ -265,7 +265,7 @@ struct ImportBatchDetailView: View {
                                 }
                                 
                                 Text(record.rawSourceText)
-                                    .font(.system(size: 13, design: .serif))
+                                    .font(.caption)
                                     .foregroundColor(.secondary)
                                     .lineSpacing(2)
                                 
@@ -314,9 +314,9 @@ struct UnresolvedFragmentHistoryRow: View {
     
     private var confidenceColor: Color {
         switch fragment.confidence.lowercased() {
-        case "high": return AppTheme.Colors.success
+        case "high": return .green
         case "medium": return .orange
-        default: return AppTheme.Colors.error
+        default: return .red
         }
     }
     
@@ -346,12 +346,12 @@ struct UnresolvedFragmentHistoryRow: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(fragment.isResolved ? "Resolved" : "Open")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(fragment.isResolved ? AppTheme.Colors.success : .orange)
+                        .foregroundColor(fragment.isResolved ? .green : .orange)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(
                             Capsule().fill(
-                                (fragment.isResolved ? AppTheme.Colors.success : Color.orange).opacity(0.12)
+                                (fragment.isResolved ? .green : Color.orange).opacity(0.12)
                             )
                         )
                     
@@ -362,7 +362,7 @@ struct UnresolvedFragmentHistoryRow: View {
             }
             
             Text(fragment.text)
-                .font(.system(size: 13, design: .serif))
+                .font(.caption)
                 .foregroundColor(.secondary)
                 .lineSpacing(2)
         }

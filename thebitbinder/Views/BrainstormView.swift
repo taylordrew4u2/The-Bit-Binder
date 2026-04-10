@@ -29,6 +29,7 @@ struct BrainstormView: View {
     
     // Persistence error surfacing
     @State private var showingTrash = false
+    @State private var showTalkToText = false
     @State private var persistenceError: String?
     @State private var showingErrorAlert = false
     
@@ -61,26 +62,45 @@ struct BrainstormView: View {
                 ideaGrid
             }
         }
-        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .toolbar {
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showAddSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    if !ideas.isEmpty {
-                        Button {
-                            isSelectMode.toggle()
-                            if !isSelectMode { selectedIdeaIDs.removeAll() }
-                        } label: {
-                            Label(isSelectMode ? "Cancel Select" : "Select Multiple",
-                                  systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
+                    Button {
+                        toggleRecording()
+                    } label: {
+                        Label(isRecording ? "Stop Recording" : "Voice Note", systemImage: isRecording ? "stop.circle.fill" : "mic.fill")
+                    }
+                    Button {
+                        showTalkToText = true
+                    } label: {
+                        Label("Talk to Text", systemImage: "mic.badge.plus")
+                    }
+                    Section {
+                        Button(action: { showFullContent.toggle() }) {
+                            Label(showFullContent ? "Show Titles Only" : "Show Full Content",
+                                  systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
+                        }
+                        if !ideas.isEmpty {
+                            Button {
+                                isSelectMode.toggle()
+                                if !isSelectMode { selectedIdeaIDs.removeAll() }
+                            } label: {
+                                Label(isSelectMode ? "Cancel Select" : "Select Multiple",
+                                      systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
+                            }
                         }
                     }
-                    Button(action: { showFullContent.toggle() }) {
-                        Label(showFullContent ? "Show Titles Only" : "Show Full Content",
-                              systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
-                    }
-                    Divider()
-                    Button { showingTrash = true } label: {
-                        Label("Trash", systemImage: "trash")
+                    Section {
+                        Button { showingTrash = true } label: {
+                            Label("Trash", systemImage: "trash")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -90,53 +110,27 @@ struct BrainstormView: View {
         .navigationDestination(isPresented: $showingTrash) {
             BrainstormTrashView()
         }
-        .safeAreaInset(edge: .bottom) {
-                HStack {
-                    Spacer()
-                    HStack(spacing: 12) {
-                        Button {
-                            toggleRecording()
-                        } label: {
-                            Image(systemName: isRecording ? "stop.circle.fill" : "mic.circle.fill")
-                                .font(.system(size: 44))
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(isRecording ? .red : (roastMode ? .orange : .accentColor))
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            showAddSheet = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 44))
-                                .symbolRenderingMode(.hierarchical)
-                                .foregroundStyle(roastMode ? .orange : .accentColor)
-                        }
-                        .buttonStyle(.plain)
-                    }
+        .sheet(isPresented: $showAddSheet) {
+            AddBrainstormIdeaSheet(isVoiceNote: false, initialText: "")
+        }
+        .sheet(isPresented: $showTalkToText) {
+            TalkToTextView(selectedFolder: nil, saveToBrainstorm: true)
+        }
+        .alert("Microphone Permission Required", isPresented: $showingPermissionAlert) {
+            Button("Settings", role: .none) {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
                 }
-                .padding(.trailing, 20)
-                .padding(.bottom, 16)
             }
-            .sheet(isPresented: $showAddSheet) {
-                AddBrainstormIdeaSheet(isVoiceNote: false, initialText: "")
-            }
-            // Detail view is now a navigation push via BrainstormDetailView
-            .alert("Microphone Permission Required", isPresented: $showingPermissionAlert) {
-                Button("Settings", role: .none) {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Please enable microphone access in Settings to use voice recording.")
-            }
-            .alert("Error", isPresented: $showingErrorAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(persistenceError ?? "An unknown error occurred")
-            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Please enable microphone access in Settings to use voice recording.")
+        }
+        .alert("Error", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(persistenceError ?? "An unknown error occurred")
+        }
         .tint(roastMode ? .orange : .accentColor)
         .onChange(of: speechManager.isRecording) { oldValue, newValue in
             if oldValue && !newValue && isRecording {
@@ -167,7 +161,7 @@ struct BrainstormView: View {
                             } label: {
                                 IdeaCard(idea: idea, scale: effectiveGridScale, roastMode: roastMode, showFullContent: showFullContent)
                             }
-                            .cardPress()
+                            .buttonStyle(.plain)
                             .contextMenu {
                                 Button {
                                     promoteToJoke(idea)
@@ -206,83 +200,6 @@ struct BrainstormView: View {
         }
     }
     
-    // MARK: - Zoom Bar
-    
-    @ViewBuilder
-    private var brainstormZoomBar: some View {
-        HStack(spacing: 12) {
-            // Zoom out button
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    brainstormGridScale = min(2.0, brainstormGridScale + 0.5)
-                }
-                haptic(.light)
-            } label: {
-                Image(systemName: "minus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(roastMode ? .orange : .accentColor)
-            }
-            .disabled(brainstormGridScale >= 2.0)
-            .opacity(brainstormGridScale >= 2.0 ? 0.4 : 1.0)
-            
-            // Column preset buttons
-            HStack(spacing: 6) {
-                brainstormColumnButton(columns: 4)
-                brainstormColumnButton(columns: 3)
-                brainstormColumnButton(columns: 2)
-            }
-            
-            // Zoom in button
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    brainstormGridScale = max(0.5, brainstormGridScale - 0.5)
-                }
-                haptic(.light)
-            } label: {
-                Image(systemName: "plus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(roastMode ? .orange : .accentColor)
-            }
-            .disabled(brainstormGridScale <= 0.5)
-            .opacity(brainstormGridScale <= 0.5 ? 0.4 : 1.0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(UIColor.secondarySystemBackground).opacity(0.95))
-        )
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-    }
-    
-    @ViewBuilder
-    private func brainstormColumnButton(columns: Int) -> some View {
-        let targetScale = 4.0 / Double(columns)
-        let isActive = abs(brainstormGridScale - targetScale) < 0.1
-        
-        Button {
-            withAnimation(.easeOut(duration: 0.2)) {
-                brainstormGridScale = targetScale
-            }
-            haptic(.light)
-        } label: {
-            HStack(spacing: 2) {
-                ForEach(0..<columns, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(isActive ? (roastMode ? Color.orange : Color.accentColor) : Color.secondary.opacity(0.5))
-                        .frame(width: 6, height: 10)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isActive ? (roastMode ? Color.orange : Color.accentColor).opacity(0.15) : Color.clear)
-            )
-        }
-    }
-    
     // MARK: - Batch Select Views
     
     @ViewBuilder
@@ -296,7 +213,7 @@ struct BrainstormView: View {
                     .opacity(isSelected ? 0.7 : 1.0)
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
+                    .font(.title3)
                     .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
                     .padding(6)
             }
@@ -340,7 +257,7 @@ struct BrainstormView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(.bar)
     }
     
     private func toggleIdeaSelection(_ idea: BrainstormIdea) {
@@ -584,45 +501,58 @@ struct IdeaCard: View {
     let roastMode: Bool
     var showFullContent: Bool = true
     
-    private var contentFontSize: CGFloat {
-        let length = idea.content.count
-        let base: CGFloat = 13 * scale
-        if length > 200 { return max(10, base * 0.75) }
-        return max(11, base)
+    private var accentColor: Color {
+        let hex = idea.colorHex
+        if !hex.isEmpty, let parsed = Color(hex: hex) {
+            return parsed
+        }
+        return roastMode ? .orange : .accentColor
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Voice indicator (subtle)
-            if idea.isVoiceNote {
-                Image(systemName: "mic.fill")
-                    .font(.system(size: max(9, 10 * scale)))
-                    .foregroundStyle(roastMode ? .orange.opacity(0.6) : .accentColor.opacity(0.5))
+        VStack(alignment: .leading, spacing: 0) {
+            // Thin color accent bar at the top
+            accentColor
+                .frame(height: 3)
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10))
+            
+            VStack(alignment: .leading, spacing: 6) {
+                // Voice indicator (subtle badge)
+                if idea.isVoiceNote {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("Voice")
+                            .font(.caption2.weight(.medium))
+                    }
+                    .foregroundStyle(roastMode ? .orange.opacity(0.7) : .accentColor.opacity(0.6))
+                }
+                
+                // Content
+                if showFullContent {
+                    Text(idea.content)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                        .lineSpacing(2)
+                        .lineLimit(6)
+                } else {
+                    Text(idea.content.components(separatedBy: .newlines).first ?? idea.content)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+                
+                Spacer(minLength: 0)
+                
+                // Timestamp (minimal)
+                Text(idea.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            
-            // Content
-            if showFullContent {
-                Text(idea.content)
-                    .font(.system(size: contentFontSize))
-                    .foregroundColor(.primary)
-                    .lineSpacing(2)
-                    .lineLimit(6)
-            } else {
-                Text(idea.content.components(separatedBy: .newlines).first ?? idea.content)
-                    .font(.system(size: max(11, 13 * scale), weight: .medium))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-            }
-            
-            Spacer(minLength: 0)
-            
-            // Timestamp (minimal)
-            Text(idea.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
-                .font(.system(size: max(8, 9 * scale)))
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, max(8, 10 * scale))
+            .padding(.vertical, max(8, 10 * scale))
         }
-        .padding(max(8, 10 * scale))
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))

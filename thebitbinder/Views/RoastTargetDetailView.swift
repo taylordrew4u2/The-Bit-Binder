@@ -39,7 +39,7 @@ struct RoastTargetDetailView: View {
     // Edit mode for drag-to-reorder
     @State private var isEditMode = false
 
-    private let accentColor = AppTheme.Colors.roastAccent
+    private let accentColor: Color = .orange
     
     enum RoastFilterMode: String, CaseIterable {
         case all = "All"
@@ -150,38 +150,21 @@ struct RoastTargetDetailView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
-                // Target Header Card
-                targetHeaderCard
-                
-                // Filter chips
-                filterChips
-                
-                Divider()
-
-                // Roast Jokes List
-                if displayedJokes.isEmpty {
-                    emptyState
-                } else {
-                    jokesList
-                }
-            }
+        VStack(spacing: 0) {
+            // Target Header Card
+            targetHeaderCard
             
-            // Floating Add Button - clean, professional
-            Button {
-                showingAddRoast = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 50, height: 50)
-                    .background(accentColor)
-                    .clipShape(Circle())
-                    .shadow(color: accentColor.opacity(0.25), radius: 6, x: 0, y: 3)
+            // Filter chips
+            filterChips
+            
+            Divider()
+
+            // Roast Jokes List
+            if displayedJokes.isEmpty {
+                emptyState
+            } else {
+                jokesList
             }
-            .padding(.trailing, 20)
-            .padding(.bottom, 20)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -277,7 +260,7 @@ struct RoastTargetDetailView: View {
                         count: target.killerCount,
                         label: "killer",
                         icon: "star.fill",
-                        color: AppTheme.Colors.hitsGold
+                        color: .yellow
                     )
                 }
                 
@@ -286,7 +269,7 @@ struct RoastTargetDetailView: View {
                         count: target.testedCount,
                         label: "tested",
                         icon: "checkmark.circle.fill",
-                        color: AppTheme.Colors.success
+                        color: .green
                     )
                 }
             }
@@ -518,6 +501,14 @@ struct RoastTargetDetailView: View {
                 showingEditTarget = true
             } label: {
                 Image(systemName: "pencil")
+            }
+        }
+        
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                showingAddRoast = true
+            } label: {
+                Image(systemName: "plus")
             }
         }
         
@@ -927,7 +918,7 @@ struct DraggableRoastCard: View {
                         .foregroundColor(joke.isKiller ? .yellow : accentColor)
                 }
             }
-            .buttonStyle(ScaleButtonStyle())
+            .buttonStyle(.plain)
             
             // Content
             VStack(alignment: .leading, spacing: 6) {
@@ -959,7 +950,7 @@ struct DraggableRoastCard: View {
                         } label: {
                             BadgePill(text: "\(joke.performanceCount)×", icon: "checkmark.circle.fill", color: .green)
                         }
-                        .buttonStyle(ScaleButtonStyle())
+                        .buttonStyle(.plain)
                     }
                     
                     // Relatability
@@ -1168,16 +1159,6 @@ struct BadgePill: View {
         .padding(.vertical, 3)
         .background(color.opacity(0.15))
         .clipShape(Capsule())
-    }
-}
-
-// MARK: - Scale Button Style
-
-struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
 
@@ -1754,7 +1735,7 @@ struct EditRoastJokeView: View {
     @State private var showOpeningAssignment = false
     @FocusState private var isContentFocused: Bool
     
-    private let accentColor = AppTheme.Colors.roastAccent
+    private let accentColor: Color = .orange
     
     /// Safe content accessor
     private var safeContent: String {
@@ -2232,7 +2213,7 @@ struct EditRoastTargetView: View {
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
 
-    private let accentColor = AppTheme.Colors.roastAccent
+    private let accentColor: Color = .orange
 
     var body: some View {
         NavigationStack {

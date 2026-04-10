@@ -131,11 +131,28 @@ DEFINE SCHEMA
         "___recordID"      REFERENCE QUERYABLE
     );
 
+    RECORD TYPE CD_NotebookFolder (
+        CD_id           STRING QUERYABLE,
+        CD_name         STRING QUERYABLE,
+        CD_dateCreated  TIMESTAMP QUERYABLE SORTABLE,
+        CD_sortOrder    INT64,
+        CD_isDeleted    INT64 QUERYABLE,
+        CD_deletedDate  TIMESTAMP,
+        "___createTime" TIMESTAMP,
+        "___createdBy"  REFERENCE,
+        "___etag"       STRING,
+        "___modTime"    TIMESTAMP,
+        "___modifiedBy" REFERENCE,
+        "___recordID"   REFERENCE QUERYABLE
+    );
+
     RECORD TYPE CD_NotebookPhotoRecord (
         CD_id           STRING QUERYABLE,
         CD_dateAdded    TIMESTAMP QUERYABLE SORTABLE,
         CD_imageData    BYTES,
         CD_notes        STRING,
+        CD_sortOrder    INT64,
+        CD_folder       REFERENCE QUERYABLE,
         CD_isDeleted    INT64 QUERYABLE,
         CD_deletedDate  TIMESTAMP,
         "___createTime" TIMESTAMP,

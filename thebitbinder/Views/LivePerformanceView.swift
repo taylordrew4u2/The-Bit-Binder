@@ -261,7 +261,7 @@ struct LivePerformanceView: View {
                                 Text(targetName.uppercased())
                                     .font(.system(size: 16, weight: .bold))
                             }
-                            .foregroundColor(AppTheme.Colors.roastAccent)
+                            .foregroundColor(.orange)
                             .padding(.bottom, 8)
                         }
                         
@@ -380,7 +380,7 @@ struct LivePerformanceView: View {
                         }
                         .foregroundColor(.white)
                         .frame(width: 100, height: 75)
-                        .background(AppTheme.Colors.roastAccent)
+                        .background(.orange)
                         .cornerRadius(12)
                     }
                 }
@@ -634,10 +634,10 @@ struct LivePerformanceView: View {
                             HStack {
                                 Image(systemName: "flame.fill")
                                     .font(.system(size: 12))
-                                    .foregroundColor(AppTheme.Colors.roastAccent)
+                                    .foregroundColor(.orange)
                                 Text("Roast Jokes (\(backupRoasts.count))")
                                     .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(AppTheme.Colors.roastAccent.opacity(0.8))
+                                    .foregroundColor(.orange.opacity(0.8))
                                 Spacer()
                             }
                             .padding(.horizontal, 16)
@@ -760,11 +760,11 @@ struct LivePerformanceView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 24))
-                            .foregroundColor(AppTheme.Colors.roastAccent)
+                            .foregroundColor(.orange)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("ROAST TARGETS")
                                 .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(AppTheme.Colors.roastAccent)
+                                .foregroundColor(.orange)
                             Text("\(allTargetsWithRoasts.count) target\(allTargetsWithRoasts.count == 1 ? "" : "s")")
                                 .font(.system(size: 12))
                                 .foregroundColor(.white.opacity(0.5))
@@ -1127,10 +1127,10 @@ struct JokeListRow: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "flame.fill")
                                     .font(.system(size: 12))
-                                    .foregroundColor(AppTheme.Colors.roastAccent)
+                                    .foregroundColor(.orange)
                                 Text(target.uppercased())
                                     .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(AppTheme.Colors.roastAccent)
+                                    .foregroundColor(.orange)
                             }
                         }
                         
@@ -1226,7 +1226,7 @@ struct JokeListRow: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(item.isRoast ? AppTheme.Colors.roastAccent : Color.blue)
+                        .background(item.isRoast ? .orange : Color.blue)
                         .cornerRadius(8)
                     }
                 }
@@ -1277,14 +1277,14 @@ struct BackupJokeRow: View {
                     if isRoast {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 14))
-                            .foregroundColor(AppTheme.Colors.roastAccent)
+                            .foregroundColor(.orange)
                     }
                     
                     // Target name if roast
                     if let target = targetName {
                         Text(target.uppercased())
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.roastAccent)
+                            .foregroundColor(.orange)
                     }
                     
                     Spacer()
@@ -1434,7 +1434,7 @@ struct TargetSection: View {
                     // Flame icon
                     Image(systemName: "flame.fill")
                         .font(.system(size: 24))
-                        .foregroundColor(AppTheme.Colors.roastAccent)
+                        .foregroundColor(.orange)
                     
                     // Target name
                     VStack(alignment: .leading, spacing: 2) {
@@ -1467,7 +1467,7 @@ struct TargetSection: View {
                         .foregroundColor(.white.opacity(0.4))
                 }
                 .padding()
-                .background(AppTheme.Colors.roastAccent.opacity(0.15))
+                .background(.orange.opacity(0.15))
             }
             
             // Opening Roast Sections (based on openingRoastCount) with their backups

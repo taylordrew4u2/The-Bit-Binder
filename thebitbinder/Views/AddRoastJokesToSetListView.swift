@@ -10,6 +10,7 @@ import SwiftUI
 import SwiftData
 
 struct AddRoastJokesToSetListView: View {
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query(filter: #Predicate<RoastTarget> { !$0.isDeleted }, sort: \RoastTarget.name) private var roastTargets: [RoastTarget]
 
@@ -21,7 +22,7 @@ struct AddRoastJokesToSetListView: View {
     @State private var expandedTargets: Set<UUID> = []
     @State private var searchText = ""
 
-    private let accent = AppTheme.Colors.roastAccent
+    private let accent = Color.orange
 
     // MARK: - Filtered Data
 
@@ -53,7 +54,7 @@ struct AddRoastJokesToSetListView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if filteredTargets.isEmpty {
                     emptyState
@@ -84,7 +85,7 @@ struct AddRoastJokesToSetListView: View {
     private var emptyState: some View {
         VStack(spacing: 20) {
             Image(systemName: "flame")
-                .font(.system(size: 60))
+                .font(.largeTitle)
                 .foregroundColor(.gray)
             Text("No roast jokes available")
                 .font(.title3)
@@ -203,7 +204,7 @@ struct AddRoastJokesToSetListView: View {
                 Spacer()
                 Image(systemName: selectedIDs.contains(joke.id) ? "checkmark.circle.fill" : "circle")
                     .foregroundColor(selectedIDs.contains(joke.id) ? accent : .secondary)
-                    .font(.system(size: 22))
+                    .font(.title3)
             }
         }
     }
@@ -213,6 +214,13 @@ struct AddRoastJokesToSetListView: View {
     private func addSelected() {
         setList.roastJokeIDs.append(contentsOf: selectedIDs)
         setList.dateModified = Date()
+        do {
+            try modelContext.save()
+        } catch {
+            #if DEBUG
+            print("⚠️ [AddRoastJokesToSetListView] Failed to save added roast jokes: \(error)")
+            #endif
+        }
         dismiss()
     }
 }

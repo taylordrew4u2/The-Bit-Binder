@@ -50,19 +50,7 @@ struct AudioImportView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Header
-                    VStack(spacing: 12) {
-                        Image(systemName: "waveform.circle.fill")
-                            .font(.system(size: 70))
-                            .foregroundStyle(.blue.gradient)
-                        
-                        Text("Import Voice Memos")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                    }
-                    .padding(.top, 20)
-                    
-                    // Drop zone for drag and drop
+                // Drop zone for drag and drop
                     DropZoneView { urls in
                         Task {
                             await processAudioFiles(urls)
@@ -74,7 +62,7 @@ struct AudioImportView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         Label("How to Import Voice Memos", systemImage: "info.circle.fill")
                             .font(.headline)
-                            .foregroundColor(AppTheme.Colors.primaryAction)
+                            .foregroundColor(.accentColor)
                         
                         VStack(alignment: .leading, spacing: 12) {
                             ImportStepRow(number: 1, text: "Open the Voice Memos app")
@@ -87,7 +75,7 @@ struct AudioImportView: View {
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AppTheme.Colors.primaryAction.opacity(0.08))
+                    .background(Color.accentColor.opacity(0.08))
                     .cornerRadius(12)
                     .padding(.horizontal)
                     
@@ -109,7 +97,7 @@ struct AudioImportView: View {
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(AppTheme.Colors.primaryAction)
+                            .background(Color.accentColor)
                             .foregroundColor(.white)
                             .cornerRadius(12)
                         }
@@ -119,7 +107,7 @@ struct AudioImportView: View {
                     // Info
                     HStack(alignment: .top, spacing: 10) {
                         Image(systemName: "info.circle.fill")
-                            .foregroundColor(AppTheme.Colors.primaryAction)
+                            .foregroundColor(.accentColor)
                         Text("Audio is transcribed to text and saved as a joke. The original audio file is not kept.")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -132,7 +120,7 @@ struct AudioImportView: View {
                     if !authorizationStatus.isEmpty {
                         Text(authorizationStatus)
                             .font(.caption)
-                            .foregroundColor(AppTheme.Colors.warning)
+                            .foregroundColor(.orange)
                             .padding(.horizontal)
                     }
                 }
@@ -270,7 +258,7 @@ struct DropZoneView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "arrow.down.doc.fill")
-                .font(.system(size: 40))
+                .font(.largeTitle)
                 .foregroundColor(isTargeted ? .blue : .gray)
             
             Text("Drag & Drop Voice Memos Here")
@@ -288,7 +276,7 @@ struct DropZoneView: View {
                 .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8]))
                 .foregroundColor(isTargeted ? .blue : .gray.opacity(0.5))
         )
-        .background(isTargeted ? AppTheme.Colors.primaryAction.opacity(0.1) : Color.clear)
+        .background(isTargeted ? .accentColor.opacity(0.1) : Color.clear)
         .cornerRadius(16)
         .dropDestination(for: URL.self) { urls, _ in
             let audioURLs = urls.filter { url in
@@ -378,9 +366,7 @@ struct ProcessingOverlay: View {
                     .truncationMode(.middle)
             }
             .padding(32)
-            .background(Color(UIColor.systemBackground))
-            .cornerRadius(16)
-            .shadow(radius: 10)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 }
@@ -401,7 +387,7 @@ struct AudioImportResultsView: View {
                             Text("\(successCount)")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
-                                .foregroundColor(AppTheme.Colors.success)
+                                .foregroundColor(.green)
                             Text("Imported")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -412,7 +398,7 @@ struct AudioImportResultsView: View {
                                 Text("\(failureCount)")
                                     .font(.largeTitle)
                                     .fontWeight(.bold)
-                                    .foregroundColor(AppTheme.Colors.error)
+                                    .foregroundColor(.red)
                                 Text("Failed")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -428,7 +414,7 @@ struct AudioImportResultsView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(AppTheme.Colors.success)
+                                        .foregroundColor(.green)
                                     Text(result.filename)
                                         .font(.subheadline)
                                         .fontWeight(.medium)
@@ -440,7 +426,7 @@ struct AudioImportResultsView: View {
                                 }
                                 Text("Confidence: \(result.confidenceDescription)")
                                     .font(.caption2)
-                                    .foregroundColor(AppTheme.Colors.primaryAction)
+                                    .foregroundColor(.accentColor)
                             }
                             .padding(.vertical, 4)
                         }
@@ -453,7 +439,7 @@ struct AudioImportResultsView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(AppTheme.Colors.error)
+                                        .foregroundColor(.red)
                                     Text(result.filename)
                                         .font(.subheadline)
                                 }
@@ -491,7 +477,7 @@ struct ImportStepRow: View {
                 .fontWeight(.bold)
                 .foregroundColor(.white)
                 .frame(width: 22, height: 22)
-                .background(AppTheme.Colors.primaryAction)
+                .background(Color.accentColor)
                 .clipShape(Circle())
             
             Text(text)

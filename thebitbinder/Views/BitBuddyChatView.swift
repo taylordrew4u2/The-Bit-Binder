@@ -26,7 +26,7 @@ struct BitBuddyChatView: View {
     @State private var displayedText = ""
     
     private var accentColor: Color {
-        roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue
+        roastMode ? .orange : .accentColor
     }
 
     @ViewBuilder
@@ -80,7 +80,7 @@ struct BitBuddyChatView: View {
             // Input Area
             inputArea
         }
-        .background(roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
+        .background(Color(UIColor.systemBackground))
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .bitBinderToolbar(roastMode: roastMode)
@@ -165,12 +165,12 @@ struct BitBuddyChatView: View {
             
             VStack(spacing: 8) {
                 Text(roastMode ? "Ready to Roast?" : "Hey, \(userPreferences.userName)!")
-                    .font(.system(size: 22, weight: .bold, design: .serif))
-                    .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                    .font(.title2.bold())
+                    .foregroundColor(.primary)
                 
                 Text("I can help with your jokes, set lists, brainstorms, recordings, imports, and more — all on-device.")
-                    .font(.system(size: 15, design: .serif))
-                    .foregroundColor(roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
@@ -203,25 +203,24 @@ struct BitBuddyChatView: View {
             sendMessage()
         } label: {
             Text(text)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                .font(.subheadline)
+                .foregroundColor(.primary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .frame(maxWidth: 280, alignment: .leading)
                 .background(
-                    RoundedRectangle(cornerRadius: AppTheme.Radius.large, style: .continuous)
-                        .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-                        .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(UIColor.secondarySystemBackground))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: AppTheme.Radius.large, style: .continuous)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(
-                            roastMode ? AppTheme.Colors.roastAccent.opacity(0.25) : AppTheme.Colors.primaryAction.opacity(0.15),
+                            roastMode ? Color.orange.opacity(0.25) : Color.accentColor.opacity(0.15),
                             lineWidth: 1
                         )
                 )
         }
-        .buttonStyle(ChipStyle())
+        .buttonStyle(.plain)
     }
     
     // MARK: - Input Area
@@ -234,18 +233,18 @@ struct BitBuddyChatView: View {
                 // Text field
                 HStack {
                     TextField("Ask BitBuddy...", text: $inputText)
-                        .font(.system(size: 16, design: .serif))
-                        .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                        .font(.body)
+                        .foregroundColor(.primary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
+                        .fill(Color(UIColor.secondarySystemBackground))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(roastMode ? AppTheme.Colors.roastAccent.opacity(0.3) : Color.clear, lineWidth: 1)
+                        .strokeBorder(roastMode ? Color.orange.opacity(0.3) : Color.clear, lineWidth: 1)
                 )
                 
                 // Send button
@@ -254,14 +253,14 @@ struct BitBuddyChatView: View {
                         Circle()
                             .fill(
                                 inputText.trimmingCharacters(in: .whitespaces).isEmpty || bitBuddy.isLoading
-                                ? (roastMode ? AppTheme.Colors.roastCard : Color(.systemGray5))
+                                ? Color(UIColor.systemGray5)
                                 : accentColor
                             )
                             .frame(width: 44, height: 44)
                         
                         if bitBuddy.isLoading {
                             ProgressView()
-                                .tint(roastMode ? .white : AppTheme.Colors.inkBlack)
+                                .tint(.primary)
                         } else {
                             Image(systemName: "arrow.up")
                                 .font(.system(size: 18, weight: .semibold))
@@ -274,11 +273,11 @@ struct BitBuddyChatView: View {
                     }
                 }
                 .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || bitBuddy.isLoading)
-                .buttonStyle(FABButtonStyle())
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(roastMode ? AppTheme.Colors.roastSurface : AppTheme.Colors.paperCream)
+            .background(Color(UIColor.systemBackground))
         }
     }
     
@@ -391,11 +390,11 @@ struct ChatBubble: View {
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 4) {
                 HStack(spacing: 0) {
                     Text(visibleText)
-                        .font(.system(size: 15, design: .serif))
+                        .font(.body)
                     
                     if isBeingTyped {
                         Text("|")
-                            .font(.system(size: 15, weight: .light, design: .serif))
+                            .font(.body.weight(.light))
                             .opacity(0.6)
                             .blinking()
                     }
@@ -403,20 +402,20 @@ struct ChatBubble: View {
                 .padding(12)
                 .background(
                     message.isUser
-                    ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.inkBlue)
-                    : (roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
+                    ? (roastMode ? Color.orange : Color.accentColor)
+                    : Color(UIColor.secondarySystemBackground)
                 )
                 .foregroundColor(
                     message.isUser
                     ? .white
-                    : (roastMode ? .white.opacity(0.9) : AppTheme.Colors.inkBlack)
+                    : .primary
                 )
                 .cornerRadius(16)
                 .cornerRadius(message.isUser ? 16 : 4, corners: message.isUser ? [.topLeft, .bottomLeft, .bottomRight] : [.topRight, .bottomLeft, .bottomRight])
                 
                 Text(message.timestamp, style: .time)
-                    .font(.system(size: 11))
-                    .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
             
             if !message.isUser {
@@ -463,7 +462,7 @@ struct TypingIndicator: View {
             HStack(spacing: 4) {
                 ForEach(0..<3, id: \.self) { index in
                     Circle()
-                        .fill(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
+                        .fill(Color.secondary.opacity(0.5))
                         .frame(width: 7, height: 7)
                         .offset(y: dotOffset[index])
                 }
@@ -471,7 +470,7 @@ struct TypingIndicator: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(
-                roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated
+                Color(UIColor.secondarySystemBackground)
             )
             .cornerRadius(16)
             .cornerRadius(4, corners: [.topRight, .bottomLeft, .bottomRight])
@@ -500,18 +499,18 @@ struct BitBuddyAvatar: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
+                .fill(Color(UIColor.secondarySystemBackground))
                 .overlay(
                     Circle()
                         .stroke(
-                            roastMode ? AppTheme.Colors.roastAccent.opacity(0.35) : AppTheme.Colors.primaryAction.opacity(0.2),
+                            roastMode ? Color.orange.opacity(0.35) : Color.accentColor.opacity(0.2),
                             lineWidth: 1
                         )
                 )
 
             Image(systemName: roastMode ? "flame.fill" : "sparkles")
                 .font(.system(size: symbolSize, weight: .semibold))
-                .foregroundStyle(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                .foregroundStyle(roastMode ? .orange : .accentColor)
         }
         .frame(width: size, height: size)
     }

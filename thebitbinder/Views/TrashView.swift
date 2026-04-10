@@ -102,7 +102,7 @@ struct TrashView: View {
                                     } label: {
                                         Label("Restore", systemImage: "arrow.uturn.backward")
                                     }
-                                    .tint(AppTheme.Colors.success)
+                                    .tint(.green)
                                 }
                                 .contextMenu {
                                     Button {
@@ -135,11 +135,11 @@ struct TrashView: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: "flame.fill")
                                             .font(.caption)
-                                            .foregroundColor(AppTheme.Colors.roastAccent)
+                                            .foregroundColor(.orange)
                                         if let targetName = roast.target?.name {
                                             Text(targetName)
                                                 .font(.caption.bold())
-                                                .foregroundColor(AppTheme.Colors.roastAccent)
+                                                .foregroundColor(.orange)
                                         }
                                     }
                                     
@@ -173,7 +173,7 @@ struct TrashView: View {
                                     } label: {
                                         Label("Restore", systemImage: "arrow.uturn.backward")
                                     }
-                                    .tint(AppTheme.Colors.success)
+                                    .tint(.green)
                                 }
                                 .contextMenu {
                                     Button {
@@ -193,7 +193,7 @@ struct TrashView: View {
                         } header: {
                             HStack {
                                 Image(systemName: "flame.fill")
-                                    .foregroundColor(AppTheme.Colors.roastAccent)
+                                    .foregroundColor(.orange)
                                 Text("Roasts (\(filteredRoastJokes.count))")
                             }
                         }
@@ -202,8 +202,8 @@ struct TrashView: View {
                 .listStyle(.insetGrouped)
             }
         }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationTitle("Trash")
+        .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, prompt: "Search trash")
         .toolbar {
             if totalTrashedCount > 0 {

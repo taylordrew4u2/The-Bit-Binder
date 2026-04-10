@@ -19,42 +19,62 @@ struct JokeCardView: View {
     private var isHit: Bool { joke.isHit }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header: Title + Hit indicator
-            HStack(alignment: .top, spacing: 6) {
-                Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .lineLimit(2)
+        HStack(spacing: 0) {
+            // Hit accent strip
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(isHit ? Color.yellow : .clear)
+                .frame(width: 3)
+                .padding(.vertical, 8)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                // Header: Title + Hit indicator
+                HStack(alignment: .top, spacing: 6) {
+                    Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                    
+                    Spacer(minLength: 4)
+                    
+                    if isHit {
+                        Image(systemName: "star.fill")
+                            .font(.caption)
+                            .foregroundColor(.yellow)
+                    }
+                }
                 
-                Spacer(minLength: 4)
+                // Content preview
+                if showFullContent {
+                    Text(joke.content)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(4)
+                        .lineSpacing(2)
+                }
                 
-                if isHit {
-                    Image(systemName: "star.fill")
-                        .font(.caption)
-                        .foregroundColor(.yellow)
+                Spacer(minLength: 0)
+                
+                // Footer: Date + folder indicator
+                HStack(spacing: 6) {
+                    Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
+                        .font(.caption2)
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                    
+                    Spacer()
+                    
+                    if let folders = joke.folders, !folders.isEmpty {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(UIColor.quaternaryLabel))
+                    }
                 }
             }
-            
-            // Content preview
-            if showFullContent {
-                Text(joke.content)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(4)
-                    .lineSpacing(2)
-            }
-            
-            Spacer(minLength: 0)
-            
-            // Date
-            Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
-                .font(.caption2)
-                .foregroundColor(NativeTheme.Colors.textTertiary)
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
+            .padding(.vertical, 12)
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(NativeTheme.Colors.backgroundSecondary)
+        .background(Color(UIColor.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
@@ -70,6 +90,12 @@ struct JokeRowView: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
+            // Hit accent strip
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(isHit ? Color.yellow : .clear)
+                .frame(width: 3, height: showFullContent ? 36 : 20)
+                .padding(.top, 2)
+            
             // Content
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
@@ -92,9 +118,21 @@ struct JokeRowView: View {
                         .lineLimit(2)
                 }
                 
-                Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
-                    .font(.caption)
-                    .foregroundColor(NativeTheme.Colors.textTertiary)
+                HStack(spacing: 6) {
+                    Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
+                        .font(.caption)
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                    
+                    if let folders = joke.folders, let first = folders.first {
+                        Text("·")
+                            .font(.caption)
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                        Text(first.name)
+                            .font(.caption)
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .lineLimit(1)
+                    }
+                }
             }
             
             Spacer()
@@ -113,7 +151,10 @@ struct FolderChip: View {
     let action: () -> Void
     
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            haptic(.selection)
+            action()
+        }) {
             Text(name)
                 .font(.subheadline)
                 .fontWeight(isSelected ? .semibold : .regular)
@@ -123,9 +164,10 @@ struct FolderChip: View {
                 .background(
                     isSelected
                         ? (roastMode ? AnyShapeStyle(Color.orange) : AnyShapeStyle(Color.accentColor))
-                        : AnyShapeStyle(NativeTheme.Colors.fillSecondary)
+                        : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
                 )
                 .clipShape(Capsule())
+                .animation(.easeInOut(duration: 0.2), value: isSelected)
         }
         .buttonStyle(.plain)
     }
@@ -140,7 +182,10 @@ struct TheHitsChip: View {
     let action: () -> Void
     
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            haptic(.selection)
+            action()
+        }) {
             HStack(spacing: 4) {
                 Image(systemName: "star.fill")
                     .font(.caption.weight(.semibold))
@@ -161,9 +206,10 @@ struct TheHitsChip: View {
             .background(
                 isSelected
                     ? AnyShapeStyle(Color.yellow)
-                    : AnyShapeStyle(NativeTheme.Colors.fillSecondary)
+                    : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
             )
             .clipShape(Capsule())
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
         }
         .buttonStyle(.plain)
     }
@@ -282,7 +328,7 @@ struct ImportProgressCard: View {
                 let currentTipIndex = tipIndex(for: context.date)
                 Text(Self.importTips[currentTipIndex % Self.importTips.count])
                     .font(.caption)
-                    .foregroundColor(NativeTheme.Colors.textTertiary)
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
                     .multilineTextAlignment(.center)
                     .id(currentTipIndex)
                     .animation(.easeInOut(duration: 0.3), value: currentTipIndex)
@@ -290,9 +336,7 @@ struct ImportProgressCard: View {
         }
         .padding(20)
         .frame(maxWidth: 280)
-        .background(NativeTheme.Colors.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
     
     private func stagePill(_ stage: ImportStage) -> some View {
@@ -318,7 +362,7 @@ struct ImportProgressCard: View {
                 ? AnyShapeStyle(Color.accentColor)
                 : (isComplete
                     ? AnyShapeStyle(Color.green.opacity(0.12))
-                    : AnyShapeStyle(NativeTheme.Colors.fillTertiary))
+                    : AnyShapeStyle(Color(UIColor.tertiarySystemFill)))
         )
         .clipShape(Capsule())
     }
@@ -347,15 +391,6 @@ enum ImportStage: Int, CaseIterable {
         case .reading: return "Read"
         case .extracting: return "Extract"
         case .finishing: return "Finish"
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .analyzing: return "doc.text.magnifyingglass"
-        case .reading: return "text.viewfinder"
-        case .extracting: return "wand.and.stars"
-        case .finishing: return "checkmark.seal"
         }
     }
 }

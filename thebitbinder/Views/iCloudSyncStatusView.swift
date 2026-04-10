@@ -17,7 +17,7 @@ struct iCloudSyncStatusView: View {
     @State private var isRefreshing = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 // Current Sync Status
                 Section("Sync Status") {
@@ -304,7 +304,7 @@ struct DiagnosticsDetailView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section("Diagnostic Results") {
                     ForEach(diagnostics.diagnosticResults, id: \.self) { result in

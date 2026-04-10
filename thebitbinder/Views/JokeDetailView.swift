@@ -25,47 +25,143 @@ struct JokeDetailView: View {
     
     // Auto-save state
     @StateObject private var autoSave = AutoSaveManager.shared
-    @State private var showSavedToast = false
     @State private var saveError: String?
     @State private var showingSaveError = false
     
-    // Accent color based on mode
-    private var accentColor: Color {
-        roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction
-    }
-    
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // MARK: - Title Section
-                titleSection
-                
-                // MARK: - Content Section
-                contentSection
-                
-                // MARK: - Tags Section
-                if !joke.tags.isEmpty || isEditing {
-                    tagsSection
-                }
-                
-                // MARK: - Actions Bar
-                actionsBar
-                
-                // MARK: - Metadata (collapsible)
-                if showingMetadata {
-                    metadataSection
+        Form {
+            // MARK: - Title Section
+            Section {
+                if isEditing {
+                    TextField("Title", text: $joke.title, axis: .vertical)
+                        .font(.title3.weight(.semibold))
+                        .lineLimit(3)
+                } else {
+                    HStack {
+                        Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
+                            .font(.title3.weight(.semibold))
+                        Spacer()
+                        if joke.isHit {
+                            Image(systemName: roastMode ? "flame.fill" : "star.fill")
+                                .foregroundColor(roastMode ? .orange : .yellow)
+                        }
+                    }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 40)
+            
+            // MARK: - Content Section
+            Section {
+                if isEditing {
+                    TextEditor(text: $joke.content)
+                        .font(.body)
+                        .lineSpacing(4)
+                        .frame(minHeight: 200)
+                } else {
+                    Text(joke.content)
+                        .font(.body)
+                        .lineSpacing(4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation {
+                                isEditing = true
+                            }
+                            HapticEngine.shared.tap()
+                        }
+                }
+            } header: {
+                if !joke.content.isEmpty {
+                    Text("\(joke.content.split(separator: " ").count) words")
+                }
+            }
+            
+            // MARK: - Tags Section
+            if !joke.tags.isEmpty {
+                Section("Tags") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(joke.tags, id: \.self) { tag in
+                                Text(tag)
+                                    .font(.caption)
+                                    .foregroundColor(.accentColor)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+                            }
+                        }
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                }
+            }
+            
+            // MARK: - Actions Section
+            Section {
+                Button {
+                    withAnimation {
+                        joke.isHit.toggle()
+                        joke.dateModified = Date()
+                    }
+                    HapticEngine.shared.starToggle(joke.isHit)
+                    do { try modelContext.save() } catch {
+                        saveError = "Couldn't save hit status: \(error.localizedDescription)"
+                        showingSaveError = true
+                    }
+                } label: {
+                    Label(
+                        joke.isHit ? "Remove from Hits" : "Add to Hits",
+                        systemImage: roastMode ? (joke.isHit ? "flame.fill" : "flame") : (joke.isHit ? "star.fill" : "star")
+                    )
+                    .foregroundColor(joke.isHit ? (roastMode ? .orange : .yellow) : .accentColor)
+                }
+                
+                Button {
+                    HapticEngine.shared.tap()
+                    showingFolderPicker = true
+                } label: {
+                    HStack {
+                        Label("Folders", systemImage: "folder")
+                        Spacer()
+                        let folderCount = (joke.folders ?? []).count
+                        if folderCount == 0 {
+                            Text("None")
+                                .foregroundColor(.secondary)
+                        } else if folderCount == 1 {
+                            Text((joke.folders ?? []).first?.name ?? "")
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("\(folderCount)")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            
+            // MARK: - Metadata Section (collapsible)
+            Section {
+                DisclosureGroup("Details", isExpanded: $showingMetadata) {
+                    LabeledContent("Created") {
+                        Text(joke.dateCreated.formatted(date: .abbreviated, time: .shortened))
+                    }
+                    LabeledContent("Modified") {
+                        Text(joke.dateModified.formatted(date: .abbreviated, time: .shortened))
+                    }
+                    if let source = joke.importSource, !source.isEmpty {
+                        LabeledContent("Imported from") {
+                            Text(source)
+                        }
+                    }
+                    if let confidence = joke.importConfidence, !confidence.isEmpty {
+                        LabeledContent("Confidence") {
+                            Text(confidence.capitalized)
+                                .foregroundColor(confidence == "high" ? .green : (confidence == "medium" ? .blue : .orange))
+                        }
+                    }
+                }
+            }
         }
-        .background(roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
         .navigationBarTitleDisplayMode(.inline)
-        .bitBinderToolbar(roastMode: roastMode)
         .toolbar { toolbarContent }
-        .tint(accentColor)
-        .successToast(message: "Changes saved", icon: "checkmark.circle.fill", isPresented: $showSavedToast, roastMode: roastMode)
+        .tint(roastMode ? .orange : .accentColor)
         .alert(joke.isDeleted ? "Restore Joke" : "Move to Trash", isPresented: $showingDeleteAlert) {
             deleteAlertButtons
         } message: {
@@ -94,7 +190,6 @@ struct JokeDetailView: View {
                 folders = (try? modelContext.fetch(descriptor)) ?? []
             }
         }
-        // Auto-save on content changes (debounced)
         .onChange(of: joke.content) { _, _ in
             scheduleAutoSave()
         }
@@ -102,9 +197,8 @@ struct JokeDetailView: View {
             scheduleAutoSave()
         }
         .onDisappear {
-            // Final save on exit
             saveJokeNow()
-            folders = []  // free memory
+            folders = []
         }
     }
     
@@ -136,298 +230,6 @@ struct JokeDetailView: View {
         }
     }
     
-    // MARK: - Title Section
-    
-    private var titleSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 12) {
-                if isEditing {
-                    TextField("Title", text: $joke.title, axis: .vertical)
-                        .font(.system(size: 24, weight: .bold, design: .serif))
-                        .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
-                        .lineLimit(3)
-                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                } else {
-                    Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
-                        .font(.system(size: 24, weight: .bold, design: .serif))
-                        .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
-                        .transition(.opacity)
-                }
-                
-                Spacer()
-                
-                // Hit badge
-                if joke.isHit {
-                    HitStarBadge(size: 24, showBackground: true, roastMode: roastMode)
-                        .transition(.scale.combined(with: .opacity))
-                }
-            }
-            .animation(EffortlessAnimation.snappy, value: isEditing)
-            .animation(EffortlessAnimation.bouncy, value: joke.isHit)
-            
-            // Word count + folders + auto-save status inline
-            HStack(spacing: 12) {
-                if joke.wordCount > 0 {
-                    Text("\(joke.wordCount) words")
-                        .font(.system(size: 12))
-                        .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
-                }
-                
-                if !(joke.folders ?? []).isEmpty {
-                    Button {
-                        HapticEngine.shared.tap()
-                        showingFolderPicker = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "folder.fill")
-                                .font(.system(size: 10))
-                            if (joke.folders ?? []).count == 1 {
-                                Text((joke.folders ?? []).first?.name ?? "")
-                                    .font(.system(size: 12, weight: .medium))
-                            } else {
-                                Text("\((joke.folders ?? []).count) folders")
-                                    .font(.system(size: 12, weight: .medium))
-                            }
-                        }
-                        .foregroundColor(accentColor.opacity(0.8))
-                    }
-                }
-                
-                Spacer()
-                
-                // Auto-save status indicator
-                if isEditing {
-                    SaveStatusIndicator(roastMode: roastMode)
-                }
-            }
-        }
-        .padding(.bottom, 16)
-    }
-    
-    // MARK: - Content Section
-    
-    private var contentSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if isEditing {
-                TextEditor(text: $joke.content)
-                    .scrollContentBackground(.hidden)
-                    .font(.system(size: 17))
-                    .foregroundColor(roastMode ? .white.opacity(0.92) : AppTheme.Colors.inkBlack)
-                    .lineSpacing(6)
-                    .frame(minHeight: 250)
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
-                            .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.99, anchor: .top)))
-            } else {
-                Text(joke.content)
-                    .font(.system(size: 17))
-                    .foregroundColor(roastMode ? .white.opacity(0.9) : AppTheme.Colors.textPrimary)
-                    .lineSpacing(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
-                            .fill(roastMode ? AppTheme.Colors.roastCard.opacity(0.5) : AppTheme.Colors.surfaceElevated.opacity(0.5))
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        // Tap to edit - feels natural
-                        withAnimation(EffortlessAnimation.snappy) {
-                            isEditing = true
-                        }
-                        HapticEngine.shared.tap()
-                    }
-                    .transition(.opacity)
-            }
-        }
-        .animation(EffortlessAnimation.smooth, value: isEditing)
-        .padding(.bottom, 16)
-    }
-    
-    // MARK: - Tags Section
-    
-    private var tagsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Tags")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
-                .textCase(.uppercase)
-                .tracking(0.5)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(joke.tags, id: \.self) { tag in
-                        BitBinderChip(
-                            text: tag,
-                            icon: "tag.fill",
-                            style: .tag,
-                            roastMode: roastMode
-                        )
-                    }
-                    
-                    if joke.tags.isEmpty {
-                        Text("No tags")
-                            .font(.system(size: 13))
-                            .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
-                            .italic()
-                    }
-                }
-            }
-        }
-        .padding(.bottom, 20)
-    }
-    
-    // MARK: - Actions Bar
-    
-    private var actionsBar: some View {
-        HStack(spacing: 12) {
-            // Hit Toggle
-            Button {
-                withAnimation(EffortlessAnimation.bouncy) {
-                    joke.isHit.toggle()
-                    joke.dateModified = Date()
-                }
-                HapticEngine.shared.starToggle(joke.isHit)
-                
-                // Save after toggle
-                do {
-                    try modelContext.save()
-                } catch {
-                    print(" [JokeDetailView] Hit toggle save failed: \(error)")
-                    saveError = "Couldn't save hit status: \(error.localizedDescription)"
-                    showingSaveError = true
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: roastMode ? (joke.isHit ? "flame.fill" : "flame") : (joke.isHit ? "star.fill" : "star"))
-                        .font(.system(size: 16, weight: .semibold))
-                        .symbolEffect(.bounce, value: joke.isHit)
-                    Text(joke.isHit ? "In Hits" : "Add to Hits")
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .foregroundColor(
-                    joke.isHit
-                        ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.hitsGold)
-                        : (roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
-                )
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
-                        .fill(
-                            joke.isHit
-                                ? (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.hitsGold).opacity(0.15)
-                                : (roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.paperDeep)
-                        )
-                )
-            }
-            .buttonStyle(SmoothScaleButtonStyle(scale: 0.95, haptic: false))
-            
-            // Folder picker
-            Button {
-                HapticEngine.shared.tap()
-                showingFolderPicker = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 14))
-                    if (joke.folders ?? []).isEmpty {
-                        Text("Add Folders")
-                            .font(.system(size: 14, weight: .medium))
-                    } else if (joke.folders ?? []).count == 1 {
-                        Text((joke.folders ?? []).first?.name ?? "")
-                            .font(.system(size: 14, weight: .medium))
-                    } else {
-                        Text("\((joke.folders ?? []).count) folders")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                }
-                .foregroundColor(roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
-                        .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.paperDeep)
-                )
-            }
-            .buttonStyle(SmoothScaleButtonStyle(scale: 0.95))
-            
-            Spacer()
-            
-            // Show/hide metadata
-            Button {
-                withAnimation(EffortlessAnimation.smooth) {
-                    showingMetadata.toggle()
-                }
-                HapticEngine.shared.tap()
-            } label: {
-                Image(systemName: showingMetadata ? "chevron.up.circle.fill" : "info.circle")
-                    .font(.system(size: 20))
-                    .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
-                    .symbolEffect(.bounce, value: showingMetadata)
-            }
-        }
-        .padding(.bottom, 16)
-    }
-    
-    // MARK: - Metadata Section (progressive disclosure)
-    
-    private var metadataSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Divider()
-                .padding(.bottom, 8)
-            
-            Text("Details")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
-                .textCase(.uppercase)
-                .tracking(0.5)
-            
-            VStack(spacing: 12) {
-                metadataRow(icon: "calendar", label: "Created", value: joke.dateCreated.formatted(date: .abbreviated, time: .shortened))
-                metadataRow(icon: "pencil", label: "Modified", value: joke.dateModified.formatted(date: .abbreviated, time: .shortened))
-                
-                if let source = joke.importSource, !source.isEmpty {
-                    metadataRow(icon: "doc.text", label: "Imported from", value: source)
-                }
-                
-                if let confidence = joke.importConfidence, !confidence.isEmpty {
-                    HStack {
-                        Label("Confidence", systemImage: "checkmark.seal")
-                            .font(.system(size: 13))
-                            .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
-                        Spacer()
-                        ConfidenceBadge(
-                            level: confidence == "high" ? .high : (confidence == "medium" ? .medium : .low),
-                            roastMode: roastMode
-                        )
-                    }
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: AppTheme.Radius.medium, style: .continuous)
-                    .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
-            )
-        }
-        .transition(.opacity.combined(with: .move(edge: .top)))
-    }
-    
-    private func metadataRow(icon: String, label: String, value: String) -> some View {
-        HStack {
-            Label(label, systemImage: icon)
-                .font(.system(size: 13))
-                .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
-            Spacer()
-            Text(value)
-                .font(.system(size: 13))
-                .foregroundColor(roastMode ? .white : AppTheme.Colors.textPrimary)
-        }
-    }
-    
     // MARK: - Toolbar
     
     @ToolbarContentBuilder
@@ -436,19 +238,16 @@ struct JokeDetailView: View {
             HStack(spacing: 16) {
                 Button(isEditing ? "Done" : "Edit") {
                     if isEditing {
-                        // Save on done
                         saveJokeNow()
                         HapticEngine.shared.success()
-                        showSavedToast = true
                     } else {
                         HapticEngine.shared.tap()
                     }
-                    withAnimation(EffortlessAnimation.snappy) {
+                    withAnimation {
                         isEditing.toggle()
                     }
                 }
                 .fontWeight(isEditing ? .semibold : .regular)
-                .foregroundColor(accentColor)
                 
                 if joke.isDeleted {
                     Button {
@@ -457,7 +256,7 @@ struct JokeDetailView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "arrow.uturn.backward.circle.fill")
-                            .foregroundColor(AppTheme.Colors.success)
+                            .foregroundColor(.green)
                     }
                 } else {
                     Button {
@@ -465,7 +264,7 @@ struct JokeDetailView: View {
                         showingDeleteAlert = true
                     } label: {
                         Image(systemName: "trash")
-                            .foregroundColor(AppTheme.Colors.error)
+                            .foregroundColor(.red)
                     }
                 }
             }
@@ -500,7 +299,7 @@ struct FolderPickerView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Button {
                     selectedFolder = nil
@@ -508,11 +307,10 @@ struct FolderPickerView: View {
                 } label: {
                     HStack {
                         Label("No Folder", systemImage: "tray")
-                            .foregroundColor(roastMode ? .white : .primary)
                         Spacer()
                         if selectedFolder == nil {
                             Image(systemName: "checkmark")
-                                .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                                .foregroundColor(roastMode ? .orange : .accentColor)
                         }
                     }
                 }
@@ -524,20 +322,19 @@ struct FolderPickerView: View {
                     } label: {
                         HStack {
                             Label(folder.name, systemImage: "folder.fill")
-                                .foregroundColor(roastMode ? .white : .primary)
                             Spacer()
                             if selectedFolder?.id == folder.id {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                                    .foregroundColor(roastMode ? .orange : .accentColor)
                             }
                         }
                     }
                 }
             }
-            .navigationTitle("")
+            .navigationTitle("Choose Folder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
@@ -568,7 +365,7 @@ struct MultiFolderPickerView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section {
                     if selectedFolders.isEmpty {
@@ -579,7 +376,6 @@ struct MultiFolderPickerView: View {
                         ForEach(selectedFolders) { folder in
                             HStack {
                                 Label(folder.name, systemImage: "folder.fill")
-                                    .foregroundColor(roastMode ? .white : .primary)
                                 Spacer()
                                 Button {
                                     toggleFolder(folder)
@@ -598,11 +394,7 @@ struct MultiFolderPickerView: View {
                     Button {
                         selectedFolders = []
                     } label: {
-                        HStack {
-                            Label("Clear All Folders", systemImage: "tray")
-                                .foregroundColor(roastMode ? .white : .primary)
-                            Spacer()
-                        }
+                        Label("Clear All Folders", systemImage: "tray")
                     }
                     .disabled(selectedFolders.isEmpty)
                     
@@ -612,10 +404,9 @@ struct MultiFolderPickerView: View {
                         } label: {
                             HStack {
                                 Label(folder.name, systemImage: "folder")
-                                    .foregroundColor(roastMode ? .white : .primary)
                                 Spacer()
                                 Image(systemName: "plus.circle")
-                                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                                    .foregroundColor(roastMode ? .orange : .accentColor)
                             }
                         }
                     }
@@ -623,7 +414,7 @@ struct MultiFolderPickerView: View {
                     Text("Available Folders")
                 }
             }
-            .navigationTitle("")
+            .navigationTitle("Folders")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

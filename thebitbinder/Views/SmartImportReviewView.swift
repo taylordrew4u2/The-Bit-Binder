@@ -42,7 +42,7 @@ struct SmartImportReviewView: View {
         NavigationStack {
             ZStack {
                 // Background
-                (roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
+                Color(UIColor.systemBackground)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -83,7 +83,7 @@ struct SmartImportReviewView: View {
                         .padding(.vertical, 10)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(AppTheme.Colors.success.opacity(0.85))
+                                .fill(.green.opacity(0.85))
                         )
                         .padding(.horizontal, 12)
                         .padding(.top, 4)
@@ -106,7 +106,7 @@ struct SmartImportReviewView: View {
                             .padding(.vertical, 12)
                             .background(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.brand)
+                                    .fill(roastMode ? Color.orange : Color.accentColor)
                             )
                         }
                         .padding(.horizontal, 12)
@@ -152,7 +152,7 @@ struct SmartImportReviewView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(
-                roastMode ? AnyShapeStyle(AppTheme.Colors.roastSurface) : AnyShapeStyle(AppTheme.Colors.paperCream),
+                roastMode ? AnyShapeStyle(Color(UIColor.secondarySystemBackground)) : AnyShapeStyle(Color(UIColor.systemBackground)),
                 for: .navigationBar
             )
             .toolbar {
@@ -249,17 +249,17 @@ struct SmartImportReviewView: View {
         HStack(spacing: 10) {
             Image(systemName: "wand.and.stars")
                 .font(.system(size: 14))
-                .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                .foregroundColor(roastMode ? Color.orange : Color.accentColor)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text("GagGrabber found \(viewModel.reviewItems.count) joke\(viewModel.reviewItems.count == 1 ? "" : "s") in **\(importResult.sourceFile)**")
                     .font(.system(size: 12))
-                    .foregroundColor(roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
+                    .foregroundColor(roastMode ? .white.opacity(0.7) : .secondary)
                 
                 if viewModel.pendingCount < viewModel.reviewItems.count {
                     Text("\(viewModel.pendingCount) left to review")
                         .font(.system(size: 11))
-                        .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
+                        .foregroundColor(roastMode ? .white.opacity(0.4) : Color(UIColor.tertiaryLabel))
                 }
             }
             
@@ -270,7 +270,7 @@ struct SmartImportReviewView: View {
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(
-                    (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                    (roastMode ? Color.orange : Color.accentColor)
                         .opacity(0.08)
                 )
         )
@@ -286,7 +286,7 @@ struct SmartImportReviewView: View {
             HStack(spacing: 16) {
                 Text(viewModel.summaryText)
                     .font(.caption)
-                    .foregroundColor(roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
+                    .foregroundColor(roastMode ? .white.opacity(0.7) : .secondary)
                 Spacer()
                 // GagGrabber daily budget indicator
                 Label(viewModel.gagGrabberStatus.shortStatusText, systemImage: viewModel.gagGrabberStatus.statusIcon)
@@ -294,17 +294,17 @@ struct SmartImportReviewView: View {
                     .foregroundColor(viewModel.gagGrabberStatus.statusColor)
                 Text(viewModel.progressText)
                     .font(.caption.bold())
-                    .foregroundColor(roastMode ? .white : AppTheme.Colors.textPrimary)
+                    .foregroundColor(roastMode ? .white : .primary)
             }
             
             // Progress bar
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(roastMode ? Color.white.opacity(0.1) : AppTheme.Colors.paperDeep)
+                        .fill(roastMode ? Color.white.opacity(0.1) : Color(UIColor.tertiarySystemBackground))
                     
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.brand)
+                        .fill(roastMode ? Color.orange : Color.accentColor)
                         .frame(width: geo.size.width * progressFraction)
                         .animation(.easeInOut(duration: 0.3), value: progressFraction)
                 }
@@ -340,14 +340,14 @@ struct SmartImportReviewView: View {
     
     private func dotColor(for item: ImportReviewItem, isActive: Bool) -> Color {
         if isActive {
-            return roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction
+            return roastMode ? .orange : .accentColor
         }
         switch item.action {
-        case .approved: return AppTheme.Colors.success
-        case .rejected: return AppTheme.Colors.error.opacity(0.5)
-        case .sendToBrainstorm: return AppTheme.Colors.brainstormAccent
-        case .needsSplitting: return AppTheme.Colors.warning
-        case .pending: return roastMode ? .white.opacity(0.2) : AppTheme.Colors.textTertiary.opacity(0.4)
+        case .approved: return .green
+        case .rejected: return .red.opacity(0.5)
+        case .sendToBrainstorm: return .yellow
+        case .needsSplitting: return .orange
+        case .pending: return roastMode ? .white.opacity(0.2) : Color(UIColor.tertiaryLabel).opacity(0.4)
         }
     }
     
@@ -361,21 +361,21 @@ struct SmartImportReviewView: View {
                 Spacer()
                 Text("Page \(item.originalJoke.sourceMetadata.pageNumber)")
                     .font(.caption)
-                    .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
+                    .foregroundColor(roastMode ? .white.opacity(0.5) : Color(UIColor.tertiaryLabel))
             }
             
             // Title
             if !item.editedTitle.isEmpty {
                 Text(item.editedTitle)
-                    .font(.system(size: 18, weight: .bold, design: .serif))
-                    .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                    .font(.headline)
+                    .foregroundColor(roastMode ? .white : .primary)
             }
             
             // Body
             ScrollView {
                 Text(item.editedBody)
-                    .font(.system(size: 16, design: .serif))
-                    .foregroundColor(roastMode ? .white.opacity(0.9) : AppTheme.Colors.textPrimary)
+                    .font(.body)
+                    .foregroundColor(roastMode ? .white.opacity(0.9) : .primary)
                     .lineSpacing(4)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -391,10 +391,10 @@ struct SmartImportReviewView: View {
                                 .padding(.vertical, 3)
                                 .background(
                                     Capsule().fill(
-                                        roastMode ? AppTheme.Colors.roastAccent.opacity(0.2) : AppTheme.Colors.brand.opacity(0.1)
+                                        roastMode ? .orange.opacity(0.2) : .accentColor.opacity(0.1)
                                     )
                                 )
-                                .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.brand)
+                                .foregroundColor(roastMode ? Color.orange : Color.accentColor)
                         }
                     }
                 }
@@ -408,13 +408,13 @@ struct SmartImportReviewView: View {
                     Text("Skip")
                         .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundColor(AppTheme.Colors.error.opacity(0.5))
+                .foregroundColor(.red.opacity(0.5))
                 
                 Spacer()
                 
                 Text("or use buttons below")
                     .font(.system(size: 10))
-                    .foregroundColor(roastMode ? .white.opacity(0.25) : AppTheme.Colors.textTertiary.opacity(0.5))
+                    .foregroundColor(roastMode ? .white.opacity(0.25) : Color(UIColor.tertiaryLabel).opacity(0.5))
                 
                 Spacer()
                 
@@ -424,14 +424,14 @@ struct SmartImportReviewView: View {
                     Image(systemName: "hand.point.right.fill")
                         .font(.system(size: 10))
                 }
-                .foregroundColor(AppTheme.Colors.success.opacity(0.5))
+                .foregroundColor(.green.opacity(0.5))
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: 400)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(roastMode ? AppTheme.Colors.roastCard : AppTheme.Colors.surfaceElevated)
+                .fill(roastMode ? Color(UIColor.tertiarySystemBackground) : Color(UIColor.secondarySystemBackground))
                 .shadow(radius: abs(dragOffset.width) > 30 ? 12 : 6, y: 4)
         )
         .overlay(
@@ -452,15 +452,15 @@ struct SmartImportReviewView: View {
     }
     
     private var swipeColor: Color {
-        if dragOffset.width > 30 { return AppTheme.Colors.success }
-        if dragOffset.width < -30 { return AppTheme.Colors.error }
+        if dragOffset.width > 30 { return .green }
+        if dragOffset.width < -30 { return .red }
         return .clear
     }
     
     private var swipeBorderColor: Color {
         let opacity = min(Double(abs(dragOffset.width)) / 100.0, 0.8)
-        if dragOffset.width > 30 { return AppTheme.Colors.success.opacity(opacity) }
-        if dragOffset.width < -30 { return AppTheme.Colors.error.opacity(opacity) }
+        if dragOffset.width > 30 { return .green.opacity(opacity) }
+        if dragOffset.width < -30 { return .red.opacity(opacity) }
         return .clear
     }
     
@@ -517,9 +517,9 @@ struct SmartImportReviewView: View {
     
     private func confidenceColor(_ confidence: ImportConfidence) -> Color {
         switch confidence {
-        case .high: return AppTheme.Colors.success
-        case .medium: return AppTheme.Colors.primaryAction
-        case .low: return AppTheme.Colors.warning
+        case .high: return .green
+        case .medium: return .accentColor
+        case .low: return .orange
         }
     }
     
@@ -551,17 +551,17 @@ struct SmartImportReviewView: View {
                     if !actionText.isEmpty {
                         Text("— \(actionText)")
                             .font(.system(size: 12))
-                            .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
+                            .foregroundColor(roastMode ? .white.opacity(0.4) : Color(UIColor.tertiaryLabel))
                     }
                 }
             }
-            .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+            .foregroundColor(roastMode ? Color.orange : Color.accentColor)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(
                 Capsule()
                     .fill(
-                        (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                        (roastMode ? Color.orange : Color.accentColor)
                             .opacity(0.1)
                     )
             )
@@ -582,19 +582,19 @@ struct SmartImportReviewView: View {
                 VStack(spacing: 6) {
                     ZStack {
                         Circle()
-                            .fill(AppTheme.Colors.error.opacity(0.12))
+                            .fill(.red.opacity(0.12))
                             .frame(width: 50, height: 50)
                         Image(systemName: "xmark")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(AppTheme.Colors.error)
+                            .foregroundColor(.red)
                     }
                     Text("Skip")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+                        .foregroundColor(roastMode ? .white.opacity(0.6) : .secondary)
                 }
             }
             .frame(maxWidth: .infinity)
-            .buttonStyle(TouchReactiveStyle(pressedScale: 0.9, hapticStyle: .light))
+            .buttonStyle(.plain)
             
             // Send to Brainstorm
             Button {
@@ -603,19 +603,19 @@ struct SmartImportReviewView: View {
                 VStack(spacing: 6) {
                     ZStack {
                         Circle()
-                            .fill(AppTheme.Colors.brainstormAccent.opacity(0.15))
+                            .fill(.yellow.opacity(0.15))
                             .frame(width: 50, height: 50)
                         Image(systemName: "lightbulb.fill")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(AppTheme.Colors.brainstormAccent)
+                            .foregroundColor(.yellow)
                     }
                     Text("Idea")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+                        .foregroundColor(roastMode ? .white.opacity(0.6) : .secondary)
                 }
             }
             .frame(maxWidth: .infinity)
-            .buttonStyle(TouchReactiveStyle(pressedScale: 0.9, hapticStyle: .light))
+            .buttonStyle(.plain)
             
             // Edit
             Button {
@@ -624,19 +624,19 @@ struct SmartImportReviewView: View {
                 VStack(spacing: 6) {
                     ZStack {
                         Circle()
-                            .fill(AppTheme.Colors.primaryAction.opacity(0.12))
+                            .fill(Color.accentColor.opacity(0.12))
                             .frame(width: 50, height: 50)
                         Image(systemName: "pencil")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(AppTheme.Colors.primaryAction)
+                            .foregroundColor(.accentColor)
                     }
                     Text("Edit")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+                        .foregroundColor(roastMode ? .white.opacity(0.6) : .secondary)
                 }
             }
             .frame(maxWidth: .infinity)
-            .buttonStyle(TouchReactiveStyle(pressedScale: 0.9, hapticStyle: .light))
+            .buttonStyle(.plain)
             
             // Accept — primary action, largest/most prominent
             Button {
@@ -645,7 +645,7 @@ struct SmartImportReviewView: View {
                 VStack(spacing: 6) {
                     ZStack {
                         Circle()
-                            .fill(AppTheme.Colors.success)
+                            .fill(.green)
                             .frame(width: 54, height: 54)
                         Image(systemName: "checkmark")
                             .font(.system(size: 22, weight: .bold))
@@ -653,17 +653,17 @@ struct SmartImportReviewView: View {
                     }
                     Text("Accept")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(AppTheme.Colors.success)
+                        .foregroundColor(.green)
                 }
             }
             .frame(maxWidth: .infinity)
-            .buttonStyle(TouchReactiveStyle(pressedScale: 0.9, hapticStyle: .medium))
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: AppTheme.Radius.xl, style: .continuous)
-                .fill(roastMode ? AppTheme.Colors.roastSurface : AppTheme.Colors.surfaceElevated)
+            RoundedRectangle(cornerRadius: CGFloat(16), style: .continuous)
+                .fill(Color(UIColor.secondarySystemBackground))
                 .shadow(color: .black.opacity(0.08), radius: 8, y: -3)
         )
         .padding(.horizontal, 16)
@@ -690,7 +690,7 @@ struct SmartImportReviewView: View {
             }
             .font(.subheadline.bold())
             .buttonStyle(.borderedProminent)
-            .tint(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.brand)
+            .tint(roastMode ? Color.orange : Color.accentColor)
             
             Spacer()
             
@@ -719,8 +719,8 @@ struct SmartImportReviewView: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    AppTheme.Colors.warning.opacity(0.15),
-                                    AppTheme.Colors.warning.opacity(0.03)
+                                    .orange.opacity(0.15),
+                                    .orange.opacity(0.03)
                                 ],
                                 center: .center, startRadius: 20, endRadius: 60
                             )
@@ -729,17 +729,17 @@ struct SmartImportReviewView: View {
                     
                     Image(systemName: "doc.text.magnifyingglass")
                         .font(.system(size: 44, weight: .medium))
-                        .foregroundColor(AppTheme.Colors.warning)
+                        .foregroundColor(.orange)
                 }
                 
                 VStack(spacing: 8) {
                     Text("No Jokes Found")
-                        .font(.system(size: 20, weight: .bold, design: .serif))
-                        .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                        .font(.title3.weight(.bold))
+                        .foregroundColor(roastMode ? .white : .primary)
                     
                     Text("GagGrabber couldn't detect any jokes in **\(importResult.sourceFile)**. This can happen for a few reasons.")
                         .font(.system(size: 15))
-                        .foregroundColor(roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
+                        .foregroundColor(roastMode ? .white.opacity(0.7) : .secondary)
                         .multilineTextAlignment(.center)
                 }
                 
@@ -747,7 +747,7 @@ struct SmartImportReviewView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Common reasons:")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(roastMode ? .white.opacity(0.9) : AppTheme.Colors.inkBlack)
+                        .foregroundColor(roastMode ? .white.opacity(0.9) : .primary)
                     
                     importTipRow(icon: "text.alignleft", text: "The file has very little text or the text is too short for joke detection")
                     importTipRow(icon: "photo", text: "Scanned images have low contrast or blurry text that OCR couldn't read")
@@ -757,14 +757,14 @@ struct SmartImportReviewView: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(roastMode ? Color.white.opacity(0.06) : AppTheme.Colors.paperDeep)
+                        .fill(roastMode ? Color.white.opacity(0.06) : Color(UIColor.tertiarySystemBackground))
                 )
                 
                 // What to try
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Try these tips:")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(roastMode ? .white.opacity(0.9) : AppTheme.Colors.inkBlack)
+                        .foregroundColor(roastMode ? .white.opacity(0.9) : .primary)
                     
                     importTipRow(icon: "doc.text", text: "Use a **PDF with selectable text** — these work best")
                     importTipRow(icon: "sun.max", text: "For photos: good lighting, flat page, dark ink on white paper")
@@ -775,14 +775,14 @@ struct SmartImportReviewView: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(roastMode ? Color.white.opacity(0.06) : AppTheme.Colors.paperDeep)
+                        .fill(roastMode ? Color.white.opacity(0.06) : Color(UIColor.tertiarySystemBackground))
                 )
                 
                 // Supported formats
                 VStack(spacing: 8) {
                     Text("Supported formats")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
+                        .foregroundColor(roastMode ? .white.opacity(0.5) : Color(UIColor.tertiaryLabel))
                     
                     HStack(spacing: 8) {
                         formatBadge("PDF")
@@ -808,10 +808,10 @@ struct SmartImportReviewView: View {
                     .padding(.vertical, 13)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                            .fill(roastMode ? Color.orange : Color.accentColor)
                     )
                 }
-                .buttonStyle(TouchReactiveStyle(pressedScale: 0.95, hapticStyle: .medium))
+                .buttonStyle(.plain)
                 
                 Spacer(minLength: 20)
             }
@@ -823,12 +823,12 @@ struct SmartImportReviewView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundColor(roastMode ? AppTheme.Colors.roastAccent.opacity(0.8) : AppTheme.Colors.primaryAction)
+                .foregroundColor(roastMode ? .orange.opacity(0.8) : .accentColor)
                 .frame(width: 20)
             
             Text(text)
                 .font(.system(size: 13))
-                .foregroundColor(roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
+                .foregroundColor(roastMode ? .white.opacity(0.7) : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -836,13 +836,13 @@ struct SmartImportReviewView: View {
     private func formatBadge(_ format: String) -> some View {
         Text(format)
             .font(.system(size: 10, weight: .bold, design: .monospaced))
-            .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+            .foregroundColor(roastMode ? Color.orange : Color.accentColor)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(
-                        (roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                        (roastMode ? Color.orange : Color.accentColor)
                             .opacity(0.1)
                     )
             )
@@ -855,21 +855,21 @@ struct SmartImportReviewView: View {
                 
                 ZStack {
                     Circle()
-                        .fill(AppTheme.Colors.success.opacity(0.15))
+                        .fill(.green.opacity(0.15))
                         .frame(width: 110, height: 110)
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 50, weight: .medium))
-                        .foregroundColor(AppTheme.Colors.success)
+                        .foregroundColor(.green)
                 }
                 
                 VStack(spacing: 8) {
                     Text("All Reviewed!")
-                        .font(.system(size: 22, weight: .bold, design: .serif))
-                        .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                        .font(.title3.weight(.bold))
+                        .foregroundColor(roastMode ? .white : .primary)
                     
                     Text("Here's what's ready to save:")
                         .font(.system(size: 15))
-                        .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+                        .foregroundColor(roastMode ? .white.opacity(0.6) : .secondary)
                 }
                 
                 // Summary stats card
@@ -878,15 +878,15 @@ struct SmartImportReviewView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "doc.text")
                             .font(.system(size: 14))
-                            .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
+                            .foregroundColor(roastMode ? .white.opacity(0.5) : Color(UIColor.tertiaryLabel))
                         Text(importResult.sourceFile)
                             .font(.system(size: 13))
-                            .foregroundColor(roastMode ? .white.opacity(0.7) : AppTheme.Colors.textSecondary)
+                            .foregroundColor(roastMode ? .white.opacity(0.7) : .secondary)
                             .lineLimit(1)
                         Spacer()
                         Text("via \(importResult.providerUsed)")
                             .font(.system(size: 11))
-                            .foregroundColor(roastMode ? .white.opacity(0.4) : AppTheme.Colors.textTertiary)
+                            .foregroundColor(roastMode ? .white.opacity(0.4) : Color(UIColor.tertiaryLabel))
                     }
                     
                     Divider()
@@ -897,7 +897,7 @@ struct SmartImportReviewView: View {
                     
                     summaryStatRow(
                         icon: "checkmark.circle.fill",
-                        color: AppTheme.Colors.success,
+                        color: .green,
                         label: "Accepted",
                         count: results.approvedJokes.count
                     )
@@ -905,7 +905,7 @@ struct SmartImportReviewView: View {
                     if results.rejectedJokes.count > 0 {
                         summaryStatRow(
                             icon: "xmark.circle.fill",
-                            color: AppTheme.Colors.error.opacity(0.7),
+                            color: .red.opacity(0.7),
                             label: "Skipped",
                             count: results.rejectedJokes.count
                         )
@@ -914,7 +914,7 @@ struct SmartImportReviewView: View {
                     if results.brainstormItems.count > 0 {
                         summaryStatRow(
                             icon: "lightbulb.fill",
-                            color: AppTheme.Colors.brainstormAccent,
+                            color: .yellow,
                             label: "Sent to Brainstorm",
                             count: results.brainstormItems.count
                         )
@@ -927,10 +927,10 @@ struct SmartImportReviewView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 12))
-                                .foregroundColor(AppTheme.Colors.success)
+                                .foregroundColor(.green)
                             Text("\(viewModel.autoAcceptedCount) auto-accepted (high confidence)")
                                 .font(.system(size: 12))
-                                .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
+                                .foregroundColor(roastMode ? .white.opacity(0.5) : Color(UIColor.tertiaryLabel))
                             Spacer()
                         }
                     }
@@ -938,7 +938,7 @@ struct SmartImportReviewView: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(roastMode ? Color.white.opacity(0.06) : AppTheme.Colors.paperDeep)
+                        .fill(roastMode ? Color.white.opacity(0.06) : Color(UIColor.tertiarySystemBackground))
                 )
                 .padding(.horizontal, 16)
                 
@@ -958,11 +958,11 @@ struct SmartImportReviewView: View {
                     .padding(.horizontal, 32)
                     .padding(.vertical, 14)
                     .background(
-                        RoundedRectangle(cornerRadius: AppTheme.Radius.large, style: .continuous)
-                            .fill(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                        RoundedRectangle(cornerRadius: CGFloat(12), style: .continuous)
+                            .fill(roastMode ? Color.orange : Color.accentColor)
                     )
                 }
-                .buttonStyle(TouchReactiveStyle(pressedScale: 0.95, hapticStyle: .medium))
+                .buttonStyle(.plain)
                 
                 Spacer(minLength: 20)
             }
@@ -977,11 +977,11 @@ struct SmartImportReviewView: View {
                 .foregroundColor(color)
             Text(label)
                 .font(.system(size: 14))
-                .foregroundColor(roastMode ? .white.opacity(0.8) : AppTheme.Colors.textPrimary)
+                .foregroundColor(roastMode ? .white.opacity(0.8) : .primary)
             Spacer()
             Text("\(count)")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundColor(roastMode ? .white : AppTheme.Colors.inkBlack)
+                .foregroundColor(roastMode ? .white : .primary)
         }
     }
     
@@ -997,7 +997,7 @@ struct SmartImportReviewView: View {
             
             VStack(spacing: 28) {
                 Text("How to Review")
-                    .font(.system(size: 22, weight: .bold, design: .serif))
+                    .font(.title3.weight(.bold))
                     .foregroundColor(.white)
                 
                 // Swipe instructions
@@ -1005,11 +1005,11 @@ struct SmartImportReviewView: View {
                     VStack(spacing: 10) {
                         ZStack {
                             Circle()
-                                .fill(AppTheme.Colors.error.opacity(0.2))
+                                .fill(.red.opacity(0.2))
                                 .frame(width: 60, height: 60)
                             Image(systemName: "hand.point.left.fill")
                                 .font(.system(size: 24))
-                                .foregroundColor(AppTheme.Colors.error)
+                                .foregroundColor(.red)
                         }
                         Text("Swipe Left")
                             .font(.system(size: 13, weight: .semibold))
@@ -1022,11 +1022,11 @@ struct SmartImportReviewView: View {
                     VStack(spacing: 10) {
                         ZStack {
                             Circle()
-                                .fill(AppTheme.Colors.success.opacity(0.2))
+                                .fill(.green.opacity(0.2))
                                 .frame(width: 60, height: 60)
                             Image(systemName: "hand.point.right.fill")
                                 .font(.system(size: 24))
-                                .foregroundColor(AppTheme.Colors.success)
+                                .foregroundColor(.green)
                         }
                         Text("Swipe Right")
                             .font(.system(size: 13, weight: .semibold))
@@ -1044,10 +1044,10 @@ struct SmartImportReviewView: View {
                         .foregroundColor(.white.opacity(0.7))
                     
                     HStack(spacing: 16) {
-                        tutorialButtonHint(icon: "xmark", label: "Skip", color: AppTheme.Colors.error)
-                        tutorialButtonHint(icon: "lightbulb.fill", label: "Idea", color: AppTheme.Colors.brainstormAccent)
-                        tutorialButtonHint(icon: "pencil", label: "Edit", color: AppTheme.Colors.primaryAction)
-                        tutorialButtonHint(icon: "checkmark", label: "Keep", color: AppTheme.Colors.success)
+                        tutorialButtonHint(icon: "xmark", label: "Skip", color: .red)
+                        tutorialButtonHint(icon: "lightbulb.fill", label: "Idea", color: .yellow)
+                        tutorialButtonHint(icon: "pencil", label: "Edit", color: .accentColor)
+                        tutorialButtonHint(icon: "checkmark", label: "Keep", color: .green)
                     }
                 }
                 
@@ -1061,10 +1061,10 @@ struct SmartImportReviewView: View {
                         .padding(.vertical, 12)
                         .background(
                             Capsule()
-                                .fill(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                                .fill(roastMode ? Color.orange : Color.accentColor)
                         )
                 }
-                .buttonStyle(TouchReactiveStyle(pressedScale: 0.95, hapticStyle: .medium))
+                .buttonStyle(.plain)
             }
             .padding(32)
             .background(
@@ -1110,7 +1110,7 @@ struct SmartImportReviewView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Title")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+                            .foregroundColor(roastMode ? .white.opacity(0.6) : .secondary)
                         
                         TextField("Joke title (optional)", text: Binding(
                             get: { viewModel.currentItem?.editedTitle ?? "" },
@@ -1134,7 +1134,7 @@ struct SmartImportReviewView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Content")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+                            .foregroundColor(roastMode ? .white.opacity(0.6) : .secondary)
                         
                         TextEditor(text: Binding(
                             get: { viewModel.currentItem?.editedBody ?? "" },
@@ -1146,7 +1146,7 @@ struct SmartImportReviewView: View {
                                 )
                             }
                         ))
-                        .font(.system(size: 15, design: .serif))
+                        .font(.subheadline)
                         .scrollContentBackground(.hidden)
                         .padding(12)
                         .frame(minHeight: 160)
@@ -1160,7 +1160,7 @@ struct SmartImportReviewView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Tags")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(roastMode ? .white.opacity(0.6) : AppTheme.Colors.textSecondary)
+                            .foregroundColor(roastMode ? .white.opacity(0.6) : .secondary)
                         
                         if let tags = viewModel.currentItem?.editedTags, !tags.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -1187,10 +1187,10 @@ struct SmartImportReviewView: View {
                                         .padding(.vertical, 5)
                                         .background(
                                             Capsule().fill(
-                                                roastMode ? AppTheme.Colors.roastAccent.opacity(0.2) : AppTheme.Colors.brand.opacity(0.1)
+                                                roastMode ? .orange.opacity(0.2) : .accentColor.opacity(0.1)
                                             )
                                         )
-                                        .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.brand)
+                                        .foregroundColor(roastMode ? Color.orange : Color.accentColor)
                                     }
                                 }
                             }
@@ -1210,7 +1210,7 @@ struct SmartImportReviewView: View {
                             Text("Original Source Text")
                                 .font(.system(size: 13, weight: .semibold))
                         }
-                        .foregroundColor(roastMode ? .white.opacity(0.5) : AppTheme.Colors.textTertiary)
+                        .foregroundColor(roastMode ? .white.opacity(0.5) : Color(UIColor.tertiaryLabel))
                         
                         Text(item.originalJoke.rawSourceText)
                             .font(.system(size: 13))
@@ -1225,7 +1225,7 @@ struct SmartImportReviewView: View {
                 }
                 .padding(20)
             }
-            .background(roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
+            .background(Color(UIColor.systemBackground))
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -21,6 +21,7 @@ struct thebitbinderApp: App {
             Recording.self,
             SetList.self,
             NotebookPhotoRecord.self,
+            NotebookFolder.self,
             RoastTarget.self,
             RoastJoke.self,
             BrainstormIdea.self,

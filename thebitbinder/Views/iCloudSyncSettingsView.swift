@@ -18,32 +18,13 @@ struct iCloudSyncSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 8) {
-                    Image(systemName: "icloud.and.arrow.up.fill")
-                        .font(.system(size: 48))
-                        .foregroundColor(AppTheme.Colors.brand)
-                    
-                    Text("iCloud Sync")
-                        .font(.system(size: 24, weight: .bold, design: .serif))
-                        .foregroundColor(AppTheme.Colors.inkBlack)
-                    
-                    Text("Back up and sync all your jokes, roasts, and recordings")
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundColor(AppTheme.Colors.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(24)
-                .frame(maxWidth: .infinity)
-                .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.Colors.surfaceElevated))
-                
                 // Status
                 VStack(spacing: 12) {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Status")
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(AppTheme.Colors.textTertiary)
+                                .foregroundColor(Color(UIColor.tertiaryLabel))
                             
                             HStack(spacing: 8) {
                                 Circle()
@@ -51,8 +32,8 @@ struct iCloudSyncSettingsView: View {
                                     .frame(width: 8, height: 8)
                                 
                                 Text(syncStatusText)
-                                    .font(.system(size: 15, weight: .semibold, design: .serif))
-                                    .foregroundColor(AppTheme.Colors.inkBlack)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.primary)
                             }
                         }
                         
@@ -62,16 +43,16 @@ struct iCloudSyncSettingsView: View {
                             VStack(alignment: .trailing, spacing: 4) {
                                 Text("Last Sync")
                                     .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(AppTheme.Colors.textTertiary)
+                                    .foregroundColor(Color(UIColor.tertiaryLabel))
                                 
                                 Text(lastSync.formatted(date: .abbreviated, time: .shortened))
                                     .font(.system(size: 12, weight: .regular))
-                                    .foregroundColor(AppTheme.Colors.textSecondary)
+                                    .foregroundColor(.secondary)
                             }
                         }
                     }
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.paperAged))
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.secondarySystemBackground)))
                     
                     // Sync Status Message
                     if case .syncing = syncService.syncStatus {
@@ -80,33 +61,33 @@ struct iCloudSyncSettingsView: View {
                                 .scaleEffect(0.8, anchor: .center)
                             Text("Syncing to iCloud...")
                                 .font(.system(size: 13))
-                                .foregroundColor(AppTheme.Colors.info)
+                                .foregroundColor(.blue)
                             Spacer()
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.Colors.info.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.1)))
                     } else if case .success = syncService.syncStatus {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(AppTheme.Colors.success)
+                                .foregroundColor(.green)
                             Text("Sync complete")
                                 .font(.system(size: 13))
-                                .foregroundColor(AppTheme.Colors.success)
+                                .foregroundColor(.green)
                             Spacer()
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.Colors.success.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.1)))
                     } else if case .error(let message) = syncService.syncStatus {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.circle.fill")
-                                .foregroundColor(AppTheme.Colors.error)
+                                .foregroundColor(.red)
                             Text(message)
                                 .font(.system(size: 13))
-                                .foregroundColor(AppTheme.Colors.error)
+                                .foregroundColor(.red)
                             Spacer()
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.Colors.error.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.1)))
                     }
                     
                     // Issues Found
@@ -125,10 +106,10 @@ struct iCloudSyncSettingsView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(issue.description)
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(AppTheme.Colors.inkBlack)
+                                        .foregroundColor(.primary)
                                     Text(issue.suggestedFix)
                                         .font(.system(size: 11))
-                                        .foregroundColor(AppTheme.Colors.textSecondary)
+                                        .foregroundColor(.secondary)
                                 }
                                 .padding(.leading, 4)
                             }
@@ -136,7 +117,7 @@ struct iCloudSyncSettingsView: View {
                             if diagnostics.syncIssuesFound.count > 3 {
                                 Text("+ \(diagnostics.syncIssuesFound.count - 3) more issues")
                                     .font(.system(size: 11))
-                                    .foregroundColor(AppTheme.Colors.textSecondary)
+                                    .foregroundColor(.secondary)
                                     .padding(.leading, 4)
                             }
                         }
@@ -150,12 +131,12 @@ struct iCloudSyncSettingsView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Enable iCloud Sync")
-                                .font(.system(size: 15, weight: .semibold, design: .serif))
-                                .foregroundColor(AppTheme.Colors.inkBlack)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.primary)
                             
                             Text("Automatically backup your data")
                                 .font(.system(size: 12, weight: .regular))
-                                .foregroundColor(AppTheme.Colors.textSecondary)
+                                .foregroundColor(.secondary)
                         }
                         
                         Spacer()
@@ -170,10 +151,10 @@ struct iCloudSyncSettingsView: View {
                                 }
                             }
                         ))
-                        .tint(AppTheme.Colors.brand)
+                        .tint(.accentColor)
                     }
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.surfaceElevated))
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.secondarySystemBackground)))
                     
                     HStack(spacing: 12) {
                         Button(action: {
@@ -183,12 +164,12 @@ struct iCloudSyncSettingsView: View {
                                 Image(systemName: "arrow.clockwise")
                                     .font(.system(size: 14, weight: .semibold))
                                 Text("Sync Now")
-                                    .font(.system(size: 15, weight: .semibold, design: .serif))
+                                    .font(.subheadline.weight(.semibold))
                                 Spacer()
                             }
                             .frame(maxWidth: .infinity)
                             .padding(14)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.brand))
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.accentColor))
                             .foregroundColor(.white)
                         }
                         .disabled(syncService.syncStatus == .syncing || !syncService.isSyncEnabled)
@@ -201,7 +182,7 @@ struct iCloudSyncSettingsView: View {
                                 Image(systemName: "arrow.triangle.2.circlepath")
                                     .font(.system(size: 14, weight: .semibold))
                                 Text("Force Refresh")
-                                    .font(.system(size: 15, weight: .semibold, design: .serif))
+                                    .font(.subheadline.weight(.semibold))
                                 Spacer()
                             }
                             .frame(maxWidth: .infinity)
@@ -220,21 +201,21 @@ struct iCloudSyncSettingsView: View {
                             Image(systemName: "arrow.up.arrow.down")
                                 .font(.system(size: 14, weight: .semibold))
                             Text("Force Settings Sync")
-                                .font(.system(size: 15, weight: .semibold, design: .serif))
+                                .font(.subheadline.weight(.semibold))
                             Spacer()
                         }
                         .frame(maxWidth: .infinity)
                         .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.surfaceElevated))
-                        .foregroundColor(AppTheme.Colors.inkBlack)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.secondarySystemBackground)))
+                        .foregroundColor(.primary)
                     }
                 }
                 
                 // What Gets Synced
                 VStack(alignment: .leading, spacing: 12) {
                     Text("What Gets Synced")
-                        .font(.system(size: 14, weight: .semibold, design: .serif))
-                        .foregroundColor(AppTheme.Colors.inkBlack)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.primary)
                     
                     VStack(spacing: 10) {
                         SyncItemRow(icon: "lightbulb.fill", label: "Thoughts & Ideas", detail: "Your notepad content and quick thoughts")
@@ -248,43 +229,43 @@ struct iCloudSyncSettingsView: View {
                     }
                 }
                 .padding(16)
-                .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.paperAged))
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.secondarySystemBackground)))
                 
                 // Info
                 VStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: "info.circle.fill")
-                                .foregroundColor(AppTheme.Colors.info)
+                                .foregroundColor(.blue)
                                 .font(.system(size: 13))
                             Text("Automatic Syncing")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(AppTheme.Colors.inkBlack)
+                                .foregroundColor(.primary)
                         }
                         Text("When enabled, your data syncs automatically when connected to WiFi or Cellular. Manual sync is also available.")
                             .font(.system(size: 12))
-                            .foregroundColor(AppTheme.Colors.textSecondary)
+                            .foregroundColor(.secondary)
                             .lineSpacing(1.5)
                     }
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.Colors.info.opacity(0.08)))
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.08)))
                     
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: "lock.fill")
-                                .foregroundColor(AppTheme.Colors.success)
+                                .foregroundColor(.green)
                                 .font(.system(size: 13))
                             Text("End-to-End Encrypted")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(AppTheme.Colors.inkBlack)
+                                .foregroundColor(.primary)
                         }
                         Text("Your data is encrypted in transit and at rest. Only you can access your jokes.")
                             .font(.system(size: 12))
-                            .foregroundColor(AppTheme.Colors.textSecondary)
+                            .foregroundColor(.secondary)
                             .lineSpacing(1.5)
                     }
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.Colors.success.opacity(0.08)))
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.08)))
                 }
                 
                 // Diagnostics
@@ -299,15 +280,15 @@ struct iCloudSyncSettingsView: View {
                             Image(systemName: "stethoscope")
                                 .font(.system(size: 14, weight: .semibold))
                             Text("Run Comprehensive Diagnostics")
-                                .font(.system(size: 15, weight: .semibold, design: .serif))
+                                .font(.subheadline.weight(.semibold))
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(.tertiary)
                         }
                         .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.Colors.surfaceElevated))
-                        .foregroundColor(AppTheme.Colors.inkBlack)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(UIColor.secondarySystemBackground)))
+                        .foregroundColor(.primary)
                     }
                     .disabled(diagnostics.isRunningDiagnostics)
                     
@@ -317,15 +298,17 @@ struct iCloudSyncSettingsView: View {
                                 .scaleEffect(0.8)
                             Text("Running diagnostics...")
                                 .font(.system(size: 12))
-                                .foregroundColor(AppTheme.Colors.textSecondary)
+                                .foregroundColor(.secondary)
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.Colors.surfaceElevated))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(UIColor.secondarySystemBackground)))
                     }
                 }
             }
             .padding(16)
         }
+        .navigationTitle("iCloud Sync")
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingDetailedDiagnostics) {
             DiagnosticsDetailView()
         }
@@ -353,9 +336,9 @@ struct iCloudSyncSettingsView: View {
         case .syncing:
             return .blue
         case .success:
-            return AppTheme.Colors.success
+            return .green
         case .error:
-            return AppTheme.Colors.error
+            return .red
         }
     }
     
@@ -382,27 +365,27 @@ struct SyncItemRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(AppTheme.Colors.brand)
+                .foregroundColor(.accentColor)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppTheme.Colors.inkBlack)
+                    .foregroundColor(.primary)
                 
                 Text(detail)
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.Colors.textSecondary)
+                    .foregroundColor(.secondary)
             }
             
             Spacer()
             
             Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(AppTheme.Colors.success)
+                .foregroundColor(.green)
                 .font(.system(size: 14))
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.Colors.paperCream))
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color(UIColor.systemBackground)))
     }
 }
 

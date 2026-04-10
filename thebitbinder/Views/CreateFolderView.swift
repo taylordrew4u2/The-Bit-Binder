@@ -18,35 +18,31 @@ struct CreateFolderView: View {
     @State private var saveErrorMessage = ""
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
-                Section(header: Text("Folder Name")) {
+                Section("Folder Name") {
                     TextField("Enter folder name", text: $folderName)
                 }
             }
-            .scrollContentBackground(roastMode ? .hidden : .visible)
-            .background(roastMode ? AppTheme.Colors.roastBackground : Color.clear)
-            .navigationTitle("")
+            .navigationTitle("New Folder")
             .navigationBarTitleDisplayMode(.inline)
-            .bitBinderToolbar(roastMode: roastMode)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
                         createFolder()
                     }
                     .disabled(folderName.isEmpty)
-                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                    .fontWeight(.semibold)
                 }
             }
         }
-        .tint(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+        .tint(roastMode ? .orange : .accentColor)
         .alert("Save Failed", isPresented: $showSaveError) {
             Button("OK", role: .cancel) { }
         } message: {

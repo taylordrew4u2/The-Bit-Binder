@@ -210,83 +210,6 @@ struct JokesView: View {
         .padding(.vertical, 10)
     }
     
-    // MARK: - Grid Zoom Bar
-    
-    @ViewBuilder
-    private func gridZoomBar(scale: Binding<Double>, roastMode: Bool = false) -> some View {
-        HStack(spacing: 12) {
-            // Zoom out button
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    scale.wrappedValue = min(2.0, scale.wrappedValue + 0.5)
-                }
-                haptic(.light)
-            } label: {
-                Image(systemName: "minus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(roastMode ? .orange : .accentColor)
-            }
-            .disabled(scale.wrappedValue >= 2.0)
-            .opacity(scale.wrappedValue >= 2.0 ? 0.4 : 1.0)
-            
-            // Column preset buttons
-            HStack(spacing: 6) {
-                gridColumnButton(columns: 4, scale: scale, roastMode: roastMode)
-                gridColumnButton(columns: 3, scale: scale, roastMode: roastMode)
-                gridColumnButton(columns: 2, scale: scale, roastMode: roastMode)
-            }
-            
-            // Zoom in button
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    scale.wrappedValue = max(0.5, scale.wrappedValue - 0.5)
-                }
-                haptic(.light)
-            } label: {
-                Image(systemName: "plus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(roastMode ? .orange : .accentColor)
-            }
-            .disabled(scale.wrappedValue <= 0.5)
-            .opacity(scale.wrappedValue <= 0.5 ? 0.4 : 1.0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(UIColor.secondarySystemBackground).opacity(0.95))
-        )
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-    }
-    
-    @ViewBuilder
-    private func gridColumnButton(columns: Int, scale: Binding<Double>, roastMode: Bool) -> some View {
-        let targetScale = 4.0 / Double(columns)
-        let isActive = abs(scale.wrappedValue - targetScale) < 0.1
-        
-        Button {
-            withAnimation(.easeOut(duration: 0.2)) {
-                scale.wrappedValue = targetScale
-            }
-            haptic(.light)
-        } label: {
-            HStack(spacing: 2) {
-                ForEach(0..<columns, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(isActive ? (roastMode ? Color.orange : Color.accentColor) : Color.secondary.opacity(0.5))
-                        .frame(width: 6, height: 10)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isActive ? (roastMode ? Color.orange : Color.accentColor).opacity(0.15) : Color.clear)
-            )
-        }
-    }
-
     @ViewBuilder
     private var emptyState: some View {
         JokesEmptyState(
@@ -330,7 +253,6 @@ struct JokesView: View {
                     }
                     .animation(.easeOut(duration: 0.2), value: effectiveRoastScale)
                 }
-                .scrollContentBackground(.hidden)
                 .simultaneousGesture(roastPinchGesture)
             } else {
                 List {
@@ -395,7 +317,6 @@ struct JokesView: View {
     
     var body: some View {
         mainContent
-            .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .searchable(text: $searchText, prompt: roastMode ? "Search targets" : "Search jokes")
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .onAppear { checkPendingVoiceMemoImports() }
@@ -551,7 +472,6 @@ struct JokesView: View {
                                 }
                                 .animation(.easeOut(duration: 0.2), value: effectiveJokesScale)
                         }
-                        .scrollContentBackground(.hidden)
                         .highPriorityGesture(jokesPinchGesture)
                         .navigationDestination(item: $selectedJokeForDetail) { joke in
                             JokeDetailView(joke: joke)
@@ -566,8 +486,6 @@ struct JokesView: View {
                                         JokeRowView(joke: joke, roastMode: roastMode, showFullContent: showFullContent)
                                             .id(joke.id)
                                     }
-                                    .listRowSeparator(.hidden)
-                                    .listRowBackground(Color.clear)
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                         Button(role: .destructive) {
                                             HapticEngine.shared.delete()
@@ -595,7 +513,7 @@ struct JokesView: View {
                                         } label: {
                                             Label(joke.isHit ? "Remove Hit" : "Add Hit", systemImage: joke.isHit ? "star.slash" : "star.fill")
                                         }
-                                        .tint(AppTheme.Colors.hitsGold)
+                                        .tint(.yellow)
                                     }
                                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                         Button {
@@ -605,7 +523,7 @@ struct JokesView: View {
                                         } label: {
                                             Label(joke.isHit ? "Remove Hit" : "The Hits", systemImage: joke.isHit ? "star.slash.fill" : "star.fill")
                                         }
-                                        .tint(AppTheme.Colors.hitsGold)
+                                        .tint(.yellow)
                                     }
                                 }
                             }
@@ -636,7 +554,7 @@ struct JokesView: View {
                     .opacity(isSelected ? 0.7 : 1.0)
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
+                    .font(.title3)
                     .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
                     .padding(6)
             }
@@ -653,13 +571,12 @@ struct JokesView: View {
         } label: {
             HStack {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
+                    .font(.title3)
                     .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
                 
                 JokeRowView(joke: joke, showFullContent: showFullContent)
             }
         }
-        .listRowSeparator(.hidden)
         .buttonStyle(.plain)
     }
     
@@ -699,7 +616,7 @@ struct JokesView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(.bar)
     }
     
     private func toggleSelection(_ joke: Joke) {
@@ -743,15 +660,19 @@ struct JokesView: View {
         NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
     }
 
-    @State private var showingExportAllRoasts = false
-    @State private var roastExportURL: URL?
-    
     @ToolbarContentBuilder
     private var combinedToolbarContent: some ToolbarContent {
         if roastMode {
-            ToolbarItem(placement: .principal) {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingAddRoastTarget = true
+                } label: {
+                    Image(systemName: "person.badge.plus")
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Section {
+                    Section("View") {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 roastViewMode = roastViewMode == .grid ? .list : .grid
@@ -761,8 +682,6 @@ struct JokesView: View {
                                   systemImage: roastViewMode.icon)
                         }
                     }
-                    
-                    Divider()
                     
                     Section("Export") {
                         Button(action: exportAllRoastsToPDF) {
@@ -774,75 +693,12 @@ struct JokesView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .foregroundColor(AppTheme.Colors.roastAccent)
-                }
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingAddRoastTarget = true
-                } label: {
-                    Image(systemName: "person.badge.plus")
                 }
             }
         } else {
-            ToolbarItem(placement: .principal) {
-                Menu {
-                    Section(header: Text("View")) {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                viewMode = viewMode == .grid ? .list : .grid
-                            }
-                        } label: {
-                            Label(viewMode == .grid ? "List View" : "Grid View",
-                                  systemImage: viewMode.icon)
-                        }
-                        Button(action: { showFullContent.toggle() }) {
-                            Label(showFullContent ? "Show Titles Only" : "Show Full Content",
-                                  systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
-                        }
-                    }
-                    Divider()
-                    Section(header: Text("Organization")) {
-                        Button(action: { showingCreateFolder = true }) {
-                            Label("New Folder", systemImage: "folder.badge.plus")
-                        }
-                        Button(action: { showingAutoOrganize = true }) {
-                            Label("Auto-Organize Jokes", systemImage: "wand.and.stars")
-                        }
-                        Button(action: { showingImportHistory = true }) {
-                            Label("Import History", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                        }
-                    }
-                    Divider()
-                    Section(header: Text("Selection")) {
-                        Button(action: {
-                            isSelectMode.toggle()
-                            if !isSelectMode { selectedJokeIDs.removeAll() }
-                        }) {
-                            Label(isSelectMode ? "Cancel Multi-Select" : "Select Multiple Jokes",
-                                  systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
-                        }
-                    }
-                    Divider()
-                    Section(header: Text("Export")) {
-                        Button(action: exportJokesToPDF) {
-                            Label("Export Jokes to PDF", systemImage: "doc.text")
-                        }
-                        Button(action: exportBrainstormToPDF) {
-                            Label("Export Brainstorm to PDF", systemImage: "lightbulb")
-                        }
-                        Button(action: exportEverythingToPDF) {
-                            Label("Export Everything", systemImage: "square.and.arrow.up")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .accessibilityLabel("More Actions")
-                }
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Section(header: Text("Create")) {
+                    Section("Create") {
                         Button(action: { showingAddJoke = true }) {
                             Label("Write a Joke", systemImage: "square.and.pencil")
                         }
@@ -850,8 +706,7 @@ struct JokesView: View {
                             Label("Talk-to-Text", systemImage: "mic.badge.plus")
                         }
                     }
-                    Divider()
-                    Section(header: Text("Import")) {
+                    Section("Import") {
                         Button(action: { showingFilePicker = true }) {
                             Label("Import from Files", systemImage: "doc.text")
                         }
@@ -870,13 +725,66 @@ struct JokesView: View {
                         .accessibilityLabel("Add or Import")
                 }
             }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Section("View") {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                viewMode = viewMode == .grid ? .list : .grid
+                            }
+                        } label: {
+                            Label(viewMode == .grid ? "List View" : "Grid View",
+                                  systemImage: viewMode.icon)
+                        }
+                        Button(action: { showFullContent.toggle() }) {
+                            Label(showFullContent ? "Show Titles Only" : "Show Full Content",
+                                  systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
+                        }
+                    }
+                    Section("Organization") {
+                        Button(action: { showingCreateFolder = true }) {
+                            Label("New Folder", systemImage: "folder.badge.plus")
+                        }
+                        Button(action: { showingAutoOrganize = true }) {
+                            Label("Auto-Organize Jokes", systemImage: "wand.and.stars")
+                        }
+                        Button(action: { showingImportHistory = true }) {
+                            Label("Import History", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                        }
+                    }
+                    Section("Selection") {
+                        Button(action: {
+                            isSelectMode.toggle()
+                            if !isSelectMode { selectedJokeIDs.removeAll() }
+                        }) {
+                            Label(isSelectMode ? "Cancel Multi-Select" : "Select Multiple Jokes",
+                                  systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
+                        }
+                    }
+                    Section("Export") {
+                        Button(action: exportJokesToPDF) {
+                            Label("Export Jokes to PDF", systemImage: "doc.text")
+                        }
+                        Button(action: exportBrainstormToPDF) {
+                            Label("Export Brainstorm to PDF", systemImage: "lightbulb")
+                        }
+                        Button(action: exportEverythingToPDF) {
+                            Label("Export Everything", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .accessibilityLabel("More Actions")
+                }
+            }
         }
     }
 
     @ViewBuilder
     private var importOverlay: some View {
         if isProcessingImages {
-            Color.black.opacity(0.5)
+            Rectangle()
+                .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
             ImportProgressCard(
                 importFileCount: importFileCount,
@@ -1484,10 +1392,6 @@ struct JokesView: View {
             print(" [VoiceMemo] Imported \(importedCount) voice memos")
         }
     }
-    
-    private func encodeParsingFlags(_ flags: ImportParsingFlags) -> String {
-        (try? String(data: JSONEncoder().encode(flags), encoding: .utf8)) ?? "{}"
-    }
 }
 
 private extension JokesView {
@@ -1502,51 +1406,10 @@ private extension JokesView {
 // MARK: - Roast Target Components
 // Note: FolderChip, JokeRowView, JokeCardView, TheHitsChip, JokesViewMode are now in JokeComponents.swift
 
-struct RoastTargetCard: View {
-    let target: RoastTarget
-
-    var body: some View {
-        VStack(spacing: 14) {
-            // Avatar — async background decode
-            AsyncAvatarView(
-                photoData: target.photoData,
-                size: 58,
-                fallbackInitial: String(target.name.prefix(1).uppercased()),
-                accentColor: AppTheme.Colors.roastAccent
-            )
-            .overlay(Circle().stroke(AppTheme.Colors.roastAccent.opacity(0.5), lineWidth: 1.5))
-
-            // Name + count
-            VStack(spacing: 3) {
-                Text(target.name)
-                    .font(.system(size: 14, weight: .semibold, design: .serif))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                Text("\(target.jokeCount) roast\(target.jokeCount == 1 ? "" : "s")")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.45))
-            }
-
-            // Flame meter
-            HStack(spacing: 3) {
-                ForEach(0..<5, id: \.self) { i in
-                    Image(systemName: i < min(target.jokeCount, 5) ? "flame.fill" : "flame")
-                        .font(.system(size: 9))
-                        .foregroundColor(i < min(target.jokeCount, 5) ? AppTheme.Colors.roastAccent : Color.white.opacity(0.20))
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 140)
-        .padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(AppTheme.Colors.roastCard))
-        .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
-    }
-}
-
 struct RoastTargetGridCard: View {
     let target: RoastTarget
     var scale: CGFloat = 1.0
-    private let accentColor = AppTheme.Colors.roastAccent
+    private let accentColor: Color = .orange
     
     /// Safe property accessors to prevent crashes on invalidated models
     private var safeName: String { target.isValid ? target.name : "" }
@@ -1554,15 +1417,9 @@ struct RoastTargetGridCard: View {
     private var safePhotoData: Data? { target.isValid ? target.photoData : nil }
 
     private var avatarSize: CGFloat { max(40, 70 * scale) }
-    private var initialFontSize: CGFloat { max(14, 24 * scale) }
-    private var nameFontSize: CGFloat { max(9, 13 * scale) }
-    private var badgeFontSize: CGFloat { max(7, 10 * scale) }
-    private var iconSize: CGFloat { max(6, 8 * scale) }
-    private var verticalPadding: CGFloat { max(6, 10 * scale) }
 
     var body: some View {
         VStack(spacing: max(4, 6 * scale)) {
-            // Avatar — async background decode
             AsyncAvatarView(
                 photoData: safePhotoData,
                 size: avatarSize,
@@ -1571,37 +1428,32 @@ struct RoastTargetGridCard: View {
             )
             .overlay(Circle().stroke(accentColor.opacity(0.5), lineWidth: 2))
 
-            // Name
             Text(safeName)
-                .font(.system(size: nameFontSize, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(.primary)
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
 
-            // Joke count badge
-            HStack(spacing: max(3, 4 * scale)) {
+            HStack(spacing: 4) {
                 Image(systemName: "flame.fill")
-                    .font(.system(size: iconSize))
+                    .font(.caption2)
                     .foregroundColor(accentColor)
                 Text("\(safeJokeCount) roast\(safeJokeCount == 1 ? "" : "s")")
-                    .font(.system(size: badgeFontSize, weight: .medium))
+                    .font(.caption)
                     .foregroundColor(.secondary)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, verticalPadding)
+        .padding(.vertical, max(6, 10 * scale))
         .padding(.horizontal, 6)
-        .background(Color(.systemBackground))
-        .overlay(
-            Rectangle()
-                .stroke(accentColor.opacity(0.15), lineWidth: 0.5)
-        )
+        .background(Color(UIColor.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
 struct RoastTargetListRow: View {
     let target: RoastTarget
-    private let accentColor = AppTheme.Colors.roastAccent
+    private let accentColor: Color = .orange
     
     /// Safe property accessors to prevent crashes on invalidated models
     private var safeName: String { target.isValid ? target.name : "" }
@@ -1610,38 +1462,30 @@ struct RoastTargetListRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            // Avatar — async background decode
             AsyncAvatarView(
                 photoData: safePhotoData,
-                size: 50,
+                size: 44,
                 fallbackInitial: String(safeName.prefix(1).uppercased()),
                 accentColor: accentColor
             )
-            .overlay(Circle().stroke(accentColor.opacity(0.5), lineWidth: 1.5))
 
-            // Target info
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(safeName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.body)
                     .foregroundColor(.primary)
                 
-                HStack(spacing: 8) {
+                HStack(spacing: 4) {
                     Image(systemName: "flame.fill")
-                        .font(.system(size: 10))
+                        .font(.caption2)
                         .foregroundColor(accentColor)
                     Text("\(safeJokeCount) roast\(safeJokeCount == 1 ? "" : "s")")
-                        .font(.system(size: 13))
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
             
             Spacer()
-            
-            // Chevron
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
     }
 }

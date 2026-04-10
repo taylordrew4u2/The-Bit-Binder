@@ -246,20 +246,19 @@ struct ReviewImportsSheet: View {
                         Section {
                             HStack(spacing: 12) {
                                 Image(systemName: "tray.full.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(AppTheme.Colors.primaryAction)
+                                    .font(.title3)
+                                    .foregroundColor(.accentColor)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("\(openFragments.count + reviewCandidates.count) item\(openFragments.count + reviewCandidates.count == 1 ? "" : "s") to review")
-                                        .font(.system(size: 15, weight: .semibold))
+                                        .font(.headline)
                                     if !possibleDuplicates.isEmpty {
                                         Text("\(possibleDuplicates.count) possible duplicate\(possibleDuplicates.count == 1 ? "" : "s") detected")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(AppTheme.Colors.warning)
+                                            .font(.caption)
+                                            .foregroundColor(.orange)
                                     }
                                 }
                                 Spacer()
                             }
-                            .listRowBackground(Color.clear)
                         }
                         
                         if !possibleDuplicates.isEmpty {
@@ -267,10 +266,10 @@ struct ReviewImportsSheet: View {
                                 ForEach(possibleDuplicates, id: \.self) { dup in
                                     HStack(spacing: 10) {
                                         Image(systemName: "exclamationmark.triangle.fill")
-                                            .font(.system(size: 14))
-                                            .foregroundColor(AppTheme.Colors.warning)
+                                            .font(.subheadline)
+                                            .foregroundColor(.orange)
                                         Text(dup)
-                                            .font(.system(size: 14))
+                                            .font(.subheadline)
                                     }
                                 }
                             } header: {
@@ -312,19 +311,10 @@ struct ReviewImportsSheet: View {
                     }
                 } else {
                     // Empty state
-                    VStack(spacing: 20) {
-                        Spacer()
-                        Image(systemName: "checkmark.seal.fill")
-                            .font(.system(size: 50))
-                            .foregroundColor(AppTheme.Colors.success.opacity(0.6))
-                        Text("All Caught Up!")
-                            .font(.system(size: 20, weight: .bold, design: .serif))
+                    ContentUnavailableView {
+                        Label("All Caught Up!", systemImage: "checkmark.seal.fill")
+                    } description: {
                         Text("No unresolved fragments or items needing review. Everything from your imports has been handled.")
-                            .font(.system(size: 14))
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                        Spacer()
                     }
                 }
             }
@@ -374,9 +364,9 @@ struct UnresolvedFragmentRow: View {
     
     private var confidenceColor: Color {
         switch fragment.confidence.lowercased() {
-        case "high": return AppTheme.Colors.success
+        case "high": return .green
         case "medium": return .orange
-        default: return AppTheme.Colors.error
+        default: return .red
         }
     }
     
@@ -386,17 +376,17 @@ struct UnresolvedFragmentRow: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(fragment.titleCandidate ?? "Recovered Fragment")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.headline)
                         .lineLimit(2)
                     
                     HStack(spacing: 8) {
                         Label(fragment.kind.capitalized, systemImage: "tag")
-                            .font(.system(size: 11))
+                            .font(.caption)
                             .foregroundColor(.secondary)
                         
                         if let page = fragment.sourcePage {
                             Label("Page \(page)", systemImage: "doc.text")
-                                .font(.system(size: 11))
+                                .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -406,7 +396,7 @@ struct UnresolvedFragmentRow: View {
                 
                 // Confidence pill
                 Text(fragment.confidence.capitalized)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundColor(confidenceColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -417,7 +407,7 @@ struct UnresolvedFragmentRow: View {
             
             // Fragment text
             Text(fragment.text)
-                .font(.system(size: 13, design: .serif))
+                .font(.subheadline)
                 .foregroundColor(.secondary)
                 .lineSpacing(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -429,7 +419,7 @@ struct UnresolvedFragmentRow: View {
             
             // Source info
             Text(fragment.sourceFilename)
-                .font(.system(size: 11))
+                .font(.caption)
                 .foregroundColor(.secondary.opacity(0.7))
             
             // Action buttons
@@ -437,14 +427,8 @@ struct UnresolvedFragmentRow: View {
                 Button {
                     onSaveAsJoke(fragment)
                 } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 13))
-                        Text("Save as Joke")
-                            .font(.system(size: 13, weight: .medium))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    Label("Save as Joke", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
@@ -452,14 +436,8 @@ struct UnresolvedFragmentRow: View {
                 Button {
                     onMarkResolved(fragment)
                 } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "checkmark.circle")
-                            .font(.system(size: 13))
-                        Text("Dismiss")
-                            .font(.system(size: 13, weight: .medium))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    Label("Dismiss", systemImage: "checkmark.circle")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

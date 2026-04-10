@@ -58,43 +58,43 @@ This document outlines the comprehensive UI/UX audit and refactoring performed t
 
 ---
 
-## Design Tokens Reference
+## Color & Token Reference
 
-### NativeTheme.Colors
+All views use **direct SwiftUI system values**. No intermediate design system or abstraction layer exists.
+
+### Colors
 ```swift
 // Text hierarchy
-.textPrimary    = Color.primary
-.textSecondary  = Color.secondary
-.textTertiary   = Color(UIColor.tertiaryLabel)
+Color.primary                              // Primary text
+Color.secondary                            // Secondary text
+Color(UIColor.tertiaryLabel)               // Tertiary text
 
 // Backgrounds
-.backgroundPrimary           = Color(UIColor.systemBackground)
-.backgroundSecondary         = Color(UIColor.secondarySystemBackground)
-.backgroundGrouped           = Color(UIColor.systemGroupedBackground)
-.backgroundGroupedSecondary  = Color(UIColor.secondarySystemGroupedBackground)
+Color(UIColor.systemBackground)            // Primary background
+Color(UIColor.secondarySystemBackground)   // Elevated surfaces
+Color(UIColor.tertiarySystemBackground)    // Cards on elevated surfaces
+Color(UIColor.systemGroupedBackground)     // Grouped list background
 
-// Semantic states
-.success     = Color.green
-.warning     = Color.orange
-.destructive = Color.red
-.info        = Color.blue
+// Semantic
+Color.green                                // Success
+Color.orange                               // Warning / Roast accent
+Color.red                                  // Error / Recordings accent
+Color.blue                                 // Info
+Color.yellow                               // Brainstorm accent / Hits gold
+Color.accentColor                          // Primary action
 ```
 
-### NativeTheme.Radius
+### Haptics
 ```swift
-.small   = 6pt
-.medium  = 10pt   // Primary card/button radius
-.large   = 12pt
+haptic(.light)      // Selections, toggles
+haptic(.medium)     // Button presses, confirmations
+haptic(.heavy)      // Major actions
+haptic(.success)    // Save completed, sync done
+haptic(.warning)    // Needs attention
+haptic(.error)      // Failed action
+haptic(.selection)  // Picker changes
 ```
-
-### NativeTheme.Spacing
-```swift
-.xs  = 8pt
-.sm  = 12pt
-.md  = 16pt   // Standard padding
-.lg  = 20pt
-.xl  = 24pt
-```
+Defined in `EffortlessUX.swift` via `HapticEngine`.
 
 ---
 
@@ -164,34 +164,120 @@ These screens are not in the primary tab bar. Consider:
 | File | Status |
 |------|--------|
 | `ContentView.swift` | ✅ TabView with standard tab bar navigation |
-| `HomeView.swift` | ✅ List with insetGrouped style, system colors |
+| `HomeView.swift` | ✅ Refactored to `List(.insetGrouped)` with standard sections and controls |
 | `SettingsView.swift` | ✅ Standard iOS Settings pattern |
 | `AddJokeView.swift` | ✅ Standard Form sheet |
-| `SetListsView.swift` | ✅ insetGrouped List style |
+| `SetListsView.swift` | ✅ insetGrouped List, consolidated toolbar (no duplicate buttons) |
 | `LaunchScreenView.swift` | ✅ Minimal loading screen with system background |
 | `JokeComponents.swift` | ✅ System fonts and semantic colors |
 | `BitBinderComponents.swift` | ✅ ContentUnavailableView for empty states |
 | `AppTheme.swift` | ✅ Mapped to system colors |
 | `NativeDesignSystem.swift` | ✅ Native design tokens |
-| `BrainstormView.swift` | ✅ System grouped background, native buttons |
-| `RecordingsView.swift` | ✅ insetGrouped List, native icons |
-| `JokesView.swift` | ✅ Native grid/list with system styling |
+| `BrainstormView.swift` | ✅ Standard toolbar buttons (no floating action buttons), system fonts |
+| `RecordingsView.swift` | ✅ Standard toolbar placement, no decorative gradients |
+| `JokesView.swift` | ✅ Standard toolbar placement, system fonts on roast components |
+| `NotebookView.swift` | ✅ Standard toolbar placement, no decorative gradients |
+| `JokeDetailView.swift` | ✅ Refactored to `Form` with standard sections and DisclosureGroup |
+| `TrashView.swift` | ✅ Proper navigation title |
+| `JokesViewModifiers.swift` | ✅ System fonts, ContentUnavailableView for empty states |
+| `BrainstormDetailView.swift` | ✅ System fonts (no .serif) |
+| `BitBuddyChatView.swift` | ✅ System fonts (no .serif) |
+| `HelpFAQView.swift` | ✅ System fonts (no .serif) |
+| `ImportBatchHistoryView.swift` | ✅ System fonts (no .serif) |
+| `AddRoastTargetView.swift` | ✅ System fonts (no .serif) |
+| `iCloudSyncSettingsView.swift` | ✅ System fonts (no .serif) |
+| `SmartImportReviewView.swift` | ✅ System fonts (no .serif) |
+| `AddBrainstormIdeaSheet.swift` | ✅ System fonts (no .serif) |
+
+---
+
+## Key Changes in Latest Pass
+
+### 1. Toolbar Placement Fixed
+**Before:** Multiple views used `.principal` placement for menus, which replaced the navigation title
+**After:** All menus moved to `.navigationBarTrailing`, navigation titles are always visible
+
+### 2. HomeView Rebuilt
+**Before:** Custom `ScrollView` with manual `VStack`, custom full-width colored buttons, custom divider grid
+**After:** Standard `List(.insetGrouped)` with `Label` buttons and `LabeledContent` rows
+
+### 3. Floating Action Buttons Removed
+**Before:** BrainstormView had large floating mic/plus buttons at bottom (Android FAB pattern)
+**After:** Standard `+` toolbar button and menu with voice recording option
+
+### 4. JokeDetailView Rebuilt
+**Before:** Custom `ScrollView` with manual padding, custom action bar, custom metadata panel
+**After:** Standard `Form` with sections, `DisclosureGroup` for metadata, standard `Button` controls
+
+### 5. All .serif Fonts Removed
+**Before:** 20+ uses of `.design: .serif` across views
+**After:** All replaced with standard system text styles (`.title3`, `.headline`, `.body`, `.subheadline`, `.caption`)
+
+### 6. Decorative Elements Removed
+- Flame meter (5 flame icons) removed from RoastTargetCard
+- Custom icon gradients removed from empty states
+- Custom shadows removed from cards
+- Redundant duplicate toolbar buttons consolidated
 
 ---
 
 ## Next Steps
 
 All primary views have been updated to use native iOS patterns:
-- ✅ System colors (`Color.primary`, `Color.secondary`, `Color(UIColor.systemBackground)`)
+- ✅ Direct system colors (`Color.primary`, `Color.secondary`, `Color(UIColor.systemBackground)`)
 - ✅ System text styles (`.largeTitle`, `.headline`, `.body`, etc.)
 - ✅ `ContentUnavailableView` for empty states
 - ✅ `insetGrouped` List styles
 - ✅ Standard iOS TabView navigation
-- ✅ Native haptic feedback via `haptic()` function
+- ✅ Native haptic feedback via `haptic()` function in `EffortlessUX.swift`
 - ✅ SF Symbols with `.symbolRenderingMode(.hierarchical)`
+- ✅ `AppTheme.swift` and `NativeDesignSystem.swift` fully gutted (empty stubs, safe to delete)
+- ✅ Zero `AppTheme.` or `NativeTheme.` references remain in any Swift file
+- ✅ Zero custom button styles (`TouchReactiveStyle`, `FABButtonStyle`, `ChipStyle`) remain
+- ✅ Zero `.cardPress()`, `.touchReactive()`, `.heavyPress()` view modifiers remain
 
 ### Optional Future Refinements:
 
-1. **Asset audit** - Ensure app icon and any images match the cleaner aesthetic
-2. **Animation review** - Remove any remaining non-standard animations
-3. **Accessibility audit** - Verify VoiceOver labels and navigation
+1. **Delete stub files** — `AppTheme.swift` and `NativeDesignSystem.swift` are empty and can be removed from the Xcode project
+2. **Asset audit** — Ensure app icon and any images match the cleaner aesthetic
+3. **Animation review** — Remove any remaining non-standard animations
+4. **Accessibility audit** — Verify VoiceOver labels and navigation
+
+---
+
+## Replacement Reference
+
+All legacy `AppTheme` and `NativeTheme` aliases were replaced with direct system equivalents:
+
+| Old Pattern | Replaced With |
+|---|---|
+| `AppTheme.Colors.roastAccent` | `.orange` |
+| `AppTheme.Colors.primaryAction` | `.accentColor` |
+| `AppTheme.Colors.success` | `.green` |
+| `AppTheme.Colors.error` | `.red` |
+| `AppTheme.Colors.warning` | `.orange` |
+| `AppTheme.Colors.info` | `.blue` |
+| `AppTheme.Colors.inkBlack` | `.primary` |
+| `AppTheme.Colors.inkBlue` | `.accentColor` |
+| `AppTheme.Colors.textPrimary` | `.primary` |
+| `AppTheme.Colors.textSecondary` | `.secondary` |
+| `AppTheme.Colors.textTertiary` | `Color(UIColor.tertiaryLabel)` |
+| `AppTheme.Colors.paperCream` | `Color(UIColor.systemBackground)` |
+| `AppTheme.Colors.roastBackground` | `Color(UIColor.systemBackground)` |
+| `AppTheme.Colors.surfaceElevated` | `Color(UIColor.secondarySystemBackground)` |
+| `AppTheme.Colors.roastCard` | `Color(UIColor.tertiarySystemBackground)` |
+| `AppTheme.Colors.paperDeep` | `Color(UIColor.tertiarySystemBackground)` |
+| `AppTheme.Colors.paperAged` | `Color(UIColor.secondarySystemBackground)` |
+| `AppTheme.Colors.brainstormAccent` | `.yellow` |
+| `AppTheme.Colors.recordingsAccent` | `.red` |
+| `AppTheme.Colors.hitsGold` | `.yellow` |
+| `NativeTheme.Colors.*` | Same system equivalents as above |
+| `AppTheme.Radius.medium` | `10` |
+| `AppTheme.Radius.large` | `12` |
+| `AppTheme.Radius.xl` | `16` |
+| `TouchReactiveStyle()` | `.buttonStyle(.plain)` |
+| `FABButtonStyle()` | `.buttonStyle(.plain)` |
+| `ChipStyle()` | `.buttonStyle(.plain)` |
+| `.cardPress()` | `.buttonStyle(.plain)` |
+| `.touchReactive()` | removed |
+| `.heavyPress()` | removed |

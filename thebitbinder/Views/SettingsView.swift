@@ -22,6 +22,63 @@ struct SettingsView: View {
     
     var body: some View {
         List {
+            // MARK: - Profile Header
+            Section {
+                HStack(spacing: 14) {
+                    // Avatar circle with initial
+                    ZStack {
+                        Circle()
+                            .fill(roastMode ? Color.orange.opacity(0.15) : Color.accentColor.opacity(0.12))
+                            .frame(width: 52, height: 52)
+                        
+                        Text(userPreferences.userName.isEmpty ? "?" : String(userPreferences.userName.prefix(1)).uppercased())
+                            .font(.title2.weight(.semibold))
+                            .foregroundColor(roastMode ? .orange : .accentColor)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        if isEditingName {
+                            TextField("Your name", text: $editingNameText)
+                                .font(.body.weight(.semibold))
+                                .textFieldStyle(.plain)
+                                .focused($nameFieldFocused)
+                                .onSubmit { saveName() }
+                                .submitLabel(.done)
+                        } else {
+                            Text(userPreferences.userName.isEmpty ? "Set Your Name" : userPreferences.userName)
+                                .font(.body.weight(.semibold))
+                                .foregroundColor(userPreferences.userName.isEmpty ? .secondary : .primary)
+                        }
+                        
+                        Text("\(jokes.filter { !$0.isDeleted }.count) jokes")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    if isEditingName {
+                        Button("Done") { saveName() }
+                            .font(.subheadline.weight(.semibold))
+                    } else {
+                        Button {
+                            editingNameText = userPreferences.userName
+                            isEditingName = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                nameFieldFocused = true
+                            }
+                        } label: {
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.title3)
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            
             // MARK: - Mode Section
             Section {
                 Toggle(isOn: $roastMode) {
@@ -63,55 +120,6 @@ struct SettingsView: View {
                 Text("Data")
             }
             
-            // MARK: - Personalization Section
-            Section {
-                HStack {
-                    Label("Name", systemImage: "person")
-                    Spacer()
-                    if isEditingName {
-                        TextField("Your name", text: $editingNameText)
-                            .multilineTextAlignment(.trailing)
-                            .foregroundColor(.primary)
-                            .textFieldStyle(.plain)
-                            .focused($nameFieldFocused)
-                            .onSubmit {
-                                saveName()
-                            }
-                            .submitLabel(.done)
-                        
-                        Button {
-                            saveName()
-                        } label: {
-                            Text("Done")
-                                .fontWeight(.medium)
-                        }
-                    } else {
-                        Button {
-                            editingNameText = userPreferences.userName
-                            isEditingName = true
-                            // Delay focus to allow UI to update
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                nameFieldFocused = true
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text(userPreferences.userName.isEmpty ? "Set your name" : userPreferences.userName)
-                                    .foregroundColor(.secondary)
-                                Image(systemName: "pencil")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            } header: {
-                Text("Personalization")
-            } footer: {
-                if !isEditingName {
-                    Text("Tap to edit your name.")
-                }
-            }
             
             // MARK: - Notifications Section
             DailyNotificationSection()

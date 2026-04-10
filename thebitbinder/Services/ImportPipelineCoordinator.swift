@@ -125,20 +125,19 @@ final class ImportPipelineCoordinator {
         var extractedJokes: [AIExtractedJoke]
         var providerUsed: String
         let textChunks = splitIntoExtractionChunks(fullText)
-        var aiExtractionFailed = false
         if textChunks.count == 1 {
-            do {
-                let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: textChunks[0], token: importToken)
-                extractedJokes = result.jokes
-                providerUsed = result.providerUsed
-            } catch {
-                aiExtractionFailed = true
-                extractedJokes = []
-                providerUsed = "AI Extraction Failed"
-            }
+            // Single chunk — let errors propagate so the caller can surface them.
+            let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: textChunks[0], token: importToken)
+            extractedJokes = result.jokes
+            providerUsed = result.providerUsed
         } else {
+            // Multi-chunk: extract each chunk independently.
+            // If some chunks fail but others succeed, keep what we got.
+            // If ALL chunks fail, re-throw the last error so the user sees it.
             var allJokes: [AIExtractedJoke] = []
             var lastProvider = "Unknown"
+            var lastError: Error? = nil
+            var failedChunkCount = 0
             debugInfo.append(" Large file split into \(textChunks.count) chunks for extraction")
             for (chunkIndex, chunk) in textChunks.enumerated() {
                 do {
@@ -147,20 +146,31 @@ final class ImportPipelineCoordinator {
                     allJokes.append(contentsOf: result.jokes)
                     lastProvider = result.providerUsed
                 } catch {
-                    aiExtractionFailed = true
+                    failedChunkCount += 1
+                    lastError = error
+                    debugInfo.append("  Chunk \(chunkIndex + 1) failed: \(error.localizedDescription)")
+                    print(" [ImportPipeline] Chunk \(chunkIndex + 1)/\(textChunks.count) failed: \(error.localizedDescription)")
                 }
+            }
+            // If every chunk failed, surface the error — no silent degradation.
+            if allJokes.isEmpty, let error = lastError {
+                throw error
+            }
+            if failedChunkCount > 0 {
+                debugInfo.append("⚠️ \(failedChunkCount)/\(textChunks.count) chunks failed — results may be incomplete")
             }
             extractedJokes = allJokes
             providerUsed = lastProvider
         }
-        // Fallback: If AI extraction failed or returned 0, split every word as a bit
-        if aiExtractionFailed || extractedJokes.isEmpty {
-            debugInfo.append(" AI extraction failed or returned 0 results. Falling back to word-split bits.")
-            let words = fullText.components(separatedBy: CharacterSet.whitespacesAndNewlines).filter { !$0.isEmpty }
-            extractedJokes = words.map { word in
-                AIExtractedJoke(jokeText: word, humorMechanism: nil, confidence: 0.0, explanation: nil, title: nil, tags: [])
-            }
-            providerUsed = aiExtractionFailed ? "Fallback: AI Error" : "Fallback: 0 Results"
+
+        // If AI returned zero results, that is a real failure — surface it.
+        // There is NO local/word-split fallback. The user must see what went wrong.
+        guard !extractedJokes.isEmpty else {
+            print(" [ImportPipeline] AI returned 0 results — throwing error (no local fallback)")
+            throw AIExtractionFailedError(
+                reason: "GagGrabber processed your file but couldn't find any jokes. Try a different file or format (PDF with selectable text works best).",
+                underlyingErrors: [:]
+            )
         }
 
         debugInfo.append(" Extracted \(extractedJokes.count) fragment(s) via \(providerUsed)")

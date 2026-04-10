@@ -204,23 +204,39 @@ final class OCRTextExtractor {
     
     private func convertPDFPageToImage(_ page: PDFPage) -> UIImage? {
         let pageSize = page.bounds(for: .mediaBox).size
+        let pageRotation = CGFloat(page.rotation)
+        
+        // Determine the size of the rendered image, accounting for rotation
+        let imageSize = (pageRotation == 90 || pageRotation == 270)
+            ? CGSize(width: pageSize.height, height: pageSize.width)
+            : pageSize
+
         // 2× is sufficient for accurate OCR and halves peak memory vs 3×.
-        // A standard A4 page at 2×  1240×1754 px (~8 MB) vs ~35 MB at 3×.
+        // A standard A4 page at 2× is ~1240×1754 px (~8 MB) vs ~35 MB at 3×.
         let scale: CGFloat = 2.0
-        let scaledSize = CGSize(width: pageSize.width * scale, height: pageSize.height * scale)
+        let scaledSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
         
         let renderer = UIGraphicsImageRenderer(size: scaledSize)
         let image = renderer.image { ctx in
             UIColor.white.set()
             ctx.fill(CGRect(origin: .zero, size: scaledSize))
             
-            ctx.cgContext.translateBy(x: 0, y: scaledSize.height)
+            // Move origin to center for rotation
+            ctx.cgContext.translateBy(x: scaledSize.width / 2.0, y: scaledSize.height / 2.0)
+            // Apply rotation
+            ctx.cgContext.rotate(by: -pageRotation * .pi / 180)
+            // Scale for rendering
             ctx.cgContext.scaleBy(x: scale, y: -scale)
+
+            // PDF drawing is based on the mediaBox. Translate so its center lands on the origin
+            let mediaBox = page.bounds(for: .mediaBox)
+            ctx.cgContext.translateBy(x: -mediaBox.midX, y: -mediaBox.midY)
             
             page.draw(with: .mediaBox, to: ctx.cgContext)
         }
         
-        return image
+        // The image is now correctly rotated, but we still normalize to fix any EXIF orientation issues.
+        return image.normalized()
     }
     
     private func normalizeOCRText(_ text: String) -> String {

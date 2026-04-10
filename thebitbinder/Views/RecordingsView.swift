@@ -33,16 +33,11 @@ struct RecordingsView: View {
             if filteredRecordings.isEmpty {
                 BitBinderEmptyState(
                     icon: "mic.circle.fill",
-                    title: roastMode ? "No Burn Recordings" : "No Recordings Yet",
+                    title: roastMode ? "No Recordings" : "No Recordings Yet",
                     subtitle: "Record your sets to review and improve your delivery",
                     actionTitle: "Start Recording",
                     action: { showingQuickRecord = true },
-                    roastMode: roastMode,
-                    iconGradient: LinearGradient(
-                        colors: [Color.red, Color.red.opacity(0.7)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+                    roastMode: roastMode
                 )
             } else {
                 List {
@@ -58,28 +53,22 @@ struct RecordingsView: View {
         }
         .searchable(text: $searchText, prompt: "Search recordings")
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Menu {
-                    Button {
-                        showingQuickRecord = true
-                    } label: {
-                        Label("Quick Recording", systemImage: "mic.circle.fill")
-                    }
-                    Divider()
-                    Button { showingTrash = true } label: {
-                        Label("Trash", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     showingQuickRecord = true
                 } label: {
-                    Image(systemName: "mic.circle.fill")
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(roastMode ? .orange : .red)
+                    Image(systemName: "plus")
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Section {
+                        Button { showingTrash = true } label: {
+                            Label("Trash", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -144,7 +133,7 @@ struct RecordingRowView: View {
         HStack(spacing: 12) {
             // Play icon
             Image(systemName: "play.circle.fill")
-                .font(.system(size: 32))
+                .font(.title)
                 .foregroundStyle(roastMode ? .orange : .red)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -170,7 +159,7 @@ struct RecordingRowView: View {
             
             Text(recording.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
                 .font(.caption)
-                .foregroundColor(NativeTheme.Colors.textTertiary)
+                .foregroundColor(Color(UIColor.tertiaryLabel))
         }
         .padding(.vertical, 6)
     }

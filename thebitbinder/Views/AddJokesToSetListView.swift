@@ -41,7 +41,7 @@ struct AddJokesToSetListView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Folder selection chips
                 if !folders.isEmpty {
@@ -72,7 +72,7 @@ struct AddJokesToSetListView: View {
                     if availableJokes.isEmpty {
                         VStack(spacing: 20) {
                             Image(systemName: "text.bubble")
-                                .font(.system(size: 60))
+                                .font(.largeTitle)
                                 .foregroundColor(.gray)
                             Text("No jokes available")
                                 .font(.title3)
@@ -103,7 +103,7 @@ struct AddJokesToSetListView: View {
                                     Spacer()
                                     if selectedJokeIDs.contains(joke.id) {
                                         Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(AppTheme.Colors.primaryAction)
+                                            .foregroundColor(.accentColor)
                                     }
                                 }
                             }
@@ -113,7 +113,7 @@ struct AddJokesToSetListView: View {
                     }
                 }
             }
-            .background(roastMode ? AppTheme.Colors.roastBackground : AppTheme.Colors.paperCream)
+            .background(roastMode ? Color(UIColor.systemBackground) : Color(UIColor.secondarySystemBackground))
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
@@ -123,7 +123,7 @@ struct AddJokesToSetListView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                    .foregroundColor(roastMode ? .orange : .accentColor)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -131,16 +131,23 @@ struct AddJokesToSetListView: View {
                         addJokes()
                     }
                     .disabled(selectedJokeIDs.isEmpty)
-                    .foregroundColor(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+                    .foregroundColor(roastMode ? .orange : .accentColor)
                 }
             }
         }
-        .tint(roastMode ? AppTheme.Colors.roastAccent : AppTheme.Colors.primaryAction)
+        .tint(roastMode ? .orange : .accentColor)
     }
     
     private func addJokes() {
         setList.jokeIDs.append(contentsOf: selectedJokeIDs)
         setList.dateModified = Date()
+        do {
+            try modelContext.save()
+        } catch {
+            #if DEBUG
+            print("⚠️ [AddJokesToSetListView] Failed to save added jokes: \(error)")
+            #endif
+        }
         dismiss()
     }
 }

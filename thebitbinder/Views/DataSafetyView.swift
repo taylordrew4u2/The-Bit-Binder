@@ -41,7 +41,7 @@ struct DataSafetyView: View {
     @State private var showMailUnavailableAlert = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 #if DEBUG
                 // Status Section (debug only)
@@ -191,7 +191,7 @@ struct DataSafetyView: View {
                         } label: {
                             HStack {
                                 Image(systemName: "flame.fill")
-                                    .foregroundColor(AppTheme.Colors.roastAccent)
+                                    .foregroundColor(.orange)
                                 VStack(alignment: .leading) {
                                     Text("Export Roasts")
                                         .foregroundColor(.primary)
@@ -589,12 +589,12 @@ struct BackupsView: View {
     @State private var backupToDelete: BackupInfo?
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if backups.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "externaldrive.badge.xmark")
-                            .font(.system(size: 44))
+                            .font(.largeTitle)
                             .foregroundColor(.secondary)
                         Text("No Backups Found")
                             .font(.headline)

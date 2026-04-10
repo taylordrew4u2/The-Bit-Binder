@@ -92,7 +92,7 @@ struct DocumentScannerView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "camera.badge.exclamationmark")
-                .font(.system(size: 44))
+                .font(.largeTitle)
                 .foregroundColor(.secondary)
             Text("Document scanning is not available on Mac.")
                 .multilineTextAlignment(.center)

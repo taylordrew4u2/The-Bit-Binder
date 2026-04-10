@@ -13,7 +13,7 @@ struct ContentView: View {
     
     var body: some View {
         MainTabView()
-            .preferredColorScheme(roastMode ? .dark : .light)
+            .preferredColorScheme(roastMode ? .dark : nil)
     }
 }
 
@@ -23,7 +23,7 @@ enum AppScreen: String, CaseIterable {
     case home = "Home"
     case brainstorm = "Brainstorm"
     case jokes = "Jokes"
-    case sets = "Set Lists"
+    case sets = "Sets"
     case recordings = "Recordings"
     case notebookSaver = "Notebook"
     case settings = "Settings"
@@ -34,7 +34,7 @@ enum AppScreen: String, CaseIterable {
     
     // Screens visible in the tab bar (primary navigation)
     static var tabBarScreens: [AppScreen] {
-        [.home, .jokes, .sets, .brainstorm, .settings]
+        [.home, .jokes, .sets, .notebookSaver, .settings]
     }
     
     static var roastTabBarScreens: [AppScreen] {
@@ -102,6 +102,18 @@ enum AppScreen: String, CaseIterable {
         default:             return .accentColor
         }
     }
+    
+    /// Content-heavy screens with VStack wrappers use `.inline` so the
+    /// title bar doesn't eat vertical space that can't be reclaimed by
+    /// scroll-collapse. Dashboard and list screens keep `.large`.
+    var preferredTitleDisplayMode: NavigationBarItem.TitleDisplayMode {
+        switch self {
+        case .home, .settings, .sets, .notebookSaver, .recordings:
+            return .large
+        case .jokes, .brainstorm:
+            return .inline
+        }
+    }
 }
 
 // MARK: - Main Tab View (Standard iOS TabView)
@@ -142,8 +154,8 @@ struct MainTabView: View {
             ForEach(visibleTabs, id: \.self) { screen in
                 NavigationStack {
                     screenView(for: screen)
-                        .navigationTitle(roastMode ? screen.roastName : screen.rawValue)
-                        .navigationBarTitleDisplayMode(.large)
+                        .navigationTitle(screen == .home ? "" : (roastMode ? screen.roastName : screen.rawValue))
+                        .navigationBarTitleDisplayMode(screen == .home ? .inline : screen.preferredTitleDisplayMode)
                         .toolbar {
                             // AI Chat button in toolbar (subtle, not a FAB)
                             if screen == .home || screen == .jokes {

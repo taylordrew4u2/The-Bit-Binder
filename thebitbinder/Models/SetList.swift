@@ -10,6 +10,10 @@ import SwiftData
 
 @Model
 final class SetList: Identifiable {
+    // ⚠️ IMPORTANT: After modifying any properties of this model, you MUST call
+    // modelContext.save() to persist changes to the database. Forgetting to save
+    // will result in data loss and inconsistent app state.
+    
     var id: UUID = UUID()
     var name: String = ""
     var dateCreated: Date = Date()

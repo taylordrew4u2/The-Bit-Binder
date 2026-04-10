@@ -14,6 +14,10 @@ final class NotebookPhotoRecord: Identifiable {
     var notes: String = ""  // Renamed from 'caption' per CD_NotebookPhotoRecord schema
     @Attribute(.externalStorage) var imageData: Data?  // Changed from fileURL to imageData (BYTES) per schema
     var dateAdded: Date = Date()  // Renamed from 'createdAt' per CD_NotebookPhotoRecord schema
+    var sortOrder: Int = 0  // For manual reordering
+
+    // Folder organisation (nil = unfiled)
+    var folder: NotebookFolder?
 
     // Soft-delete (trash) support
     var isDeleted: Bool = false
@@ -24,7 +28,11 @@ final class NotebookPhotoRecord: Identifiable {
         self.notes = notes
         self.imageData = imageData
         self.dateAdded = Date()
+        self.sortOrder = Int(Date().timeIntervalSince1970 * 1000) // Default to timestamp for ordering
     }
+
+    // Convenience accessor for dateCreated (used in queries)
+    var dateCreated: Date { dateAdded }
 
     // MARK: - Trash Helpers
 

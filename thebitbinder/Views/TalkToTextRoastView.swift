@@ -43,7 +43,7 @@ struct TalkToTextRoastView: View {
         case denied
     }
     
-    private let accentColor = AppTheme.Colors.roastAccent
+    private let accentColor = Color.orange
     
     var body: some View {
         NavigationStack {
@@ -51,26 +51,21 @@ struct TalkToTextRoastView: View {
                 // Header
                 VStack(spacing: 12) {
                     ZStack {
-                        Circle()
-                            .fill(isRecording ? AppTheme.Colors.recordingsAccent.opacity(0.15) : accentColor.opacity(0.1))
-                            .frame(width: 100, height: 100)
-                            .scaleEffect(isRecording ? 1.1 : 1.0)
-                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isRecording)
-                        
-                        Image(systemName: isRecording ? "waveform" : "mic.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(isRecording ? .red : accentColor)
-                            .symbolEffect(.variableColor, isActive: isRecording)
-                    }
-                    
-                    Text(isRecording ? "Listening..." : "Roast Talk-to-Text")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text("Recording for \(safeTargetName)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                         Circle()
+                             .fill(isRecording ? Color.red.opacity(0.15) : accentColor.opacity(0.1))
+                             .frame(width: 100, height: 100)
+                             .scaleEffect(isRecording ? 1.1 : 1.0)
+                             .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isRecording)
+                         
+                         Image(systemName: isRecording ? "waveform" : "mic.fill")
+                             .font(.largeTitle)
+                             .foregroundColor(isRecording ? .red : accentColor)
+                             .symbolEffect(.variableColor, isActive: isRecording)
+                     }
+                     
+                     Text(isRecording ? "Listening..." : "Ready")
+                         .font(.title3)
+                         .fontWeight(.semibold)
                 }
                 .padding(.top, 20)
                 
@@ -91,8 +86,8 @@ struct TalkToTextRoastView: View {
                     }
                     
                     ZStack(alignment: .topLeading) {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(AppTheme.Colors.surfaceElevated)
+                         RoundedRectangle(cornerRadius: 12)
+                             .fill(Color(UIColor.secondarySystemBackground))
                         
                         if transcribedText.isEmpty && !isRecording {
                             Text("Your transcription will appear here...")
@@ -114,12 +109,12 @@ struct TalkToTextRoastView: View {
                 .padding(.horizontal, 20)
                 
                 // Error message
-                if let error = errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(AppTheme.Colors.recordingsAccent)
-                        .padding(.horizontal, 20)
-                }
+                 if let error = errorMessage {
+                     Text(error)
+                         .font(.caption)
+                         .foregroundColor(.red)
+                         .padding(.horizontal, 20)
+                 }
                 
                 Spacer()
                 
@@ -133,18 +128,13 @@ struct TalkToTextRoastView: View {
                             startRecording()
                         }
                     } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                                .font(.system(size: 20))
-                            Text(isRecording ? "Stop" : "Start Recording")
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(isRecording ? AppTheme.Colors.recordingsAccent : accentColor)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        Label(isRecording ? "Stop" : "Start Recording",
+                              systemImage: isRecording ? "stop.fill" : "mic.fill")
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(isRecording ? .red : accentColor)
+                    .controlSize(.large)
                     .disabled(permissionStatus == .denied)
                     
                     // Save button (only show when there's text and not recording)
@@ -152,18 +142,12 @@ struct TalkToTextRoastView: View {
                         Button {
                             saveRoast()
                         } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 20))
-                                Text("Save as Roast")
-                                    .fontWeight(.semibold)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(AppTheme.Colors.success)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            Label("Save as Roast", systemImage: "checkmark.circle.fill")
+                                .frame(maxWidth: .infinity)
                         }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.green)
+                        .controlSize(.large)
                     }
                 }
                 .padding(.horizontal, 20)
