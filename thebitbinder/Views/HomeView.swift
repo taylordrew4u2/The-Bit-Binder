@@ -22,25 +22,6 @@ struct HomeView: View {
     @State private var showTalkToText = false
     @State private var showQuickRecord = false
     @AppStorage("roastModeEnabled") private var roastMode = false
-    @AppStorage("userName") private var userName = ""
-    
-    // Time-aware greeting
-    private var greeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 0..<5:   return "Late night session"
-        case 5..<12:  return "Good morning"
-        case 12..<17: return "Good afternoon"
-        case 17..<21: return "Good evening"
-        default:      return "Night owl mode"
-        }
-    }
-    
-    private var greetingName: String {
-        let name = userName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.isEmpty { return greeting }
-        return "\(greeting), \(name)"
-    }
     
     // Stats
     private var hitsCount: Int {
@@ -58,27 +39,6 @@ struct HomeView: View {
 
     var body: some View {
         List {
-            // MARK: - Greeting Header
-            Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(greetingName)
-                        .font(.title2.weight(.semibold))
-                        .foregroundColor(.primary)
-                    
-                    if allJokes.isEmpty {
-                        Text("Let's get your first joke on paper")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text(motivationalSubtitle)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 12, trailing: 20))
-            }
-            
             // MARK: - Quick Actions
             Section {
                 Button {
@@ -247,15 +207,6 @@ struct HomeView: View {
         }
     }
     
-    private var motivationalSubtitle: String {
-        if thisWeekCount > 0 {
-            return "\(thisWeekCount) new joke\(thisWeekCount == 1 ? "" : "s") this week — keep it going"
-        } else if hitsCount > 0 {
-            return "You've got \(hitsCount) hit\(hitsCount == 1 ? "" : "s") in your set"
-        } else {
-            return "\(allJokes.count) joke\(allJokes.count == 1 ? "" : "s") and counting"
-        }
-    }
 }
 
 // MARK: - Stat Card
