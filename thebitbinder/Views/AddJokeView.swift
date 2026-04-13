@@ -80,15 +80,11 @@ struct AddJokeView: View {
                     .fontWeight(.semibold)
                 }
                 
-                // Only show keyboard toolbar when content is actually focused
-                // This prevents spurious keyboard frame notifications
-                if contentFocused {
-                    ToolbarItem(placement: .keyboard) {
-                        HStack {
-                            Spacer()
-                            Button("Done") {
-                                contentFocused = false
-                            }
+                ToolbarItem(placement: .keyboard) {
+                    HStack {
+                        Spacer()
+                        Button("Done") {
+                            contentFocused = false
                         }
                     }
                 }
@@ -111,7 +107,7 @@ struct AddJokeView: View {
         haptic(.light)
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            let joke = thebitbinder.Joke(content: content, title: title, folder: selectedFolder)
+            let joke = Joke(content: content, title: title, folder: selectedFolder)
             modelContext.insert(joke)
             
             do {
@@ -132,5 +128,5 @@ struct AddJokeView: View {
 
 #Preview {
     AddJokeView()
-        .modelContainer(for: [thebitbinder.Joke.self, JokeFolder.self], inMemory: true)
+        .modelContainer(for: [Joke.self, JokeFolder.self], inMemory: true)
 }

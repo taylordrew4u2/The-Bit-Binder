@@ -781,6 +781,12 @@ struct JokesView: View {
                         Button(action: { activeSheet = .createFolder }) {
                             Label("New Folder", systemImage: "folder.badge.plus")
                         }
+                        Button {
+                            isSelectMode = true
+                            selectedJokeIDs.removeAll()
+                        } label: {
+                            Label("Manual Organize (Multi-Select)", systemImage: "checklist")
+                        }
                         Button(action: { activeSheet = .autoOrganize }) {
                             Label("Auto-Organize Jokes", systemImage: "wand.and.stars")
                         }

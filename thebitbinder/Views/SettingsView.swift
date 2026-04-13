@@ -16,6 +16,7 @@ struct SettingsView: View {
     @EnvironmentObject private var userPreferences: UserPreferences
     
     @AppStorage("roastModeEnabled") private var roastMode = false
+    @State private var pendingDeepLink: AppDeepLinkDestination?
     @State private var isEditingName = false
     @State private var editingNameText = ""
     @FocusState private var nameFieldFocused: Bool
@@ -24,19 +25,8 @@ struct SettingsView: View {
         List {
             // MARK: - Profile Header
             Section {
-                HStack(spacing: 14) {
-                    // Avatar circle with initial
-                    ZStack {
-                        Circle()
-                            .fill(roastMode ? Color.orange.opacity(0.15) : Color.accentColor.opacity(0.12))
-                            .frame(width: 52, height: 52)
-                        
-                        Text(userPreferences.userName.isEmpty ? "?" : String(userPreferences.userName.prefix(1)).uppercased())
-                            .font(.title2.weight(.semibold))
-                            .foregroundColor(roastMode ? .orange : .accentColor)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
                         if isEditingName {
                             TextField("Your name", text: $editingNameText)
                                 .font(.body.weight(.semibold))
@@ -54,6 +44,7 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Spacer()
                     
@@ -76,7 +67,8 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.vertical, 4)
+                .frame(minHeight: 44)
+                .padding(.vertical, 2)
             }
             
             // MARK: - Mode Section
@@ -148,6 +140,20 @@ struct SettingsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .navigationDestination(item: $pendingDeepLink) { destination in
+            switch destination {
+            case .helpFAQ:
+                HelpFAQView()
+            }
+        }
+        .onAppear {
+            consumePendingDeepLink()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToScreen)) { notification in
+            guard let screenRaw = notification.userInfo?["screen"] as? String,
+                  screenRaw == AppScreen.settings.rawValue else { return }
+            consumePendingDeepLink()
+        }
         .onChange(of: nameFieldFocused) { _, focused in
             if !focused && isEditingName {
                 saveName()
@@ -162,6 +168,11 @@ struct SettingsView: View {
         }
         isEditingName = false
         nameFieldFocused = false
+    }
+
+    private func consumePendingDeepLink() {
+        guard let destination = AppDeepLinkStore.consumeSettingsDestination() else { return }
+        pendingDeepLink = destination
     }
 }
 

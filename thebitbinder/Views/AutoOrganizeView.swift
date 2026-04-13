@@ -136,7 +136,7 @@ struct AutoOrganizeView: View {
                     
                     Spacer()
                     
-                    Button(action: { showOrganizationSummary = false; dismiss() }) {
+                    Button(action: { showOrganizationSummary = false }) {
                          Text("Done")
                              .frame(maxWidth: .infinity)
                              .padding()
@@ -177,11 +177,6 @@ struct AutoOrganizeView: View {
                         assignJokeToFolder(joke, category: category)
                     }
                 )
-            }
-            .alert("Organization Complete", isPresented: $showOrganizationSummary) {
-                Button("Done") { }
-            } message: {
-                Text(" Organized: \(organizationStats.organized) jokes\n Folder assignments: \(organizationStats.suggested)")
             }
             .confirmationDialog(
                 "Reorganize All Jokes",

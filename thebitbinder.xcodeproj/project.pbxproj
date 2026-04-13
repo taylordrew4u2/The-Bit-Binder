@@ -11,6 +11,8 @@
 		BAD6B2CE2F6F753E00A09B53 /* bit.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = BAD6B2C62F6F753E00A09B53 /* bit.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BAD6B5562F6FCBB600A09B53 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = BAD6B5552F6FCBB600A09B53 /* GoogleGenerativeAI */; };
 		BAD6B5912F716B2400A09B53 /* OpenAI in Frameworks */ = {isa = PBXBuildFile; productRef = BAD6B5902F716B2400A09B53 /* OpenAI */; };
+		BAFA10012F99000100A1B2C3 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = BAFA10022F99000100A1B2C3 /* MLXLLM */; };
+		BAFA10032F99000100A1B2C3 /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = BAFA10042F99000100A1B2C3 /* Transformers */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +95,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				BA22E5EC2F732DFC00B9A423 /* Algorithms in Frameworks */,
+				BAFA10012F99000100A1B2C3 /* MLXLLM in Frameworks */,
+				BAFA10032F99000100A1B2C3 /* Transformers in Frameworks */,
 				BAD6B5912F716B2400A09B53 /* OpenAI in Frameworks */,
 				BAD6B5562F6FCBB600A09B53 /* GoogleGenerativeAI in Frameworks */,
 			);
@@ -152,6 +156,8 @@
 				BAD6B5552F6FCBB600A09B53 /* GoogleGenerativeAI */,
 				BAD6B5902F716B2400A09B53 /* OpenAI */,
 				BA22E5EB2F732DFC00B9A423 /* Algorithms */,
+				BAFA10022F99000100A1B2C3 /* MLXLLM */,
+				BAFA10042F99000100A1B2C3 /* Transformers */,
 			);
 			productName = thebitbinder;
 			productReference = BAB3D0522EDF80F5007295C1 /* thebitbinder.app */;
@@ -207,6 +213,8 @@
 				BAD6B5542F6FCBB600A09B53 /* XCRemoteSwiftPackageReference "generative-ai-swift" */,
 				BAD6B58F2F716B2400A09B53 /* XCRemoteSwiftPackageReference "OpenAI" */,
 				BA22E5EA2F732DFC00B9A423 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
+				BAFA10052F99000100A1B2C3 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				BAFA10062F99000100A1B2C3 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BAB3D0532EDF80F5007295C1 /* Products */;
@@ -616,6 +624,22 @@
 				minimumVersion = 0.4.7;
 			};
 		};
+		BAFA10052F99000100A1B2C3 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 2.29.1;
+			};
+		};
+		BAFA10062F99000100A1B2C3 /* XCRemoteSwiftPackageReference "swift-transformers" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/swift-transformers";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 1.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -633,6 +657,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BAD6B58F2F716B2400A09B53 /* XCRemoteSwiftPackageReference "OpenAI" */;
 			productName = OpenAI;
+		};
+		BAFA10022F99000100A1B2C3 /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BAFA10052F99000100A1B2C3 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLLM;
+		};
+		BAFA10042F99000100A1B2C3 /* Transformers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BAFA10062F99000100A1B2C3 /* XCRemoteSwiftPackageReference "swift-transformers" */;
+			productName = Transformers;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

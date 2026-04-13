@@ -18,6 +18,7 @@ enum JokesSheet: String, Identifiable {
     case addJoke
     case scanner
     case createFolder
+    case organizeOptions
     case autoOrganize
     case audioImport
     case talkToText
@@ -57,8 +58,8 @@ struct JokesSheetsModifier: ViewModifier {
                     }
                 case .createFolder:
                     CreateFolderView()
-                case .autoOrganize:
-                    AutoOrganizeView()
+                case .organizeOptions:
+                    OrganizeOptionsView()
                 case .audioImport:
                     AudioImportView(selectedFolder: selectedFolder)
                 case .talkToText:
@@ -87,6 +88,73 @@ struct JokesSheetsModifier: ViewModifier {
                     ImportBatchHistoryView()
                 }
             }
+    }
+}
+
+// MARK: - Alerts Modifier
+
+struct OrganizeOptionsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var showAutoOrganize = false
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button {
+                        showAutoOrganize = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "wand.and.stars")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.accentColor)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Auto-Organize Jokes")
+                                    .font(.headline)
+                                Text("AI-powered categorization and folder management")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                } header: {
+                    Text("Smart Organization")
+                } footer: {
+                    Text("Let BitBuddy analyze your jokes and automatically organize them into categories.")
+                }
+                
+                // You can add more organization options here in the future
+                // For example:
+                // - Manual organization
+                // - Folder management
+                // - Tag management
+                // etc.
+            }
+            .navigationTitle("Organize")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(isPresented: $showAutoOrganize) {
+                AutoOrganizeView()
+            }
+        }
     }
 }
 

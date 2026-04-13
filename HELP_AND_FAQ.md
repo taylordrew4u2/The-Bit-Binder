@@ -315,7 +315,7 @@ BitBinder is a professional comedy notebook app designed for comedians and perfo
 - `generate [topic]` — Create a joke in your style
 - `style` — See your writing style summary
 
-**Privacy**: Runs 100% on-device. Your jokes never leave your phone.
+**Privacy**: Chat and inference run on-device. Model files may download once, but your jokes never leave your phone unless you explicitly export/share.
 
 ---
 

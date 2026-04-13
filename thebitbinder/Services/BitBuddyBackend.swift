@@ -67,11 +67,17 @@ protocol BitBuddyBackend: Sendable {
     var isAvailable: Bool { get }
     var supportsStreaming: Bool { get }
     
+    func preload() async
+    
     func send(
         message: String,
         session: BitBuddySessionSnapshot,
         dataContext: BitBuddyDataContext
     ) async throws -> String
+}
+
+extension BitBuddyBackend {
+    func preload() async {}
 }
 
 enum BitBuddyBackendError: LocalizedError {

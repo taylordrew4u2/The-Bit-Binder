@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 /// Full-screen chat view accessed from the side menu
 struct BitBuddyChatView: View {
@@ -110,6 +111,9 @@ struct BitBuddyChatView: View {
         .tint(accentColor)
         .onAppear {
             handleAppear()
+            Task {
+                await bitBuddy.preloadBackend()
+            }
             // Provide larger context for local analysis (200 items)
             bitBuddy.registerJokeDataProvider {
                 jokes.prefix(200).map {
@@ -150,6 +154,9 @@ struct BitBuddyChatView: View {
             bitBuddy.clearPendingNavigation()
             // Give the user a beat to read the status before we navigate away.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                if section == .help {
+                    AppDeepLinkStore.setSettingsDestination(.helpFAQ)
+                }
                 NotificationCenter.default.post(
                     name: .navigateToScreen,
                     object: nil,
@@ -180,6 +187,10 @@ struct BitBuddyChatView: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
+
+                Text("Model: \(bitBuddy.backendName)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             
             // Suggestion chips — one per major section
@@ -343,7 +354,8 @@ struct BitBuddyChatView: View {
             } catch {
                 await MainActor.run {
                     isTyping = false
-                    let errorMsg = ChatBubbleMessage(text: "Sorry, I encountered an error. Please try again.", isUser: false, conversationId: conversationId)
+                    let details = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                    let errorMsg = ChatBubbleMessage(text: "I hit an issue: \(details)", isUser: false, conversationId: conversationId)
                     messages.append(errorMsg)
                 }
             }
@@ -519,23 +531,71 @@ struct BitBuddyAvatar: View {
     let size: CGFloat
     let symbolSize: CGFloat
 
+    private var tintColor: Color {
+        roastMode ? .orange : .accentColor
+    }
+
+    private var glyphSize: CGFloat {
+        max(size * 0.56, symbolSize * 1.9)
+    }
+
     var body: some View {
         ZStack {
             Circle()
-                .fill(Color(UIColor.secondarySystemBackground))
-                .overlay(
-                    Circle()
-                        .stroke(
-                            roastMode ? Color.orange.opacity(0.35) : Color.accentColor.opacity(0.2),
-                            lineWidth: 1
-                        )
-                )
+                .fill(Color(UIColor.tertiarySystemBackground))
 
-            Image(systemName: roastMode ? "flame.fill" : "sparkles")
-                .font(.system(size: symbolSize, weight: .semibold))
-                .foregroundStyle(roastMode ? .orange : .accentColor)
+            ClownGlyph()
+                .frame(width: glyphSize, height: glyphSize)
+                .foregroundStyle(tintColor)
         }
+        .overlay(
+            Circle()
+                .stroke(
+                    tintColor.opacity(0.18),
+                    lineWidth: 0.8
+                )
+        )
         .frame(width: size, height: size)
+    }
+}
+
+private struct ClownGlyph: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let w = proxy.size.width
+            let h = proxy.size.height
+
+            ZStack {
+                // Hair puffs
+                Circle().frame(width: w * 0.24, height: w * 0.24).offset(x: -w * 0.34, y: -h * 0.12)
+                Circle().frame(width: w * 0.24, height: w * 0.24).offset(x:  w * 0.34, y: -h * 0.12)
+
+                // Face outline
+                Circle()
+                    .stroke(style: StrokeStyle(lineWidth: w * 0.12, lineCap: .round, lineJoin: .round))
+                    .frame(width: w * 0.66, height: h * 0.66)
+
+                // Eyes
+                Circle().frame(width: w * 0.1, height: w * 0.1).offset(x: -w * 0.14, y: -h * 0.04)
+                Circle().frame(width: w * 0.1, height: w * 0.1).offset(x:  w * 0.14, y: -h * 0.04)
+
+                // Nose
+                Circle().frame(width: w * 0.12, height: w * 0.12).offset(y: h * 0.08)
+
+                // Smile
+                Path { path in
+                    path.addArc(
+                        center: CGPoint(x: w * 0.5, y: h * 0.58),
+                        radius: w * 0.2,
+                        startAngle: .degrees(20),
+                        endAngle: .degrees(160),
+                        clockwise: false
+                    )
+                }
+                .stroke(style: StrokeStyle(lineWidth: w * 0.11, lineCap: .round, lineJoin: .round))
+            }
+            .frame(width: w, height: h)
+        }
     }
 }
 
