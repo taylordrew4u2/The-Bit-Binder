@@ -245,7 +245,7 @@ struct BrainstormView: View {
                     .font(.subheadline.bold())
             }
             .disabled(selectedIdeaIDs.isEmpty)
-            .tint(.red)
+            .tint(.accentColor)
             
             Button {
                 isSelectMode = false
@@ -403,7 +403,8 @@ class SpeechRecognitionManager: ObservableObject {
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private var audioEngine = AVAudioEngine()
+    // Lazy — only created when recording starts to avoid blocking the main thread on view init
+    private var audioEngine: AVAudioEngine?
     
     @Published var transcribedText = ""
     @Published var isRecording = false
@@ -436,7 +437,9 @@ class SpeechRecognitionManager: ObservableObject {
         
         recognitionRequest.shouldReportPartialResults = true
         
-        let inputNode = audioEngine.inputNode
+        let engine = AVAudioEngine()
+        audioEngine = engine
+        let inputNode = engine.inputNode
         
         recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self = self else { return }
@@ -448,10 +451,11 @@ class SpeechRecognitionManager: ObservableObject {
             }
             
             if error != nil || result?.isFinal == true {
-                self.audioEngine.stop()
+                self.audioEngine?.stop()
                 inputNode.removeTap(onBus: 0)
                 self.recognitionRequest = nil
                 self.recognitionTask = nil
+                self.audioEngine = nil
                 DispatchQueue.main.async {
                     self.isRecording = false
                 }
@@ -463,10 +467,10 @@ class SpeechRecognitionManager: ObservableObject {
             recognitionRequest.append(buffer)
         }
         
-        audioEngine.prepare()
+        engine.prepare()
         
         do {
-            try audioEngine.start()
+            try engine.start()
             DispatchQueue.main.async {
                 self.isRecording = true
             }
@@ -474,13 +478,15 @@ class SpeechRecognitionManager: ObservableObject {
             #if DEBUG
             print("Audio engine start failed: \(error)")
             #endif
+            audioEngine = nil
         }
     }
     
     func stopRecording() {
-        audioEngine.stop()
+        audioEngine?.stop()
         recognitionRequest?.endAudio()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine?.inputNode.removeTap(onBus: 0)
+        audioEngine = nil
         
         DispatchQueue.main.async {
             self.isRecording = false
@@ -489,7 +495,8 @@ class SpeechRecognitionManager: ObservableObject {
     
     deinit {
         recognitionTask?.cancel()
-        audioEngine.stop()
+        audioEngine?.stop()
+        audioEngine = nil
     }
 }
 

@@ -33,12 +33,13 @@ final class DataValidationService: ObservableObject {
         // Using active-only counts prevents false data-loss alerts after trash
         // purge, since purged items should not count toward the baseline.
         result.jokesCount = await countActiveJokes(context: context)
-        result.foldersCount = await countEntities(of: JokeFolder.self, context: context)
+        result.foldersCount = await countActiveFolders(context: context)
         result.recordingsCount = await countActiveRecordings(context: context)
         result.setListsCount = await countActiveSetLists(context: context)
         result.roastTargetsCount = await countEntities(of: RoastTarget.self, context: context)
         result.roastJokesCount = await countActiveRoastJokes(context: context)
         result.brainstormIdeasCount = await countActiveBrainstormIdeas(context: context)
+        result.notebookFoldersCount = await countActiveNotebookFolders(context: context)
         result.notebookPhotoRecordsCount = await countActiveNotebookPhotos(context: context)
         result.importBatchesCount = await countEntities(of: ImportBatch.self, context: context)
         result.chatMessagesCount = await countEntities(of: ChatMessage.self, context: context)
@@ -91,6 +92,12 @@ final class DataValidationService: ObservableObject {
     
     private func countActiveJokes(context: ModelContext) async -> Int {
         (try? context.fetch(FetchDescriptor<Joke>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+    }
+    private func countActiveFolders(context: ModelContext) async -> Int {
+        (try? context.fetch(FetchDescriptor<JokeFolder>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+    }
+    private func countActiveNotebookFolders(context: ModelContext) async -> Int {
+        (try? context.fetch(FetchDescriptor<NotebookFolder>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
     }
     private func countActiveRecordings(context: ModelContext) async -> Int {
         (try? context.fetch(FetchDescriptor<Recording>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
@@ -253,6 +260,7 @@ final class DataValidationService: ObservableObject {
             (current.roastTargetsCount, previous.roastTargetsCount),
             (current.roastJokesCount, previous.roastJokesCount),
             (current.brainstormIdeasCount, previous.brainstormIdeasCount),
+            (current.notebookFoldersCount, previous.notebookFoldersCount),
             (current.notebookPhotoRecordsCount, previous.notebookPhotoRecordsCount)
         ]
         
@@ -287,6 +295,7 @@ final class DataValidationService: ObservableObject {
             roastTargetsCount: result.roastTargetsCount,
             roastJokesCount: result.roastJokesCount,
             brainstormIdeasCount: result.brainstormIdeasCount,
+            notebookFoldersCount: result.notebookFoldersCount,
             notebookPhotoRecordsCount: result.notebookPhotoRecordsCount,
             importBatchesCount: result.importBatchesCount,
             chatMessagesCount: result.chatMessagesCount,
@@ -300,19 +309,23 @@ final class DataValidationService: ObservableObject {
     
     // MARK: - Repair Functions
     
-    /// Attempts to repair common data issues
+    /// Attempts to repair common data issues. Returns the list of issue strings that were resolved.
     func repairDataIssues(context: ModelContext, issues: [String]) async -> [String] {
         var repairedIssues: [String] = []
         
         for issue in issues {
             if issue.contains("empty content") {
-                // Could implement repair for empty jokes
+                // Empty-content repair requires user input — not auto-repairable
             } else if issue.contains("invalid dates") {
                 if await repairInvalidDates(context: context) {
                     repairedIssues.append(issue)
                 }
             } else if issue.contains("broken") && issue.contains("relationships") {
                 if await repairBrokenRelationships(context: context) {
+                    repairedIssues.append(issue)
+                }
+            } else if issue.contains("missing files") {
+                if await repairMissingRecordingFiles(context: context) {
                     repairedIssues.append(issue)
                 }
             }
@@ -324,106 +337,123 @@ final class DataValidationService: ObservableObject {
     private func repairInvalidDates(context: ModelContext) async -> Bool {
         do {
             let jokes = try context.fetch(FetchDescriptor<Joke>())
-            var repairedCount = 0
-            
-            for joke in jokes {
-                if joke.dateCreated < Date(timeIntervalSince1970: 0) {
-                    joke.dateCreated = Date()
-                    joke.dateModified = Date()
-                    repairedCount += 1
-                }
+            let epoch = Date(timeIntervalSince1970: 0)
+            var repaired = 0
+            for joke in jokes where joke.dateCreated < epoch {
+                joke.dateCreated = Date()
+                repaired += 1
             }
-            
-            if repairedCount > 0 {
+            if repaired > 0 {
                 try context.save()
-                print(" [DataValidation] Repaired \(repairedCount) jokes with invalid dates")
+                print("🔧 [DataValidation] Repaired \(repaired) invalid joke dates")
             }
-            
-            return repairedCount > 0
+            return repaired > 0
         } catch {
-            print(" [DataValidation] Failed to repair invalid dates: \(error)")
+            print("❌ [DataValidation] Failed to repair dates: \(error)")
             return false
         }
     }
     
     private func repairBrokenRelationships(context: ModelContext) async -> Bool {
         do {
+            // Repair broken joke-folder relationships
             let jokes = try context.fetch(FetchDescriptor<Joke>())
             let folders = try context.fetch(FetchDescriptor<JokeFolder>())
+            let folderIDs = Set(folders.map { $0.id })
             
             var repairedCount = 0
-            
             for joke in jokes {
-                if let folder = joke.folder {
-                    // If folder doesn't exist in database, remove the relationship
-                    if !folders.contains(where: { $0.id == folder.id }) {
-                        joke.folder = nil
-                        repairedCount += 1
-                    }
+                if let folder = joke.folder, !folderIDs.contains(folder.id) {
+                    joke.folder = nil
+                    repairedCount += 1
                 }
             }
             
             if repairedCount > 0 {
                 try context.save()
-                print(" [DataValidation] Repaired \(repairedCount) broken folder relationships")
+                print("🔧 [DataValidation] Repaired \(repairedCount) broken joke-folder relationships")
             }
             
-            // Repair RoastJoke  RoastTarget relationships
+            // Repair broken roast joke-target relationships
             let roastJokes = try context.fetch(FetchDescriptor<RoastJoke>())
             let roastTargets = try context.fetch(FetchDescriptor<RoastTarget>())
+            let roastTargetIDs = Set(roastTargets.map { $0.id })
             
-            var roastRepaired = 0
             var orphanedRoastJokes: [RoastJoke] = []
-            
             for roastJoke in roastJokes {
-                if let target = roastJoke.target {
-                    // Check if the target still exists
-                    if !roastTargets.contains(where: { $0.id == target.id }) {
-                        // Target reference is broken — null it out so it doesn't crash
-                        roastJoke.target = nil
-                        orphanedRoastJokes.append(roastJoke)
-                        roastRepaired += 1
-                    }
+                if let target = roastJoke.target, !roastTargetIDs.contains(target.id) {
+                    orphanedRoastJokes.append(roastJoke)
                 }
-                // NOTE: A roast joke with target == nil is NOT considered orphaned.
-                // The user may have intentionally created it without a target.
-                // Only jokes whose target reference was *broken* get re-homed.
             }
             
-            // Try to re-home orphaned roast jokes to a target if there's exactly one,
-            // or to the most recently modified target as a recovery bucket
-            if !orphanedRoastJokes.isEmpty && !roastTargets.isEmpty {
-                // Sort targets by most recent modification
-                let sortedTargets = roastTargets.sorted { $0.dateModified > $1.dateModified }
-                
-                if roastTargets.count == 1 {
-                    // Only one target — clearly they all belong there
-                    let onlyTarget = roastTargets[0]
-                    for roastJoke in orphanedRoastJokes {
-                        roastJoke.target = onlyTarget
-                        roastRepaired += 1
-                    }
-                    print(" [DataValidation] Re-assigned \(orphanedRoastJokes.count) orphaned roast jokes to '\(onlyTarget.name)'")
-                } else {
-                    // Multiple targets — assign to most recently modified as recovery
-                    // User can manually move them later
-                    let recoveryTarget = sortedTargets[0]
-                    for roastJoke in orphanedRoastJokes where roastJoke.target == nil {
-                        roastJoke.target = recoveryTarget
-                        roastRepaired += 1
-                    }
-                    print(" [DataValidation] Re-assigned \(orphanedRoastJokes.count) orphaned roast jokes to '\(recoveryTarget.name)' for recovery — user should verify")
+            let roastRepaired: Int
+            if orphanedRoastJokes.isEmpty {
+                roastRepaired = 0
+            } else if roastTargets.count == 1, let recoveryTarget = roastTargets.first {
+                // Re-assign orphans to the single existing target for recovery
+                for roastJoke in orphanedRoastJokes {
+                    roastJoke.target = recoveryTarget
                 }
+                roastRepaired = orphanedRoastJokes.count
+                print("🔧 [DataValidation] Re-assigned \(roastRepaired) orphaned roast jokes to '\(recoveryTarget.name)' for recovery — user should verify")
+            } else {
+                // Multiple targets or none — null out the broken reference so the
+                // joke remains accessible without a dangling relationship.
+                for roastJoke in orphanedRoastJokes {
+                    roastJoke.target = nil
+                }
+                roastRepaired = orphanedRoastJokes.count
+                print("🔧 [DataValidation] Nulled \(roastRepaired) broken roast-joke target references")
             }
             
             if roastRepaired > 0 {
                 try context.save()
-                print(" [DataValidation] Repaired \(roastRepaired) broken roast relationships")
+                print("🔧 [DataValidation] Repaired \(roastRepaired) broken roast relationships")
             }
             
             return (repairedCount + roastRepaired) > 0
         } catch {
-            print(" [DataValidation] Failed to repair relationships: \(error)")
+            print("❌ [DataValidation] Failed to repair relationships: \(error)")
+            return false
+        }
+    }
+
+    /// Annotates active Recording rows whose audio file no longer exists on disk.
+    /// The metadata record is preserved; the transcription is updated to note the
+    /// missing file so playback code can surface a meaningful message instead of
+    /// hanging or crashing.  Records are NOT deleted — that is an explicit user action.
+    private func repairMissingRecordingFiles(context: ModelContext) async -> Bool {
+        do {
+            let recordings = try context.fetch(FetchDescriptor<Recording>())
+            var repairedCount = 0
+            let missingNote = "(Audio file missing — recording metadata preserved)"
+
+            for recording in recordings {
+                // Only check active (non-soft-deleted) recordings.
+                guard !recording.isDeleted, !recording.fileURL.isEmpty else { continue }
+
+                let fileURL = recording.resolvedURL
+                guard !FileManager.default.fileExists(atPath: fileURL.path) else { continue }
+
+                // Don't overwrite an annotation that already exists.
+                if recording.transcription?.contains(missingNote) == true { continue }
+
+                let existing = recording.transcription ?? ""
+                recording.transcription = existing.isEmpty
+                    ? missingNote
+                    : existing + "\n" + missingNote
+                // Mark as processed so the transcription pipeline skips this row.
+                recording.isProcessed = true
+                repairedCount += 1
+            }
+
+            if repairedCount > 0 {
+                try context.save()
+                print("🔧 [DataValidation] Annotated \(repairedCount) recording(s) whose audio file is missing")
+            }
+            return repairedCount > 0
+        } catch {
+            print("❌ [DataValidation] Failed to repair missing recording files: \(error)")
             return false
         }
     }
@@ -440,6 +470,7 @@ struct DataValidationResult {
     var roastTargetsCount = 0
     var roastJokesCount = 0
     var brainstormIdeasCount = 0
+    var notebookFoldersCount = 0
     var notebookPhotoRecordsCount = 0
     var importBatchesCount = 0
     var chatMessagesCount = 0
@@ -447,7 +478,8 @@ struct DataValidationResult {
     var totalEntities: Int {
         jokesCount + foldersCount + recordingsCount + setListsCount +
         roastTargetsCount + roastJokesCount + brainstormIdeasCount +
-        notebookPhotoRecordsCount + importBatchesCount + chatMessagesCount
+        notebookFoldersCount + notebookPhotoRecordsCount +
+        importBatchesCount + chatMessagesCount
     }
     
     var issues: [String] = []
@@ -467,6 +499,7 @@ struct DataValidationCounts: Codable {
     let roastTargetsCount: Int
     let roastJokesCount: Int
     let brainstormIdeasCount: Int
+    let notebookFoldersCount: Int
     let notebookPhotoRecordsCount: Int
     let importBatchesCount: Int
     let chatMessagesCount: Int

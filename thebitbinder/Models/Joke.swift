@@ -63,6 +63,9 @@ final class Joke: Identifiable {
     // The Hits - perfected jokes that work every time
     var isHit: Bool = false
     
+    // Open Mic - jokes queued to try at the next open mic
+    var isOpenMic: Bool = false
+    
     // Pre-computed word count for fast sorting and filtering
     var wordCount: Int = 0
     

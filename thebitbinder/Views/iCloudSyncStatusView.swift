@@ -103,7 +103,7 @@ struct iCloudSyncStatusView: View {
     private var syncToggleRow: some View {
         HStack {
             Image(systemName: "icloud")
-                .foregroundColor(.blue)
+                .foregroundColor(.accentColor)
             
             Text("iCloud Sync")
                 .font(.headline)
@@ -135,7 +135,7 @@ struct iCloudSyncStatusView: View {
         } label: {
             HStack {
                 Image(systemName: "arrow.clockwise")
-                    .foregroundColor(.blue)
+                    .foregroundColor(.accentColor)
                 Text("Sync Now")
                     .foregroundColor(.primary)
                 
@@ -151,11 +151,13 @@ struct iCloudSyncStatusView: View {
     
     private var forceKVSyncRow: some View {
         Button {
-            diagnostics.forceKeyValueSync()
+            Task {
+                await diagnostics.forceKeyValueSync()
+            }
         } label: {
             HStack {
                 Image(systemName: "arrow.up.arrow.down")
-                    .foregroundColor(.orange)
+                    .foregroundColor(.accentColor)
                 Text("Force Settings Sync")
                     .foregroundColor(.primary)
             }
@@ -168,7 +170,7 @@ struct iCloudSyncStatusView: View {
         } label: {
             HStack {
                 Image(systemName: "stethoscope")
-                    .foregroundColor(.green)
+                    .foregroundColor(.accentColor)
                 Text("Run Diagnostics")
                     .foregroundColor(.primary)
                 
@@ -184,7 +186,7 @@ struct iCloudSyncStatusView: View {
     private var accountStatusRow: some View {
         HStack {
             Image(systemName: "person.icloud")
-                .foregroundColor(.blue)
+                .foregroundColor(.accentColor)
             
             VStack(alignment: .leading) {
                 Text("Account Status")
@@ -219,9 +221,9 @@ struct iCloudSyncStatusView: View {
         case .idle:
             return .secondary
         case .syncing:
-            return .blue
+            return .accentColor
         case .success:
-            return .green
+            return .accentColor
         case .error:
             return .red
         }
@@ -292,9 +294,9 @@ struct IssueRowView: View {
         case .critical:
             return .red
         case .warning:
-            return .orange
+            return .accentColor
         case .info:
-            return .blue
+            return .accentColor
         }
     }
 }

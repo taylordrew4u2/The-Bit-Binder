@@ -17,17 +17,18 @@ struct JokeCardView: View {
     var showFullContent: Bool = true
     
     private var isHit: Bool { joke.isHit }
+    private var isOpenMic: Bool { joke.isOpenMic }
     
     var body: some View {
         HStack(spacing: 0) {
             // Hit accent strip
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(isHit ? Color.yellow : .clear)
+                .fill(isHit ? Color.accentColor : (isOpenMic ? Color.green : .clear))
                 .frame(width: 3)
                 .padding(.vertical, 8)
             
             VStack(alignment: .leading, spacing: 8) {
-                // Header: Title + Hit indicator
+                // Header: Title + Hit/OpenMic indicator
                 HStack(alignment: .top, spacing: 6) {
                     Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
                         .font(.headline)
@@ -39,7 +40,12 @@ struct JokeCardView: View {
                     if isHit {
                         Image(systemName: "star.fill")
                             .font(.caption)
-                            .foregroundColor(.yellow)
+                            .foregroundColor(.accentColor)
+                    }
+                    if isOpenMic {
+                        Image(systemName: "mic.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
                     }
                 }
                 
@@ -87,12 +93,13 @@ struct JokeRowView: View {
     var showFullContent: Bool = true
     
     private var isHit: Bool { joke.isHit }
+    private var isOpenMic: Bool { joke.isOpenMic }
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Hit accent strip
+            // Hit/OpenMic accent strip
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(isHit ? Color.yellow : .clear)
+                .fill(isHit ? Color.accentColor : (isOpenMic ? Color.green : .clear))
                 .frame(width: 3, height: showFullContent ? 36 : 20)
                 .padding(.top, 2)
             
@@ -107,7 +114,12 @@ struct JokeRowView: View {
                     if isHit {
                         Image(systemName: "star.fill")
                             .font(.caption2)
-                            .foregroundColor(.yellow)
+                            .foregroundColor(.accentColor)
+                    }
+                    if isOpenMic {
+                        Image(systemName: "mic.fill")
+                            .font(.caption2)
+                            .foregroundColor(.green)
                     }
                 }
                 
@@ -189,7 +201,7 @@ struct TheHitsChip: View {
             HStack(spacing: 4) {
                 Image(systemName: "star.fill")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(isSelected ? .white : .yellow)
+                    .foregroundColor(isSelected ? .white : .accentColor)
                 
                 Text("Hits")
                     .font(.subheadline.weight(.semibold))
@@ -197,7 +209,7 @@ struct TheHitsChip: View {
                 if count > 0 && !isSelected {
                     Text("\(count)")
                         .font(.caption.weight(.bold))
-                        .foregroundColor(.yellow)
+                        .foregroundColor(.accentColor)
                 }
             }
             .foregroundColor(isSelected ? .white : .primary)
@@ -205,7 +217,48 @@ struct TheHitsChip: View {
             .padding(.vertical, 8)
             .background(
                 isSelected
-                    ? AnyShapeStyle(Color.yellow)
+                    ? AnyShapeStyle(Color.accentColor)
+                    : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
+            )
+            .clipShape(Capsule())
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Open Mic Chip
+
+struct OpenMicChip: View {
+    let count: Int
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: {
+            haptic(.selection)
+            action()
+        }) {
+            HStack(spacing: 4) {
+                Image(systemName: "mic.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(isSelected ? .white : .green)
+                
+                Text("Open Mic")
+                    .font(.subheadline.weight(.semibold))
+                
+                if count > 0 && !isSelected {
+                    Text("\(count)")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(.green)
+                }
+            }
+            .foregroundColor(isSelected ? .white : .primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                isSelected
+                    ? AnyShapeStyle(Color.green)
                     : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
             )
             .clipShape(Capsule())
@@ -262,9 +315,12 @@ struct ImportProgressCard: View {
     
     private var currentStage: ImportStage {
         let lower = importStatusMessage.lowercased()
-        if lower.contains("found") { return .finishing }
-        if lower.contains("extract") || lower.contains("gaggrabber") { return .extracting }
-        if lower.contains("scan") || lower.contains("analyz") || lower.contains("loading") { return .reading }
+        if lower.contains("found") || lower.contains("✅") { return .finishing }
+        // AI extraction stage: GagGrabber is actively calling an AI provider
+        if lower.contains("ai is") || lower.contains("gaggrabber ai") || lower.contains("still analyz") || lower.contains("almost there") { return .extracting }
+        // Text / OCR reading stage
+        if lower.contains("reading") || lower.contains("scan") || lower.contains("loading") { return .reading }
+        // Fallback: detecting file, preparing, etc.
         return .analyzing
     }
     
@@ -313,7 +369,7 @@ struct ImportProgressCard: View {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.caption2)
-                                .foregroundColor(.green)
+                                .foregroundColor(.accentColor)
                             Text(name)
                                 .font(.caption)
                                 .lineLimit(1)
@@ -353,7 +409,7 @@ struct ImportProgressCard: View {
                 .fontWeight(isActive ? .semibold : .regular)
         }
         .foregroundColor(
-            isActive ? .white : (isComplete ? .green : .secondary)
+            isActive ? .white : (isComplete ? .accentColor : .secondary)
         )
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
@@ -361,7 +417,7 @@ struct ImportProgressCard: View {
             isActive
                 ? AnyShapeStyle(Color.accentColor)
                 : (isComplete
-                    ? AnyShapeStyle(Color.green.opacity(0.12))
+                    ? AnyShapeStyle(Color.accentColor.opacity(0.12))
                     : AnyShapeStyle(Color(UIColor.tertiarySystemFill)))
         )
         .clipShape(Capsule())
@@ -378,18 +434,18 @@ enum ImportStage: Int, CaseIterable {
     
     var title: String {
         switch self {
-        case .analyzing: return "Analyzing File..."
-        case .reading: return "Reading Content..."
-        case .extracting: return "Extracting..."
+        case .analyzing: return "Detecting File..."
+        case .reading: return "Reading Text..."
+        case .extracting: return "🤖 AI Extracting Jokes..."
         case .finishing: return "Almost Done..."
         }
     }
     
     var shortLabel: String {
         switch self {
-        case .analyzing: return "Analyze"
+        case .analyzing: return "Detect"
         case .reading: return "Read"
-        case .extracting: return "Extract"
+        case .extracting: return "AI Extract"
         case .finishing: return "Finish"
         }
     }

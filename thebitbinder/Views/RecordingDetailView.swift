@@ -30,11 +30,11 @@ struct RecordingDetailView: View {
                         VStack(spacing: 16) {
                             ZStack {
                                 Circle()
-                                    .fill(Color.red.opacity(0.1))
+                                    .fill(Color.accentColor.opacity(0.1))
                                     .frame(width: 100, height: 100)
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .font(.system(size: 40))
-                                    .foregroundColor(.red)
+                                    .foregroundColor(.accentColor)
                             }
                             
                             Text("Unable to Play")

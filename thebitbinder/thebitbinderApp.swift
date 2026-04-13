@@ -182,9 +182,9 @@ struct thebitbinderApp: App {
                 // notifications can call refreshAllObjects() on the right context
                 iCloudSyncService.shared.modelContext = sharedModelContainer.mainContext
                 
-                // Register for remote push notifications — CloudKit uses silent
-                // pushes to tell the app "new data available, please fetch"
-                UIApplication.shared.registerForRemoteNotifications()
+                // Note: registerForRemoteNotifications() is called in AppDelegate
+                // didFinishLaunchingWithOptions. Calling it here a second time is
+                // redundant and produces spurious log noise — removed.
                 
                 #if DEBUG
                 CloudKitResetUtility.logContainerInfo()
@@ -257,16 +257,16 @@ struct thebitbinderApp: App {
                 NotificationManager.shared.scheduleIfNeeded()
                 
                 // Always trigger a sync check when app becomes active
-                // This ensures cross-device changes are picked up immediately
+                // This ensures cross-device changes are picked up immediately.
+                // Guard: skip if a sync is already in flight to prevent parallel runs.
                 Task {
                     let syncService = iCloudSyncService.shared
-                    if syncService.isSyncEnabled {
-                        // Check if iCloud is available before syncing
-                        let available = await syncService.checkiCloudAvailability()
-                        if available {
-                            await syncService.syncNow()
-                            print(" [AppLifecycle] Triggered sync on app activation")
-                        }
+                    guard syncService.isSyncEnabled,
+                          syncService.syncStatus != .syncing else { return }
+                    let available = await syncService.checkiCloudAvailability()
+                    if available {
+                        await syncService.syncNow()
+                        print(" [AppLifecycle] Triggered sync on app activation")
                     }
                 }
                 

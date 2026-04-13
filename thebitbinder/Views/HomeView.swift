@@ -18,9 +18,17 @@ struct HomeView: View {
     @Query(filter: #Predicate<BrainstormIdea> { !$0.isDeleted }) private var allIdeas: [BrainstormIdea]
     @Query(filter: #Predicate<Recording> { !$0.isDeleted }) private var allRecordings: [Recording]
 
-    @State private var showAddJoke = false
-    @State private var showTalkToText = false
-    @State private var showQuickRecord = false
+    /// Single active-sheet enum so only one `.sheet(item:)` modifier is needed.
+    /// Chaining multiple `.sheet(isPresented:)` on the same view is a known SwiftUI
+    /// bug that can break environment propagation (modelContext) for non-first sheets.
+    enum HomeSheet: String, Identifiable {
+        case addJoke
+        case talkToText
+        case quickRecord
+        var id: String { rawValue }
+    }
+
+    @State private var activeSheet: HomeSheet?
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     // Stats
@@ -41,41 +49,26 @@ struct HomeView: View {
         List {
             // MARK: - Quick Actions
             Section {
-                Button {
-                    haptic(.medium)
-                    showAddJoke = true
-                } label: {
-                    Label {
-                        Text("New Joke")
-                    } icon: {
-                        Image(systemName: "square.and.pencil")
-                            .foregroundColor(.accentColor)
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12)
+                ], spacing: 12) {
+                    QuickActionCard(title: "New Joke", icon: "square.and.pencil", tint: .accentColor) {
+                        haptic(.medium)
+                        activeSheet = .addJoke
+                    }
+                    QuickActionCard(title: "Capture Idea", icon: "mic.fill", tint: .accentColor) {
+                        haptic(.light)
+                        activeSheet = .talkToText
+                    }
+                    QuickActionCard(title: "Record Set", icon: "record.circle", tint: .accentColor) {
+                        haptic(.light)
+                        activeSheet = .quickRecord
                     }
                 }
-
-                Button {
-                    haptic(.light)
-                    showTalkToText = true
-                } label: {
-                    Label {
-                        Text("Capture Idea")
-                    } icon: {
-                        Image(systemName: "mic.fill")
-                            .foregroundColor(.purple)
-                    }
-                }
-
-                Button {
-                    haptic(.light)
-                    showQuickRecord = true
-                } label: {
-                    Label {
-                        Text("Record Set")
-                    } icon: {
-                        Image(systemName: "record.circle")
-                            .foregroundColor(.red)
-                    }
-                }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
             }
 
             // MARK: - At a Glance Stats
@@ -91,19 +84,19 @@ struct HomeView: View {
                         label: "Hits",
                         value: hitsCount,
                         icon: "star.fill",
-                        tint: .yellow
+                        tint: .accentColor
                     )
                     StatCard(
                         label: "Sets",
                         value: allSets.count,
                         icon: "list.bullet.rectangle.portrait",
-                        tint: .green
+                        tint: .accentColor
                     )
                     StatCard(
                         label: "This Week",
                         value: thisWeekCount,
                         icon: "flame.fill",
-                        tint: .orange
+                        tint: .accentColor
                     )
                 }
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
@@ -118,7 +111,7 @@ struct HomeView: View {
                             HStack(spacing: 12) {
                                 // Hit indicator
                                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                    .fill(joke.isHit ? Color.yellow : Color(UIColor.separator))
+                                    .fill(joke.isHit ? Color.accentColor : Color(UIColor.separator))
                                     .frame(width: 3, height: 32)
                                 
                                 VStack(alignment: .leading, spacing: 3) {
@@ -135,7 +128,7 @@ struct HomeView: View {
                                         if joke.isHit {
                                             Label("Hit", systemImage: "star.fill")
                                                 .font(.caption2.weight(.medium))
-                                                .foregroundColor(.yellow)
+                                                .foregroundColor(.accentColor)
                                         }
                                     }
                                 }
@@ -163,7 +156,7 @@ struct HomeView: View {
                                     Text("Brainstorm Ideas")
                                 } icon: {
                                     Image(systemName: "lightbulb.fill")
-                                        .foregroundColor(.yellow)
+                                        .foregroundColor(.accentColor)
                                 }
                             }
                         }
@@ -184,7 +177,7 @@ struct HomeView: View {
                                     Text("Recordings")
                                 } icon: {
                                     Image(systemName: "waveform")
-                                        .foregroundColor(.red)
+                                        .foregroundColor(.accentColor)
                                 }
                             }
                         }
@@ -196,17 +189,47 @@ struct HomeView: View {
         .navigationDestination(for: Joke.self) { joke in
             JokeDetailView(joke: joke)
         }
-        .sheet(isPresented: $showAddJoke) {
-            AddJokeView()
-        }
-        .sheet(isPresented: $showTalkToText) {
-            TalkToTextView(selectedFolder: nil as JokeFolder?, saveToBrainstorm: true)
-        }
-        .sheet(isPresented: $showQuickRecord) {
-            StandaloneRecordingView()
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .addJoke:
+                AddJokeView()
+            case .talkToText:
+                TalkToTextView(selectedFolder: nil as JokeFolder?, saveToBrainstorm: true)
+            case .quickRecord:
+                StandaloneRecordingView()
+            }
         }
     }
     
+}
+
+// MARK: - Quick Action Card
+
+private struct QuickActionCard: View {
+    let title: String
+    let icon: String
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(tint)
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, minHeight: 72)
+            .padding(8)
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 // MARK: - Stat Card

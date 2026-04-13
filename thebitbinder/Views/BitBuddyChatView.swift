@@ -24,7 +24,8 @@ struct BitBuddyChatView: View {
     @State private var isTyping = false
     @State private var typingMessageId: UUID?
     @State private var displayedText = ""
-    
+    @State private var pendingActionMessageId: UUID?
+
     private var accentColor: Color {
         roastMode ? .orange : .accentColor
     }
@@ -129,27 +130,33 @@ struct BitBuddyChatView: View {
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyAddJoke)) { notification in
             guard let jokeText = notification.userInfo?["jokeText"] as? String,
                   !jokeText.isEmpty else { return }
+            appendStatusMessage("Saving this joke to your library...")
             let newJoke = Joke(content: jokeText)
             modelContext.insert(newJoke)
             do {
                 try modelContext.save()
                 print(" [BitBuddy→SwiftData] Joke saved via action dispatch")
+                appendStatusMessage("Saved. You can find it in Jokes.")
             } catch {
                 print(" [BitBuddy→SwiftData] Failed to save joke: \(error)")
+                appendStatusMessage("Couldn't save the joke. Please try again.")
             }
         }
         .onChange(of: bitBuddy.pendingNavigation) { _, section in
             guard let section else { return }
             guard let appScreen = appScreen(for: section) else { return }
+            let status = "Opening \(section.displayName)..."
+            appendStatusMessage(status)
             bitBuddy.clearPendingNavigation()
-            // Post navigation then dismiss the sheet so the user lands
-            // on the target screen.
-            NotificationCenter.default.post(
-                name: .navigateToScreen,
-                object: nil,
-                userInfo: ["screen": appScreen.rawValue]
-            )
-            dismiss()
+            // Give the user a beat to read the status before we navigate away.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                NotificationCenter.default.post(
+                    name: .navigateToScreen,
+                    object: nil,
+                    userInfo: ["screen": appScreen.rawValue]
+                )
+                dismiss()
+            }
         }
     }
     
@@ -301,6 +308,7 @@ struct BitBuddyChatView: View {
         let message = inputText.trimmingCharacters(in: .whitespaces)
         guard !message.isEmpty else { return }
         guard !bitBuddy.isLoading else { return }
+        pendingActionMessageId = nil
         
         let userMessage = ChatBubbleMessage(text: message, isUser: true, conversationId: conversationId)
         messages.append(userMessage)
@@ -342,6 +350,12 @@ struct BitBuddyChatView: View {
         }
     }
     
+    private func appendStatusMessage(_ text: String) {
+        let statusMessage = ChatBubbleMessage(text: text, isUser: false, conversationId: conversationId)
+        messages.append(statusMessage)
+        pendingActionMessageId = statusMessage.id
+    }
+    
     // MARK: - Section → AppScreen Mapping
     
     /// Maps a BitBuddySection to the corresponding AppScreen for navigation.
@@ -356,6 +370,15 @@ struct BitBuddyChatView: View {
         case .help:               return .settings   // Help lives under Settings
         case .importFlow:         return .jokes       // Import lands on Jokes
         case .bitbuddy:           return nil           // Stay in chat
+        }
+    }
+}
+
+struct BitBuddyChatView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            BitBuddyChatView()
+                .environmentObject(UserPreferences())
         }
     }
 }
@@ -535,12 +558,5 @@ struct BlinkingModifier: ViewModifier {
 extension View {
     func blinking() -> some View {
         modifier(BlinkingModifier())
-    }
-}
-
-#Preview {
-    NavigationStack {
-        BitBuddyChatView()
-            .environmentObject(UserPreferences())
     }
 }

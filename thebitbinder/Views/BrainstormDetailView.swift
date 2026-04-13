@@ -32,7 +32,7 @@ struct BrainstormDetailView: View {
     @State private var showPromotedToast = false
 
     private var accentColor: Color {
-        roastMode ? .orange : .yellow
+        roastMode ? .orange : .accentColor
     }
 
     private var wordCount: Int {
@@ -327,7 +327,7 @@ struct BrainstormDetailView: View {
                     showingDeleteAlert = true
                 } label: {
                     Image(systemName: "trash")
-                        .foregroundColor(.red)
+                        .foregroundColor(.accentColor)
                 }
             }
         }

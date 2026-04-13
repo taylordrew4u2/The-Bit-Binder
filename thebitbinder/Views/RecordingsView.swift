@@ -150,7 +150,7 @@ struct RecordingRowView: View {
                     if recording.transcription != nil {
                         Text("Transcribed")
                             .font(.caption2)
-                            .foregroundColor(.green)
+                            .foregroundColor(.accentColor)
                     }
                 }
             }

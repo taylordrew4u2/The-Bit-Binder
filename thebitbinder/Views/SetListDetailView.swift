@@ -58,10 +58,10 @@ struct SetListDetailView: View {
              VStack(spacing: 12) {
                  HStack {
                      if audioService.isRecording {
-                         Circle().fill(Color.red).frame(width: 12, height: 12)
+                         Circle().fill(Color.accentColor).frame(width: 12, height: 12)
                              .opacity(0.8)
                              .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
-                         Text("Recording").font(.headline).foregroundColor(.red)
+                         Text("Recording").font(.headline).foregroundColor(.accentColor)
                          Spacer()
                          Text(timeString(from: recordingDuration))
                              .font(.system(.title3, design: .monospaced))
@@ -75,24 +75,24 @@ struct SetListDetailView: View {
                  HStack(spacing: 24) {
                      if !audioService.isRecording {
                          Button(action: startRecording) {
-                             Label("Start Recording", systemImage: "record.circle.fill")
-                                 .labelStyle(.iconOnly)
-                                 .font(.system(size: 44))
-                                 .foregroundColor(.red)
-                         }
-                         .accessibilityLabel("Start Recording")
-                     } else {
-                         Button(action: pauseResumeRecording) {
-                             Image(systemName: audioService.isPaused ? "play.circle.fill" : "pause.circle.fill")
-                                 .font(.system(size: 40))
-                                 .foregroundColor(.accentColor)
-                         }
-                         .accessibilityLabel(audioService.isPaused ? "Resume" : "Pause")
-                         
-                         Button(action: stopRecording) {
-                             Image(systemName: "stop.circle.fill")
-                                 .font(.system(size: 40))
-                                 .foregroundColor(.red)
+                              Label("Start Recording", systemImage: "record.circle.fill")
+                                  .labelStyle(.iconOnly)
+                                  .font(.system(size: 44))
+                                  .foregroundColor(.accentColor)
+                          }
+                          .accessibilityLabel("Start Recording")
+                      } else {
+                          Button(action: pauseResumeRecording) {
+                              Image(systemName: audioService.isPaused ? "play.circle.fill" : "pause.circle.fill")
+                                  .font(.system(size: 40))
+                                  .foregroundColor(.accentColor)
+                          }
+                          .accessibilityLabel(audioService.isPaused ? "Resume" : "Pause")
+                          
+                          Button(action: stopRecording) {
+                              Image(systemName: "stop.circle.fill")
+                                  .font(.system(size: 40))
+                                  .foregroundColor(.accentColor)
                          }
                          .accessibilityLabel("Stop Recording")
                      }
@@ -111,7 +111,7 @@ struct SetListDetailView: View {
                     } actions: {
                         Button("Add Roast Jokes") { showingAddJokes = true }
                             .buttonStyle(.borderedProminent)
-                            .tint(.orange)
+                            .tint(.accentColor)
                     }
                 } else {
                     List {
@@ -164,7 +164,7 @@ struct SetListDetailView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(setList.isFinalized ? Color.green : Color.blue)
+                        .background(Color.accentColor)
                         .clipShape(Capsule())
                     }
                 }
@@ -446,7 +446,7 @@ struct SetListDetailView: View {
             } label: {
                 Text("GO LIVE")
                     .font(.caption.bold())
-                    .foregroundColor(.green)
+                    .foregroundColor(.accentColor)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(Color.white)
@@ -454,7 +454,7 @@ struct SetListDetailView: View {
             }
         }
         .padding()
-        .background(Color.green)
+        .background(Color.accentColor)
     }
     
     // MARK: - Quick Perform Banner (for unfinalized sets)
@@ -483,7 +483,7 @@ struct SetListDetailView: View {
                 } label: {
                     Text("GO LIVE")
                         .font(.caption.bold())
-                        .foregroundColor(.blue)
+                        .foregroundColor(.accentColor)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Color.white)
@@ -500,7 +500,7 @@ struct SetListDetailView: View {
             }
         }
         .padding()
-        .background(Color.blue)
+        .background(Color.accentColor)
     }
     
     private func unfinalizeSet() {

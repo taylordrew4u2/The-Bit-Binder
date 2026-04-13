@@ -55,9 +55,11 @@ enum SyncedKeys {
 }
 
 /// Singleton that keeps UserDefaults and NSUbiquitousKeyValueStore in sync.
-/// On launch it pulls from iCloud  local. On local writes it pushes to iCloud.
+/// On launch it pulls from iCloud → local. On local writes it pushes to iCloud.
 /// Also observes UserDefaults so @AppStorage changes are pushed automatically.
-final class iCloudKeyValueStore {
+/// `@unchecked Sendable` — safe because all mutation is either on main queue
+/// or serialised through the debounce work-item / isSyncing guard.
+final class iCloudKeyValueStore: @unchecked Sendable {
     static let shared = iCloudKeyValueStore()
     
     private let cloud = NSUbiquitousKeyValueStore.default
@@ -234,7 +236,10 @@ final class iCloudKeyValueStore {
                 local.set(cloudValue, forKey: key)
             }
         }
-        local.synchronize()
+        // Note: UserDefaults.synchronize() is deprecated since iOS 12 and calls
+        // CFPreferencesSynchronize(kCFPreferencesAnyUser, …) which produces
+        // "only allowed for System Containers" warnings in containerised apps.
+        // iOS flushes UserDefaults automatically — explicit sync is unnecessary.
         print(" [iCloudKV] Pulled \(SyncedKeys.all.count) keys from iCloud")
     }
     
@@ -297,7 +302,7 @@ final class iCloudKeyValueStore {
             }
             
             if successCount > 0 {
-                local.synchronize()
+                // UserDefaults.synchronize() removed — see pullFromCloud() comment.
                 print(" [iCloudKV] Successfully synced \(successCount) keys from \(reasonString)")
                 
                 // Post notification so views can refresh
@@ -336,23 +341,45 @@ final class iCloudKeyValueStore {
         print(" [iCloudKV] Force sync completed")
     }
     
-    /// Returns diagnostic information about the current KV store state.
+    /// Generates a lightweight snapshot of sync state for the diagnostics UI.
     func diagnostics() -> [String] {
         var results: [String] = []
+        let syncResult = cloud.synchronize()
+        results.append("synchronize() returned: \(syncResult)")
         
-        results.append(" iCloud KV Store Diagnostics ")
-        
+        var mismatchCount = 0
         for key in SyncedKeys.all {
-            let localVal = local.object(forKey: key)
-            let cloudVal = cloud.object(forKey: key)
-            let match = valuesEqual(localVal, cloudVal)
-            let localStr = localVal.map { "\($0)" } ?? "nil"
-            let cloudStr = cloudVal.map { "\($0)" } ?? "nil"
-            let status = match ? "" : " MISMATCH"
-            results.append("\(status) \(key): local=\(localStr.prefix(40)) | cloud=\(cloudStr.prefix(40))")
+            let localValue = local.object(forKey: key)
+            let cloudValue = cloud.object(forKey: key)
+            
+            if valuesEqual(localValue, cloudValue) {
+                results.append("OK: \(key)")
+            } else {
+                mismatchCount += 1
+                results.append(
+                    "MISMATCH: \(key) local=\(describeValue(localValue)) cloud=\(describeValue(cloudValue))"
+                )
+            }
+        }
+        
+        if mismatchCount == 0 {
+            results.append("All \(SyncedKeys.all.count) synced keys match local and iCloud values.")
+        } else {
+            results.append("Found \(mismatchCount) mismatched synced key(s).")
         }
         
         return results
+    }
+    
+    private func describeValue(_ value: Any?) -> String {
+        guard let value else { return "nil" }
+        
+        switch value {
+        case let data as Data:
+            return "Data(\(data.count) bytes)"
+        default:
+            return String(describing: value)
+        }
     }
 }
 

@@ -84,7 +84,7 @@ struct SettingsView: View {
                 Toggle(isOn: $roastMode) {
                     Label("Roast Mode", systemImage: roastMode ? "flame.fill" : "flame")
                 }
-                .tint(.orange)
+                .tint(.accentColor)
             } footer: {
                 Text("Organize material by roast target instead of folder.")
             }

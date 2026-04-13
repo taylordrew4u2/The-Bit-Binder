@@ -257,6 +257,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             try BGTaskScheduler.shared.submit(request)
             isRefreshTaskScheduled = true
             print(" [BGTask] Scheduled background refresh")
+        } catch let e as BGTaskScheduler.Error where e.code == .tooManyPendingTaskRequests {
+            // System already has this task queued from a previous app session —
+            // update the flag so we don't try to submit again this session.
+            isRefreshTaskScheduled = true
+            print(" [BGTask] Refresh already pending in system queue")
         } catch {
             print(" [BGTask] Could not schedule refresh: \(error.localizedDescription)")
             isRefreshTaskScheduled = false
@@ -275,14 +280,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             try BGTaskScheduler.shared.submit(request)
             isSyncTaskScheduled = true
             print(" [BGTask] Scheduled background sync")
+        } catch let e as BGTaskScheduler.Error where e.code == .tooManyPendingTaskRequests {
+            // System already has this task queued from a previous app session.
+            isSyncTaskScheduled = true
+            print(" [BGTask] Sync already pending in system queue")
         } catch {
             print(" [BGTask] Could not schedule sync: \(error.localizedDescription)")
             isSyncTaskScheduled = false
         }
     }
-    
-    // MARK: - Audio Session Configuration
-    
+
     private func configureAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()

@@ -28,140 +28,79 @@ struct JokeDetailView: View {
     @State private var saveError: String?
     @State private var showingSaveError = false
     
+    // Focus for immediate writing
+    @FocusState private var contentFocused: Bool
+    @FocusState private var titleFocused: Bool
+    
+    private var accentTint: Color { roastMode ? .orange : .accentColor }
+    
+    private var displayTitle: String {
+        joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title
+    }
+    
     var body: some View {
-        Form {
-            // MARK: - Title Section
-            Section {
-                if isEditing {
-                    TextField("Title", text: $joke.title, axis: .vertical)
-                        .font(.title3.weight(.semibold))
-                        .lineLimit(3)
-                } else {
-                    HStack {
-                        Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
-                            .font(.title3.weight(.semibold))
-                        Spacer()
-                        if joke.isHit {
-                            Image(systemName: roastMode ? "flame.fill" : "star.fill")
-                                .foregroundColor(roastMode ? .orange : .yellow)
-                        }
-                    }
-                }
-            }
-            
-            // MARK: - Content Section
-            Section {
-                if isEditing {
-                    TextEditor(text: $joke.content)
-                        .font(.body)
-                        .lineSpacing(4)
-                        .frame(minHeight: 200)
-                } else {
-                    Text(joke.content)
-                        .font(.body)
-                        .lineSpacing(4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation {
-                                isEditing = true
-                            }
-                            HapticEngine.shared.tap()
-                        }
-                }
-            } header: {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                
+                // MARK: - Status Badges (compact, top)
+                statusBadges
+                
+                // MARK: - Title Area
+                titleSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+                
+                // MARK: - Word Count (subtle)
                 if !joke.content.isEmpty {
                     Text("\(joke.content.split(separator: " ").count) words")
-                }
-            }
-            
-            // MARK: - Tags Section
-            if !joke.tags.isEmpty {
-                Section("Tags") {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(joke.tags, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.caption)
-                                    .foregroundColor(.accentColor)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.accentColor.opacity(0.12), in: Capsule())
-                            }
-                        }
-                    }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                }
-            }
-            
-            // MARK: - Actions Section
-            Section {
-                Button {
-                    withAnimation {
-                        joke.isHit.toggle()
-                        joke.dateModified = Date()
-                    }
-                    HapticEngine.shared.starToggle(joke.isHit)
-                    do { try modelContext.save() } catch {
-                        saveError = "Couldn't save hit status: \(error.localizedDescription)"
-                        showingSaveError = true
-                    }
-                } label: {
-                    Label(
-                        joke.isHit ? "Remove from Hits" : "Add to Hits",
-                        systemImage: roastMode ? (joke.isHit ? "flame.fill" : "flame") : (joke.isHit ? "star.fill" : "star")
-                    )
-                    .foregroundColor(joke.isHit ? (roastMode ? .orange : .yellow) : .accentColor)
+                        .font(.caption)
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 2)
                 }
                 
-                Button {
-                    HapticEngine.shared.tap()
-                    showingFolderPicker = true
-                } label: {
-                    HStack {
-                        Label("Folders", systemImage: "folder")
-                        Spacer()
-                        let folderCount = (joke.folders ?? []).count
-                        if folderCount == 0 {
-                            Text("None")
-                                .foregroundColor(.secondary)
-                        } else if folderCount == 1 {
-                            Text((joke.folders ?? []).first?.name ?? "")
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("\(folderCount)")
-                                .foregroundColor(.secondary)
-                        }
-                    }
+                // Soft divider
+                Rectangle()
+                    .fill(Color(UIColor.separator).opacity(0.3))
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                
+                // MARK: - Content Area (the workspace)
+                contentSection
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                
+                // MARK: - Tags (floating pills)
+                if !joke.tags.isEmpty && !isEditing {
+                    tagsSection
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
                 }
-            }
-            
-            // MARK: - Metadata Section (collapsible)
-            Section {
-                DisclosureGroup("Details", isExpanded: $showingMetadata) {
-                    LabeledContent("Created") {
-                        Text(joke.dateCreated.formatted(date: .abbreviated, time: .shortened))
-                    }
-                    LabeledContent("Modified") {
-                        Text(joke.dateModified.formatted(date: .abbreviated, time: .shortened))
-                    }
-                    if let source = joke.importSource, !source.isEmpty {
-                        LabeledContent("Imported from") {
-                            Text(source)
-                        }
-                    }
-                    if let confidence = joke.importConfidence, !confidence.isEmpty {
-                        LabeledContent("Confidence") {
-                            Text(confidence.capitalized)
-                                .foregroundColor(confidence == "high" ? .green : (confidence == "medium" ? .blue : .orange))
-                        }
-                    }
+                
+                // MARK: - Folder Badges
+                if !isEditing {
+                    folderBadges
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
                 }
+                
+                // MARK: - Metadata (collapsible, tucked away)
+                if !isEditing {
+                    metadataSection
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .padding(.bottom, 40)
+                }
+                
+                Spacer(minLength: 60)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color(UIColor.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
-        .tint(roastMode ? .orange : .accentColor)
+        .tint(accentTint)
         .alert(joke.isDeleted ? "Restore Joke" : "Move to Trash", isPresented: $showingDeleteAlert) {
             deleteAlertButtons
         } message: {
@@ -202,6 +141,239 @@ struct JokeDetailView: View {
         }
     }
     
+    // MARK: - Status Badges
+    
+    @ViewBuilder
+    private var statusBadges: some View {
+        let hasBadges = joke.isHit || joke.isOpenMic
+        if hasBadges && !isEditing {
+            HStack(spacing: 8) {
+                if joke.isHit {
+                    HStack(spacing: 4) {
+                        Image(systemName: roastMode ? "flame.fill" : "star.fill")
+                            .font(.caption2.weight(.semibold))
+                        Text(roastMode ? "Fire" : "Hit")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(roastMode ? Color.orange : accentTint, in: Capsule())
+                }
+                if joke.isOpenMic {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mic.fill")
+                            .font(.caption2.weight(.semibold))
+                        Text("Open Mic")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.green, in: Capsule())
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+        }
+    }
+    
+    // MARK: - Title Section
+    
+    @ViewBuilder
+    private var titleSection: some View {
+        if isEditing {
+            TextField("Give it a name...", text: $joke.title, axis: .vertical)
+                .font(.title2.weight(.bold))
+                .lineLimit(1...4)
+                .focused($titleFocused)
+        } else {
+            Text(displayTitle)
+                .font(.title2.weight(.bold))
+                .foregroundColor(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture { enterEditing() }
+        }
+    }
+    
+    // MARK: - Content Section (the writing canvas)
+    
+    @ViewBuilder
+    private var contentSection: some View {
+        if isEditing {
+            TextEditor(text: $joke.content)
+                .font(.body.leading(.loose))
+                .lineSpacing(6)
+                .scrollContentBackground(.hidden)
+                .focused($contentFocused)
+                .frame(minHeight: 320)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 8)
+        } else {
+            Group {
+                if joke.content.isEmpty {
+                    Text("Tap to start writing...")
+                        .font(.body)
+                        .foregroundColor(.secondary.opacity(0.5))
+                        .italic()
+                } else {
+                    Text(joke.content)
+                        .font(.body.leading(.loose))
+                        .lineSpacing(6)
+                        .foregroundColor(.primary)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .onTapGesture { enterEditing(focusContent: true) }
+        }
+    }
+    
+    // MARK: - Tags Section
+    
+    @ViewBuilder
+    private var tagsSection: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(joke.tags, id: \.self) { tag in
+                    Text(tag)
+                        .font(.caption)
+                        .foregroundColor(accentTint)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(accentTint.opacity(0.1), in: Capsule())
+                }
+            }
+        }
+    }
+    
+    // MARK: - Folder Badges
+    
+    @ViewBuilder
+    private var folderBadges: some View {
+        let jokeF = joke.folders ?? []
+        if !jokeF.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(jokeF) { folder in
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder.fill")
+                                .font(.caption2)
+                            Text(folder.name)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color(UIColor.tertiarySystemFill), in: Capsule())
+                    }
+                    
+                    // Quick add folder button
+                    Button {
+                        HapticEngine.shared.tap()
+                        showingFolderPicker = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.secondary)
+                            .frame(width: 26, height: 26)
+                            .background(Color(UIColor.tertiarySystemFill), in: Circle())
+                    }
+                }
+            }
+        } else {
+            Button {
+                HapticEngine.shared.tap()
+                showingFolderPicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "folder.badge.plus")
+                        .font(.caption)
+                    Text("Add to Folder")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color(UIColor.tertiarySystemFill), in: Capsule())
+            }
+        }
+    }
+    
+    // MARK: - Metadata Section
+    
+    @ViewBuilder
+    private var metadataSection: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) { showingMetadata.toggle() }
+            } label: {
+                HStack {
+                    Text("Details")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary.opacity(0.5))
+                        .rotationEffect(.degrees(showingMetadata ? 90 : 0))
+                }
+                .padding(.vertical, 8)
+            }
+            
+            if showingMetadata {
+                VStack(spacing: 10) {
+                    metadataRow("Created", value: joke.dateCreated.formatted(date: .abbreviated, time: .shortened))
+                    metadataRow("Modified", value: joke.dateModified.formatted(date: .abbreviated, time: .shortened))
+                    if let source = joke.importSource, !source.isEmpty {
+                        metadataRow("Imported from", value: source)
+                    }
+                    if let confidence = joke.importConfidence, !confidence.isEmpty {
+                        metadataRow("Confidence", value: confidence.capitalized, valueColor: accentTint)
+                    }
+                }
+                .padding(.top, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func metadataRow(_ label: String, value: String, valueColor: Color = .secondary) -> some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary.opacity(0.7))
+            Spacer()
+            Text(value)
+                .font(.caption)
+                .foregroundColor(valueColor)
+        }
+    }
+    
+    // MARK: - Editing Helpers
+    
+    private func enterEditing(focusContent: Bool = false) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isEditing = true
+        }
+        HapticEngine.shared.tap()
+        // Slight delay so the TextEditor is mounted before focusing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            if focusContent {
+                contentFocused = true
+            } else {
+                titleFocused = true
+            }
+        }
+    }
+    
     // MARK: - Auto-Save
     
     private func scheduleAutoSave() {
@@ -235,36 +407,98 @@ struct JokeDetailView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            HStack(spacing: 16) {
-                Button(isEditing ? "Done" : "Edit") {
-                    if isEditing {
+            HStack(spacing: 12) {
+                if isEditing {
+                    Button {
                         saveJokeNow()
                         HapticEngine.shared.success()
-                    } else {
-                        HapticEngine.shared.tap()
-                    }
-                    withAnimation {
-                        isEditing.toggle()
-                    }
-                }
-                .fontWeight(isEditing ? .semibold : .regular)
-                
-                if joke.isDeleted {
-                    Button {
-                        HapticEngine.shared.success()
-                        joke.restoreFromTrash()
-                        dismiss()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isEditing = false
+                            contentFocused = false
+                            titleFocused = false
+                        }
                     } label: {
-                        Image(systemName: "arrow.uturn.backward.circle.fill")
-                            .foregroundColor(.green)
+                        Text("Done")
+                            .fontWeight(.semibold)
                     }
                 } else {
-                    Button {
-                        HapticEngine.shared.warning()
-                        showingDeleteAlert = true
+                    // Actions menu — keeps the writing space clean
+                    Menu {
+                        // Hit toggle
+                        Button {
+                            withAnimation {
+                                joke.isHit.toggle()
+                                joke.dateModified = Date()
+                            }
+                            HapticEngine.shared.starToggle(joke.isHit)
+                            do { try modelContext.save() } catch {
+                                saveError = "Couldn't save hit status: \(error.localizedDescription)"
+                                showingSaveError = true
+                            }
+                        } label: {
+                            Label(
+                                joke.isHit ? "Remove from Hits" : "Add to Hits",
+                                systemImage: roastMode
+                                    ? (joke.isHit ? "flame.fill" : "flame")
+                                    : (joke.isHit ? "star.fill" : "star")
+                            )
+                        }
+                        
+                        // Open Mic toggle
+                        Button {
+                            withAnimation {
+                                joke.isOpenMic.toggle()
+                                joke.dateModified = Date()
+                            }
+                            HapticEngine.shared.tap()
+                            do { try modelContext.save() } catch {
+                                saveError = "Couldn't save open mic status: \(error.localizedDescription)"
+                                showingSaveError = true
+                            }
+                        } label: {
+                            Label(
+                                joke.isOpenMic ? "Remove from Open Mic" : "Add to Open Mic",
+                                systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill"
+                            )
+                        }
+                        
+                        Divider()
+                        
+                        // Folders
+                        Button {
+                            HapticEngine.shared.tap()
+                            showingFolderPicker = true
+                        } label: {
+                            let folderCount = (joke.folders ?? []).count
+                            Label(
+                                folderCount == 0 ? "Add to Folder" : "Manage Folders (\(folderCount))",
+                                systemImage: "folder"
+                            )
+                        }
+                        
+                        Divider()
+                        
+                        // Delete / Restore
+                        if joke.isDeleted {
+                            Button {
+                                HapticEngine.shared.success()
+                                joke.restoreFromTrash()
+                                dismiss()
+                            } label: {
+                                Label("Restore from Trash", systemImage: "arrow.uturn.backward")
+                            }
+                        } else {
+                            Button(role: .destructive) {
+                                HapticEngine.shared.warning()
+                                showingDeleteAlert = true
+                            } label: {
+                                Label("Move to Trash", systemImage: "trash")
+                            }
+                        }
                     } label: {
-                        Image(systemName: "trash")
-                            .foregroundColor(.red)
+                        Image(systemName: "ellipsis.circle")
+                            .font(.body)
+                            .foregroundColor(accentTint)
                     }
                 }
             }
@@ -381,7 +615,7 @@ struct MultiFolderPickerView: View {
                                     toggleFolder(folder)
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red.opacity(0.7))
+                                        .foregroundColor(.accentColor.opacity(0.7))
                                 }
                             }
                         }

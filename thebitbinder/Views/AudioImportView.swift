@@ -120,7 +120,7 @@ struct AudioImportView: View {
                     if !authorizationStatus.isEmpty {
                         Text(authorizationStatus)
                             .font(.caption)
-                            .foregroundColor(.orange)
+                            .foregroundColor(.secondary)
                             .padding(.horizontal)
                     }
                 }
@@ -259,11 +259,11 @@ struct DropZoneView: View {
         VStack(spacing: 16) {
             Image(systemName: "arrow.down.doc.fill")
                 .font(.largeTitle)
-                .foregroundColor(isTargeted ? .blue : .gray)
+                .foregroundColor(isTargeted ? .accentColor : .gray)
             
             Text("Drag & Drop Voice Memos Here")
                 .font(.headline)
-                .foregroundColor(isTargeted ? .blue : .primary)
+                .foregroundColor(isTargeted ? .accentColor : .primary)
             
             Text("or use Share from Voice Memos app")
                 .font(.caption)
@@ -274,7 +274,7 @@ struct DropZoneView: View {
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8]))
-                .foregroundColor(isTargeted ? .blue : .gray.opacity(0.5))
+                .foregroundColor(isTargeted ? .accentColor : .gray.opacity(0.5))
         )
         .background(isTargeted ? .accentColor.opacity(0.1) : Color.clear)
         .cornerRadius(16)
@@ -387,7 +387,7 @@ struct AudioImportResultsView: View {
                             Text("\(successCount)")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
-                                .foregroundColor(.green)
+                                .foregroundColor(.accentColor)
                             Text("Imported")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -398,7 +398,7 @@ struct AudioImportResultsView: View {
                                 Text("\(failureCount)")
                                     .font(.largeTitle)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.red)
+                                    .foregroundColor(.secondary)
                                 Text("Failed")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -414,7 +414,7 @@ struct AudioImportResultsView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.accentColor)
                                     Text(result.filename)
                                         .font(.subheadline)
                                         .fontWeight(.medium)
@@ -439,7 +439,7 @@ struct AudioImportResultsView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red)
+                                        .foregroundColor(.secondary)
                                     Text(result.filename)
                                         .font(.subheadline)
                                 }

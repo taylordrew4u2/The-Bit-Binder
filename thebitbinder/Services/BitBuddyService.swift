@@ -68,6 +68,13 @@ final class BitBuddyService: NSObject, ObservableObject {
         conversationId = activeConversationId
         appendTurn(.init(role: .user, text: message), conversationId: activeConversationId)
         
+        if let faqItem = FAQData.matchingAnswer(for: message) {
+            let response = "FAQ — \(faqItem.question)\n\n\(faqItem.answer)"
+            appendTurn(.init(role: .assistant, text: response), conversationId: activeConversationId)
+            isConnected = true
+            return response
+        }
+        
         let session = BitBuddySessionSnapshot(
             conversationId: activeConversationId,
             turns: turnsByConversation[activeConversationId] ?? []

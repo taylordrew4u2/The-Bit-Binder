@@ -273,7 +273,7 @@ struct LivePerformanceView: View {
                                     VStack(alignment: .leading, spacing: 6) {
                                         Text("SETUP")
                                             .font(.system(size: 12, weight: .bold))
-                                            .foregroundColor(.yellow)
+                                            .foregroundColor(.accentColor)
                                         Text(item.setup)
                                             .font(.system(size: fontSize, weight: .regular))
                                             .foregroundColor(.white.opacity(0.95))
@@ -285,7 +285,7 @@ struct LivePerformanceView: View {
                                     VStack(alignment: .leading, spacing: 6) {
                                         Text("PUNCHLINE")
                                             .font(.system(size: 12, weight: .bold))
-                                            .foregroundColor(.green)
+                                            .foregroundColor(.accentColor)
                                         Text(item.punchline)
                                             .font(.system(size: fontSize + 4, weight: .semibold))
                                             .foregroundColor(.white)
@@ -306,10 +306,10 @@ struct LivePerformanceView: View {
                             HStack(alignment: .top, spacing: 8) {
                                 Image(systemName: "lightbulb.fill")
                                     .font(.system(size: 14))
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.accentColor)
                                 Text(item.notes)
                                     .font(.system(size: max(14, fontSize - 8)))
-                                    .foregroundColor(.blue.opacity(0.9))
+                                    .foregroundColor(.accentColor.opacity(0.9))
                                     .italic()
                             }
                             .padding(.top, 24)
@@ -402,7 +402,7 @@ struct LivePerformanceView: View {
                         }
                         .foregroundColor(.white)
                         .frame(width: 80, height: 60)
-                        .background(Color.blue.opacity(0.8))
+                        .background(Color.accentColor.opacity(0.8))
                         .cornerRadius(10)
                     }
                     
@@ -999,7 +999,7 @@ struct FinalizeSetSheet: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Label("What Finalizing Does", systemImage: "checkmark.seal.fill")
                             .font(.headline)
-                            .foregroundColor(.green)
+                            .foregroundColor(.accentColor)
                         
                         VStack(alignment: .leading, spacing: 8) {
                             FeatureRow(icon: "lock.fill", text: "Locks set order - no accidental changes")
@@ -1068,7 +1068,7 @@ struct FeatureRow: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundColor(.green)
+                .foregroundColor(.accentColor)
                 .frame(width: 20)
             Text(text)
                 .font(.subheadline)
@@ -1090,7 +1090,7 @@ struct FinalizedBadge: View {
         .foregroundColor(.white)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color.green)
+        .background(Color.accentColor)
         .clipShape(Capsule())
     }
 }
@@ -1118,7 +1118,7 @@ struct JokeListRow: View {
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundColor(isCurrentIndex ? .black : .white)
                         .frame(width: 32, height: 32)
-                        .background(isCurrentIndex ? Color.green : Color.white.opacity(0.2))
+                        .background(isCurrentIndex ? Color.accentColor : Color.white.opacity(0.2))
                         .clipShape(Circle())
                     
                     // Joke preview
@@ -1148,10 +1148,10 @@ struct JokeListRow: View {
                         if isCurrentIndex {
                             Text("NOW")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.green)
+                                .foregroundColor(.accentColor)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.green.opacity(0.2))
+                                .background(Color.accentColor.opacity(0.2))
                                 .cornerRadius(4)
                         }
                         
@@ -1171,7 +1171,7 @@ struct JokeListRow: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(isCurrentIndex ? Color.green.opacity(0.15) : Color.clear)
+                .background(isCurrentIndex ? Color.accentColor.opacity(0.15) : Color.clear)
             }
             
             // Expanded details for roasts
@@ -1181,7 +1181,7 @@ struct JokeListRow: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("SETUP")
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.yellow)
+                                .foregroundColor(.accentColor)
                             Text(item.setup)
                                 .font(.system(size: fontSize - 4))
                                 .foregroundColor(.white.opacity(0.95))
@@ -1193,7 +1193,7 @@ struct JokeListRow: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("PUNCHLINE")
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.green)
+                                .foregroundColor(.accentColor)
                             Text(item.punchline)
                                 .font(.system(size: fontSize + 2, weight: .semibold))
                                 .foregroundColor(.white)
@@ -1205,10 +1205,10 @@ struct JokeListRow: View {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "lightbulb.fill")
                                 .font(.system(size: 12))
-                                .foregroundColor(.blue)
+                                .foregroundColor(.accentColor)
                             Text(item.notes)
                                 .font(.system(size: 12))
-                                .foregroundColor(.blue.opacity(0.9))
+                                .foregroundColor(.accentColor.opacity(0.9))
                                 .italic()
                         }
                     }
@@ -1226,7 +1226,7 @@ struct JokeListRow: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(item.isRoast ? .orange : Color.blue)
+                        .background(item.isRoast ? .orange : Color.accentColor)
                         .cornerRadius(8)
                     }
                 }
@@ -1305,7 +1305,7 @@ struct BackupJokeRow: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("SETUP")
                                         .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(.yellow)
+                                        .foregroundColor(.accentColor)
                                     Text(setup)
                                         .font(.system(size: fontSize))
                                         .foregroundColor(.white.opacity(0.95))
@@ -1317,7 +1317,7 @@ struct BackupJokeRow: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("PUNCHLINE")
                                         .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.accentColor)
                                     Text(punchline)
                                         .font(.system(size: fontSize + 2, weight: .semibold))
                                         .foregroundColor(.white)
@@ -1345,10 +1345,10 @@ struct BackupJokeRow: View {
                             HStack(alignment: .top, spacing: 8) {
                                 Image(systemName: "lightbulb.fill")
                                     .font(.system(size: 12))
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.accentColor)
                                 Text(notes)
                                     .font(.system(size: max(12, fontSize - 8)))
-                                    .foregroundColor(.blue.opacity(0.9))
+                                    .foregroundColor(.accentColor.opacity(0.9))
                                     .italic()
                             }
                         }
@@ -1663,10 +1663,10 @@ struct OpeningRoastDetailRow: View {
                     if item != nil {
                         Text("IN SET")
                             .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.green)
+                            .foregroundColor(.accentColor)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(Color.green.opacity(0.2))
+                            .background(Color.accentColor.opacity(0.2))
                             .cornerRadius(4)
                     }
                     
@@ -1689,7 +1689,7 @@ struct OpeningRoastDetailRow: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("SETUP")
                                     .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(.accentColor)
                                 Text(joke.setup)
                                     .font(.system(size: fontSize))
                                     .foregroundColor(.white.opacity(0.95))
@@ -1701,7 +1701,7 @@ struct OpeningRoastDetailRow: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("PUNCHLINE")
                                     .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.green)
+                                    .foregroundColor(.accentColor)
                                 Text(joke.punchline)
                                     .font(.system(size: fontSize + 2, weight: .semibold))
                                     .foregroundColor(.white)
@@ -1721,10 +1721,10 @@ struct OpeningRoastDetailRow: View {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "lightbulb.fill")
                                 .font(.system(size: 12))
-                                .foregroundColor(.blue)
+                                .foregroundColor(.accentColor)
                             Text(joke.performanceNotes)
                                 .font(.system(size: max(12, fontSize - 8)))
-                                .foregroundColor(.blue.opacity(0.9))
+                                .foregroundColor(.accentColor.opacity(0.9))
                                 .italic()
                         }
                     }
@@ -1812,7 +1812,7 @@ struct BackupRoastDetailRow: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("SETUP")
                                     .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(.accentColor)
                                 Text(joke.setup)
                                     .font(.system(size: fontSize - 2))
                                     .foregroundColor(.white.opacity(0.9))
@@ -1824,7 +1824,7 @@ struct BackupRoastDetailRow: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("PUNCHLINE")
                                     .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.green)
+                                    .foregroundColor(.accentColor)
                                 Text(joke.punchline)
                                     .font(.system(size: fontSize, weight: .semibold))
                                     .foregroundColor(.white)
@@ -1844,10 +1844,10 @@ struct BackupRoastDetailRow: View {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "lightbulb.fill")
                                 .font(.system(size: 11))
-                                .foregroundColor(.blue)
+                                .foregroundColor(.accentColor)
                             Text(joke.performanceNotes)
                                 .font(.system(size: max(11, fontSize - 10)))
-                                .foregroundColor(.blue.opacity(0.9))
+                                .foregroundColor(.accentColor.opacity(0.9))
                                 .italic()
                         }
                     }

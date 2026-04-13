@@ -34,7 +34,7 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     var defaultModel: String {
         switch self {
         case .openAI:      return "gpt-4o-mini"
-        case .arceeAI:     return "mistralai/mistral-small-3.1-24b-instruct:free"  // 24B, 128k ctx, strong JSON instruction following
+        case .arceeAI:     return "openrouter/free"  // was a specific Mistral model that 404s when rotated out
         case .openRouter:  return "openrouter/free"  // auto-routes to the best available free model
         }
     }

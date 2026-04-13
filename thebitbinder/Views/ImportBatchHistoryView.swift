@@ -104,7 +104,7 @@ struct ImportBatchHistoryView: View {
                     icon: "checkmark.circle.fill",
                     value: "\(batch.totalImportedRecords)",
                     label: "imported",
-                    color: .green
+                    color: .accentColor
                 )
                 
                 if batch.unresolvedFragmentCount > 0 {
@@ -112,7 +112,7 @@ struct ImportBatchHistoryView: View {
                         icon: "exclamationmark.triangle.fill",
                         value: "\(batch.unresolvedFragmentCount)",
                         label: "unresolved",
-                        color: .orange
+                        color: .accentColor
                     )
                 }
                 
@@ -181,9 +181,9 @@ struct ImportBatchDetailView: View {
     
     private func confidenceColor(_ confidence: String) -> Color {
         switch confidence.lowercased() {
-        case "high": return .green
-        case "medium": return .orange
-        default: return .red
+        case "high": return .accentColor
+        case "medium": return .accentColor
+        default: return .accentColor
         }
     }
     
@@ -218,12 +218,12 @@ struct ImportBatchDetailView: View {
                             summaryStatItem(
                                 value: "\(batch.totalImportedRecords)",
                                 label: "Imported",
-                                color: .green
+                                color: .accentColor
                             )
                             summaryStatItem(
                                 value: "\(batch.unresolvedFragmentCount)",
                                 label: "Unresolved",
-                                color: batch.unresolvedFragmentCount > 0 ? .orange : .secondary
+                                color: batch.unresolvedFragmentCount > 0 ? .accentColor : .secondary
                             )
                             summaryStatItem(
                                 value: "\(batch.totalSegments)",
@@ -314,9 +314,9 @@ struct UnresolvedFragmentHistoryRow: View {
     
     private var confidenceColor: Color {
         switch fragment.confidence.lowercased() {
-        case "high": return .green
-        case "medium": return .orange
-        default: return .red
+        case "high": return .accentColor
+        case "medium": return .accentColor
+        default: return .accentColor
         }
     }
     
@@ -346,12 +346,12 @@ struct UnresolvedFragmentHistoryRow: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(fragment.isResolved ? "Resolved" : "Open")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(fragment.isResolved ? .green : .orange)
+                        .foregroundColor(.accentColor)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(
                             Capsule().fill(
-                                (fragment.isResolved ? .green : Color.orange).opacity(0.12)
+                                Color.accentColor.opacity(0.12)
                             )
                         )
                     

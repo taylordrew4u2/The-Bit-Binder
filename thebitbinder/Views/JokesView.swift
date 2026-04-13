@@ -24,8 +24,7 @@ struct JokesView: View {
     // Roast mode — toggled from Settings
     @AppStorage("roastModeEnabled") private var roastMode = false
     
-    // Roast sheet state
-    @State private var showingAddRoastTarget = false
+    // Roast state
     @State private var roastTargetToDelete: RoastTarget?
     @State private var showingDeleteRoastAlert = false
     
@@ -75,13 +74,10 @@ struct JokesView: View {
         return Array(repeating: GridItem(.flexible(), spacing: 0), count: count)
     }
     
-    @State private var showingAddJoke = false
-    @State private var showingScanner = false
-    @State private var showingImagePicker = false
-    @State private var showingFilePicker = false
-    @State private var showingCreateFolder = false
-    @State private var showingAutoOrganize = false
-    @State private var showingImportHistory = false
+    // Consolidated sheet state — single .sheet(item:) prevents the SwiftUI
+    // multi-sheet presentation bug that was blocking import result views.
+    @State private var activeSheet: JokesSheet?
+    @State private var showingImagePicker = false  // PhotosPicker uses its own modifier
     @State private var showingExportAlert = false
     @State private var selectedFolder: JokeFolder?
     @State private var showRecentlyAdded = false
@@ -95,12 +91,8 @@ struct JokesView: View {
     @State private var showingImportSummary = false
     @State private var folderPendingDeletion: JokeFolder?
     @State private var showingDeleteFolderAlert = false
-    @State private var showingMoveJokesSheet = false
-    @State private var showingAudioImport = false
-    @State private var showingTalkToText = false
     
     @State private var reviewCandidates: [JokeImportCandidate] = []
-    @State private var showingReviewSheet = false
     @State private var possibleDuplicates: [String] = []
     @State private var unresolvedImportFragments: [UnresolvedImportFragment] = []
     
@@ -139,6 +131,12 @@ struct JokesView: View {
     // State for showing The Hits filter
     @State private var showingHitsFilter = false
 
+    // MARK: - Open Mic Button
+    private var openMicCount: Int {
+        jokes.filter { $0.isOpenMic }.count
+    }
+    @State private var showingOpenMicFilter = false
+
 
     private var folderChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -153,6 +151,21 @@ struct JokesView: View {
                         if showingHitsFilter {
                             selectedFolder = nil
                             showRecentlyAdded = false
+                            showingOpenMicFilter = false
+                        }
+                    }
+                )
+                
+                // Open Mic chip
+                OpenMicChip(
+                    count: openMicCount,
+                    isSelected: showingOpenMicFilter,
+                    action: {
+                        showingOpenMicFilter.toggle()
+                        if showingOpenMicFilter {
+                            selectedFolder = nil
+                            showRecentlyAdded = false
+                            showingHitsFilter = false
                         }
                     }
                 )
@@ -161,12 +174,13 @@ struct JokesView: View {
                 FolderChip(
                     name: "All",
                     icon: "tray.full.fill",
-                    isSelected: selectedFolder == nil && !showRecentlyAdded && !showingHitsFilter,
+                    isSelected: selectedFolder == nil && !showRecentlyAdded && !showingHitsFilter && !showingOpenMicFilter,
                     roastMode: roastMode,
                     action: {
                         selectedFolder = nil
                         showRecentlyAdded = false
                         showingHitsFilter = false
+                        showingOpenMicFilter = false
                     }
                 )
                 
@@ -174,12 +188,13 @@ struct JokesView: View {
                 FolderChip(
                     name: "Recent",
                     icon: "clock.fill",
-                    isSelected: showRecentlyAdded && !showingHitsFilter,
+                    isSelected: showRecentlyAdded && !showingHitsFilter && !showingOpenMicFilter,
                     roastMode: roastMode,
                     action: {
                         showRecentlyAdded = true
                         selectedFolder = nil
                         showingHitsFilter = false
+                        showingOpenMicFilter = false
                     }
                 )
                 
@@ -187,12 +202,13 @@ struct JokesView: View {
                 ForEach(folders) { folder in
                     FolderChip(
                         name: folder.name,
-                        isSelected: selectedFolder?.id == folder.id && !showRecentlyAdded && !showingHitsFilter,
+                        isSelected: selectedFolder?.id == folder.id && !showRecentlyAdded && !showingHitsFilter && !showingOpenMicFilter,
                         roastMode: roastMode,
                         action: {
                             selectedFolder = folder
                             showRecentlyAdded = false
                             showingHitsFilter = false
+                            showingOpenMicFilter = false
                         }
                     )
                     .contextMenu {
@@ -214,8 +230,8 @@ struct JokesView: View {
     private var emptyState: some View {
         JokesEmptyState(
             roastMode: roastMode,
-            hasFilter: selectedFolder != nil || showRecentlyAdded || showingHitsFilter || !searchText.isEmpty,
-            onAddJoke: { showingAddJoke = true }
+            hasFilter: selectedFolder != nil || showRecentlyAdded || showingHitsFilter || showingOpenMicFilter || !searchText.isEmpty,
+            onAddJoke: { activeSheet = .addJoke }
         )
     }
 
@@ -230,7 +246,7 @@ struct JokesView: View {
                 title: "No Roast Targets Yet",
                 subtitle: "Add someone to start writing jokes about them",
                 actionTitle: "Add Target",
-                action: { showingAddRoastTarget = true },
+                action: { activeSheet = .addRoastTarget },
                 roastMode: true
             )
         } else {
@@ -281,10 +297,11 @@ struct JokesView: View {
     private var filterKey: String {
         let folder = selectedFolder?.id.uuidString ?? "nil"
         let hits   = showingHitsFilter ? "1" : "0"
+        let mic    = showingOpenMicFilter ? "1" : "0"
         let recent = showRecentlyAdded  ? "1" : "0"
         let search = debouncedSearchText
         let count  = jokes.count
-        return "\(folder)|\(hits)|\(recent)|\(search)|\(count)"
+        return "\(folder)|\(hits)|\(mic)|\(recent)|\(search)|\(count)"
     }
 
     var filteredJokes: [Joke] { cachedFilteredJokes }
@@ -293,6 +310,8 @@ struct JokesView: View {
         let base: [Joke]
         if showingHitsFilter {
             base = jokes.filter { $0.isHit }
+        } else if showingOpenMicFilter {
+            base = jokes.filter { $0.isOpenMic }
         } else if showRecentlyAdded {
             let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
             base = jokes.filter { $0.dateCreated >= sevenDaysAgo }
@@ -326,16 +345,7 @@ struct JokesView: View {
                     Task { await processSelectedPhotos(newValue) }
                 }
                 .modifier(JokesSheetsModifier(
-                    showingAddJoke: $showingAddJoke,
-                    showingScanner: $showingScanner,
-                    showingCreateFolder: $showingCreateFolder,
-                    showingAutoOrganize: $showingAutoOrganize,
-                    showingAudioImport: $showingAudioImport,
-                    showingTalkToText: $showingTalkToText,
-                    showingFilePicker: $showingFilePicker,
-                    showingAddRoastTarget: $showingAddRoastTarget,
-                    showingMoveJokesSheet: $showingMoveJokesSheet,
-                    showingReviewSheet: $showingReviewSheet,
+                    activeSheet: $activeSheet,
                     selectedFolder: selectedFolder,
                     folders: folders,
                     folderPendingDeletion: $folderPendingDeletion,
@@ -347,9 +357,6 @@ struct JokesView: View {
                     moveJokes: moveJokes,
                     deleteFolder: deleteFolder
                 ))
-                .sheet(isPresented: $showingImportHistory) {
-                    ImportBatchHistoryView()
-                }
                 .fullScreenCover(item: $smartImportResult) { result in
                     SmartImportReviewView(
                         importResult: result,
@@ -375,7 +382,7 @@ struct JokesView: View {
                     showingImportSummary: $showingImportSummary,
                     showingDeleteFolderAlert: $showingDeleteFolderAlert,
                     showingDeleteRoastAlert: $showingDeleteRoastAlert,
-                    showingMoveJokesSheet: $showingMoveJokesSheet,
+                    activeSheet: $activeSheet,
                     exportedPDFURL: exportedPDFURL,
                     importSummary: importSummary,
                     folderPendingDeletion: $folderPendingDeletion,
@@ -452,16 +459,31 @@ struct JokesView: View {
                                                         }
                                                     }
                                                     
+                                                    Button {
+                                                        joke.isOpenMic.toggle()
+                                                        joke.dateModified = Date()
+                                                    } label: {
+                                                        Label(joke.isOpenMic ? "Remove from Open Mic" : "Add to Open Mic",
+                                                              systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill")
+                                                    }
+                                                    
                                                     Divider()
                                                     
                                                     Button(role: .destructive) {
                                                         joke.moveToTrash()
-                                                        do {
-                                                            try modelContext.save()
-                                                        } catch {
-                                                            print(" [JokesView] Failed to save after trash: \(error)")
-                                                            persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
-                                                            showingPersistenceError = true
+                                                        // Defer save to the next run-loop turn so SwiftUI can
+                                                        // finish dismissing the context menu before the @Query
+                                                        // observer fires and rebuilds the ForEach. Saving
+                                                        // synchronously inside the action causes a "context menu
+                                                        // lifecycle" warning on iOS 17+.
+                                                        Task { @MainActor in
+                                                            do {
+                                                                try modelContext.save()
+                                                            } catch {
+                                                                print(" [JokesView] Failed to save after trash: \(error)")
+                                                                persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
+                                                                showingPersistenceError = true
+                                                            }
                                                         }
                                                     } label: {
                                                         Label("Move to Trash", systemImage: "trash")
@@ -524,6 +546,20 @@ struct JokesView: View {
                                             Label(joke.isHit ? "Remove Hit" : "The Hits", systemImage: joke.isHit ? "star.slash.fill" : "star.fill")
                                         }
                                         .tint(.yellow)
+                                        
+                                        Button {
+                                            HapticEngine.shared.tap()
+                                            joke.isOpenMic.toggle()
+                                            joke.dateModified = Date()
+                                            do {
+                                                try modelContext.save()
+                                            } catch {
+                                                print(" [JokesView] Failed to save open mic toggle: \(error)")
+                                            }
+                                        } label: {
+                                            Label(joke.isOpenMic ? "Remove Mic" : "Open Mic", systemImage: joke.isOpenMic ? "mic.slash.fill" : "mic.fill")
+                                        }
+                                        .tint(.green)
                                     }
                                 }
                             }
@@ -604,7 +640,7 @@ struct JokesView: View {
                     .font(.subheadline.bold())
             }
             .disabled(selectedJokeIDs.isEmpty)
-            .tint(.red)
+            .tint(.accentColor)
             
             Button {
                 isSelectMode = false
@@ -665,7 +701,7 @@ struct JokesView: View {
         if roastMode {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
-                    showingAddRoastTarget = true
+                    activeSheet = .addRoastTarget
                 } label: {
                     Image(systemName: "person.badge.plus")
                 }
@@ -699,24 +735,24 @@ struct JokesView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Section("Create") {
-                        Button(action: { showingAddJoke = true }) {
+                        Button(action: { activeSheet = .addJoke }) {
                             Label("Write a Joke", systemImage: "square.and.pencil")
                         }
-                        Button(action: { showingTalkToText = true }) {
+                        Button(action: { activeSheet = .talkToText }) {
                             Label("Talk-to-Text", systemImage: "mic.badge.plus")
                         }
                     }
                     Section("Import") {
-                        Button(action: { showingFilePicker = true }) {
+                        Button(action: { activeSheet = .filePicker }) {
                             Label("Import from Files", systemImage: "doc.text")
                         }
-                        Button(action: { showingScanner = true }) {
+                        Button(action: { activeSheet = .scanner }) {
                             Label("Scan with Camera", systemImage: "camera.viewfinder")
                         }
                         Button(action: { showingImagePicker = true }) {
                             Label("Import from Photos", systemImage: "photo.on.rectangle")
                         }
-                        Button(action: { showingAudioImport = true }) {
+                        Button(action: { activeSheet = .audioImport }) {
                             Label("Import from Voice Memos", systemImage: "waveform")
                         }
                     }
@@ -742,13 +778,13 @@ struct JokesView: View {
                         }
                     }
                     Section("Organization") {
-                        Button(action: { showingCreateFolder = true }) {
+                        Button(action: { activeSheet = .createFolder }) {
                             Label("New Folder", systemImage: "folder.badge.plus")
                         }
-                        Button(action: { showingAutoOrganize = true }) {
+                        Button(action: { activeSheet = .autoOrganize }) {
                             Label("Auto-Organize Jokes", systemImage: "wand.and.stars")
                         }
-                        Button(action: { showingImportHistory = true }) {
+                        Button(action: { activeSheet = .importHistory }) {
                             Label("Import History", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                         }
                     }
@@ -895,7 +931,19 @@ struct JokesView: View {
                     try jpegData.write(to: tmpURL)
                     defer { try? FileManager.default.removeItem(at: tmpURL) }
 
-                    await MainActor.run { importStatusMessage = "GagGrabber extracting jokes from scan \(importFileIndex) of \(images.count)..." }
+                    // Run a concurrent task that advances the status message once
+                    // OCR is done and the AI call begins. Cancelled automatically
+                    // when the pipeline finishes via the defer below.
+                    let scanLabel = "scan \(importFileIndex) of \(images.count)"
+                    let stageTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        guard !Task.isCancelled else { return }
+                        importStatusMessage = "🤖 GagGrabber AI is reading \(scanLabel)..."
+                        try? await Task.sleep(nanoseconds: 15_000_000_000)
+                        guard !Task.isCancelled else { return }
+                        importStatusMessage = "Still analyzing \(scanLabel) — almost there..."
+                    }
+                    defer { stageTask.cancel() }
 
                     let result = try await FileImportService.shared.importWithPipeline(from: tmpURL)
                     combinedAutoSaved.append(contentsOf: result.autoSavedJokes)
@@ -905,7 +953,7 @@ struct JokesView: View {
 
                     await MainActor.run {
                         let found = result.autoSavedJokes.count + result.reviewQueueJokes.count
-                        importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in scan \(importFileIndex)!"
+                        importStatusMessage = "✅ Found \(found) joke\(found == 1 ? "" : "s") in \(scanLabel)!"
                     }
                 } catch {
                     print(" SCANNER: Pipeline failed for image \(idx + 1): \(error)")
@@ -941,6 +989,15 @@ struct JokesView: View {
                 importFileCount = 0
                 importFileIndex = 0
 
+                // Ensure any lingering sheet is dismissed before the fullScreenCover
+                self.activeSheet = nil
+            }
+
+            // Allow sheet dismissal animation to complete before presenting
+            // the fullScreenCover — prevents SwiftUI's silent presentation drop.
+            try? await Task.sleep(nanoseconds: 600_000_000)
+
+            await MainActor.run {
                 let total = combinedAutoSaved.count + combinedReview.count
                 if total > 0 {
                     self.smartImportResult = combinedResult
@@ -962,137 +1019,146 @@ struct JokesView: View {
     }
     
     private func processSelectedPhotos(_ items: [PhotosPickerItem]) async {
-        isProcessingImages = true
-        importedJokeNames = []
-        importStatusMessage = "Analyzing \(items.count) photo\(items.count == 1 ? "" : "s")..."
-        importFileCount = items.count
-        importFileIndex = 0
+        guard !items.isEmpty else { return }
 
-        var combinedAutoSaved:  [ImportedJoke] = []
-        var combinedReview:     [ImportedJoke] = []
-        var combinedRejected:   [LayoutBlock]  = []
-        var providersUsed = Set<String>()
-        var failedMessages: [String] = []  // collect per-photo errors — never silently drop them
+        // Show progress overlay immediately — same experience as PDF import.
+        // MainActor.run returns false if already processing (guard against re-entry).
+        let shouldProceed = await MainActor.run { () -> Bool in
+            guard !isProcessingImages else { return false }
+            // Dismiss the photo picker immediately so its animation doesn't
+            // collide with the fullScreenCover presentation later.
+            showingImagePicker = false
+            isProcessingImages = true
+            importFileCount = items.count
+            importFileIndex = 0
+            importedJokeNames = []
+            importStatusMessage = "Loading \(items.count) photo\(items.count == 1 ? "" : "s")..."
+            return true
+        }
+        guard shouldProceed else { return }
+
+        var tempURLs: [URL] = []
+        var failedMessages: [String] = []
 
         for (idx, item) in items.enumerated() {
             await MainActor.run {
                 importFileIndex = idx + 1
-                importStatusMessage = "Reading text from photo \(importFileIndex) of \(importFileCount)..."
+                importStatusMessage = "Preparing photo \(idx + 1) of \(items.count)..."
             }
 
             guard let data = try? await item.loadTransferable(type: Data.self),
                   let image = UIImage(data: data),
-                  let pngData = image.pngData() else {
+                  let jpegData = image.jpegData(compressionQuality: 0.85) else {
                 failedMessages.append("Photo \(idx + 1): could not load image data")
                 continue
             }
 
+            let fileName = "Photo \(idx + 1).jpg"
             let tmpURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent("photo_\(idx)_\(UUID().uuidString).png")
+                .appendingPathComponent("photo_\(idx)_\(UUID().uuidString)_\(fileName)")
             do {
-                try pngData.write(to: tmpURL)
-                defer { try? FileManager.default.removeItem(at: tmpURL) }
-
-                await MainActor.run { importStatusMessage = "GagGrabber extracting jokes from photo \(importFileIndex) of \(importFileCount)..." }
-
-                let result = try await FileImportService.shared.importWithPipeline(from: tmpURL)
-                combinedAutoSaved.append(contentsOf: result.autoSavedJokes)
-                combinedReview.append(contentsOf: result.reviewQueueJokes)
-                combinedRejected.append(contentsOf: result.rejectedBlocks)
-                providersUsed.insert(result.providerUsed)
-
-                await MainActor.run {
-                    let found = result.autoSavedJokes.count + result.reviewQueueJokes.count
-                    importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in photo \(importFileIndex)!"
-                }
+                try jpegData.write(to: tmpURL)
+                tempURLs.append(tmpURL)
             } catch {
-                print(" PHOTOS: Pipeline failed for photo \(idx + 1): \(error)")
                 failedMessages.append("Photo \(idx + 1): \(error.localizedDescription)")
             }
         }
 
-        let providerSummary = providersUsed.count == 1 ? (providersUsed.first ?? "Unknown") : (providersUsed.isEmpty ? "Unknown" : "Multiple")
-        let combinedResult = ImportPipelineResult(
-            sourceFile: "Photo Library",
-            autoSavedJokes: combinedAutoSaved,
-            reviewQueueJokes: combinedReview,
-            rejectedBlocks: combinedRejected,
-            pipelineStats: PipelineStats(
-                totalPagesProcessed: items.count,
-                totalLinesExtracted: 0,
-                totalBlocksCreated: combinedAutoSaved.count + combinedReview.count,
-                autoSavedCount: combinedAutoSaved.count,
-                reviewQueueCount: combinedReview.count,
-                rejectedCount: combinedRejected.count,
-                extractionMethod: .visionOCR,
-                processingTimeSeconds: 0,
-                averageConfidence: 0.7
-            ),
-            debugInfo: nil,
-            providerUsed: providerSummary
-        )
-
-        await MainActor.run {
+        // Hand off to the shared import pipeline (same path as PDF import)
+        processImportURLs(
+            tempURLs,
+            preflightFailures: failedMessages,
+            cleanupURLs: tempURLs
+        ) {
             selectedPhotos = []
+        }
+    }
+
+    private func processDocuments(_ urls: [URL]) {
+        print(" SMART IMPORT START: \(urls.count) files selected")
+        // Dismiss the file picker sheet immediately so its dismissal animation
+        // finishes before the SmartImportReviewView fullScreenCover presents.
+        activeSheet = nil
+        processImportURLs(urls)
+    }
+
+    private func processImportURLs(
+        _ urls: [URL],
+        preflightFailures: [String] = [],
+        cleanupURLs: [URL] = [],
+        onComplete: (() -> Void)? = nil
+    ) {
+        if urls.isEmpty {
             isProcessingImages = false
             importStatusMessage = ""
             importedJokeNames = []
             importFileCount = 0
             importFileIndex = 0
 
-            let total = combinedAutoSaved.count + combinedReview.count
-            if total > 0 {
-                self.smartImportResult = combinedResult
-                // Surface partial-failure info even when some photos succeeded
-                if !failedMessages.isEmpty {
-                    self.importError = ImportErrorMessage(message: "Some photos failed:\n" + failedMessages.joined(separator: "\n"))
-                    self.showingImportError = true
-                }
-            } else if !failedMessages.isEmpty {
-                // Every photo failed — show the collected errors
-                self.importError = ImportErrorMessage(message: failedMessages.joined(separator: "\n"))
-                self.showingImportError = true
+            if !preflightFailures.isEmpty {
+                importError = ImportErrorMessage(message: preflightFailures.joined(separator: "\n"))
+                showingImportError = true
             } else {
-                self.importSummary = (0, 0)
-                self.showingImportSummary = true
+                importSummary = (0, 0)
+                showingImportSummary = true
             }
+            onComplete?()
+            return
         }
-    }
-    
-    private func processDocuments(_ urls: [URL]) {
-        print(" SMART IMPORT START: \(urls.count) files selected")
+
         isProcessingImages = true
         importedJokeNames = []
         importStatusMessage = "Analyzing \(urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files")..."
         importFileCount = urls.count
         importFileIndex = 0
-        
+
         Task {
+            defer {
+                cleanupURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+            }
+
             // For multi-file imports, we combine results from all files
             var combinedAutoSaved: [ImportedJoke] = []
             var combinedReview: [ImportedJoke] = []
             var combinedRejected: [LayoutBlock] = []
             var sourceFile = ""
             var providersUsed = Set<String>()
-            var failedMessages: [String] = []  // collect per-file errors — never silently drop them
-            
+            var failedMessages: [String] = preflightFailures // never silently drop preflight failures
+
             for url in urls {
                 await MainActor.run {
                     importFileIndex += 1
-                    importStatusMessage = "GagGrabber scanning \(url.lastPathComponent)..."
+                    importStatusMessage = "Reading text from \(url.lastPathComponent)..."
                 }
-                
+
                 do {
+                    // Run a concurrent task that advances the status message through
+                    // the OCR → AI stages. Cancelled automatically when the pipeline
+                    // returns (success or failure) via the defer below.
+                    let fileName = url.lastPathComponent
+                    let stageTask = Task { @MainActor in
+                        // After ~2 s the text extraction (OCR / PDFKit) is usually done
+                        // and the AI call is starting — update the message accordingly.
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        guard !Task.isCancelled else { return }
+                        importStatusMessage = "🤖 GagGrabber AI is reading \(fileName)..."
+                        // After a further ~15 s, reassure the user it's still running.
+                        try? await Task.sleep(nanoseconds: 15_000_000_000)
+                        guard !Task.isCancelled else { return }
+                        importStatusMessage = "Still analyzing \(fileName) — almost there..."
+                    }
+                    defer { stageTask.cancel() }
+
                     let result = try await FileImportService.shared.importWithPipeline(from: url)
                     combinedAutoSaved.append(contentsOf: result.autoSavedJokes)
                     combinedReview.append(contentsOf: result.reviewQueueJokes)
                     combinedRejected.append(contentsOf: result.rejectedBlocks)
                     sourceFile = result.sourceFile
                     providersUsed.insert(result.providerUsed)
-                    
+
                     await MainActor.run {
                         let found = result.autoSavedJokes.count + result.reviewQueueJokes.count
-                        importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in \(url.lastPathComponent)!"
+                        importStatusMessage = "✅ Found \(found) joke\(found == 1 ? "" : "s") in \(fileName)!"
                     }
                 } catch {
                     print(" IMPORT: AI extraction failed for \(url.lastPathComponent): \(error)")
@@ -1101,14 +1167,14 @@ struct JokesView: View {
                     // Continue looping so other selected files can still be processed.
                 }
             }
-            
+
             let providerSummary: String = {
                 let unique = Array(providersUsed)
                 if unique.isEmpty { return "Unknown" }
                 if unique.count == 1 { return unique[0] }
                 return "Multiple"
             }()
-            
+
             // Build combined result
             let combinedResult = ImportPipelineResult(
                 sourceFile: sourceFile,
@@ -1129,14 +1195,27 @@ struct JokesView: View {
                 debugInfo: nil,
                 providerUsed: providerSummary
             )
-            
+
             await MainActor.run {
                 self.isProcessingImages = false
                 self.importStatusMessage = ""
                 self.importedJokeNames = []
                 self.importFileCount = 0
                 self.importFileIndex = 0
-                
+
+                // Ensure any lingering sheet is dismissed before the fullScreenCover
+                self.activeSheet = nil
+
+                onComplete?()
+            }
+
+            // Allow sheet/picker dismissal animation to complete before
+            // presenting the fullScreenCover. Without this delay SwiftUI
+            // silently drops the presentation because it can't dismiss and
+            // present in the same render pass.
+            try? await Task.sleep(nanoseconds: 600_000_000)
+
+            await MainActor.run {
                 let totalJokes = combinedAutoSaved.count + combinedReview.count
                 if totalJokes > 0 {
                     // Show the Smart Import Review for all AI-reviewed fragments
@@ -1379,7 +1458,7 @@ struct JokesView: View {
         
         // Clear pending imports
         sharedDefaults.removeObject(forKey: "pendingVoiceMemoImports")
-        sharedDefaults.synchronize()
+        // Note: synchronize() removed — iOS flushes UserDefaults automatically.
         
         if importedCount > 0 {
             do {

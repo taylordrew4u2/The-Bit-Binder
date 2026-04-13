@@ -88,7 +88,7 @@ struct DataSafetyView: View {
                     } label: {
                         HStack {
                             Image(systemName: "checkmark.shield")
-                                .foregroundColor(.blue)
+                                .foregroundColor(.accentColor)
                             VStack(alignment: .leading) {
                                 Text("Validate Data Integrity")
                                     .foregroundColor(.primary)
@@ -113,7 +113,7 @@ struct DataSafetyView: View {
                     } label: {
                         HStack {
                             Image(systemName: "externaldrive.badge.plus")
-                                .foregroundColor(.green)
+                                .foregroundColor(.accentColor)
                             VStack(alignment: .leading) {
                                 Text("Create Backup")
                                     .foregroundColor(.primary)
@@ -135,7 +135,7 @@ struct DataSafetyView: View {
                     } label: {
                         HStack {
                             Image(systemName: "externaldrive")
-                                .foregroundColor(.orange)
+                                .foregroundColor(.accentColor)
                             Text("View Backups")
                                 .foregroundColor(.primary)
                             Spacer()
@@ -154,7 +154,7 @@ struct DataSafetyView: View {
                     } label: {
                         HStack {
                             Image(systemName: "doc.text")
-                                .foregroundColor(.orange)
+                                .foregroundColor(.accentColor)
                             VStack(alignment: .leading) {
                                 Text("Export All Jokes")
                                     .foregroundColor(.primary)
@@ -172,7 +172,7 @@ struct DataSafetyView: View {
                     } label: {
                         HStack {
                             Image(systemName: "waveform")
-                                .foregroundColor(.red)
+                                .foregroundColor(.accentColor)
                             VStack(alignment: .leading) {
                                 Text("Export All Audio Files")
                                     .foregroundColor(.primary)
@@ -234,19 +234,19 @@ struct DataSafetyView: View {
                             if !result.issues.isEmpty {
                                 Text("Issues Found:")
                                     .fontWeight(.semibold)
-                                    .foregroundColor(.red)
+                                    .foregroundColor(.accentColor)
                                 
                                 ForEach(result.issues.indices, id: \.self) { index in
                                     Text("• \(result.issues[index])")
                                         .font(.caption)
-                                        .foregroundColor(.red)
+                                        .foregroundColor(.accentColor)
                                 }
                             }
                             
                             if result.significantDataLoss {
                                 Text(" SIGNIFICANT DATA LOSS DETECTED")
                                     .fontWeight(.bold)
-                                    .foregroundColor(.red)
+                                    .foregroundColor(.accentColor)
                             }
                         }
                         .padding(.vertical, 4)
@@ -558,7 +558,7 @@ struct StatusRow: View {
     var body: some View {
         HStack {
             Image(systemName: isHealthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundColor(isHealthy ? .green : .orange)
+                .foregroundColor(isHealthy ? .accentColor : .accentColor)
             
             VStack(alignment: .leading) {
                 Text(title)
@@ -649,7 +649,7 @@ struct BackupsView: View {
                                                 .padding(.vertical, 7)
                                                 .background(
                                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                        .fill(Color.blue)
+                                                        .fill(Color.accentColor)
                                                 )
                                         }
                                         .buttonStyle(.plain)
@@ -662,11 +662,11 @@ struct BackupsView: View {
                                         } label: {
                                             Image(systemName: "trash")
                                                 .font(.caption)
-                                                .foregroundColor(.red.opacity(0.8))
+                                                .foregroundColor(.accentColor.opacity(0.8))
                                                 .padding(7)
                                                 .background(
                                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                        .fill(Color.red.opacity(0.1))
+                                                        .fill(Color.accentColor.opacity(0.1))
                                                 )
                                         }
                                         .buttonStyle(.plain)

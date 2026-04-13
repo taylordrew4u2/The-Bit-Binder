@@ -38,6 +38,9 @@ struct AutoOrganizeView: View {
     @State private var showReorganizeConfirmation = false
     @State private var deleteOldFoldersOnReorganize = true
     
+    // Guided Manual Sort state
+    @State private var showGuidedSort = false
+    
     // Track if we've populated categorization results
     @State private var hasPopulatedCategorizationResults = false
     
@@ -99,7 +102,7 @@ struct AutoOrganizeView: View {
                     VStack(spacing: 12) {
                          Image(systemName: "checkmark.circle.fill")
                              .font(.system(size: 60))
-                             .foregroundColor(.green)
+                             .foregroundColor(.accentColor)
                          
                          Text("Auto-Organization Complete!")
                              .font(.title2.bold())
@@ -164,6 +167,15 @@ struct AutoOrganizeView: View {
                     useCustomFoldersOnly: $useCustomFoldersOnly,
                     unorganizedJokes: unorganizedJokes,
                     existingFolders: folders.map { $0.name }
+                )
+            }
+            .sheet(isPresented: $showGuidedSort) {
+                GuidedManualSortView(
+                    jokes: unorganizedJokes,
+                    existingFolders: folders,
+                    onAssign: { joke, category in
+                        assignJokeToFolder(joke, category: category)
+                    }
                 )
             }
             .alert("Organization Complete", isPresented: $showOrganizationSummary) {
@@ -233,7 +245,7 @@ struct AutoOrganizeView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.purple)
+            .background(Color.accentColor)
             .cornerRadius(10)
             
             // Auto-Organize Button
@@ -276,6 +288,31 @@ struct AutoOrganizeView: View {
             .background(Color.accentColor)
             .cornerRadius(10)
             
+            // Guided Manual Sort Button
+            Button(action: { showGuidedSort = true }) {
+                HStack(spacing: 12) {
+                    Image(systemName: "hand.tap")
+                        .font(.system(size: 16, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Guided Manual Sort")
+                            .font(.headline)
+                        Text("Go joke-by-joke with AI suggestions")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+            }
+            .disabled(isAnalyzing)
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.accentColor)
+            .cornerRadius(10)
+            
             // Reorganize All Button
             Button(action: { showReorganizeConfirmation = true }) {
                 HStack(spacing: 12) {
@@ -298,7 +335,7 @@ struct AutoOrganizeView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange)
+            .background(Color.accentColor)
             .cornerRadius(10)
         }
     }
@@ -330,7 +367,7 @@ struct AutoOrganizeView: View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 50))
-                .foregroundColor(.green)
+                .foregroundColor(.accentColor)
             Text("All Jokes Organized!")
                 .font(.headline)
             Text("Your jokes have been sorted into categories with confidence scoring")
@@ -345,12 +382,12 @@ struct AutoOrganizeView: View {
                     Text("Reorganize All")
                         .font(.subheadline.weight(.semibold))
                 }
-                .foregroundColor(.orange)
+                .foregroundColor(.accentColor)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.orange.opacity(0.1))
+                        .fill(Color.accentColor.opacity(0.1))
                 )
             }
             .disabled(isAnalyzing)
@@ -884,7 +921,7 @@ struct JokeOrganizationCard: View {
                              .foregroundColor(.white)
                              .padding(.horizontal, 12)
                              .padding(.vertical, 6)
-                             .background(.green)
+                             .background(Color.accentColor)
                              .cornerRadius(6)
                         }
                         
@@ -898,7 +935,7 @@ struct JokeOrganizationCard: View {
                              .foregroundColor(.accentColor)
                              .padding(.horizontal, 12)
                              .padding(.vertical, 6)
-                             .background(Color.accentColor.opacity(0.1))
+                             .background(Color.accentColor)
                              .cornerRadius(6)
                          }
                          
@@ -943,7 +980,7 @@ struct JokeOrganizationCard: View {
             }
         }
         .padding(12)
-        .background(Color.orange.opacity(0.05))
+        .background(Color.accentColor.opacity(0.05))
         .cornerRadius(8)
             }
         }
@@ -955,11 +992,11 @@ struct JokeOrganizationCard: View {
     private func confidenceColor(_ confidence: Double) -> Color {
         switch confidence {
         case 0.8...:
-            return .green
+            return .accentColor
         case 0.6..<0.8:
-            return .blue
+            return .accentColor
         case 0.4..<0.6:
-            return .orange
+            return .accentColor
         default:
             return .gray
         }
@@ -1093,11 +1130,11 @@ struct CategorySuggestionDetail: View {
     private func confidenceColor(_ confidence: Double) -> Color {
         switch confidence {
         case 0.8...:
-            return .green
+            return .accentColor
         case 0.6..<0.8:
-            return .blue
+            return .accentColor
         case 0.4..<0.6:
-            return .orange
+            return .accentColor
         default:
             return .gray
         }
@@ -1192,7 +1229,7 @@ struct FolderSetupView: View {
                                 Spacer()
                                 if customFolders.contains(folder) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.accentColor)
                                 } else {
                                     Button("Add") {
                                         if !customFolders.contains(folder) {
@@ -1262,7 +1299,7 @@ struct FolderSetupView: View {
                                 Spacer()
                                 if customFolders.contains(folder) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.accentColor)
                                 } else {
                                     Button("Use") {
                                         if !customFolders.contains(folder) {
@@ -1316,7 +1353,7 @@ struct FolderSetupView: View {
     private func deleteFolder(at offsets: IndexSet) {
         customFolders.remove(atOffsets: offsets)
     }
-    
+
     private func generateAIFolders() {
         isGeneratingFolders = true
         
@@ -1349,6 +1386,451 @@ struct FolderSetupView: View {
                     isGeneratingFolders = false
                 }
             }
+        }
+    }
+}
+
+// MARK: - Guided Manual Sort View
+
+struct GuidedManualSortView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let jokes: [Joke]
+    let existingFolders: [JokeFolder]
+    let onAssign: (Joke, String) -> Void
+
+    @State private var currentIndex: Int = 0
+    @State private var customFolderName: String = ""
+    @State private var assignedFolders: [UUID: [String]] = [:]  // jokeID -> assigned folder names
+    @State private var skipped: Set<UUID> = []
+    @State private var showDoneSummary = false
+    @FocusState private var customFieldFocused: Bool
+
+    private var currentJoke: Joke? {
+        guard currentIndex < jokes.count else { return nil }
+        return jokes[currentIndex]
+    }
+
+    private var suggestions: [CategoryMatch] {
+        guard let joke = currentJoke else { return [] }
+        joke.loadCategorizationResults()
+        if !joke.categorizationResults.isEmpty { return joke.categorizationResults }
+        let fresh = AutoOrganizeService.categorize(content: joke.content)
+        joke.categorizationResults = fresh
+        joke.saveCategorizationResults()
+        return fresh
+    }
+
+    private var progress: Double {
+        jokes.isEmpty ? 1.0 : Double(currentIndex) / Double(jokes.count)
+    }
+
+    var body: some View {
+        NavigationStack {
+            if jokes.isEmpty {
+                allDoneEmptyState
+            } else if showDoneSummary {
+                doneSummaryView
+            } else if let joke = currentJoke {
+                jokeCard(joke)
+            }
+        }
+    }
+
+    // MARK: - Joke Card
+
+    @ViewBuilder
+    private func jokeCard(_ joke: Joke) -> some View {
+        ScrollView {
+            VStack(spacing: 20) {
+
+                // Progress
+                VStack(spacing: 6) {
+                    HStack {
+                        Text("Joke \(currentIndex + 1) of \(jokes.count)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        let doneCount = assignedFolders.count + skipped.count
+                        Text("\(doneCount) handled")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    ProgressView(value: progress)
+                        .tint(.accentColor)
+                }
+                .padding(.horizontal)
+
+                // Joke content card
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(joke.title)
+                        .font(.headline)
+                        .fontWeight(.bold)
+                    Text(joke.content)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(12)
+                .padding(.horizontal)
+
+                // Current assignment badges
+                if let assigned = assignedFolders[joke.id], !assigned.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Assigned to:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(assigned, id: \.self) { folderName in
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "folder.fill")
+                                            .font(.caption2)
+                                        Text(folderName)
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                        Button(action: { removeAssignment(joke: joke, folder: folderName) }) {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.caption2)
+                                                .foregroundColor(.white.opacity(0.7))
+                                        }
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Color.accentColor)
+                                    .cornerRadius(20)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                }
+
+                // AI Suggestions
+                if !suggestions.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Image(systemName: "sparkles")
+                                .font(.caption)
+                                .foregroundColor(.accentColor)
+                            Text("AI Suggestions")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        }
+                        .padding(.horizontal)
+
+                        VStack(spacing: 8) {
+                            ForEach(suggestions.prefix(5), id: \.category) { match in
+                                suggestionRow(match, joke: joke)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+
+                // Existing Folders
+                let otherFolders = existingFolders.filter { folder in
+                    !suggestions.prefix(5).map(\.category).contains(folder.name)
+                }
+                if !otherFolders.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Other Folders")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal)
+
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach(otherFolders) { folder in
+                                let isAssigned = assignedFolders[joke.id]?.contains(folder.name) ?? false
+                                Button(action: { toggleAssignment(joke: joke, folderName: folder.name) }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: isAssigned ? "checkmark.circle.fill" : "folder")
+                                            .font(.caption)
+                                        Text(folder.name)
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                            .lineLimit(1)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .foregroundColor(isAssigned ? .white : .accentColor)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(isAssigned ? Color.accentColor : Color.accentColor.opacity(0.1))
+                                    .cornerRadius(8)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+
+                // Custom Folder Input
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("New Folder")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal)
+
+                    HStack(spacing: 10) {
+                        TextField("Folder name...", text: $customFolderName)
+                            .textFieldStyle(.roundedBorder)
+                            .focused($customFieldFocused)
+                            .onSubmit { addCustomFolder(joke: joke) }
+
+                        Button(action: { addCustomFolder(joke: joke) }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(customFolderName.trimmingCharacters(in: .whitespaces).isEmpty ? .gray : .accentColor)
+                        }
+                        .disabled(customFolderName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .padding(.horizontal)
+                }
+
+                // Bottom action row
+                HStack(spacing: 12) {
+                    // Back
+                    if currentIndex > 0 {
+                        Button(action: goBack) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "chevron.left")
+                                Text("Back")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.accentColor)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.accentColor.opacity(0.1))
+                            .cornerRadius(10)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Skip
+                    Button(action: { skipJoke(joke) }) {
+                        Text("Skip")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color(UIColor.systemGray5))
+                            .cornerRadius(10)
+                    }
+
+                    // Next / Done
+                    let isLast = currentIndex == jokes.count - 1
+                    Button(action: { advanceOrFinish(joke) }) {
+                        HStack(spacing: 6) {
+                            Text(isLast ? "Finish" : "Next")
+                            Image(systemName: isLast ? "checkmark" : "chevron.right")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.accentColor)
+                        .cornerRadius(10)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 24)
+            }
+            .padding(.vertical, 16)
+        }
+        .navigationTitle("Guided Sort")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+        }
+    }
+
+    // MARK: - Suggestion Row
+
+    @ViewBuilder
+    private func suggestionRow(_ match: CategoryMatch, joke: Joke) -> some View {
+        let isAssigned = assignedFolders[joke.id]?.contains(match.category) ?? false
+        Button(action: { toggleAssignment(joke: joke, folderName: match.category) }) {
+            HStack(spacing: 12) {
+                Image(systemName: isAssigned ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundColor(isAssigned ? .white : .accentColor)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(match.category)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(isAssigned ? .white : .primary)
+                    Text(match.reasoning)
+                        .font(.caption)
+                        .foregroundColor(isAssigned ? .white.opacity(0.8) : .secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Text(match.confidencePercent)
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(isAssigned ? .white : .white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(isAssigned ? Color.white.opacity(0.25) : confidenceBadgeColor(match.confidence))
+                    .cornerRadius(6)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(isAssigned ? Color.accentColor : Color(UIColor.systemGray6))
+            .cornerRadius(10)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Done Summary
+
+    @ViewBuilder
+    private var doneSummaryView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 64))
+                .foregroundColor(.accentColor)
+
+            Text("All Done!")
+                .font(.title2.bold())
+
+            VStack(spacing: 12) {
+                summaryRow(icon: "folder.fill", label: "Jokes assigned", value: "\(assignedFolders.values.filter { !$0.isEmpty }.count)")
+                summaryRow(icon: "forward.fill", label: "Jokes skipped", value: "\(skipped.count)")
+                let totalAssignments = assignedFolders.values.reduce(0) { $0 + $1.count }
+                summaryRow(icon: "tray.2.fill", label: "Total folder assignments", value: "\(totalAssignments)")
+            }
+            .padding()
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(12)
+            .padding(.horizontal)
+
+            Button(action: { dismiss() }) {
+                Text("Done")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.accentColor)
+                    .cornerRadius(12)
+            }
+            .padding(.horizontal)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.vertical, 40)
+        .navigationTitle("Summary")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") { dismiss() }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func summaryRow(icon: String, label: String, value: String) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(.accentColor)
+                .frame(width: 24)
+            Text(label)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .fontWeight(.semibold)
+        }
+    }
+
+    // MARK: - Empty State
+
+    @ViewBuilder
+    private var allDoneEmptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 50))
+                .foregroundColor(.accentColor)
+            Text("All Jokes Organized!")
+                .font(.headline)
+            Text("There are no unorganized jokes to sort right now.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Close") { dismiss() }
+                .padding(.top, 8)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("Guided Sort")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // MARK: - Actions
+
+    private func toggleAssignment(joke: Joke, folderName: String) {
+        var current = assignedFolders[joke.id] ?? []
+        if let idx = current.firstIndex(of: folderName) {
+            // Deselect
+            current.remove(at: idx)
+        } else {
+            // Select and persist immediately
+            current.append(folderName)
+            onAssign(joke, folderName)
+        }
+        assignedFolders[joke.id] = current
+        skipped.remove(joke.id)
+    }
+
+    private func removeAssignment(joke: Joke, folder: String) {
+        assignedFolders[joke.id]?.removeAll { $0 == folder }
+    }
+
+    private func addCustomFolder(joke: Joke) {
+        let name = customFolderName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        toggleAssignment(joke: joke, folderName: name)
+        customFolderName = ""
+        customFieldFocused = false
+    }
+
+    private func skipJoke(_ joke: Joke) {
+        skipped.insert(joke.id)
+        advanceOrFinish(joke)
+    }
+
+    private func advanceOrFinish(_ joke: Joke) {
+        customFolderName = ""
+        customFieldFocused = false
+        if currentIndex < jokes.count - 1 {
+            currentIndex += 1
+        } else {
+            showDoneSummary = true
+        }
+    }
+
+    private func goBack() {
+        guard currentIndex > 0 else { return }
+        customFolderName = ""
+        customFieldFocused = false
+        currentIndex -= 1
+    }
+
+    private func confidenceBadgeColor(_ confidence: Double) -> Color {
+        switch confidence {
+        case 0.7...: return .accentColor
+        case 0.45..<0.7: return Color.accentColor.opacity(0.75)
+        default: return .gray
         }
     }
 }

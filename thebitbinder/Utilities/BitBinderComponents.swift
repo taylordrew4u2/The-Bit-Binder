@@ -48,22 +48,22 @@ struct BitBinderBadge: View {
         var backgroundColor: Color {
             switch self {
             case .neutral: return Color(UIColor.secondarySystemBackground)
-            case .success: return Color.green.opacity(0.12)
-            case .warning: return Color.orange.opacity(0.12)
-            case .error: return Color.red.opacity(0.12)
-            case .gold: return Color.yellow.opacity(0.15)
-            case .info: return Color.blue.opacity(0.12)
+            case .success: return Color.accentColor.opacity(0.12)
+            case .warning: return Color.accentColor.opacity(0.12)
+            case .error: return Color.accentColor.opacity(0.12)
+            case .gold: return Color.accentColor.opacity(0.15)
+            case .info: return Color.accentColor.opacity(0.12)
             }
         }
         
         var foregroundColor: Color {
             switch self {
             case .neutral: return .secondary
-            case .success: return .green
-            case .warning: return .orange
-            case .error: return .red
-            case .gold: return .yellow
-            case .info: return .blue
+            case .success: return .accentColor
+            case .warning: return .accentColor
+            case .error: return .accentColor
+            case .gold: return .accentColor
+            case .info: return .accentColor
             }
         }
     }

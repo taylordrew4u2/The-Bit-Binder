@@ -10,19 +10,29 @@ import SwiftUI
 import SwiftData
 import UIKit
 
+// MARK: - Consolidated Sheet Enum
+
+/// All sheets presented from JokesView, consolidated into a single enum
+/// to avoid the SwiftUI multi-.sheet(isPresented:) presentation bug.
+enum JokesSheet: String, Identifiable {
+    case addJoke
+    case scanner
+    case createFolder
+    case autoOrganize
+    case audioImport
+    case talkToText
+    case filePicker
+    case addRoastTarget
+    case moveJokes
+    case reviewSheet
+    case importHistory
+    var id: String { rawValue }
+}
+
 // MARK: - Sheets Modifier
 
 struct JokesSheetsModifier: ViewModifier {
-    @Binding var showingAddJoke: Bool
-    @Binding var showingScanner: Bool
-    @Binding var showingCreateFolder: Bool
-    @Binding var showingAutoOrganize: Bool
-    @Binding var showingAudioImport: Bool
-    @Binding var showingTalkToText: Bool
-    @Binding var showingFilePicker: Bool
-    @Binding var showingAddRoastTarget: Bool
-    @Binding var showingMoveJokesSheet: Bool
-    @Binding var showingReviewSheet: Bool
+    @Binding var activeSheet: JokesSheet?
 
     let selectedFolder: JokeFolder?
     let folders: [JokeFolder]
@@ -37,56 +47,45 @@ struct JokesSheetsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $showingAddJoke) {
-                AddJokeView(selectedFolder: selectedFolder)
-            }
-            .sheet(isPresented: $showingScanner) {
-                DocumentScannerView { images in
-                    processScannedImages(images)
-                }
-            }
-            .sheet(isPresented: $showingCreateFolder) {
-                CreateFolderView()
-            }
-            .sheet(isPresented: $showingAutoOrganize) {
-                AutoOrganizeView()
-            }
-            .sheet(isPresented: $showingAudioImport) {
-                AudioImportView(selectedFolder: selectedFolder)
-            }
-            .sheet(isPresented: $showingTalkToText) {
-                TalkToTextView(selectedFolder: selectedFolder)
-            }
-            .sheet(isPresented: $showingFilePicker) {
-                DocumentPickerView { urls in
-                    processDocuments(urls)
-                }
-            }
-            .sheet(isPresented: $showingAddRoastTarget) {
-                AddRoastTargetView()
-                    .onAppear {
-                        #if DEBUG
-                        print(" [JokesViewModifiers] AddRoastTargetView sheet appeared")
-                        #endif
+            .sheet(item: $activeSheet) { sheet in
+                switch sheet {
+                case .addJoke:
+                    AddJokeView(selectedFolder: selectedFolder)
+                case .scanner:
+                    DocumentScannerView { images in
+                        processScannedImages(images)
                     }
-            }
-            .sheet(isPresented: $showingMoveJokesSheet) {
-                MoveJokesSheet(
-                    folders: folders,
-                    folderPendingDeletion: $folderPendingDeletion,
-                    showingMoveJokesSheet: $showingMoveJokesSheet,
-                    moveJokes: moveJokes,
-                    deleteFolder: deleteFolder
-                )
-            }
-            .sheet(isPresented: $showingReviewSheet) {
-                ReviewImportsSheet(
-                    showingReviewSheet: $showingReviewSheet,
-                    reviewCandidates: reviewCandidates,
-                    possibleDuplicates: possibleDuplicates,
-                    unresolvedFragments: unresolvedFragments,
-                    selectedFolder: selectedFolder
-                )
+                case .createFolder:
+                    CreateFolderView()
+                case .autoOrganize:
+                    AutoOrganizeView()
+                case .audioImport:
+                    AudioImportView(selectedFolder: selectedFolder)
+                case .talkToText:
+                    TalkToTextView(selectedFolder: selectedFolder)
+                case .filePicker:
+                    DocumentPickerView { urls in
+                        processDocuments(urls)
+                    }
+                case .addRoastTarget:
+                    AddRoastTargetView()
+                case .moveJokes:
+                    MoveJokesSheet(
+                        folders: folders,
+                        folderPendingDeletion: $folderPendingDeletion,
+                        moveJokes: moveJokes,
+                        deleteFolder: deleteFolder
+                    )
+                case .reviewSheet:
+                    ReviewImportsSheet(
+                        reviewCandidates: reviewCandidates,
+                        possibleDuplicates: possibleDuplicates,
+                        unresolvedFragments: unresolvedFragments,
+                        selectedFolder: selectedFolder
+                    )
+                case .importHistory:
+                    ImportBatchHistoryView()
+                }
             }
     }
 }
@@ -98,7 +97,7 @@ struct JokesAlertsModifier: ViewModifier {
     @Binding var showingImportSummary: Bool
     @Binding var showingDeleteFolderAlert: Bool
     @Binding var showingDeleteRoastAlert: Bool
-    @Binding var showingMoveJokesSheet: Bool
+    @Binding var activeSheet: JokesSheet?
 
     let exportedPDFURL: URL?
     let importSummary: (added: Int, skipped: Int)
@@ -133,7 +132,7 @@ struct JokesAlertsModifier: ViewModifier {
             }
             .alert("Delete Folder?", isPresented: $showingDeleteFolderAlert) {
                 Button("Move Jokes…") {
-                    showingMoveJokesSheet = true
+                    activeSheet = .moveJokes
                 }
                 Button("Remove From Folder", role: .destructive) {
                     if let folder = folderPendingDeletion {
@@ -155,7 +154,6 @@ struct JokesAlertsModifier: ViewModifier {
                             try modelContext.save()
                         } catch {
                             print(" [JokesViewModifiers] Failed to delete roast target: \(error)")
-                            // SwiftData will retry on next save cycle; log for diagnostics
                         }
                         roastTargetToDelete = nil
                     }
@@ -172,9 +170,9 @@ struct JokesAlertsModifier: ViewModifier {
 // MARK: - Move Jokes Sheet (extracted)
 
 struct MoveJokesSheet: View {
+    @Environment(\.dismiss) private var dismiss
     let folders: [JokeFolder]
     @Binding var folderPendingDeletion: JokeFolder?
-    @Binding var showingMoveJokesSheet: Bool
     let moveJokes: (JokeFolder, JokeFolder?) -> Void
     let deleteFolder: (JokeFolder) -> Void
 
@@ -186,7 +184,7 @@ struct MoveJokesSheet: View {
                         moveJokes(folder, nil)
                         deleteFolder(folder)
                     }
-                    showingMoveJokesSheet = false
+                    dismiss()
                     folderPendingDeletion = nil
                 }) {
                     Label("Move to No Folder", systemImage: "tray")
@@ -198,7 +196,7 @@ struct MoveJokesSheet: View {
                                 moveJokes(source, dest)
                                 deleteFolder(source)
                             }
-                            showingMoveJokesSheet = false
+                            dismiss()
                             folderPendingDeletion = nil
                         }) {
                             Label(dest.name, systemImage: "folder")
@@ -210,7 +208,7 @@ struct MoveJokesSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showingMoveJokesSheet = false }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -223,7 +221,7 @@ struct MoveJokesSheet: View {
 
 struct ReviewImportsSheet: View {
     @Environment(\.modelContext) private var modelContext
-    @Binding var showingReviewSheet: Bool
+    @Environment(\.dismiss) private var dismiss
     let reviewCandidates: [JokeImportCandidate]
     let possibleDuplicates: [String]
     let unresolvedFragments: [UnresolvedImportFragment]
@@ -254,7 +252,7 @@ struct ReviewImportsSheet: View {
                                     if !possibleDuplicates.isEmpty {
                                         Text("\(possibleDuplicates.count) possible duplicate\(possibleDuplicates.count == 1 ? "" : "s") detected")
                                             .font(.caption)
-                                            .foregroundColor(.orange)
+                                            .foregroundColor(.accentColor)
                                     }
                                 }
                                 Spacer()
@@ -267,7 +265,7 @@ struct ReviewImportsSheet: View {
                                     HStack(spacing: 10) {
                                         Image(systemName: "exclamationmark.triangle.fill")
                                             .font(.subheadline)
-                                            .foregroundColor(.orange)
+                                            .foregroundColor(.accentColor)
                                         Text(dup)
                                             .font(.subheadline)
                                     }
@@ -322,7 +320,7 @@ struct ReviewImportsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { showingReviewSheet = false }
+                    Button("Close") { dismiss() }
                 }
             }
         }
@@ -364,9 +362,9 @@ struct UnresolvedFragmentRow: View {
     
     private var confidenceColor: Color {
         switch fragment.confidence.lowercased() {
-        case "high": return .green
-        case "medium": return .orange
-        default: return .red
+        case "high": return .accentColor
+        case "medium": return .accentColor
+        default: return .accentColor
         }
     }
     

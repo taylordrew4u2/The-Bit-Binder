@@ -54,10 +54,10 @@ struct AddRoastJokeView: View {
                     if savedCount > 0 {
                         Text("\(savedCount) added")
                             .font(.caption.bold())
-                            .foregroundColor(.green)
+                            .foregroundColor(.accentColor)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.green.opacity(0.15))
+                            .background(Color.accentColor.opacity(0.15))
                             .clipShape(Capsule())
                     }
                 }

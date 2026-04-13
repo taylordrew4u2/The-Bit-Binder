@@ -333,8 +333,11 @@ final class iCloudSyncDiagnostics: ObservableObject {
     private func checkKeyValueStore() async {
         diagnosticResults.append("🔍 Checking iCloud Key-Value Store...")
         
-        let kvStore = iCloudKeyValueStore.shared
-        let kvDiagnostics = kvStore.diagnostics()
+        // Run diagnostics synchronously on background thread to avoid async/sync warnings
+        let kvDiagnostics: [String] = await Task.detached {
+            let kvStore = iCloudKeyValueStore.shared
+            return kvStore.diagnostics()
+        }.value
         
         diagnosticResults.append("📋 Key-Value Store Status:")
         for diagnostic in kvDiagnostics {
@@ -364,11 +367,14 @@ final class iCloudSyncDiagnostics: ObservableObject {
         }
     }
     
-    func forceKeyValueSync() {
+    func forceKeyValueSync() async {
         diagnosticResults.append("🔄 Forcing Key-Value Store sync...")
         
-        let kvStore = iCloudKeyValueStore.shared
-        kvStore.forceSync()
+        // Run sync on detached task to avoid Sendable issues
+        await Task.detached {
+            let kvStore = iCloudKeyValueStore.shared
+            kvStore.forceSync()
+        }.value
         
         diagnosticResults.append("✅ Key-Value Store force sync completed")
     }

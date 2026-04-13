@@ -74,7 +74,7 @@ struct BrainstormTrashView: View {
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
-                            .tint(.green)
+                            .tint(.accentColor)
                         }
                         .contextMenu {
                             Button {

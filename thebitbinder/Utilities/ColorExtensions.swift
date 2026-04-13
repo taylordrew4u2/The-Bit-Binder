@@ -3,6 +3,8 @@
 //  thebitbinder
 //
 //  Lightweight Color utilities for native iOS design.
+//  App palette: System Blue (accentColor) + White only.
+//  Roast mode uses orange as its accent.
 //
 
 import SwiftUI

@@ -5,6 +5,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import Speech
 import AVFoundation
 import AVFAudio
@@ -151,7 +152,7 @@ struct TalkToTextView: View {
                                 .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(saveToBrainstorm ? .orange : .green)
+                            .tint(.accentColor)
                             .controlSize(.large)
                             .disabled(isSaving)
                         }
@@ -203,7 +204,7 @@ struct TalkToTextView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 48))
-                                .foregroundColor(saveToBrainstorm ? .orange : .green)
+                                .foregroundColor(.accentColor)
                             Text(saveToBrainstorm ? "Idea Saved!" : "Joke Saved!")
                                 .font(.headline)
                         }
@@ -345,7 +346,7 @@ struct TalkToTextView: View {
         isSaving = true
         errorMessage = nil
         
-        // Create the brainstorm idea
+        // Create the brainstorm idea with explicit defaults
         let idea = BrainstormIdea(
             content: text,
             colorHex: BrainstormIdea.randomColor(),
@@ -356,8 +357,24 @@ struct TalkToTextView: View {
         
         do {
             try modelContext.save()
+            
+            // Verify the save actually persisted
+            let savedId = idea.id
+            let descriptor = FetchDescriptor<BrainstormIdea>(
+                predicate: #Predicate { $0.id == savedId }
+            )
+            let results = try modelContext.fetch(descriptor)
+            guard !results.isEmpty else {
+                isSaving = false
+                errorMessage = "Idea appeared to save but was not found. Please try again."
+                #if DEBUG
+                print("⚠️ [TalkToTextView] Brainstorm idea not found after save — id: \(savedId)")
+                #endif
+                return
+            }
+            
             #if DEBUG
-            print(" [TalkToTextView] Brainstorm idea saved — id: \(idea.id)")
+            print("✅ [TalkToTextView] Brainstorm idea saved & verified — id: \(idea.id)")
             #endif
             
             isSaving = false
@@ -370,7 +387,7 @@ struct TalkToTextView: View {
         } catch {
             isSaving = false
             #if DEBUG
-            print(" [TalkToTextView] Failed to save brainstorm idea: \(error)")
+            print("❌ [TalkToTextView] Failed to save brainstorm idea: \(error)")
             #endif
             errorMessage = "Could not save idea: \(error.localizedDescription)"
         }
