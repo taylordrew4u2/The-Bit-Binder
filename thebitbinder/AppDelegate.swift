@@ -275,6 +275,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             try BGTaskScheduler.shared.submit(request)
             isRefreshTaskScheduled = true
             print(" [BGTask] Scheduled background refresh")
+        } catch let e as NSError where e.domain == "BGTaskSchedulerErrorDomain" && e.code == 3 {
+            // BGTaskSchedulerErrorCodeTooManyPendingTaskRequests
+            isRefreshTaskScheduled = true
+            print(" [BGTask] Refresh already pending in system queue")
         } catch {
             print(" [BGTask] Could not schedule refresh: \(error.localizedDescription)")
             isRefreshTaskScheduled = false
@@ -294,23 +298,23 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             try BGTaskScheduler.shared.submit(request)
             isSyncTaskScheduled = true
             print(" [BGTask] Scheduled background sync")
+        } catch let e as NSError where e.domain == "BGTaskSchedulerErrorDomain" && e.code == 3 {
+            // BGTaskSchedulerErrorCodeTooManyPendingTaskRequests
+            isSyncTaskScheduled = true
+            print(" [BGTask] Sync already pending in system queue")
         } catch {
             print(" [BGTask] Could not schedule sync: \(error.localizedDescription)")
             isSyncTaskScheduled = false
         }
     }
     
-    // MARK: - Audio Session Configuration
-    
     private func configureAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(
                 .playAndRecord,
-                mode: .default,
                 options: [
                     .defaultToSpeaker,
-                    .allowBluetoothHFP,
                     .allowBluetoothA2DP,
                     .allowAirPlay,
                     .mixWithOthers

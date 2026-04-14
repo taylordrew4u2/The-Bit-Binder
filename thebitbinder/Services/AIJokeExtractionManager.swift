@@ -242,6 +242,12 @@ final class AIJokeExtractionManager {
                     markRateLimited(providerType, forSeconds: retryAfter)
                 case .keyNotConfigured:
                     print(" [Extraction] \(providerType.displayName) key not configured, trying next…")
+                case .apiError(_, let message) where message.contains("HTTP 404"):
+                    // Model endpoint no longer exists (common with free-tier model rotation).
+                    // This is a configuration issue, not a transient failure — skip cleanly
+                    // without logging an alarming error and without marking as rate-limited.
+                    print(" [Extraction] \(providerType.displayName) model not available (404) — trying next provider")
+                    continue
                 default:
                     print(" [Extraction] \(providerType.displayName) error: \(error.localizedDescription)")
                 }

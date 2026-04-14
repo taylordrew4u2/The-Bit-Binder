@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ContentView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
@@ -163,8 +164,7 @@ struct MainTabView: View {
                                     Button {
                                         showAIChat = true
                                     } label: {
-                                        Image(systemName: "bubble.left.and.bubble.right")
-                                            .symbolRenderingMode(.hierarchical)
+                                        BitBuddyAvatar(roastMode: roastMode, size: 22, symbolSize: 10)
                                     }
                                 }
                             }

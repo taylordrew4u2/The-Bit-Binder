@@ -1,7 +1,7 @@
 import Foundation
 
-/// BitBuddy's local rule-based engine — the ONLY backend for chat.
-/// AI services are reserved exclusively for the GagGrabber joke-extraction pipeline.
+/// BitBuddy's local rule-based fallback engine.
+/// Used when the on-device MLX model runtime is unavailable.
 /// Powered by the 93-intent router for structured command handling across 11 app sections.
 final class LocalFallbackBitBuddyService: BitBuddyBackend {
     static let shared = LocalFallbackBitBuddyService()

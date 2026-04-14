@@ -26,6 +26,8 @@ final class BrainstormIdea: Identifiable {
         self.dateCreated = Date()
         self.colorHex = colorHex
         self.isVoiceNote = isVoiceNote
+        self.isDeleted = false
+        self.deletedDate = nil
     }
     
     // Predefined color palette for sticky notes

@@ -958,7 +958,7 @@ struct DraggableRoastCard: View {
                         HStack(spacing: 1) {
                             ForEach(0..<5, id: \.self) { i in
                                 Circle()
-                                    .fill(i < joke.relatabilityScore ? Color.blue : Color.gray.opacity(0.2))
+                                    .fill(i < joke.relatabilityScore ? Color.accentColor : Color.gray.opacity(0.2))
                                     .frame(width: 5, height: 5)
                             }
                         }

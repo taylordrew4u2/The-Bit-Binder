@@ -134,34 +134,34 @@ class AudioTranscriptionService {
         // We also retain the last non-empty partial result so that the terminal
         // nil-result / nil-error callback does not incorrectly throw noSpeechDetected.
         let result = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<SFSpeechRecognitionResult, Error>) in
-            // Serial queue guards all mutable state shared between the timeout
-            // DispatchWorkItem (global queue) and the recognitionTask callback
-            // (internal SFSpeechRecognizer queue). Without this, concurrent access
-            // to `completed` / `lastResult` is a data race that can double-resume
-            // the continuation.
-            let guard_queue = DispatchQueue(label: "com.thebitbinder.transcription-guard")
+            // NSLock guards all mutable state shared between the timeout work item
+            // (DispatchQueue.global()) and the recognitionTask callback (internal
+            // SFSpeechRecognizer queue). Using NSLock instead of DispatchQueue.sync
+            // avoids blocking Swift concurrency cooperative pool threads.
+            let guard_lock = NSLock()
             var completed = false
             var lastResult: SFSpeechRecognitionResult?
             var task: SFSpeechRecognitionTask?
             
             // 60-second hard timeout – SFSpeechRecognizer can hang on some files
             let timeoutWork = DispatchWorkItem {
-                guard_queue.sync {
-                    guard !completed else { return }
-                    completed = true
-                    task?.cancel()
-                    if let best = lastResult {
-                        continuation.resume(returning: best)
-                    } else {
-                        continuation.resume(throwing: AudioTranscriptionError.transcriptionFailed("Transcription timed out"))
-                    }
+                guard_lock.lock()
+                defer { guard_lock.unlock() }
+                guard !completed else { return }
+                completed = true
+                task?.cancel()
+                if let best = lastResult {
+                    continuation.resume(returning: best)
+                } else {
+                    continuation.resume(throwing: AudioTranscriptionError.transcriptionFailed("Transcription timed out"))
                 }
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + 60, execute: timeoutWork)
             
             task = recognizer.recognitionTask(with: request) { result, error in
-                guard_queue.sync {
-                    guard !completed else { return }
+                guard_lock.lock()
+                defer { guard_lock.unlock() }
+                guard !completed else { return }
                     
                     if let result = result {
                         lastResult = result
@@ -188,7 +188,6 @@ class AudioTranscriptionService {
                     } else {
                         continuation.resume(throwing: AudioTranscriptionError.noSpeechDetected)
                     }
-                }
             }
         }
         

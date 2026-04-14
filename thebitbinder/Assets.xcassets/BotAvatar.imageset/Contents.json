@@ -1,0 +1,17 @@
+{
+  "images" : [
+    {
+      "idiom" : "universal",
+      "filename" : "BotAvatar.pdf",
+      "scale" : "1x"
+    }
+  ],
+  "properties" : {
+    "preserves-vector-representation" : true,
+    "template-rendering-intent" : "template"
+  },
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

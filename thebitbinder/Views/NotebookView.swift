@@ -38,6 +38,10 @@ struct NotebookView: View {
     @State private var isImportingPDF = false
     @State private var pdfImportProgress: String = ""
     @State private var draggingPhoto: NotebookPhotoRecord?
+    @State private var isSelectMode = false
+    @State private var selectedPhotoIDs: Set<UUID> = []
+    @State private var showingBatchDeleteAlert = false
+    @State private var showingBatchMoveSheet = false
 
     // Folder state
     @State private var selectedFilter: NotebookFilter = .all
@@ -75,6 +79,59 @@ struct NotebookView: View {
         } catch {
             print(" [NotebookView] Failed to save after photo soft-delete: \(error)")
             persistenceError = "Could not delete photo: \(error.localizedDescription)"
+            showingPersistenceError = true
+        }
+    }
+
+    private func toggleSelection(_ photo: NotebookPhotoRecord) {
+        if selectedPhotoIDs.contains(photo.id) {
+            selectedPhotoIDs.remove(photo.id)
+        } else {
+            selectedPhotoIDs.insert(photo.id)
+        }
+    }
+
+    private func batchTrashSelectedPhotos() {
+        let photosToTrash = filteredPhotos.filter { selectedPhotoIDs.contains($0.id) }
+        guard !photosToTrash.isEmpty else {
+            selectedPhotoIDs.removeAll()
+            isSelectMode = false
+            return
+        }
+
+        let count = photosToTrash.count
+        for photo in photosToTrash {
+            photo.moveToTrash()
+        }
+
+        do {
+            try modelContext.save()
+            selectedPhotoIDs.removeAll()
+            isSelectMode = false
+        } catch {
+            print(" [NotebookView] Failed to save after batch photo soft-delete: \(error)")
+            persistenceError = "Could not delete \(count) photo\(count == 1 ? "" : "s"): \(error.localizedDescription)"
+            showingPersistenceError = true
+        }
+    }
+
+    private func batchMoveSelectedPhotos(to folder: NotebookFolder?) {
+        let photosToMove = filteredPhotos.filter { selectedPhotoIDs.contains($0.id) }
+        guard !photosToMove.isEmpty else { return }
+
+        let count = photosToMove.count
+        for photo in photosToMove {
+            photo.folder = folder
+        }
+
+        do {
+            try modelContext.save()
+            selectedPhotoIDs.removeAll()
+            isSelectMode = false
+            showingBatchMoveSheet = false
+        } catch {
+            print(" [NotebookView] Failed to save after batch photo move: \(error)")
+            persistenceError = "Could not move \(count) photo\(count == 1 ? "" : "s"): \(error.localizedDescription)"
             showingPersistenceError = true
         }
     }
@@ -119,28 +176,84 @@ struct NotebookView: View {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(filteredPhotos, id: \.id) { photo in
-                                NotebookThumbnailCell(photo: photo, isDragging: draggingPhoto?.id == photo.id) {
-                                    showingDetail = photo
+                                let cell = NotebookThumbnailCell(
+                                    photo: photo,
+                                    isDragging: draggingPhoto?.id == photo.id,
+                                    isSelectMode: isSelectMode,
+                                    isSelected: selectedPhotoIDs.contains(photo.id)
+                                ) {
+                                    if isSelectMode {
+                                        toggleSelection(photo)
+                                    } else {
+                                        showingDetail = photo
+                                    }
                                 } onDelete: {
                                     delete(photo)
                                 } onMove: {
                                     photoToMove = photo
                                     showingMoveSheet = true
                                 }
-                                .onDrag {
-                                    draggingPhoto = photo
-                                    return NSItemProvider(object: photo.id.uuidString as NSString)
+
+                                if isSelectMode {
+                                    cell
+                                } else {
+                                    cell
+                                        .onDrag {
+                                            draggingPhoto = photo
+                                            return NSItemProvider(object: photo.id.uuidString as NSString)
+                                        }
+                                        .onDrop(of: [.text], delegate: NotebookDropDelegate(
+                                            item: photo,
+                                            draggingItem: $draggingPhoto,
+                                            onMove: move
+                                        ))
                                 }
-                                .onDrop(of: [.text], delegate: NotebookDropDelegate(
-                                    item: photo,
-                                    draggingItem: $draggingPhoto,
-                                    onMove: move
-                                ))
                             }
                         }
                         .padding()
                     }
                 }
+            }
+
+            if isSelectMode {
+                HStack(spacing: 16) {
+                    Button("Select All") {
+                        selectedPhotoIDs = Set(filteredPhotos.map(\.id))
+                    }
+
+                    Spacer()
+
+                    Text("\(selectedPhotoIDs.count) selected")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Button {
+                        showingBatchMoveSheet = true
+                    } label: {
+                        Label("Move", systemImage: "folder")
+                            .font(.subheadline.bold())
+                    }
+                    .disabled(selectedPhotoIDs.isEmpty)
+
+                    Button(role: .destructive) {
+                        showingBatchDeleteAlert = true
+                    } label: {
+                        Label("Trash", systemImage: "trash")
+                            .font(.subheadline.bold())
+                    }
+                    .disabled(selectedPhotoIDs.isEmpty)
+
+                    Button("Done") {
+                        isSelectMode = false
+                        selectedPhotoIDs.removeAll()
+                    }
+                    .font(.subheadline.bold())
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(.bar)
             }
         }
         .overlay {
@@ -183,6 +296,18 @@ struct NotebookView: View {
                 Menu {
                     Button { showingCreateFolder = true } label: {
                         Label("New Folder", systemImage: "folder.badge.plus")
+                    }
+
+                    Divider()
+
+                    Button {
+                        isSelectMode.toggle()
+                        if !isSelectMode {
+                            selectedPhotoIDs.removeAll()
+                        }
+                    } label: {
+                        Label(isSelectMode ? "Cancel Multi-Select" : "Select Multiple Photos",
+                              systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
                     }
 
                     if let folder = selectedFolder {
@@ -254,6 +379,14 @@ struct NotebookView: View {
                 MoveToNotebookFolderSheet(photo: photo)
             }
         }
+        .sheet(isPresented: $showingBatchMoveSheet) {
+            BatchMoveNotebookPhotosSheet(
+                selectedCount: selectedPhotoIDs.count,
+                onMove: { folder in
+                    batchMoveSelectedPhotos(to: folder)
+                }
+            )
+        }
         .alert("Delete Folder?", isPresented: $showingDeleteFolderAlert) {
             Button("Cancel", role: .cancel) { folderToDelete = nil }
             Button("Delete", role: .destructive) {
@@ -264,6 +397,14 @@ struct NotebookView: View {
             }
         } message: {
             Text("The folder will be deleted but your photos will be kept as unfiled pages.")
+        }
+        .alert("Move selected photos to Trash?", isPresented: $showingBatchDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Move to Trash", role: .destructive) {
+                batchTrashSelectedPhotos()
+            }
+        } message: {
+            Text("This will move \(selectedPhotoIDs.count) selected photo\(selectedPhotoIDs.count == 1 ? "" : "s") to Notebook Trash.")
         }
         .onDisappear {
             // Memory cleanup handled by MemoryManager
@@ -876,6 +1017,8 @@ struct CameraView: View {
 private struct NotebookThumbnailCell: View {
     let photo: NotebookPhotoRecord
     var isDragging: Bool = false
+    var isSelectMode: Bool = false
+    var isSelected: Bool = false
     let onTap: () -> Void
     let onDelete: () -> Void
     let onMove: () -> Void
@@ -883,29 +1026,46 @@ private struct NotebookThumbnailCell: View {
     @State private var thumbnail: UIImage?
 
     var body: some View {
-        Group {
-            if let thumb = thumbnail {
-                Image(uiImage: thumb)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Color.gray.opacity(0.2)
-                    .overlay(ProgressView().tint(.secondary))
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let thumb = thumbnail {
+                    Image(uiImage: thumb)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Color.gray.opacity(0.2)
+                        .overlay(ProgressView().tint(.secondary))
+                }
+            }
+            .frame(minWidth: 100, minHeight: 100)
+            .clipped()
+            .cornerRadius(8)
+            .overlay {
+                if isSelectMode && isSelected {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.accentColor, lineWidth: 2)
+                }
+            }
+
+            if isSelectMode {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundColor(isSelected ? .accentColor : .white.opacity(0.9))
+                    .padding(6)
             }
         }
-        .frame(minWidth: 100, minHeight: 100)
-        .clipped()
-        .cornerRadius(8)
         .opacity(isDragging ? 0.5 : 1.0)
         .scaleEffect(isDragging ? 1.05 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isDragging)
         .onTapGesture { onTap() }
         .contextMenu {
-            Button(action: onMove) {
-                Label("Move to Folder", systemImage: "folder")
-            }
-            Button(role: .destructive, action: onDelete) {
-                Label("Delete", systemImage: "trash")
+            if !isSelectMode {
+                Button(action: onMove) {
+                    Label("Move to Folder", systemImage: "folder")
+                }
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete", systemImage: "trash")
+                }
             }
         }
         .task(id: photo.id) {
@@ -1139,5 +1299,53 @@ private struct NotebookDropDelegate: DropDelegate {
     
     func dropUpdated(info: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
+    }
+}
+
+private struct BatchMoveNotebookPhotosSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Query(filter: #Predicate<NotebookFolder> { !$0.isDeleted }, sort: \.name) private var folders: [NotebookFolder]
+
+    let selectedCount: Int
+    let onMove: (NotebookFolder?) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("Move \(selectedCount) selected photo\(selectedCount == 1 ? "" : "s")")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Section("Destination") {
+                    Button {
+                        onMove(nil)
+                        dismiss()
+                    } label: {
+                        Label("Unfiled", systemImage: "tray")
+                    }
+                    .tint(.primary)
+
+                    ForEach(folders) { folder in
+                        Button {
+                            onMove(folder)
+                            dismiss()
+                        } label: {
+                            Label(folder.name, systemImage: "folder.fill")
+                        }
+                        .tint(.primary)
+                    }
+                }
+            }
+            .navigationTitle("Move Photos")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

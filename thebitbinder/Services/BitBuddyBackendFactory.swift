@@ -2,13 +2,20 @@ import Foundation
 
 /// BitBuddy backend factory.
 ///
-/// BitBuddy is 100% local and rule-based. It does NOT use any AI service.
-/// Extraction providers (OpenAI, Arcee, OpenRouter) are reserved exclusively for
-/// the GagGrabber file-import joke-extraction pipeline.
-/// All AI extraction requires an `AIExtractionToken` — see AIJokeExtractionManager.
+/// Prefers on-device LLM backends in this order:
+/// 1) MLX Phi-3
+/// 2) Hugging Face CoreML (swift-transformers)
+/// 3) Local rule-based fallback
 enum BitBuddyBackendFactory {
     static func makeBackend() -> BitBuddyBackend {
-        // Always return the local fallback — BitBuddy never calls AI.
+        if MLXBitBuddyService.shared.isAvailable {
+            return MLXBitBuddyService.shared
+        }
+
+        if HuggingFaceTransformersBitBuddyService.shared.isAvailable {
+            return HuggingFaceTransformersBitBuddyService.shared
+        }
+
         return LocalFallbackBitBuddyService.shared
     }
 }

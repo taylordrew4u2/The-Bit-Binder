@@ -9,9 +9,7 @@ import Foundation
 import AVFoundation
 
 /// BitBuddy — Your on-device comedy writing assistant.
-/// 100% local and rule-based. NEVER uses AI providers.
-/// Extraction providers (OpenAI, Arcee, OpenRouter) are reserved exclusively for file-import
-/// joke extraction and are token-gated via `AIExtractionToken`.
+/// Prefers an on-device MLX Phi-3 backend with a local rule-based fallback.
 /// Powered by a 93-intent router that covers all 11 app sections.
 @MainActor
 final class BitBuddyService: NSObject, ObservableObject {
@@ -24,7 +22,7 @@ final class BitBuddyService: NSObject, ObservableObject {
     
     // MARK: - State
     @Published var isLoading = false
-    /// Whether the backend is reachable. Always `true` for the local engine.
+    /// Whether the current backend is reachable for inference.
     @Published var isConnected: Bool
     @Published private(set) var backendName: String
     /// Published so the UI can navigate to the section an intent targets.
@@ -53,8 +51,14 @@ final class BitBuddyService: NSObject, ObservableObject {
     func registerJokeDataProvider(_ provider: @escaping () -> [BitBuddyJokeSummary]) {
         recentJokeProvider = provider
     }
+
+    /// Warm up the selected backend (e.g., model load) to reduce first-response latency.
+    func preloadBackend() async {
+        await backend.preload()
+        isConnected = backend.isAvailable
+    }
     
-    /// Send a text message and get a response from the local BitBuddy backend.
+    /// Send a text message and get a response from the active BitBuddy backend.
     func sendMessage(_ message: String) async throws -> String {
         try await authService.ensureAuthenticated()
         
@@ -68,13 +72,21 @@ final class BitBuddyService: NSObject, ObservableObject {
         conversationId = activeConversationId
         appendTurn(.init(role: .user, text: message), conversationId: activeConversationId)
         
+        // Route first so FAQ only intercepts explicit help/FAQ requests.
+        let routeResult = intentRouter.route(message)
+
+        if shouldConsultFAQ(for: message, routeResult: routeResult),
+           let faqItem = FAQData.matchingAnswer(for: message) {
+            let response = "FAQ — \(faqItem.question)\n\n\(faqItem.answer)"
+            appendTurn(.init(role: .assistant, text: response), conversationId: activeConversationId)
+            isConnected = true
+            return response
+        }
+        
         let session = BitBuddySessionSnapshot(
             conversationId: activeConversationId,
             turns: turnsByConversation[activeConversationId] ?? []
         )
-        
-        // Route the intent
-        let routeResult = intentRouter.route(message)
         
         var dataContext = BitBuddyDataContext()
         dataContext.userName = UserDefaults.standard.string(forKey: "userName") ?? "Comedian"
@@ -87,14 +99,12 @@ final class BitBuddyService: NSObject, ObservableObject {
             let rawResponse = try await backend.send(message: message, session: session, dataContext: dataContext)
             
             // Process the response through our JSON handler (handles
-            // any future structured-JSON backends). For the local
-            // rule-based backend this is a no-op pass-through.
+            // any future structured-JSON backends).
             let displayText = handleBitBuddyResponse(rawResponse)
             
             // Dispatch the structured action from the routed intent.
-            // The local backend returns plain text (never JSON), so
-            // handleBitBuddyResponse's JSON path never fires. We
-            // dispatch directly from the route result instead.
+            // Current backends return plain text, so we dispatch
+            // directly from the route result.
             if let route = routeResult {
                 let intentAction: [String: Any] = [
                     "type": route.intent.id
@@ -123,7 +133,7 @@ final class BitBuddyService: NSObject, ObservableObject {
             turnsByConversation.removeValue(forKey: oldId)
         }
         conversationId = nil
-        // isConnected stays true — the local backend is always available.
+        // Keep current connectivity state based on the selected backend.
         pendingNavigation = nil
         lastActions = []
         
@@ -667,6 +677,24 @@ final class BitBuddyService: NSObject, ObservableObject {
         line
             .replacingOccurrences(of: #"^[-•*]\s*"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"^\d+[\.)]\s*"#, with: "", options: .regularExpression)
+    }
+
+    private func shouldConsultFAQ(for message: String, routeResult: BitBuddyRouteResult?) -> Bool {
+        if let routeResult {
+            if routeResult.section == .help { return true }
+            if routeResult.intent.id == "open_help_faq" || routeResult.intent.id == "explain_feature" {
+                return true
+            }
+        }
+
+        let lower = message.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !lower.isEmpty else { return false }
+
+        if lower.contains("faq") || lower.contains("help") || lower.contains("how do i") {
+            return true
+        }
+
+        return false
     }
     
     private func inferCategory(from lower: String) -> String {
