@@ -46,11 +46,12 @@ final class BitBuddyService: NSObject, ObservableObject {
     /// match (i.e. when the backend response is conversational text, not a structured
     /// JSON payload with validated fields).
     private static let dataMutatingActions: Set<String> = [
-        "add_joke", "save_joke", "save_joke_in_folder",
+        "add_joke", "save_joke", "save_joke_in_folder", "duplicate_joke",
         "edit_joke", "rename_joke", "delete_joke", "restore_deleted_joke",
         "delete_brainstorm_note", "delete_set_list", "delete_recording",
         "delete_folder", "remove_joke_from_set", "reject_imported_joke",
         "add_brainstorm_note", "add_roast_joke", "create_roast_target",
+        "create_set_list", "create_folder",
         "save_notebook_text", "approve_imported_joke",
     ]
     
@@ -142,9 +143,14 @@ final class BitBuddyService: NSObject, ObservableObject {
             // "missing joke text" errors, and bad UI loops.
             if let route = routeResult {
                 if !Self.dataMutatingActions.contains(route.intent.id) {
-                    let intentAction: [String: Any] = [
+                    var intentAction: [String: Any] = [
                         "type": route.intent.id
                     ]
+                    // Forward extracted entities so action handlers can use
+                    // names, folders, targets, etc. from the user's message.
+                    for (key, value) in route.extractedEntities {
+                        intentAction[key] = value
+                    }
                     executeBitBuddyAction(intentAction)
                 }
                 
@@ -470,8 +476,17 @@ final class BitBuddyService: NSObject, ObservableObject {
         return true
     }
     
-    /// Executes a single BitBuddy action
-    /// - Parameter action: Dictionary containing action type and parameters
+    /// Executes a single BitBuddy action.
+    ///
+    /// Actions fall into four buckets:
+    /// 1. **Data creation** — posts a notification with payload; the UI layer
+    ///    (BitBuddyChatView) handles SwiftData persistence via ModelContext.
+    /// 2. **Navigation** — sets `pendingNavigation` so the chat dismisses and
+    ///    the user lands on the correct app section.
+    /// 3. **Direct execution** — inline work like toggling settings, syncing,
+    ///    clearing cache.
+    /// 4. **Backend-handled** — the text response from the backend *is* the
+    ///    action (joke analysis, premise generation, etc.). No extra dispatch.
     private func executeBitBuddyAction(_ action: [String: Any]) {
         guard let actionType = action["type"] as? String else {
             print(" [BitBuddy] Invalid action - missing type")
@@ -491,222 +506,309 @@ final class BitBuddyService: NSObject, ObservableObject {
         // Dispatch by intent category
         switch actionType {
 
-        //  Jokes 
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Jokes — Data Creation
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "add_joke", "save_joke":
             handleAddJokeAction(action)
         case "save_joke_in_folder":
             handleAddJokeAction(action) // folder param handled inside
-        case "edit_joke":
-            print(" [BitBuddy] edit_joke routed — UI will present editor")
-        case "rename_joke":
-            print(" [BitBuddy] rename_joke routed")
-        case "delete_joke":
-            print(" [BitBuddy] delete_joke routed")
-        case "restore_deleted_joke":
-            print(" [BitBuddy] restore_deleted_joke routed")
-        case "mark_hit":
-            print(" [BitBuddy] mark_hit routed")
-        case "unmark_hit":
-            print(" [BitBuddy] unmark_hit routed")
-        case "add_tags":
-            print(" [BitBuddy] add_tags routed")
-        case "remove_tags":
-            print(" [BitBuddy] remove_tags routed")
-        case "move_joke_folder":
-            print(" [BitBuddy] move_joke_folder routed")
-        case "create_folder":
-            print(" [BitBuddy] create_folder routed")
-        case "rename_folder":
-            print(" [BitBuddy] rename_folder routed")
-        case "delete_folder":
-            print(" [BitBuddy] delete_folder routed")
-        case "search_jokes":
-            print(" [BitBuddy] search_jokes routed")
-        case "filter_jokes_recent", "filter_jokes_by_folder", "filter_jokes_by_tag":
-            print(" [BitBuddy] filter routed: \(actionType)")
-        case "list_hits":
-            print(" [BitBuddy] list_hits routed")
-        case "share_joke":
-            print(" [BitBuddy] share_joke routed")
         case "duplicate_joke":
-            print(" [BitBuddy] duplicate_joke routed")
-        case "merge_jokes":
-            print(" [BitBuddy] merge_jokes routed")
+            handleAddJokeAction(action) // creates a copy as a new joke
+        case "create_folder":
+            handleCreateFolderAction(action)
 
-        //  Brainstorm 
+        // MARK: Jokes — Navigate to section for context-dependent actions
+        case "edit_joke", "rename_joke", "delete_joke", "restore_deleted_joke",
+             "mark_hit", "unmark_hit", "add_tags", "remove_tags",
+             "move_joke_folder", "rename_folder", "delete_folder",
+             "share_joke", "merge_jokes":
+            print(" [BitBuddy] \(actionType) → navigating to Jokes for user to act")
+            pendingNavigation = .jokes
+
+        // MARK: Jokes — Search / Filter → Navigate to Jokes
+        case "search_jokes", "filter_jokes_recent", "filter_jokes_by_folder",
+             "filter_jokes_by_tag", "list_hits":
+            print(" [BitBuddy] \(actionType) → navigating to Jokes section")
+            pendingNavigation = .jokes
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Brainstorm — Data Creation
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "add_brainstorm_note":
-            print(" [BitBuddy] add_brainstorm_note routed")
+            handleAddBrainstormNoteAction(action)
         case "voice_capture_idea":
-            print(" [BitBuddy] voice_capture_idea routed")
-        case "edit_brainstorm_note":
-            print(" [BitBuddy] edit_brainstorm_note routed")
-        case "delete_brainstorm_note":
-            print(" [BitBuddy] delete_brainstorm_note routed")
-        case "promote_idea_to_joke":
-            print(" [BitBuddy] promote_idea_to_joke routed")
-        case "search_brainstorm":
-            print(" [BitBuddy] search_brainstorm routed")
-        case "group_brainstorm_topics":
-            print(" [BitBuddy] group_brainstorm_topics routed")
+            // Navigate to Brainstorm where voice capture UI lives
+            print(" [BitBuddy] voice_capture_idea → navigating to Brainstorm")
+            pendingNavigation = .brainstorm
 
-        //  Set Lists 
+        // MARK: Brainstorm — Context-dependent → Navigate
+        case "edit_brainstorm_note", "delete_brainstorm_note",
+             "promote_idea_to_joke", "search_brainstorm", "group_brainstorm_topics":
+            print(" [BitBuddy] \(actionType) → navigating to Brainstorm")
+            pendingNavigation = .brainstorm
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Set Lists — Data Creation
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "create_set_list":
-            print(" [BitBuddy] create_set_list routed")
-        case "rename_set_list":
-            print(" [BitBuddy] rename_set_list routed")
-        case "delete_set_list":
-            print(" [BitBuddy] delete_set_list routed")
-        case "add_joke_to_set":
-            print(" [BitBuddy] add_joke_to_set routed")
-        case "remove_joke_from_set":
-            print(" [BitBuddy] remove_joke_from_set routed")
-        case "reorder_set":
-            print(" [BitBuddy] reorder_set routed")
-        case "estimate_set_time":
-            print(" [BitBuddy] estimate_set_time routed")
-        case "shuffle_set":
-            print(" [BitBuddy] shuffle_set routed")
-        case "suggest_set_opener":
-            print(" [BitBuddy] suggest_set_opener routed")
-        case "suggest_set_closer":
-            print(" [BitBuddy] suggest_set_closer routed")
-        case "present_set":
-            print(" [BitBuddy] present_set routed")
-        case "find_set_list":
-            print(" [BitBuddy] find_set_list routed")
+            handleCreateSetListAction(action)
 
-        //  Recordings 
+        // MARK: Set Lists — Context-dependent → Navigate
+        case "rename_set_list", "delete_set_list", "add_joke_to_set",
+             "remove_joke_from_set", "reorder_set", "shuffle_set",
+             "present_set", "find_set_list":
+            print(" [BitBuddy] \(actionType) → navigating to Set Lists")
+            pendingNavigation = .setLists
+
+        // MARK: Set Lists — Analysis (handled by backend text, no navigation)
+        case "estimate_set_time", "suggest_set_opener", "suggest_set_closer":
+            // The backend's text response IS the action result
+            print(" [BitBuddy] \(actionType) — handled by backend response text")
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Recordings — Direct + Navigate
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "start_recording":
-            print(" [BitBuddy] start_recording routed")
+            print(" [BitBuddy] start_recording → posting notification + navigating to Recordings")
+            NotificationCenter.default.post(name: .bitBuddyStartRecording, object: nil)
+            pendingNavigation = .recordings
         case "stop_recording":
-            print(" [BitBuddy] stop_recording routed")
-        case "rename_recording":
-            print(" [BitBuddy] rename_recording routed")
-        case "delete_recording":
-            print(" [BitBuddy] delete_recording routed")
-        case "play_recording":
-            print(" [BitBuddy] play_recording routed")
-        case "transcribe_recording":
-            print(" [BitBuddy] transcribe_recording routed")
-        case "search_transcripts":
-            print(" [BitBuddy] search_transcripts routed")
-        case "clip_recording":
-            print(" [BitBuddy] clip_recording routed")
-        case "attach_recording_to_set":
-            print(" [BitBuddy] attach_recording_to_set routed")
-        case "review_set_from_recording":
-            print(" [BitBuddy] review_set_from_recording routed")
+            print(" [BitBuddy] stop_recording → posting notification")
+            NotificationCenter.default.post(name: .bitBuddyStopRecording, object: nil)
 
-        //  BitBuddy Writing 
-        case "analyze_joke":
-            print(" [BitBuddy] analyze_joke — handled by backend")
-        case "improve_joke":
-            print(" [BitBuddy] improve_joke — handled by backend")
-        case "generate_premise":
-            print(" [BitBuddy] generate_premise — handled by backend")
-        case "generate_joke":
-            print(" [BitBuddy] generate_joke — handled by backend")
-        case "summarize_style":
-            print(" [BitBuddy] summarize_style — handled by backend")
-        case "suggest_unexplored_topics":
-            print(" [BitBuddy] suggest_unexplored_topics — handled by backend")
-        case "find_similar_jokes":
-            print(" [BitBuddy] find_similar_jokes — handled by backend")
-        case "shorten_joke":
-            print(" [BitBuddy] shorten_joke — handled by backend")
-        case "expand_joke":
-            print(" [BitBuddy] expand_joke — handled by backend")
-        case "generate_tags_for_joke":
-            print(" [BitBuddy] generate_tags_for_joke — handled by backend")
-        case "rewrite_in_my_style":
-            print(" [BitBuddy] rewrite_in_my_style — handled by backend")
-        case "crowdwork_help":
-            print(" [BitBuddy] crowdwork_help — handled by backend")
-        case "roast_line_generation":
-            print(" [BitBuddy] roast_line_generation — handled by backend")
-        case "compare_versions":
-            print(" [BitBuddy] compare_versions — handled by backend")
-        case "extract_premises_from_notes":
-            print(" [BitBuddy] extract_premises_from_notes — handled by backend")
-        case "explain_comedy_theory":
-            print(" [BitBuddy] explain_comedy_theory — handled by backend")
+        // MARK: Recordings — Context-dependent → Navigate
+        case "rename_recording", "delete_recording", "play_recording",
+             "transcribe_recording", "search_transcripts", "clip_recording",
+             "attach_recording_to_set", "review_set_from_recording":
+            print(" [BitBuddy] \(actionType) → navigating to Recordings")
+            pendingNavigation = .recordings
 
-        //  Notebook 
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: BitBuddy Writing — Backend-Handled
+        // The backend's text response IS the action. No extra dispatch.
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        case "analyze_joke", "improve_joke", "generate_premise", "generate_joke",
+             "summarize_style", "suggest_unexplored_topics", "find_similar_jokes",
+             "shorten_joke", "expand_joke", "generate_tags_for_joke",
+             "rewrite_in_my_style", "crowdwork_help", "roast_line_generation",
+             "compare_versions", "extract_premises_from_notes", "explain_comedy_theory":
+            print(" [BitBuddy] \(actionType) — handled by backend response text")
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Notebook — Data Creation + Navigation
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "open_notebook":
-            print(" [BitBuddy] open_notebook routed")
-            // Navigation handled centrally in sendMessage via routeResult
+            pendingNavigation = .notebook
         case "save_notebook_text":
-            print(" [BitBuddy] save_notebook_text routed")
+            handleSaveNotebookTextAction(action)
         case "attach_photo_to_notebook":
-            print(" [BitBuddy] attach_photo_to_notebook routed")
+            // Photo attachment needs the Notebook UI
+            print(" [BitBuddy] attach_photo_to_notebook → navigating to Notebook")
+            pendingNavigation = .notebook
         case "search_notebook":
-            print(" [BitBuddy] search_notebook routed")
+            print(" [BitBuddy] search_notebook → navigating to Notebook")
+            pendingNavigation = .notebook
 
-        //  Roast Mode 
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Roast Mode — Direct + Data Creation + Navigation
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "toggle_roast_mode":
             let current = UserDefaults.standard.bool(forKey: "roastModeEnabled")
             UserDefaults.standard.set(!current, forKey: "roastModeEnabled")
-            print(" [BitBuddy] toggle_roast_mode  \(!current)")
+            print(" [BitBuddy] toggle_roast_mode → \(!current)")
         case "create_roast_target":
-            print(" [BitBuddy] create_roast_target routed")
+            handleCreateRoastTargetAction(action)
         case "add_roast_joke":
-            print(" [BitBuddy] add_roast_joke routed")
-        case "search_roasts":
-            print(" [BitBuddy] search_roasts routed")
-        case "create_roast_set":
-            print(" [BitBuddy] create_roast_set routed")
-        case "present_roast_set":
-            print(" [BitBuddy] present_roast_set routed")
-        case "attach_photo_to_target":
-            print(" [BitBuddy] attach_photo_to_target routed")
+            handleAddRoastJokeAction(action)
+        case "search_roasts", "create_roast_set", "present_roast_set",
+             "attach_photo_to_target":
+            print(" [BitBuddy] \(actionType) → navigating to Roast Mode")
+            pendingNavigation = .roastMode
 
-        //  Import 
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Import — Direct + Navigation
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "import_file":
-            print(" [BitBuddy] import_file routed — triggering file picker in chat")
+            print(" [BitBuddy] import_file → triggering file picker in chat")
             NotificationCenter.default.post(name: .bitBuddyTriggerFileImport, object: nil)
         case "import_image":
-            print(" [BitBuddy] import_image routed")
-        case "review_import_queue":
-            print(" [BitBuddy] review_import_queue routed")
-        case "approve_imported_joke":
-            print(" [BitBuddy] approve_imported_joke routed")
-        case "reject_imported_joke":
-            print(" [BitBuddy] reject_imported_joke routed")
-        case "edit_imported_joke":
-            print(" [BitBuddy] edit_imported_joke routed")
+            // Image import also uses the file picker flow
+            print(" [BitBuddy] import_image → triggering file picker in chat")
+            NotificationCenter.default.post(name: .bitBuddyTriggerFileImport, object: nil)
+        case "review_import_queue", "approve_imported_joke", "reject_imported_joke",
+             "edit_imported_joke", "show_import_history":
+            // Import review lives inside Jokes
+            print(" [BitBuddy] \(actionType) → navigating to Jokes (import review)")
+            pendingNavigation = .importFlow
         case "check_import_limit":
-            print(" [BitBuddy] check_import_limit routed")
-        case "show_import_history":
-            print(" [BitBuddy] show_import_history routed")
+            // Handled by backend text response (shows remaining grabs)
+            print(" [BitBuddy] check_import_limit — handled by backend response text")
 
-        //  Sync 
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Sync — Direct Execution
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "check_sync_status":
-            print(" [BitBuddy] check_sync_status routed")
+            print(" [BitBuddy] check_sync_status → navigating to Sync settings")
+            pendingNavigation = .sync
         case "sync_now":
             print(" [BitBuddy] sync_now — triggering manual sync")
             Task { @MainActor in await iCloudSyncService.shared.syncNow() }
         case "toggle_icloud_sync":
-            print(" [BitBuddy] toggle_icloud_sync routed")
+            let syncService = iCloudSyncService.shared
+            Task { @MainActor in
+                if syncService.isSyncEnabled {
+                    syncService.disableiCloudSync()
+                } else {
+                    await syncService.enableiCloudSync()
+                }
+            }
+            print(" [BitBuddy] toggle_icloud_sync — toggled")
 
-        //  Settings 
-        case "export_all_jokes":
-            print(" [BitBuddy] export_all_jokes routed")
-        case "export_recordings":
-            print(" [BitBuddy] export_recordings routed")
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Settings — Direct Execution + Navigation
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        case "export_all_jokes", "export_recordings":
+            print(" [BitBuddy] \(actionType) → navigating to Settings")
+            pendingNavigation = .settings
         case "clear_cache":
             print(" [BitBuddy] clear_cache — clearing temp files")
             clearTempFiles()
 
-        //  Help 
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // MARK: Help — Navigation + Backend
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "open_help_faq":
-            print(" [BitBuddy] open_help_faq routed")
-            // Navigation handled centrally in sendMessage via routeResult
+            pendingNavigation = .help
         case "explain_feature":
-            print(" [BitBuddy] explain_feature — handled by backend")
+            // Backend text response IS the explanation
+            print(" [BitBuddy] explain_feature — handled by backend response text")
 
         default:
             print(" [BitBuddy] Unknown action type: \(actionType)")
         }
+    }
+    
+    // MARK: - Action Handlers (Notification Publishers)
+    
+    /// Posts a notification to create a brainstorm note. The UI layer
+    /// handles SwiftData persistence via its active ModelContext.
+    private func handleAddBrainstormNoteAction(_ action: [String: Any]) {
+        let text = (action["text"] as? String)
+            ?? (action["quoted_value"] as? String)
+            ?? (action["value"] as? String)
+        guard let noteText = text, !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print(" [BitBuddy] add_brainstorm_note missing text — navigating to Brainstorm instead")
+            pendingNavigation = .brainstorm
+            return
+        }
+        print(" [BitBuddy] Publishing add_brainstorm_note for UI persistence")
+        NotificationCenter.default.post(
+            name: .bitBuddyAddBrainstormNote,
+            object: nil,
+            userInfo: ["text": noteText]
+        )
+    }
+    
+    /// Posts a notification to create a set list.
+    private func handleCreateSetListAction(_ action: [String: Any]) {
+        let name = (action["set_name"] as? String)
+            ?? (action["name"] as? String)
+            ?? (action["quoted_value"] as? String)
+            ?? (action["value"] as? String)
+        guard let setName = name, !setName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print(" [BitBuddy] create_set_list missing name — navigating to Set Lists instead")
+            pendingNavigation = .setLists
+            return
+        }
+        print(" [BitBuddy] Publishing create_set_list for UI persistence")
+        NotificationCenter.default.post(
+            name: .bitBuddyCreateSetList,
+            object: nil,
+            userInfo: ["name": setName]
+        )
+    }
+    
+    /// Posts a notification to create a joke folder.
+    private func handleCreateFolderAction(_ action: [String: Any]) {
+        let name = (action["folder"] as? String)
+            ?? (action["name"] as? String)
+            ?? (action["quoted_value"] as? String)
+            ?? (action["value"] as? String)
+        guard let folderName = name, !folderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print(" [BitBuddy] create_folder missing name — navigating to Jokes instead")
+            pendingNavigation = .jokes
+            return
+        }
+        print(" [BitBuddy] Publishing create_folder for UI persistence")
+        NotificationCenter.default.post(
+            name: .bitBuddyCreateFolder,
+            object: nil,
+            userInfo: ["name": folderName]
+        )
+    }
+    
+    /// Posts a notification to create a roast target.
+    private func handleCreateRoastTargetAction(_ action: [String: Any]) {
+        let name = (action["target"] as? String)
+            ?? (action["name"] as? String)
+            ?? (action["quoted_value"] as? String)
+            ?? (action["value"] as? String)
+        guard let targetName = name, !targetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print(" [BitBuddy] create_roast_target missing name — navigating to Roast Mode instead")
+            pendingNavigation = .roastMode
+            return
+        }
+        let notes = action["notes"] as? String
+        print(" [BitBuddy] Publishing create_roast_target for UI persistence")
+        NotificationCenter.default.post(
+            name: .bitBuddyCreateRoastTarget,
+            object: nil,
+            userInfo: [
+                "name": targetName,
+                "notes": notes as Any
+            ]
+        )
+    }
+    
+    /// Posts a notification to add a roast joke.
+    private func handleAddRoastJokeAction(_ action: [String: Any]) {
+        let jokeText = (action["joke"] as? String)
+            ?? (action["text"] as? String)
+            ?? (action["quoted_value"] as? String)
+        guard let content = jokeText, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print(" [BitBuddy] add_roast_joke missing joke text — navigating to Roast Mode instead")
+            pendingNavigation = .roastMode
+            return
+        }
+        let target = action["target"] as? String
+        print(" [BitBuddy] Publishing add_roast_joke for UI persistence")
+        NotificationCenter.default.post(
+            name: .bitBuddyAddRoastJoke,
+            object: nil,
+            userInfo: [
+                "joke": content,
+                "target": target as Any
+            ]
+        )
+    }
+    
+    /// Posts a notification to save notebook text.
+    private func handleSaveNotebookTextAction(_ action: [String: Any]) {
+        let text = (action["text"] as? String)
+            ?? (action["quoted_value"] as? String)
+            ?? (action["value"] as? String)
+        guard let noteText = text, !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print(" [BitBuddy] save_notebook_text missing text — navigating to Notebook instead")
+            pendingNavigation = .notebook
+            return
+        }
+        print(" [BitBuddy] Publishing save_notebook_text for UI persistence")
+        NotificationCenter.default.post(
+            name: .bitBuddySaveNotebookText,
+            object: nil,
+            userInfo: ["text": noteText]
+        )
     }
     
     /// Handles the add_joke action — publishes the joke text so the UI layer

@@ -186,7 +186,19 @@ struct BitBuddyChatView: View {
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyAddJoke)) { notification in
             guard let jokeText = notification.userInfo?["jokeText"] as? String,
                   !jokeText.isEmpty else { return }
+            let folderName = notification.userInfo?["folder"] as? String
             let newJoke = Joke(content: jokeText)
+            // If a folder was specified, try to find or create it
+            if let folderName = folderName, !folderName.isEmpty {
+                let existingFolders = (try? modelContext.fetch(FetchDescriptor<JokeFolder>())) ?? []
+                if let folder = existingFolders.first(where: { $0.name.lowercased() == folderName.lowercased() && !$0.isDeleted }) {
+                    newJoke.folder = folder
+                } else {
+                    let folder = JokeFolder(name: folderName)
+                    modelContext.insert(folder)
+                    newJoke.folder = folder
+                }
+            }
             modelContext.insert(newJoke)
             do {
                 try modelContext.save()
@@ -195,13 +207,101 @@ struct BitBuddyChatView: View {
                 print(" [BitBuddy→SwiftData] Failed to save joke: \(error)")
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .bitBuddyAddBrainstormNote)) { notification in
+            guard let text = notification.userInfo?["text"] as? String, !text.isEmpty else { return }
+            let idea = BrainstormIdea(content: text, colorHex: BrainstormIdea.randomColor())
+            modelContext.insert(idea)
+            do {
+                try modelContext.save()
+                print(" [BitBuddy→SwiftData] Brainstorm idea saved via action dispatch")
+            } catch {
+                print(" [BitBuddy→SwiftData] Failed to save brainstorm idea: \(error)")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .bitBuddyCreateSetList)) { notification in
+            guard let name = notification.userInfo?["name"] as? String, !name.isEmpty else { return }
+            let setList = SetList(name: name)
+            modelContext.insert(setList)
+            do {
+                try modelContext.save()
+                print(" [BitBuddy→SwiftData] Set list '\(name)' created via action dispatch")
+            } catch {
+                print(" [BitBuddy→SwiftData] Failed to create set list: \(error)")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .bitBuddyCreateFolder)) { notification in
+            guard let name = notification.userInfo?["name"] as? String, !name.isEmpty else { return }
+            // Check for duplicate folder names before creating
+            let existingFolders = (try? modelContext.fetch(FetchDescriptor<JokeFolder>())) ?? []
+            if existingFolders.contains(where: { $0.name.lowercased() == name.lowercased() && !$0.isDeleted }) {
+                print(" [BitBuddy→SwiftData] Folder '\(name)' already exists — skipping create")
+                return
+            }
+            let folder = JokeFolder(name: name)
+            modelContext.insert(folder)
+            do {
+                try modelContext.save()
+                print(" [BitBuddy→SwiftData] Folder '\(name)' created via action dispatch")
+            } catch {
+                print(" [BitBuddy→SwiftData] Failed to create folder: \(error)")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .bitBuddyCreateRoastTarget)) { notification in
+            guard let name = notification.userInfo?["name"] as? String, !name.isEmpty else { return }
+            let notes = notification.userInfo?["notes"] as? String ?? ""
+            let target = RoastTarget(name: name, notes: notes)
+            modelContext.insert(target)
+            do {
+                try modelContext.save()
+                print(" [BitBuddy→SwiftData] Roast target '\(name)' created via action dispatch")
+            } catch {
+                print(" [BitBuddy→SwiftData] Failed to create roast target: \(error)")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .bitBuddyAddRoastJoke)) { notification in
+            guard let jokeText = notification.userInfo?["joke"] as? String, !jokeText.isEmpty else { return }
+            let targetName = notification.userInfo?["target"] as? String
+            let roastJoke = RoastJoke(content: jokeText)
+            // If a target was named, find it and attach
+            if let targetName = targetName, !targetName.isEmpty {
+                let allTargets = (try? modelContext.fetch(FetchDescriptor<RoastTarget>())) ?? []
+                if let target = allTargets.first(where: { $0.name.lowercased() == targetName.lowercased() && !$0.isDeleted }) {
+                    roastJoke.target = target
+                }
+            }
+            modelContext.insert(roastJoke)
+            do {
+                try modelContext.save()
+                print(" [BitBuddy→SwiftData] Roast joke saved via action dispatch")
+            } catch {
+                print(" [BitBuddy→SwiftData] Failed to save roast joke: \(error)")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .bitBuddySaveNotebookText)) { notification in
+            guard let text = notification.userInfo?["text"] as? String, !text.isEmpty else { return }
+            let record = NotebookPhotoRecord(notes: text, imageData: nil)
+            modelContext.insert(record)
+            do {
+                try modelContext.save()
+                print(" [BitBuddy→SwiftData] Notebook text saved via action dispatch")
+            } catch {
+                print(" [BitBuddy→SwiftData] Failed to save notebook text: \(error)")
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyTriggerFileImport)) { _ in
             showDocumentPicker = true
         }
-        .sheet(isPresented: $showDocumentPicker) {
-            BitBuddyDocumentPicker { urls in
+        .fileImporter(
+            isPresented: $showDocumentPicker,
+            allowedContentTypes: [.text, .plainText, .utf8PlainText, .pdf, .rtf, .html, .commaSeparatedText],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
                 guard let url = urls.first else { return }
                 Task { await handleDocumentPicked(url) }
+            case .failure(let error):
+                appendErrorMessage("Could not open file: \(error.localizedDescription)")
             }
         }
         .onChange(of: bitBuddy.pendingNavigation) { _, section in
@@ -598,6 +698,25 @@ struct BitBuddyChatView: View {
                     return
                 }
                 text = combined
+            } else if ext == "rtf" || ext == "rtfd" {
+                let data = try Data(contentsOf: url)
+                let attributed = try NSAttributedString(
+                    data: data,
+                    options: [.documentType: NSAttributedString.DocumentType.rtf],
+                    documentAttributes: nil
+                )
+                text = attributed.string
+            } else if ext == "html" || ext == "htm" {
+                let data = try Data(contentsOf: url)
+                let attributed = try NSAttributedString(
+                    data: data,
+                    options: [
+                        .documentType: NSAttributedString.DocumentType.html,
+                        .characterEncoding: String.Encoding.utf8.rawValue
+                    ],
+                    documentAttributes: nil
+                )
+                text = attributed.string
             } else {
                 // Try UTF-8 first, fall back to auto-detected encoding
                 if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
@@ -913,34 +1032,6 @@ extension View {
     }
 }
 
-// MARK: - BitBuddy Document Picker
-
-/// A lightweight UIDocumentPickerViewController wrapper for uploading
-/// .txt and .pdf files into BitBuddy for joke extraction via HybridGagGrabber.
-private struct BitBuddyDocumentPicker: UIViewControllerRepresentable {
-    let completion: ([URL]) -> Void
-
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let types: [UTType] = [.plainText, .pdf, .utf8PlainText, .text]
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
-        picker.allowsMultipleSelection = false
-        picker.delegate = context.coordinator
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
-
-    final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let completion: ([URL]) -> Void
-        init(completion: @escaping ([URL]) -> Void) { self.completion = completion }
-
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            completion(urls)
-        }
-    }
-}
 
 #Preview {
     NavigationStack {

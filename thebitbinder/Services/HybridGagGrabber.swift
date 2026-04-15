@@ -408,7 +408,7 @@ struct HybridGagGrabberSheet: View {
                     Button {
                         showPicker = true
                     } label: {
-                        Label("Pick a Document (.txt, .pdf)", systemImage: "doc.badge.plus")
+                        Label("Pick a Document (.txt, .pdf, .rtf, …)", systemImage: "doc.badge.plus")
                     }
                     .disabled(grabber.isExtracting)
                 }
@@ -496,12 +496,17 @@ struct HybridGagGrabberSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .sheet(isPresented: $showPicker) {
-                GagGrabberDocumentPicker { urls in
+            .fileImporter(
+                isPresented: $showPicker,
+                allowedContentTypes: [.text, .plainText, .utf8PlainText, .pdf, .rtf, .html, .commaSeparatedText],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
                     guard let url = urls.first else { return }
-                    Task {
-                        await handlePickedDocument(url)
-                    }
+                    Task { await handlePickedDocument(url) }
+                case .failure(let error):
+                    grabber.lastError = "Could not open file: \(error.localizedDescription)"
                 }
             }
             .onAppear {
@@ -527,6 +532,25 @@ struct HybridGagGrabberSheet: View {
             let text: String
             if ext == "pdf" {
                 text = try GagGrabberPDFReader.extractText(from: url)
+            } else if ext == "rtf" || ext == "rtfd" {
+                let data = try Data(contentsOf: url)
+                let attributed = try NSAttributedString(
+                    data: data,
+                    options: [.documentType: NSAttributedString.DocumentType.rtf],
+                    documentAttributes: nil
+                )
+                text = attributed.string
+            } else if ext == "html" || ext == "htm" {
+                let data = try Data(contentsOf: url)
+                let attributed = try NSAttributedString(
+                    data: data,
+                    options: [
+                        .documentType: NSAttributedString.DocumentType.html,
+                        .characterEncoding: String.Encoding.utf8.rawValue
+                    ],
+                    documentAttributes: nil
+                )
+                text = attributed.string
             } else {
                 if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
                     text = utf8
@@ -562,33 +586,6 @@ struct HybridGagGrabberSheet: View {
     }
 }
 
-// MARK: - Document Picker
-
-/// A lightweight UIDocumentPickerViewController wrapper scoped to .txt and .pdf.
-private struct GagGrabberDocumentPicker: UIViewControllerRepresentable {
-    let completion: ([URL]) -> Void
-
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let types: [UTType] = [.plainText, .pdf, .utf8PlainText, .text]
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
-        picker.allowsMultipleSelection = false
-        picker.delegate = context.coordinator
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
-
-    final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let completion: ([URL]) -> Void
-        init(completion: @escaping ([URL]) -> Void) { self.completion = completion }
-
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            completion(urls)
-        }
-    }
-}
 
 // MARK: - Preview
 

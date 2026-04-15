@@ -1184,12 +1184,15 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                 id: "import_file",
                 section: .importFlow, category: .capture,
                 description: "Import jokes from a file.",
-                keywords: ["import", "pdf", "bring in", "file", "document", "gaggrabber"],
+                keywords: ["import", "pdf", "bring in", "file", "document", "gaggrabber", "upload", "attach"],
                 examplePatterns: [
                     "import a pdf of my jokes", "bring in this file",
                     "import jokes from a document", "use gaggrabber on this file",
                     "pull jokes out of this pdf", "import material from this text file",
-                    "add jokes from a document", "scan this file into bitbinder"
+                    "add jokes from a document", "scan this file into bitbinder",
+                    "add a file", "add files", "upload a file", "upload files",
+                    "attach a file", "let me upload a document",
+                    "i want to add a file", "open a file to extract jokes"
                 ]
             ),
             BitBuddyIntent(
