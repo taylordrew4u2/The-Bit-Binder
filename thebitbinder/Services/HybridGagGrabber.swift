@@ -1,20 +1,17 @@
 //
-//  HybridGagGrabber.swift
+//  GagGrabber.swift  (was HybridGagGrabber.swift)
 //  thebitbinder
 //
-//  Hybrid joke extractor: uses on-device MLX (Phi-3 Mini) as the primary
-//  extraction engine, with an optional OpenAI fallback when the user provides
-//  their own API key.
+//  Joke extractor: uses OpenAI (gpt-3.5-turbo, free-tier friendly) with a
+//  heuristic fallback when no API key is configured or the request fails.
 //
-//  Architecture notes:
-//  - MLX extraction always runs first.
-//  - OpenAI only runs when `useOpenAI` is true AND a key is configured.
-//  - If OpenAI fails (rate limit, offline, bad key), the MLX results are still
-//    returned — extraction never silently fails to produce results when MLX
-//    succeeds.
+//  Architecture:
+//  - OpenAI runs when `useOpenAI` is true AND a key is configured.
+//  - If OpenAI fails (rate limit, offline, bad key) or is disabled, a fast
+//    heuristic extractor runs instead — extraction never silently fails.
 //  - Long text is chunked (2 000 chars, sentence-boundary aware) before being
-//    sent to either extractor.
-//  - Results from both sources are merged and exact-duplicate lines removed.
+//    sent to the API.
+//  - Results are deduplicated by exact match.
 //
 //  UI: `HybridGagGrabberSheet` — a toolbar-button-triggered sheet that lets the
 //  user pick a .txt or .pdf, extract jokes, and add them one-by-one to their
@@ -26,14 +23,9 @@ import SwiftData
 import PDFKit
 import UniformTypeIdentifiers
 
-#if canImport(MLXLLM) && canImport(MLXLMCommon)
-import MLXLLM
-import MLXLMCommon
-#endif
-
 // MARK: - HybridGagGrabber (ObservableObject)
 
-/// Extracts jokes from raw text using MLX (local) + optional OpenAI (remote).
+/// Extracts jokes from raw text using OpenAI (remote) with a heuristic fallback.
 /// Published state drives the companion `HybridGagGrabberSheet` view.
 @MainActor
 final class HybridGagGrabber: ObservableObject {
@@ -78,11 +70,12 @@ final class HybridGagGrabber: ObservableObject {
 
     // MARK: - Main Extraction Entry Point
 
-    /// Extract jokes from `rawText` using MLX and, optionally, OpenAI.
+    /// Extract jokes from `rawText` using OpenAI (if enabled) with a heuristic
+    /// fallback that always guarantees results.
     ///
     /// - Parameters:
     ///   - rawText: The full text of the document.
-    ///   - useOpenAI: When `true`, also queries OpenAI if a key is available.
+    ///   - useOpenAI: When `true`, queries OpenAI if a key is available.
     func extractJokes(from rawText: String, useOpenAI: Bool = false) async {
         guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             lastError = "Document is empty — nothing to extract."
@@ -93,23 +86,11 @@ final class HybridGagGrabber: ObservableObject {
         lastError = nil
         extractedJokes = []
 
-        let chunks = HybridGagGrabberChunker.chunk(rawText, maxLength: 2000)
-        print(" [HybridGagGrabber] Text length: \(rawText.count) chars → \(chunks.count) chunk(s)")
+        let chunks = GagGrabberChunker.chunk(rawText, maxLength: 2000)
+        print(" [GagGrabber] Text length: \(rawText.count) chars → \(chunks.count) chunk(s)")
 
         // ------------------------------------------------------------------
-        // 1. MLX (local, always attempted)
-        // ------------------------------------------------------------------
-        var mlxJokes: [String] = []
-        do {
-            mlxJokes = try await extractViaMLX(chunks: chunks)
-            print(" [HybridGagGrabber] MLX returned \(mlxJokes.count) joke(s)")
-        } catch {
-            print(" [HybridGagGrabber] MLX extraction failed: \(error.localizedDescription)")
-            // Not fatal — OpenAI may still work, or we surface error at the end.
-        }
-
-        // ------------------------------------------------------------------
-        // 2. OpenAI (optional)
+        // 1. OpenAI (optional)
         // ------------------------------------------------------------------
         var openAIJokes: [String] = []
         if useOpenAI {
@@ -119,22 +100,32 @@ final class HybridGagGrabber: ObservableObject {
             if let key = resolvedKey, !key.isEmpty {
                 do {
                     openAIJokes = try await extractViaOpenAI(chunks: chunks, apiKey: key)
-                    print(" [HybridGagGrabber] OpenAI returned \(openAIJokes.count) joke(s)")
+                    print(" [GagGrabber] OpenAI returned \(openAIJokes.count) joke(s)")
                 } catch {
-                    print(" [HybridGagGrabber] OpenAI extraction failed: \(error.localizedDescription)")
-                    // Non-fatal — MLX results (if any) still used.
+                    print(" [GagGrabber] OpenAI extraction failed: \(error.localizedDescription)")
+                    // Non-fatal — heuristic results will be used instead.
                 }
             } else {
-                print(" [HybridGagGrabber] OpenAI skipped — no API key configured")
+                print(" [GagGrabber] OpenAI skipped — no API key configured")
             }
+        }
+
+        // ------------------------------------------------------------------
+        // 2. Heuristic fallback (when OpenAI is off or produced nothing)
+        // ------------------------------------------------------------------
+        var heuristicJokes: [String] = []
+        if openAIJokes.isEmpty {
+            print(" [GagGrabber] Running heuristic fallback")
+            heuristicJokes = Self.extractViaHeuristic(from: rawText)
+            print(" [GagGrabber] Heuristic returned \(heuristicJokes.count) joke(s)")
         }
 
         // ------------------------------------------------------------------
         // 3. Merge & deduplicate
         // ------------------------------------------------------------------
-        let merged = Self.deduplicateJokes(mlxJokes + openAIJokes)
+        let merged = Self.deduplicateJokes(openAIJokes + heuristicJokes)
 
-        if merged.isEmpty && mlxJokes.isEmpty && openAIJokes.isEmpty {
+        if merged.isEmpty {
             lastError = "No jokes found. The document may not contain recognizable joke content."
         }
 
@@ -142,71 +133,15 @@ final class HybridGagGrabber: ObservableObject {
         isExtracting = false
     }
 
-    // MARK: - MLX Extraction
-
-    /// Runs each chunk through the on-device Phi-3 Mini model and parses
-    /// lines prefixed with "JOKE:" from the output.
-    private func extractViaMLX(chunks: [String]) async throws -> [String] {
-#if canImport(MLXLLM) && canImport(MLXLMCommon)
-        var results: [String] = []
-
-        for (index, chunk) in chunks.enumerated() {
-            print(" [HybridGagGrabber/MLX] Processing chunk \(index + 1)/\(chunks.count)")
-
-            let prompt = Self.buildMLXPrompt(for: chunk)
-
-            let container = try await LLMModelFactory.shared.loadContainer(
-                configuration: ModelConfiguration(
-                    id: "mlx-community/Phi-3-mini-4k-instruct-4bit",
-                    defaultPrompt: "Extract jokes from text.",
-                    extraEOSTokens: ["<|end|>"]
-                )
-            )
-            let session = ChatSession(
-                container,
-                instructions: """
-                You are a joke extraction tool. Read the text and output every joke you find.
-                Output ONLY lines starting with "JOKE:" followed by the joke text.
-                Do not add commentary, numbering, or any other text.
-                """
-            )
-            let output = try await session.respond(to: prompt)
-            let parsed = Self.parseJokeLines(from: output)
-            results.append(contentsOf: parsed)
-        }
-
-        return results
-#else
-        print(" [HybridGagGrabber] MLX unavailable on this platform")
-        throw HybridGagGrabberError.mlxUnavailable
-#endif
-    }
-
-    /// Builds the MLX prompt for a single text chunk.
-    private static func buildMLXPrompt(for chunk: String) -> String {
-        """
-        [INST] <<SYS>>
-        Extract every joke, bit, or comedic premise from the text below.
-        Output one joke per line, each starting with "JOKE:".
-        Do not paraphrase — preserve the original wording.
-        If no jokes are found, output nothing.
-        <</SYS>>
-
-        --- TEXT ---
-        \(chunk)
-        [/INST]
-        """
-    }
-
     // MARK: - OpenAI Extraction
 
     /// Sends each chunk to the OpenAI Chat Completions API and parses "JOKE:"
-    /// lines from the response.
+    /// lines from the response. Includes basic rate-limit handling.
     private func extractViaOpenAI(chunks: [String], apiKey: String) async throws -> [String] {
         var results: [String] = []
 
         for (index, chunk) in chunks.enumerated() {
-            print(" [HybridGagGrabber/OpenAI] Processing chunk \(index + 1)/\(chunks.count)")
+            print(" [GagGrabber/OpenAI] Processing chunk \(index + 1)/\(chunks.count)")
 
             let body: [String: Any] = [
                 "model": "gpt-3.5-turbo",
@@ -239,11 +174,11 @@ final class HybridGagGrabber: ObservableObject {
 
             if let http = response as? HTTPURLResponse {
                 if http.statusCode == 429 {
-                    throw HybridGagGrabberError.openAIRateLimited
+                    throw GagGrabberError.openAIRateLimited
                 }
                 guard (200...299).contains(http.statusCode) else {
                     let detail = String(data: data, encoding: .utf8) ?? "Unknown error"
-                    throw HybridGagGrabberError.openAIError("HTTP \(http.statusCode): \(detail)")
+                    throw GagGrabberError.openAIError("HTTP \(http.statusCode): \(detail)")
                 }
             }
 
@@ -252,7 +187,7 @@ final class HybridGagGrabber: ObservableObject {
                   let first = choices.first,
                   let message = first["message"] as? [String: Any],
                   let content = message["content"] as? String else {
-                throw HybridGagGrabberError.openAIError("Unexpected response format")
+                throw GagGrabberError.openAIError("Unexpected response format")
             }
 
             let parsed = Self.parseJokeLines(from: content)
@@ -262,16 +197,71 @@ final class HybridGagGrabber: ObservableObject {
         return results
     }
 
+    // MARK: - Heuristic Extraction (always available)
+
+    /// Structural heuristic that splits text by blank lines, bullet points,
+    /// and numbered lists — mirrors `BitBuddyService.extractJokes(from:)`.
+    /// This guarantees the user always gets results even when OpenAI is
+    /// unavailable or disabled.
+    private static func extractViaHeuristic(from text: String) -> [String] {
+        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
+        let rawParts = normalized
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        var jokes: [String] = []
+        var currentBlock: [String] = []
+
+        for line in rawParts {
+            if line.isEmpty {
+                if !currentBlock.isEmpty {
+                    jokes.append(currentBlock.joined(separator: "\n"))
+                    currentBlock.removeAll()
+                }
+                continue
+            }
+
+            let isBullet = line.hasPrefix("-") || line.hasPrefix("•") || line.hasPrefix("*")
+            let isNumbered = line.range(of: #"^\d+[\.)]\s"#, options: .regularExpression) != nil
+
+            if (isBullet || isNumbered), !currentBlock.isEmpty {
+                jokes.append(currentBlock.joined(separator: "\n"))
+                currentBlock = [stripListMarker(from: line)]
+            } else {
+                currentBlock.append(isBullet || isNumbered ? stripListMarker(from: line) : line)
+            }
+        }
+
+        if !currentBlock.isEmpty {
+            jokes.append(currentBlock.joined(separator: "\n"))
+        }
+
+        let filtered = jokes
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if filtered.isEmpty, !normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return [normalized.trimmingCharacters(in: .whitespacesAndNewlines)]
+        }
+
+        return filtered
+    }
+
+    private static func stripListMarker(from line: String) -> String {
+        line
+            .replacingOccurrences(of: #"^[-•*]\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^\d+[\.)]\s*"#, with: "", options: .regularExpression)
+    }
+
     // MARK: - Parsing Helpers
 
     /// Parses output lines starting with "JOKE:" into an array of joke strings.
     /// Leading/trailing whitespace and the "JOKE:" prefix are stripped.
-    static func parseJokeLines(from output: String) -> [String] {
+    nonisolated static func parseJokeLines(from output: String) -> [String] {
         output
             .components(separatedBy: .newlines)
             .compactMap { line -> String? in
                 let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                // Case-insensitive check for the "JOKE:" prefix
                 guard trimmed.uppercased().hasPrefix("JOKE:") else { return nil }
                 let jokeText = String(trimmed.dropFirst(5))
                     .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -293,9 +283,9 @@ final class HybridGagGrabber: ObservableObject {
 // MARK: - Text Chunker
 
 /// Splits a long string into chunks of at most `maxLength` characters,
-/// preferring to break at sentence boundaries so the LLM receives
+/// preferring to break at sentence boundaries so the API receives
 /// coherent context.
-enum HybridGagGrabberChunker {
+enum GagGrabberChunker {
 
     static func chunk(_ text: String, maxLength: Int = 2000) -> [String] {
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -312,22 +302,14 @@ enum HybridGagGrabberChunker {
                 break
             }
 
-            // Look for the last sentence-ending punctuation within the window.
             let window = remaining.prefix(maxLength)
             var splitIndex = window.endIndex
 
-            // Search backwards for ". " or "! " or "? " or newline
             for candidate in [". ", "! ", "? ", "\n"] {
                 if let range = window.range(of: candidate, options: .backwards) {
-                    // Include the punctuation character, break after the space/newline
                     splitIndex = range.upperBound
                     break
                 }
-            }
-
-            // If no sentence boundary found, hard-split at maxLength
-            if splitIndex == window.endIndex {
-                splitIndex = window.endIndex
             }
 
             let chunk = String(remaining[remaining.startIndex..<splitIndex])
@@ -344,16 +326,13 @@ enum HybridGagGrabberChunker {
 
 // MARK: - Errors
 
-enum HybridGagGrabberError: LocalizedError {
-    case mlxUnavailable
+enum GagGrabberError: LocalizedError {
     case openAIRateLimited
     case openAIError(String)
     case pdfExtractionFailed
 
     var errorDescription: String? {
         switch self {
-        case .mlxUnavailable:
-            return "On-device MLX model is not available on this platform."
         case .openAIRateLimited:
             return "OpenAI rate limit hit — try again in a minute."
         case .openAIError(let detail):
@@ -366,15 +345,12 @@ enum HybridGagGrabberError: LocalizedError {
 
 // MARK: - PDF Text Extraction Helper
 
-/// Lightweight PDF-to-text helper using PDFKit. The existing
-/// `PDFTextExtractor` in the codebase is more sophisticated (layout-aware,
-/// repeating-header detection). This helper is intentionally simpler — it
-/// just needs the raw string for the joke extractor.
-private enum HybridPDFReader {
+/// Lightweight PDF-to-text helper using PDFKit.
+private enum GagGrabberPDFReader {
 
     static func extractText(from url: URL) throws -> String {
         guard let document = PDFDocument(url: url) else {
-            throw HybridGagGrabberError.pdfExtractionFailed
+            throw GagGrabberError.pdfExtractionFailed
         }
 
         var pages: [String] = []
@@ -386,7 +362,7 @@ private enum HybridPDFReader {
 
         let combined = pages.joined(separator: "\n\n")
         guard !combined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw HybridGagGrabberError.pdfExtractionFailed
+            throw GagGrabberError.pdfExtractionFailed
         }
         return combined
     }
@@ -396,13 +372,6 @@ private enum HybridPDFReader {
 
 /// A toolbar button that presents the `HybridGagGrabberSheet`.
 /// Drop this into any SwiftUI view's `.toolbar { }` block.
-///
-/// Example:
-/// ```swift
-/// .toolbar {
-///     HybridGagGrabberToolbarButton()
-/// }
-/// ```
 struct HybridGagGrabberToolbarButton: View {
     @State private var showSheet = false
 
@@ -429,7 +398,7 @@ struct HybridGagGrabberSheet: View {
     @State private var showPicker = false
     @State private var useOpenAI = false
     @State private var openAIKeyInput = ""
-    @State private var savedJokeIDs: Set<Int> = []   // track which rows were saved
+    @State private var savedJokeIDs: Set<Int> = []
 
     var body: some View {
         NavigationStack {
@@ -446,7 +415,7 @@ struct HybridGagGrabberSheet: View {
 
                 // MARK: OpenAI Toggle
                 Section {
-                    Toggle("Also use OpenAI", isOn: $useOpenAI)
+                    Toggle("Use OpenAI", isOn: $useOpenAI)
 
                     if useOpenAI {
                         SecureField("OpenAI API Key (optional)", text: $openAIKeyInput)
@@ -467,7 +436,7 @@ struct HybridGagGrabberSheet: View {
                 } header: {
                     Text("AI Sources")
                 } footer: {
-                    Text("MLX (on-device) always runs. OpenAI is optional — if it fails, MLX results are still used.")
+                    Text("OpenAI is optional. Without it, a heuristic extractor splits the document by structure (blank lines, bullets, numbered lists).")
                 }
 
                 // MARK: Status
@@ -520,7 +489,7 @@ struct HybridGagGrabberSheet: View {
                     }
                 }
             }
-            .navigationTitle("HybridGagGrabber")
+            .navigationTitle("GagGrabber")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -528,7 +497,7 @@ struct HybridGagGrabberSheet: View {
                 }
             }
             .sheet(isPresented: $showPicker) {
-                HybridDocumentPicker { urls in
+                GagGrabberDocumentPicker { urls in
                     guard let url = urls.first else { return }
                     Task {
                         await handlePickedDocument(url)
@@ -536,7 +505,6 @@ struct HybridGagGrabberSheet: View {
                 }
             }
             .onAppear {
-                // Pre-fill key field from Keychain if one already exists
                 if let existing = KeychainHelper.load(forKey: HybridGagGrabber.keychainAccount),
                    !existing.isEmpty {
                     openAIKeyInput = existing
@@ -548,15 +516,23 @@ struct HybridGagGrabberSheet: View {
     // MARK: - Document Handling
 
     private func handlePickedDocument(_ url: URL) async {
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+        }
+
         let ext = url.pathExtension.lowercased()
 
         do {
             let text: String
             if ext == "pdf" {
-                text = try HybridPDFReader.extractText(from: url)
+                text = try GagGrabberPDFReader.extractText(from: url)
             } else {
-                // .txt, .md, .rtf, or anything text-based
-                text = try String(contentsOf: url, encoding: .utf8)
+                if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
+                    text = utf8
+                } else {
+                    text = try String(contentsOf: url)
+                }
             }
 
             await grabber.extractJokes(from: text, useOpenAI: useOpenAI)
@@ -568,29 +544,28 @@ struct HybridGagGrabberSheet: View {
     // MARK: - Persistence
 
     /// Creates a new `Joke` from the extracted text and inserts it into
-    /// SwiftData. Follows the existing `Joke.init(content:title:folder:)`
-    /// pattern.
+    /// SwiftData. Follows the existing `Joke.init(content:title:folder:)` pattern.
     private func addJokeToLibrary(_ jokeText: String, index: Int) {
         let joke = Joke(content: jokeText)
-        joke.importSource = "HybridGagGrabber"
+        joke.importSource = "GagGrabber"
         joke.importTimestamp = Date()
         modelContext.insert(joke)
 
         do {
             try modelContext.save()
             savedJokeIDs.insert(index)
-            print(" [HybridGagGrabber] Saved joke #\(index + 1) to library")
+            print(" [GagGrabber] Saved joke #\(index + 1) to library")
         } catch {
             grabber.lastError = "Failed to save joke: \(error.localizedDescription)"
-            print(" [HybridGagGrabber] Save failed: \(error)")
+            print(" [GagGrabber] Save failed: \(error)")
         }
     }
 }
 
-// MARK: - Minimal Document Picker (reuses the project's UTType set)
+// MARK: - Document Picker
 
 /// A lightweight UIDocumentPickerViewController wrapper scoped to .txt and .pdf.
-private struct HybridDocumentPicker: UIViewControllerRepresentable {
+private struct GagGrabberDocumentPicker: UIViewControllerRepresentable {
     let completion: ([URL]) -> Void
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {

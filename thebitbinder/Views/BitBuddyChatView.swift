@@ -557,6 +557,13 @@ struct BitBuddyChatView: View {
     /// Reads a picked document (txt/pdf), runs HybridGagGrabber extraction,
     /// and displays the results inline in the chat.
     private func handleDocumentPicked(_ url: URL) async {
+        // Security-scoped resource access — required for files from
+        // Files app, iCloud Drive, and third-party file providers.
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess { url.stopAccessingSecurityScopedResource() }
+        }
+
         let fileName = url.lastPathComponent
         extractedFileName = fileName
         extractedJokeResults = []
@@ -592,7 +599,12 @@ struct BitBuddyChatView: View {
                 }
                 text = combined
             } else {
-                text = try String(contentsOf: url, encoding: .utf8)
+                // Try UTF-8 first, fall back to auto-detected encoding
+                if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
+                    text = utf8
+                } else {
+                    text = try String(contentsOf: url)
+                }
             }
             
             await gagGrabber.extractJokes(from: text, useOpenAI: false)
