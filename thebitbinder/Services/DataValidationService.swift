@@ -17,6 +17,18 @@ final class DataValidationService: ObservableObject {
     // Track data counts for validation
     private let countsKey = "DataValidation_Counts"
     
+    /// Prevents concurrent or rapid back-to-back validation runs.
+    private var isValidating = false
+    /// Timestamp of last completed validation — enforces a minimum gap.
+    private var lastValidationDate: Date = .distantPast
+    /// Minimum seconds between validation runs (prevents duplicates on rapid launch paths).
+    private let validationCooldown: TimeInterval = 10
+    
+    /// UserDefaults key for recording IDs whose missing-file status has already been handled.
+    /// Prevents the same orphan recordings from being rediscovered every launch
+    /// (e.g. when CloudKit re-syncs the record from another device).
+    private let handledMissingRecordingsKey = "DataValidation_HandledMissingRecordingIDs"
+    
     init() {
         print(" [DataValidation] Service initialized")
     }
@@ -25,6 +37,21 @@ final class DataValidationService: ObservableObject {
     
     /// Performs comprehensive data validation
     func validateDataIntegrity(context: ModelContext) async -> DataValidationResult {
+        // Guard: prevent concurrent or rapid back-to-back runs
+        guard !isValidating else {
+            print(" [DataValidation] Validation already in progress — skipping duplicate run")
+            return DataValidationResult()
+        }
+        guard Date().timeIntervalSince(lastValidationDate) >= validationCooldown else {
+            print(" [DataValidation] Validation ran recently (\(String(format: "%.0f", Date().timeIntervalSince(lastValidationDate)))s ago) — skipping")
+            return DataValidationResult()
+        }
+        isValidating = true
+        defer {
+            isValidating = false
+            lastValidationDate = Date()
+        }
+        
         var result = DataValidationResult()
         
         print(" [DataValidation] Starting data integrity check...")
@@ -78,8 +105,7 @@ final class DataValidationService: ObservableObject {
     private func countEntities<T: PersistentModel>(of type: T.Type, context: ModelContext) async -> Int {
         do {
             let descriptor = FetchDescriptor<T>()
-            let entities = try context.fetch(descriptor)
-            return entities.count
+            return try context.fetchCount(descriptor)
         } catch {
             print(" [DataValidation] Failed to count \(type): \(error)")
             return 0
@@ -90,22 +116,22 @@ final class DataValidationService: ObservableObject {
     // These prevent false data-loss alerts when trash purge removes old items.
     
     private func countActiveJokes(context: ModelContext) async -> Int {
-        (try? context.fetch(FetchDescriptor<Joke>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+        (try? context.fetchCount(FetchDescriptor<Joke>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
     }
     private func countActiveRecordings(context: ModelContext) async -> Int {
-        (try? context.fetch(FetchDescriptor<Recording>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+        (try? context.fetchCount(FetchDescriptor<Recording>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
     }
     private func countActiveSetLists(context: ModelContext) async -> Int {
-        (try? context.fetch(FetchDescriptor<SetList>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+        (try? context.fetchCount(FetchDescriptor<SetList>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
     }
     private func countActiveRoastJokes(context: ModelContext) async -> Int {
-        (try? context.fetch(FetchDescriptor<RoastJoke>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+        (try? context.fetchCount(FetchDescriptor<RoastJoke>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
     }
     private func countActiveBrainstormIdeas(context: ModelContext) async -> Int {
-        (try? context.fetch(FetchDescriptor<BrainstormIdea>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+        (try? context.fetchCount(FetchDescriptor<BrainstormIdea>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
     }
     private func countActiveNotebookPhotos(context: ModelContext) async -> Int {
-        (try? context.fetch(FetchDescriptor<NotebookPhotoRecord>(predicate: #Predicate { $0.isDeleted == false })).count) ?? 0
+        (try? context.fetchCount(FetchDescriptor<NotebookPhotoRecord>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
     }
     
     // MARK: - Entity-Specific Validation
@@ -158,6 +184,7 @@ final class DataValidationService: ObservableObject {
     private func validateRecordings(context: ModelContext, result: inout DataValidationResult) async {
         do {
             let recordings = try context.fetch(FetchDescriptor<Recording>())
+            let handledIDs = getHandledMissingRecordingIDs()
             
             var invalidFileURLs = 0
             var missingFiles = 0
@@ -171,6 +198,10 @@ final class DataValidationService: ObservableObject {
                     invalidFileURLs += 1
                     continue
                 }
+                
+                // Skip recordings whose missing-file status was already handled
+                // (prevents rediscovery when CloudKit re-syncs the record)
+                if handledIDs.contains(recording.id.uuidString) { continue }
                 
                 // Resolve file URL (handles absolute, stale, and relative paths)
                 let fileURL = recording.resolvedURL
@@ -446,11 +477,15 @@ final class DataValidationService: ObservableObject {
             )
             
             var trashedCount = 0
+            var handledIDs = getHandledMissingRecordingIDs()
             
             for recording in recordings {
                 // Skip recordings with empty fileURL — those are caught by
                 // the "invalid file URLs" check and are a different issue.
                 guard !recording.fileURL.isEmpty else { continue }
+                
+                // Skip recordings whose missing-file status was already handled
+                guard !handledIDs.contains(recording.id.uuidString) else { continue }
                 
                 let resolved = recording.resolvedURL
                 if !FileManager.default.fileExists(atPath: resolved.path) {
@@ -465,12 +500,16 @@ final class DataValidationService: ObservableObject {
                     
                     recording.moveToTrash()
                     trashedCount += 1
+                    handledIDs.insert(recording.id.uuidString)
                     print(" [DataValidation] Trashed recording '\(recording.title)' (id: \(recording.id)) — audio file missing at: \(resolved.lastPathComponent)")
                 }
             }
             
             if trashedCount > 0 {
                 try context.save()
+                // Persist the handled IDs so these recordings are not rediscovered
+                // on next launch (e.g. if CloudKit re-syncs the record metadata).
+                saveHandledMissingRecordingIDs(handledIDs)
                 print(" [DataValidation] Moved \(trashedCount) recording(s) with missing files to trash (recoverable for 30 days)")
                 DataOperationLogger.shared.logSuccess(
                     "Auto-trashed \(trashedCount) recording(s) with missing audio files — recoverable in trash"
@@ -482,6 +521,19 @@ final class DataValidationService: ObservableObject {
             print(" [DataValidation] Failed to repair recordings with missing files: \(error)")
             return false
         }
+    }
+    
+    // MARK: - Handled Missing-File Recording Tracking
+    
+    private func getHandledMissingRecordingIDs() -> Set<String> {
+        let array = UserDefaults.standard.stringArray(forKey: handledMissingRecordingsKey) ?? []
+        return Set(array)
+    }
+    
+    private func saveHandledMissingRecordingIDs(_ ids: Set<String>) {
+        // Cap at 200 entries to avoid unbounded growth
+        let capped = Array(ids.prefix(200))
+        UserDefaults.standard.set(capped, forKey: handledMissingRecordingsKey)
     }
 }
 

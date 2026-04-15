@@ -123,6 +123,9 @@ struct JokesView: View {
     // Navigation state for grid items (prevents accidental taps)
     @State private var selectedJokeForDetail: Joke?
     
+    // Move-to-folder via long-press context menu
+    @State private var jokeToMove: Joke?
+    
     // Persistence error surfacing
     @State private var persistenceError: String?
     @State private var showingPersistenceError = false
@@ -221,6 +224,12 @@ struct JokesView: View {
                             showingOpenMicFilter = false
                         }
                     )
+                    .dropDestination(for: JokeDragItem.self) { items, _ in
+                        handleJokeDrop(items, onto: folder)
+                        return true
+                    } isTargeted: { isTargeted in
+                        // Visual feedback handled by SwiftUI automatically
+                    }
                     .contextMenu {
                         Button(role: .destructive) {
                             folderPendingDeletion = folder
@@ -420,6 +429,9 @@ struct JokesView: View {
                 } message: {
                     Text(persistenceError ?? "An unknown error occurred")
                 }
+                .sheet(item: $jokeToMove) { joke in
+                    MoveJokeToFolderSheet(joke: joke, allFolders: folders)
+                }
                 .overlay { importOverlay }
                 // Rebuild filtered list whenever filter inputs change
                 .task(id: filterKey) {
@@ -465,7 +477,22 @@ struct JokesView: View {
                                                     HapticEngine.shared.tap()
                                                     selectedJokeForDetail = joke
                                                 }
+                                                .draggable(JokeDragItem(jokeID: joke.id.uuidString)) {
+                                                    // Drag preview
+                                                    Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
+                                                        .font(.subheadline.weight(.medium))
+                                                        .padding(10)
+                                                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                                }
                                                 .contextMenu {
+                                                    Button {
+                                                        jokeToMove = joke
+                                                    } label: {
+                                                        Label("Move to Folder", systemImage: "folder")
+                                                    }
+                                                    
+                                                    Divider()
+                                                    
                                                     if joke.isHit {
                                                         Button {
                                                             joke.isHit = false
@@ -532,6 +559,63 @@ struct JokesView: View {
                                         JokeRowView(joke: joke, roastMode: roastMode, showFullContent: showFullContent)
                                             .id(joke.id)
                                     }
+                                    .draggable(JokeDragItem(jokeID: joke.id.uuidString))
+                                    .contextMenu {
+                                        Button {
+                                            jokeToMove = joke
+                                        } label: {
+                                            Label("Move to Folder", systemImage: "folder")
+                                        }
+                                        
+                                        Divider()
+                                        
+                                        if joke.isHit {
+                                            Button {
+                                                joke.isHit = false
+                                                joke.dateModified = Date()
+                                            } label: {
+                                                Label("Remove from Hits", systemImage: "star.slash")
+                                            }
+                                        } else {
+                                            Button {
+                                                joke.isHit = true
+                                                joke.dateModified = Date()
+                                            } label: {
+                                                Label("Add to Hits", systemImage: "star.fill")
+                                            }
+                                        }
+                                        
+                                        if joke.isOpenMic {
+                                            Button {
+                                                joke.isOpenMic = false
+                                                joke.dateModified = Date()
+                                            } label: {
+                                                Label("Remove from Open Mic", systemImage: "mic.slash")
+                                            }
+                                        } else {
+                                            Button {
+                                                joke.isOpenMic = true
+                                                joke.dateModified = Date()
+                                            } label: {
+                                                Label("Open Mic", systemImage: "mic.fill")
+                                            }
+                                        }
+                                        
+                                        Divider()
+                                        
+                                        Button(role: .destructive) {
+                                            joke.moveToTrash()
+                                            do {
+                                                try modelContext.save()
+                                            } catch {
+                                                print(" [JokesView] Failed to save after trash: \(error)")
+                                                persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
+                                                showingPersistenceError = true
+                                            }
+                                        } label: {
+                                            Label("Move to Trash", systemImage: "trash")
+                                        }
+                                    }
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                         Button(role: .destructive) {
                                             HapticEngine.shared.delete()
@@ -559,7 +643,7 @@ struct JokesView: View {
                                         } label: {
                                             Label(joke.isHit ? "Remove Hit" : "Add Hit", systemImage: joke.isHit ? "star.slash" : "star.fill")
                                         }
-                                        .tint(.blue)
+                                        .tint(.yellow)
                                     }
                                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                         Button {
@@ -569,7 +653,7 @@ struct JokesView: View {
                                         } label: {
                                             Label(joke.isHit ? "Remove Hit" : "The Hits", systemImage: joke.isHit ? "star.slash.fill" : "star.fill")
                                         }
-                                        .tint(.blue)
+                                        .tint(.yellow)
                                         
                                         Button {
                                             haptic(.medium)
@@ -583,7 +667,7 @@ struct JokesView: View {
                                         } label: {
                                             Label(joke.isOpenMic ? "Remove Open Mic" : "Open Mic", systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill")
                                         }
-                                        .tint(.blue)
+                                        .tint(.purple)
                                     }
                                 }
                             }
@@ -873,6 +957,36 @@ struct JokesView: View {
             showingPersistenceError = true
         }
         NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
+    }
+    
+    // MARK: - Drag & Drop
+    
+    private func handleJokeDrop(_ items: [JokeDragItem], onto folder: JokeFolder) {
+        var movedCount = 0
+        for item in items {
+            guard let uuid = UUID(uuidString: item.jokeID),
+                  let joke = jokes.first(where: { $0.id == uuid }) else { continue }
+            
+            var currentFolders = joke.folders ?? []
+            if !currentFolders.contains(where: { $0.id == folder.id }) {
+                currentFolders.append(folder)
+                joke.folders = currentFolders
+                joke.dateModified = Date()
+                movedCount += 1
+            }
+        }
+        
+        guard movedCount > 0 else { return }
+        
+        do {
+            try modelContext.save()
+            HapticEngine.shared.tap()
+            print(" [JokesView] Moved \(movedCount) joke(s) to folder '\(folder.name)'")
+        } catch {
+            print(" [JokesView] Failed to save after drag-drop move: \(error)")
+            persistenceError = "Could not move joke(s) to folder: \(error.localizedDescription)"
+            showingPersistenceError = true
+        }
     }
     
     private func moveJokes(from sourceFolder: JokeFolder, to destinationFolder: JokeFolder?) {
@@ -1476,7 +1590,7 @@ private extension JokesView {
 struct RoastTargetGridCard: View {
     let target: RoastTarget
     var scale: CGFloat = 1.0
-    private let accentColor: Color = .blue
+    private let accentColor: Color = .orange
     
     /// Safe property accessors to prevent crashes on invalidated models
     private var safeName: String { target.isValid ? target.name : "" }
@@ -1520,7 +1634,7 @@ struct RoastTargetGridCard: View {
 
 struct RoastTargetListRow: View {
     let target: RoastTarget
-    private let accentColor: Color = .blue
+    private let accentColor: Color = .orange
     
     /// Safe property accessors to prevent crashes on invalidated models
     private var safeName: String { target.isValid ? target.name : "" }

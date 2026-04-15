@@ -281,14 +281,6 @@ struct thebitbinderApp: App {
                 // Pull latest settings from iCloud
                 iCloudKeyValueStore.shared.pullFromCloud()
                 
-                // CRITICAL: Post remote change notification to trigger SwiftData
-                // to check for and merge any pending CloudKit changes.
-                // This is the primary mechanism for cross-device sync on app resume.
-                NotificationCenter.default.post(
-                    name: .NSPersistentStoreRemoteChange,
-                    object: nil
-                )
-                
                 // Save to trigger SwiftData to merge any pending remote changes into the UI
                 do {
                     try sharedModelContainer.mainContext.save()
@@ -300,20 +292,6 @@ struct thebitbinderApp: App {
                 
                 // Ensure notifications are scheduled
                 NotificationManager.shared.scheduleIfNeeded()
-                
-                // Always trigger a sync check when app becomes active
-                // This ensures cross-device changes are picked up immediately
-                Task { @MainActor in
-                    let syncService = iCloudSyncService.shared
-                    if syncService.isSyncEnabled {
-                        // Check if iCloud is available before syncing
-                        let available = await syncService.checkiCloudAvailability()
-                        if available {
-                            await syncService.syncNow()
-                            print(" [AppLifecycle] Triggered sync on app activation")
-                        }
-                    }
-                }
                 
             case .inactive:
                 print(" [AppLifecycle] App became inactive")
@@ -336,6 +314,13 @@ struct thebitbinderApp: App {
     /// has finished launching. This was previously done synchronously in the
     /// ModelContainer initializer, which caused watchdog timeout (code 9).
     private func performDeferredBackup() async {
+        // Check memory pressure before starting expensive file I/O
+        MemoryManager.shared.ensureMemoryHeadroom()
+        
+        // Capture the @MainActor-isolated singleton on MainActor BEFORE
+        // entering the detached task — avoids unsafeForcedSync runtime warning.
+        let protectionService = DataProtectionService.shared
+        
         await Task.detached(priority: .utility) {
             let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
             let lastEmergencyBackupKey = "lastEmergencyBackupTimestamp"
@@ -370,8 +355,9 @@ struct thebitbinderApp: App {
                 print(" [DataProtection] Could not create emergency backup: \(error)")
             }
             
-            // Clean up old backups — file I/O only, safe off main thread
-            await DataProtectionService.shared.cleanupEmergencyBackups()
+            // Clean up old backups — nonisolated method, safe from detached context.
+            // Reference was captured on MainActor above to avoid unsafeForcedSync.
+            protectionService.cleanupEmergencyBackups()
         }.value
     }
     

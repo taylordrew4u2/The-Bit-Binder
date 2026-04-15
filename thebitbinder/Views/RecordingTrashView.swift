@@ -22,6 +22,8 @@ struct RecordingTrashView: View {
     @State private var showingEmptyTrashAlert = false
     @State private var persistenceError: String?
     @State private var showingErrorAlert = false
+    @State private var showingMissingFileAlert = false
+    @State private var pendingRestoreRecording: Recording?
 
     private var filtered: [Recording] {
         let t = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -63,14 +65,7 @@ struct RecordingTrashView: View {
                             }
 
                             Button {
-                                recording.restoreFromTrash()
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print(" [RecordingTrashView] Failed to restore recording: \(error)")
-                                    persistenceError = "Could not restore recording: \(error.localizedDescription)"
-                                    showingErrorAlert = true
-                                }
+                                restoreRecording(recording)
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
@@ -78,14 +73,7 @@ struct RecordingTrashView: View {
                         }
                         .contextMenu {
                             Button {
-                                recording.restoreFromTrash()
-                                do {
-                                    try modelContext.save()
-                                } catch {
-                                    print(" [RecordingTrashView] Failed to restore recording: \(error)")
-                                    persistenceError = "Could not restore recording: \(error.localizedDescription)"
-                                    showingErrorAlert = true
-                                }
+                                restoreRecording(recording)
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
@@ -129,6 +117,46 @@ struct RecordingTrashView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(persistenceError ?? "An unknown error occurred")
+        }
+        .alert("Audio File Missing", isPresented: $showingMissingFileAlert) {
+            Button("Restore Anyway") {
+                if let recording = pendingRestoreRecording {
+                    performRestore(recording)
+                }
+                pendingRestoreRecording = nil
+            }
+            Button("Delete Instead", role: .destructive) {
+                if let recording = pendingRestoreRecording {
+                    RecordingsView.permanentlyDelete(recording, context: modelContext)
+                }
+                pendingRestoreRecording = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingRestoreRecording = nil
+            }
+        } message: {
+            Text("The audio file for this recording no longer exists. Restoring will create an entry with no playable audio.")
+        }
+    }
+
+    /// Restores a recording, checking for backing file existence first.
+    private func restoreRecording(_ recording: Recording) {
+        if !recording.backingFileExists && !recording.fileURL.isEmpty {
+            pendingRestoreRecording = recording
+            showingMissingFileAlert = true
+        } else {
+            performRestore(recording)
+        }
+    }
+
+    private func performRestore(_ recording: Recording) {
+        recording.restoreFromTrash()
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [RecordingTrashView] Failed to restore recording: \(error)")
+            persistenceError = "Could not restore recording: \(error.localizedDescription)"
+            showingErrorAlert = true
         }
     }
 

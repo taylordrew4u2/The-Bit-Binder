@@ -2,7 +2,8 @@
 //  AddJokeView.swift
 //  thebitbinder
 //
-//  Standard iOS sheet for adding a new joke.
+//  A comfortable space to write a new joke.
+//  Open canvas, generous room, auto-focused so you can start right away.
 //
 
 import SwiftUI
@@ -18,6 +19,7 @@ struct AddJokeView: View {
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
     @State private var isSaving = false
+    @FocusState private var titleFocused: Bool
     @FocusState private var contentFocused: Bool
     
     var selectedFolder: JokeFolder?
@@ -28,41 +30,67 @@ struct AddJokeView: View {
     
     var body: some View {
         NavigationStack {
-            Form {
-                // Title Section
-                Section {
-                    TextField("Title (optional)", text: $title)
-                } header: {
-                    Text("Title")
-                }
-                
-                // Content Section
-                Section {
-                    TextEditor(text: $content)
-                        .frame(minHeight: 150)
-                        .focused($contentFocused)
-                } header: {
-                    HStack {
-                        Text("Joke")
-                        Spacer()
-                        if !content.isEmpty {
-                            Text("\(content.split(separator: " ").count) words")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    
+                    // Title field — feels like a page heading
+                    TextField("Title (optional)", text: $title, axis: .vertical)
+                        .font(.title2.weight(.semibold))
+                        .lineLimit(3)
+                        .focused($titleFocused)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                    
+                    // Folder badge
+                    if let folder = selectedFolder {
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder.fill")
+                                .font(.caption2)
+                            Text(folder.name)
                                 .font(.caption)
-                                .foregroundColor(.secondary)
                         }
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 6)
                     }
-                }
-                
-                // Folder indicator
-                if let folder = selectedFolder {
-                    Section {
-                        Label(folder.name, systemImage: "folder.fill")
-                            .foregroundColor(.secondary)
-                    } header: {
-                        Text("Folder")
+                    
+                    // Word count
+                    if !content.isEmpty {
+                        Text("\(content.split(separator: " ").count) words")
+                            .font(.caption)
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .padding(.horizontal, 20)
+                            .padding(.top, 8)
+                    }
+                    
+                    Divider()
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+                    
+                    // Content editor — the main writing canvas
+                    ZStack(alignment: .topLeading) {
+                        if content.isEmpty {
+                            Text("Start writing your joke…")
+                                .font(.body)
+                                .foregroundColor(Color(UIColor.placeholderText))
+                                .padding(.horizontal, 24)
+                                .padding(.top, 16)
+                                .allowsHitTesting(false)
+                        }
+                        
+                        TextEditor(text: $content)
+                            .font(.body)
+                            .lineSpacing(6)
+                            .frame(minHeight: 350)
+                            .scrollContentBackground(.hidden)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                            .focused($contentFocused)
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color(UIColor.systemBackground))
             .navigationTitle("New Joke")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -85,6 +113,7 @@ struct AddJokeView: View {
                         Spacer()
                         Button("Done") {
                             contentFocused = false
+                            titleFocused = false
                         }
                     }
                 }

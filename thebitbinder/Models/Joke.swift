@@ -7,6 +7,12 @@
 
 import Foundation
 import SwiftData
+import CoreTransferable
+import UniformTypeIdentifiers
+
+extension UTType {
+    static let bitBinderJoke = UTType(exportedAs: "com.thebitbinder.joke")
+}
 
 @Model
 final class Joke: Identifiable {
@@ -68,6 +74,9 @@ final class Joke: Identifiable {
     
     // Pre-computed word count for fast sorting and filtering
     var wordCount: Int = 0
+    
+    // Scratch notes / ideas related to this joke
+    var notes: String = ""
     
     // Import source tracking
     var importSource: String?  // Source file name if imported
@@ -187,5 +196,17 @@ final class Joke: Identifiable {
         isDeleted = false
         deletedDate = nil
         dateModified = Date()
+    }
+}
+
+// MARK: - Drag & Drop Support
+
+/// Lightweight codable token used for drag-and-drop.
+/// We pass only the UUID so the destination can look up the real Joke from SwiftData.
+struct JokeDragItem: Codable, Transferable {
+    let jokeID: String
+    
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .bitBinderJoke)
     }
 }

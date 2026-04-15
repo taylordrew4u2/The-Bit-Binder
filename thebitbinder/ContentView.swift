@@ -39,7 +39,7 @@ enum AppScreen: String, CaseIterable {
     }
     
     static var roastTabBarScreens: [AppScreen] {
-        [.jokes, .settings]
+        [.jokes, .sets, .settings]
     }
 
     var icon: String {
@@ -158,14 +158,12 @@ struct MainTabView: View {
                         .navigationTitle(screen == .home ? "" : (roastMode ? screen.roastName : screen.rawValue))
                         .navigationBarTitleDisplayMode(screen == .home ? .inline : screen.preferredTitleDisplayMode)
                         .toolbar {
-                            // AI Chat button in toolbar (subtle, not a FAB)
-                            if screen == .home || screen == .jokes {
-                                ToolbarItem(placement: .navigationBarTrailing) {
-                                    Button {
-                                        showAIChat = true
-                                    } label: {
-                                        BitBuddyAvatar(roastMode: roastMode, size: 22, symbolSize: 10)
-                                    }
+                            // BitBuddy available on every screen for quick questions
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button {
+                                    showAIChat = true
+                                } label: {
+                                    BitBuddyAvatar(roastMode: roastMode, size: 22, symbolSize: 10)
                                 }
                             }
                         }

@@ -7,6 +7,8 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
+import PDFKit
 
 /// Full-screen chat view accessed from the side menu
 struct BitBuddyChatView: View {
@@ -23,6 +25,19 @@ struct BitBuddyChatView: View {
     @State private var isTyping = false
     @State private var typingMessageId: UUID?
     @State private var displayedText = ""
+    /// Tracks the active send + typewriter Task so it can be cancelled
+    /// when the user sends a new message, resets the conversation, or
+    /// dismisses the sheet. Without this, concurrent typewriter Tasks
+    /// both write to `displayedText` and produce garbled output.
+    @State private var activeResponseTask: Task<Void, Never>?
+    @FocusState private var isInputFocused: Bool
+    
+    // MARK: - HybridGagGrabber Integration
+    @StateObject private var gagGrabber = HybridGagGrabber()
+    @State private var showDocumentPicker = false
+    @State private var extractedJokeResults: [String] = []
+    @State private var savedExtractedJokeIDs: Set<Int> = []
+    @State private var extractedFileName: String = ""
     
     private var accentColor: Color {
         roastMode ? .orange : .accentColor
@@ -51,6 +66,32 @@ struct BitBuddyChatView: View {
                                 )
                                 .id(message.id)
                             }
+                        }
+                        
+                        // HybridGagGrabber extraction progress
+                        if gagGrabber.isExtracting {
+                            HStack(alignment: .top, spacing: 8) {
+                                BitBuddyAvatar(roastMode: roastMode, size: 32, symbolSize: 14)
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Extracting jokes from \(extractedFileName)…")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(12)
+                                .background(Color(UIColor.secondarySystemBackground))
+                                .cornerRadius(16)
+                                .cornerRadius(4, corners: [.topRight, .bottomLeft, .bottomRight])
+                                Spacer(minLength: 60)
+                            }
+                            .id("extraction-progress")
+                        }
+                        
+                        // HybridGagGrabber extracted jokes results
+                        if !extractedJokeResults.isEmpty {
+                            extractedJokesSection
+                                .id("extracted-jokes")
                         }
                         
                         if isTyping {
@@ -86,17 +127,26 @@ struct BitBuddyChatView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button("Done") {
-                    dismiss()
+                    // Dismiss keyboard first to avoid stale input session errors
+                    isInputFocused = false
+                    // Brief delay lets keyboard frame animation complete
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        dismiss()
+                    }
                 }
                 .foregroundColor(accentColor)
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
+                    activeResponseTask?.cancel()
+                    activeResponseTask = nil
                     messages.removeAll()
                     conversationId = UUID().uuidString
                     typingMessageId = nil
                     displayedText = ""
                     isTyping = false
+                    extractedJokeResults.removeAll()
+                    savedExtractedJokeIDs.removeAll()
                     bitBuddy.startNewConversation()
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
@@ -122,7 +172,15 @@ struct BitBuddyChatView: View {
             }
         }
         .onDisappear {
+            isInputFocused = false
+            activeResponseTask?.cancel()
+            activeResponseTask = nil
+            typingMessageId = nil
+            displayedText = ""
+            isTyping = false
             messages.removeAll()
+            extractedJokeResults.removeAll()
+            savedExtractedJokeIDs.removeAll()
             bitBuddy.cleanupAudioResources()
         }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyAddJoke)) { notification in
@@ -137,10 +195,21 @@ struct BitBuddyChatView: View {
                 print(" [BitBuddy→SwiftData] Failed to save joke: \(error)")
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .bitBuddyTriggerFileImport)) { _ in
+            showDocumentPicker = true
+        }
+        .sheet(isPresented: $showDocumentPicker) {
+            BitBuddyDocumentPicker { urls in
+                guard let url = urls.first else { return }
+                Task { await handleDocumentPicked(url) }
+            }
+        }
         .onChange(of: bitBuddy.pendingNavigation) { _, section in
             guard let section else { return }
             guard let appScreen = appScreen(for: section) else { return }
             bitBuddy.clearPendingNavigation()
+            // Dismiss keyboard first to prevent stale input sessions
+            isInputFocused = false
             // Post navigation then dismiss the sheet so the user lands
             // on the target screen.
             NotificationCenter.default.post(
@@ -148,7 +217,9 @@ struct BitBuddyChatView: View {
                 object: nil,
                 userInfo: ["screen": appScreen.rawValue]
             )
-            dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                dismiss()
+            }
         }
     }
     
@@ -185,8 +256,33 @@ struct BitBuddyChatView: View {
                     suggestionChip("Analyze this joke: I told my therapist I feel invisible. She said 'Next!'")
                     suggestionChip("Create a set list for tonight")
                     suggestionChip("Give me a premise about dating apps")
-                    suggestionChip("Show me The Hits")
+                    suggestionChip("What makes a good punchline?")
                     suggestionChip("How do recordings work?")
+                    
+                    // File upload suggestion — opens document picker directly
+                    Button {
+                        showDocumentPicker = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.subheadline)
+                            Text("Extract jokes from a file")
+                                .font(.subheadline)
+                        }
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: 280, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color(UIColor.secondarySystemBackground))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.top, 16)
@@ -229,11 +325,25 @@ struct BitBuddyChatView: View {
             Divider()
             
             HStack(spacing: 12) {
+                // Document upload button (HybridGagGrabber)
+                Button {
+                    showDocumentPicker = true
+                } label: {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 20))
+                        .foregroundColor(accentColor.opacity(0.8))
+                }
+                .disabled(gagGrabber.isExtracting || bitBuddy.isLoading)
+                .buttonStyle(.plain)
+                
                 // Text field
                 HStack {
                     TextField("Ask BitBuddy...", text: $inputText)
                         .font(.body)
                         .foregroundColor(.primary)
+                        .focused($isInputFocused)
+                        .submitLabel(.send)
+                        .onSubmit { sendMessage() }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -281,7 +391,14 @@ struct BitBuddyChatView: View {
     }
     
     private func handleAppear() {
-        // No-op — auth is always available for local-only BitBuddy
+        // Greet the user on every fresh conversation
+        if messages.isEmpty {
+            let greeting = roastMode
+                ? "🔥 BitBuddy here — Roast Mode is ON. Give me a target and I'll load the burns."
+                : "Hey! I'm BitBuddy, your comedy writing partner. Ask me to analyze a joke, build a set list, brainstorm premises, or anything else — I'm ready when you are."
+            let intro = ChatBubbleMessage(text: greeting, isUser: false, conversationId: conversationId)
+            messages.append(intro)
+        }
     }
     
     private func scrollToBottom(proxy: ScrollViewProxy) {
@@ -297,14 +414,26 @@ struct BitBuddyChatView: View {
         guard !message.isEmpty else { return }
         guard !bitBuddy.isLoading else { return }
         
+        // Cancel any in-flight typewriter animation from a previous response.
+        // Without this, two Tasks write to `displayedText` simultaneously and
+        // the user sees garbled text.
+        activeResponseTask?.cancel()
+        activeResponseTask = nil
+        // If a previous message was mid-typewriter, reveal its full text now
+        typingMessageId = nil
+        
         let userMessage = ChatBubbleMessage(text: message, isUser: true, conversationId: conversationId)
         messages.append(userMessage)
         inputText = ""
         isTyping = true
         
-        Task {
+        activeResponseTask = Task {
             do {
                 let response = try await bitBuddy.sendMessage(message)
+                
+                // Bail out if the Task was cancelled while waiting for the response
+                guard !Task.isCancelled else { return }
+                
                 await MainActor.run {
                     isTyping = false
                     let aiMessage = ChatBubbleMessage(text: response, isUser: false, conversationId: conversationId)
@@ -315,7 +444,20 @@ struct BitBuddyChatView: View {
                 // Typewriter: reveal word by word
                 let words = response.split(separator: " ", omittingEmptySubsequences: false)
                 for (index, word) in words.enumerated() {
-                    try? await Task.sleep(nanoseconds: 35_000_000) // 35ms per word
+                    // Check cancellation before each word so we stop quickly
+                    // when the user sends a new message or dismisses the sheet.
+                    guard !Task.isCancelled else {
+                        return
+                    }
+                    try? await Task.sleep(nanoseconds: 15_000_000) // 15ms per word
+                    // Re-check after sleep — cancellation may have fired while
+                    // we were waiting. Without this second guard a cancelled
+                    // task writes one stale word into displayedText, which
+                    // contaminates the *next* response's typewriter output
+                    // and produces garbled text with missing or wrong letters.
+                    guard !Task.isCancelled else {
+                        return
+                    }
                     await MainActor.run {
                         if index == 0 {
                             displayedText = String(word)
@@ -328,12 +470,194 @@ struct BitBuddyChatView: View {
                     typingMessageId = nil
                 }
             } catch {
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
                     isTyping = false
                     let errorMsg = ChatBubbleMessage(text: "Sorry, I encountered an error. Please try again.", isUser: false, conversationId: conversationId)
                     messages.append(errorMsg)
                 }
             }
+        }
+    }
+    
+    // MARK: - HybridGagGrabber: Extracted Jokes Section
+    
+    private var extractedJokesSection: some View {
+        HStack(alignment: .top, spacing: 8) {
+            BitBuddyAvatar(roastMode: roastMode, size: 32, symbolSize: 14)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Found \(extractedJokeResults.count) joke\(extractedJokeResults.count == 1 ? "" : "s") in **\(extractedFileName)**")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.primary)
+                
+                if let error = gagGrabber.lastError {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                
+                ForEach(Array(extractedJokeResults.enumerated()), id: \.offset) { index, joke in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(joke)
+                            .font(.callout)
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        if savedExtractedJokeIDs.contains(index) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.body)
+                        } else {
+                            Button {
+                                saveExtractedJoke(joke, index: index)
+                            } label: {
+                                Text("Add")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .tint(accentColor)
+                        }
+                    }
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color(UIColor.tertiarySystemBackground))
+                    )
+                }
+                
+                // Bulk action: add all remaining
+                if extractedJokeResults.count > 1,
+                   savedExtractedJokeIDs.count < extractedJokeResults.count {
+                    Button {
+                        saveAllExtractedJokes()
+                    } label: {
+                        Label("Add All to Library", systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(accentColor)
+                    .controlSize(.small)
+                    .padding(.top, 4)
+                }
+            }
+            .padding(12)
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(16)
+            .cornerRadius(4, corners: [.topRight, .bottomLeft, .bottomRight])
+            
+            Spacer(minLength: 20)
+        }
+    }
+    
+    // MARK: - HybridGagGrabber: Document Handling
+    
+    /// Reads a picked document (txt/pdf), runs HybridGagGrabber extraction,
+    /// and displays the results inline in the chat.
+    private func handleDocumentPicked(_ url: URL) async {
+        let fileName = url.lastPathComponent
+        extractedFileName = fileName
+        extractedJokeResults = []
+        savedExtractedJokeIDs = []
+        
+        // Add a user-style message to the chat showing the file was selected
+        let userMsg = ChatBubbleMessage(
+            text: "Extract jokes from \(fileName)",
+            isUser: true,
+            conversationId: conversationId
+        )
+        messages.append(userMsg)
+        
+        let ext = url.pathExtension.lowercased()
+        
+        do {
+            let text: String
+            if ext == "pdf" {
+                guard let document = PDFDocument(url: url) else {
+                    appendErrorMessage("Could not open PDF: \(fileName)")
+                    return
+                }
+                var pages: [String] = []
+                for i in 0..<document.pageCount {
+                    if let page = document.page(at: i), let content = page.string {
+                        pages.append(content)
+                    }
+                }
+                let combined = pages.joined(separator: "\n\n")
+                guard !combined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    appendErrorMessage("PDF has no extractable text: \(fileName)")
+                    return
+                }
+                text = combined
+            } else {
+                text = try String(contentsOf: url, encoding: .utf8)
+            }
+            
+            await gagGrabber.extractJokes(from: text, useOpenAI: false)
+            
+            // Populate results for the in-chat display
+            extractedJokeResults = gagGrabber.extractedJokes
+            
+            if extractedJokeResults.isEmpty {
+                let noResultsMsg = ChatBubbleMessage(
+                    text: gagGrabber.lastError ?? "No jokes found in \(fileName). The document may not contain recognizable joke content.",
+                    isUser: false,
+                    conversationId: conversationId
+                )
+                messages.append(noResultsMsg)
+            }
+        } catch {
+            appendErrorMessage("Failed to read \(fileName): \(error.localizedDescription)")
+        }
+    }
+    
+    /// Appends a BitBuddy error message to the chat.
+    private func appendErrorMessage(_ text: String) {
+        let msg = ChatBubbleMessage(text: text, isUser: false, conversationId: conversationId)
+        messages.append(msg)
+    }
+    
+    // MARK: - HybridGagGrabber: Persistence
+    
+    /// Saves a single extracted joke to the library via SwiftData.
+    private func saveExtractedJoke(_ jokeText: String, index: Int) {
+        let joke = Joke(content: jokeText)
+        joke.importSource = "HybridGagGrabber"
+        joke.importTimestamp = Date()
+        modelContext.insert(joke)
+        
+        do {
+            try modelContext.save()
+            savedExtractedJokeIDs.insert(index)
+            print(" [BitBuddy→GagGrabber] Saved extracted joke #\(index + 1) to library")
+        } catch {
+            print(" [BitBuddy→GagGrabber] Save failed: \(error)")
+            appendErrorMessage("Failed to save joke: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Saves all un-saved extracted jokes to the library in one batch.
+    private func saveAllExtractedJokes() {
+        var savedCount = 0
+        for (index, jokeText) in extractedJokeResults.enumerated() {
+            guard !savedExtractedJokeIDs.contains(index) else { continue }
+            
+            let joke = Joke(content: jokeText)
+            joke.importSource = "HybridGagGrabber"
+            joke.importTimestamp = Date()
+            modelContext.insert(joke)
+            savedExtractedJokeIDs.insert(index)
+            savedCount += 1
+        }
+        
+        do {
+            try modelContext.save()
+            print(" [BitBuddy→GagGrabber] Bulk saved \(savedCount) joke(s) to library")
+        } catch {
+            print(" [BitBuddy→GagGrabber] Bulk save failed: \(error)")
+            appendErrorMessage("Failed to save jokes: \(error.localizedDescription)")
         }
     }
     
@@ -493,246 +817,54 @@ struct BitBuddyAvatar: View {
 
     var body: some View {
         Canvas { context, canvasSize in
-            let s = min(canvasSize.width, canvasSize.height)
-            let cx = canvasSize.width / 2
-            let cy = canvasSize.height / 2
+            let w = canvasSize.width
+            let h = canvasSize.height
+            // 100×100 design space, scaled to square frame
+            let s = min(w, h) / 100.0
+            let ox = (w - 100.0 * s) / 2.0
+            let oy = (h - 100.0 * s) / 2.0
 
-            // Background circle
-            let bgRect = CGRect(x: cx - s / 2, y: cy - s / 2, width: s, height: s)
-            let bgCircle = Path(ellipseIn: bgRect)
-            context.fill(bgCircle, with: .color(Color(UIColor.secondarySystemBackground)))
-            context.stroke(
-                bgCircle,
-                with: .color(roastMode ? Color.orange.opacity(0.35) : Color.accentColor.opacity(0.2)),
-                lineWidth: s * 0.02
-            )
+            func r(_ v: CGFloat) -> CGFloat { v * s }
 
-            if roastMode {
-                drawDevilFace(context: &context, cx: cx, cy: cy, s: s)
-            } else {
-                drawClownFace(context: &context, cx: cx, cy: cy, s: s)
-            }
+            let blue: Color = .blue
+            let lineW = max(1.0, s * 2.4)
+
+            // ====== SMILEY FACE WITH CLOWN NOSE — ALL BLUE ======
+
+            // --- Face circle (stroked outline) ---
+            var face = Path()
+            face.addEllipse(in: CGRect(x: ox + 8 * s, y: oy + 8 * s,
+                                       width: r(84), height: r(84)))
+            context.stroke(face, with: .color(blue), lineWidth: lineW)
+
+            // --- Eyes (filled dots) ---
+            var leftEye = Path()
+            leftEye.addEllipse(in: CGRect(x: ox + 32 * s - r(4.5),
+                                          y: oy + 36 * s - r(4.5),
+                                          width: r(9), height: r(9)))
+            context.fill(leftEye, with: .color(blue))
+
+            var rightEye = Path()
+            rightEye.addEllipse(in: CGRect(x: ox + 68 * s - r(4.5),
+                                           y: oy + 36 * s - r(4.5),
+                                           width: r(9), height: r(9)))
+            context.fill(rightEye, with: .color(blue))
+
+            // --- Clown nose (filled, prominent round nose) ---
+            var nose = Path()
+            nose.addEllipse(in: CGRect(x: ox + 50 * s - r(7),
+                                       y: oy + 48 * s - r(6.5),
+                                       width: r(14), height: r(13)))
+            context.fill(nose, with: .color(blue))
+
+            // --- Smile (wide arc) ---
+            var smile = Path()
+            smile.move(to: CGPoint(x: ox + 28 * s, y: oy + 62 * s))
+            smile.addQuadCurve(to: CGPoint(x: ox + 72 * s, y: oy + 62 * s),
+                               control: CGPoint(x: ox + 50 * s, y: oy + 82 * s))
+            context.stroke(smile, with: .color(blue), lineWidth: lineW)
         }
         .frame(width: size, height: size)
-    }
-
-    // MARK: - Clown Face (normal mode)
-
-    private func drawClownFace(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, s: CGFloat) {
-        // --- Hair tufts (blue puffs on sides + top) ---
-        let tuftRadius = s * 0.13
-        let tuftColor = Color(red: 0.0, green: 0.48, blue: 1.0)
-        // Left tuft
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx - s * 0.42, y: cy - s * 0.18, width: tuftRadius * 2, height: tuftRadius * 2)),
-            with: .color(tuftColor)
-        )
-        // Right tuft
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx + s * 0.42 - tuftRadius * 2, y: cy - s * 0.18, width: tuftRadius * 2, height: tuftRadius * 2)),
-            with: .color(tuftColor)
-        )
-        // Top tuft
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx - tuftRadius, y: cy - s * 0.44, width: tuftRadius * 2, height: tuftRadius * 1.8)),
-            with: .color(tuftColor)
-        )
-
-        // --- Face (cream/white circle) ---
-        let faceR = s * 0.32
-        let faceRect = CGRect(x: cx - faceR, y: cy - faceR + s * 0.02, width: faceR * 2, height: faceR * 2)
-        context.fill(Path(ellipseIn: faceRect), with: .color(Color(red: 1.0, green: 0.95, blue: 0.88)))
-        context.stroke(Path(ellipseIn: faceRect), with: .color(Color.black.opacity(0.08)), lineWidth: s * 0.008)
-
-        let faceCY = cy + s * 0.02
-
-        // --- Eyes (white ovals with black pupils) ---
-        let eyeW = s * 0.1
-        let eyeH = s * 0.12
-        let eyeY = faceCY - s * 0.1
-        let leftEyeRect = CGRect(x: cx - s * 0.12 - eyeW / 2, y: eyeY - eyeH / 2, width: eyeW, height: eyeH)
-        let rightEyeRect = CGRect(x: cx + s * 0.12 - eyeW / 2, y: eyeY - eyeH / 2, width: eyeW, height: eyeH)
-        context.fill(Path(ellipseIn: leftEyeRect), with: .color(.white))
-        context.fill(Path(ellipseIn: rightEyeRect), with: .color(.white))
-        context.stroke(Path(ellipseIn: leftEyeRect), with: .color(Color.black.opacity(0.3)), lineWidth: s * 0.006)
-        context.stroke(Path(ellipseIn: rightEyeRect), with: .color(Color.black.opacity(0.3)), lineWidth: s * 0.006)
-
-        // Pupils
-        let pupilR = s * 0.03
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx - s * 0.12 - pupilR, y: eyeY - pupilR * 0.5, width: pupilR * 2, height: pupilR * 2)),
-            with: .color(.black)
-        )
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx + s * 0.12 - pupilR, y: eyeY - pupilR * 0.5, width: pupilR * 2, height: pupilR * 2)),
-            with: .color(.black)
-        )
-
-        // --- Eyebrows (small arcs above eyes) ---
-        var leftBrow = Path()
-        leftBrow.move(to: CGPoint(x: cx - s * 0.18, y: eyeY - eyeH * 0.7))
-        leftBrow.addQuadCurve(
-            to: CGPoint(x: cx - s * 0.06, y: eyeY - eyeH * 0.7),
-            control: CGPoint(x: cx - s * 0.12, y: eyeY - eyeH * 1.1)
-        )
-        context.stroke(leftBrow, with: .color(Color.black.opacity(0.5)), lineWidth: s * 0.012)
-
-        var rightBrow = Path()
-        rightBrow.move(to: CGPoint(x: cx + s * 0.06, y: eyeY - eyeH * 0.7))
-        rightBrow.addQuadCurve(
-            to: CGPoint(x: cx + s * 0.18, y: eyeY - eyeH * 0.7),
-            control: CGPoint(x: cx + s * 0.12, y: eyeY - eyeH * 1.1)
-        )
-        context.stroke(rightBrow, with: .color(Color.black.opacity(0.5)), lineWidth: s * 0.012)
-
-        // --- Blue nose ---
-        let noseR = s * 0.065
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx - noseR, y: faceCY - noseR * 0.3, width: noseR * 2, height: noseR * 2)),
-            with: .color(Color(red: 0.0, green: 0.48, blue: 1.0))
-        )
-        // Nose highlight
-        let highlightR = noseR * 0.35
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx - noseR * 0.4, y: faceCY + noseR * 0.05, width: highlightR, height: highlightR)),
-            with: .color(.white.opacity(0.5))
-        )
-
-        // --- Big smile (blue arc with white teeth) ---
-        let smileY = faceCY + s * 0.1
-        let smileW = s * 0.22
-        let smileH = s * 0.12
-
-        // Blue lip area
-        var smilePath = Path()
-        smilePath.move(to: CGPoint(x: cx - smileW, y: smileY))
-        smilePath.addQuadCurve(
-            to: CGPoint(x: cx + smileW, y: smileY),
-            control: CGPoint(x: cx, y: smileY + smileH * 2)
-        )
-        smilePath.addQuadCurve(
-            to: CGPoint(x: cx - smileW, y: smileY),
-            control: CGPoint(x: cx, y: smileY + smileH * 0.4)
-        )
-        context.fill(smilePath, with: .color(Color(red: 0.0, green: 0.4, blue: 0.85)))
-
-        // White teeth stripe
-        var teethPath = Path()
-        teethPath.move(to: CGPoint(x: cx - smileW * 0.7, y: smileY + s * 0.02))
-        teethPath.addQuadCurve(
-            to: CGPoint(x: cx + smileW * 0.7, y: smileY + s * 0.02),
-            control: CGPoint(x: cx, y: smileY + smileH * 1.2)
-        )
-        teethPath.addQuadCurve(
-            to: CGPoint(x: cx - smileW * 0.7, y: smileY + s * 0.02),
-            control: CGPoint(x: cx, y: smileY + smileH * 0.5)
-        )
-        context.fill(teethPath, with: .color(.white))
-
-        // --- Cheek dots (light blue circles) ---
-        let cheekR = s * 0.05
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx - s * 0.26, y: faceCY + s * 0.02, width: cheekR * 2, height: cheekR * 1.5)),
-            with: .color(Color.blue.opacity(0.25))
-        )
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx + s * 0.26 - cheekR * 2, y: faceCY + s * 0.02, width: cheekR * 2, height: cheekR * 1.5)),
-            with: .color(Color.blue.opacity(0.25))
-        )
-    }
-
-    // MARK: - Devil Face (roast mode)
-
-    private func drawDevilFace(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, s: CGFloat) {
-        // --- Horns ---
-        let hornColor = Color(red: 0.8, green: 0.1, blue: 0.1)
-        var leftHorn = Path()
-        leftHorn.move(to: CGPoint(x: cx - s * 0.2, y: cy - s * 0.22))
-        leftHorn.addLine(to: CGPoint(x: cx - s * 0.32, y: cy - s * 0.44))
-        leftHorn.addLine(to: CGPoint(x: cx - s * 0.08, y: cy - s * 0.26))
-        leftHorn.closeSubpath()
-        context.fill(leftHorn, with: .color(hornColor))
-
-        var rightHorn = Path()
-        rightHorn.move(to: CGPoint(x: cx + s * 0.2, y: cy - s * 0.22))
-        rightHorn.addLine(to: CGPoint(x: cx + s * 0.32, y: cy - s * 0.44))
-        rightHorn.addLine(to: CGPoint(x: cx + s * 0.08, y: cy - s * 0.26))
-        rightHorn.closeSubpath()
-        context.fill(rightHorn, with: .color(hornColor))
-
-        // --- Face (dark red/maroon circle) ---
-        let faceR = s * 0.3
-        let faceRect = CGRect(x: cx - faceR, y: cy - faceR + s * 0.04, width: faceR * 2, height: faceR * 2)
-        context.fill(Path(ellipseIn: faceRect), with: .color(Color(red: 0.55, green: 0.08, blue: 0.08)))
-
-        let faceCY = cy + s * 0.04
-
-        // --- Eyes (yellow/orange slanted) ---
-        let eyeW = s * 0.09
-        let eyeH = s * 0.1
-        let eyeY = faceCY - s * 0.08
-        let leftEyeRect = CGRect(x: cx - s * 0.13 - eyeW / 2, y: eyeY - eyeH / 2, width: eyeW, height: eyeH)
-        let rightEyeRect = CGRect(x: cx + s * 0.13 - eyeW / 2, y: eyeY - eyeH / 2, width: eyeW, height: eyeH)
-        context.fill(Path(ellipseIn: leftEyeRect), with: .color(Color(red: 1.0, green: 0.75, blue: 0.0)))
-        context.fill(Path(ellipseIn: rightEyeRect), with: .color(Color(red: 1.0, green: 0.75, blue: 0.0)))
-
-        // Slit pupils
-        let slitW = s * 0.015
-        let slitH = s * 0.06
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx - s * 0.13 - slitW / 2, y: eyeY - slitH / 2, width: slitW, height: slitH)),
-            with: .color(.black)
-        )
-        context.fill(
-            Path(ellipseIn: CGRect(x: cx + s * 0.13 - slitW / 2, y: eyeY - slitH / 2, width: slitW, height: slitH)),
-            with: .color(.black)
-        )
-
-        // --- Angry eyebrows (angled down toward center) ---
-        var leftBrow = Path()
-        leftBrow.move(to: CGPoint(x: cx - s * 0.22, y: eyeY - eyeH * 0.5))
-        leftBrow.addLine(to: CGPoint(x: cx - s * 0.06, y: eyeY - eyeH * 0.9))
-        context.stroke(leftBrow, with: .color(Color.orange), lineWidth: s * 0.018)
-
-        var rightBrow = Path()
-        rightBrow.move(to: CGPoint(x: cx + s * 0.22, y: eyeY - eyeH * 0.5))
-        rightBrow.addLine(to: CGPoint(x: cx + s * 0.06, y: eyeY - eyeH * 0.9))
-        context.stroke(rightBrow, with: .color(Color.orange), lineWidth: s * 0.018)
-
-        // --- Devious grin ---
-        let smileY = faceCY + s * 0.08
-        let smileW = s * 0.2
-        var grin = Path()
-        grin.move(to: CGPoint(x: cx - smileW, y: smileY))
-        grin.addQuadCurve(
-            to: CGPoint(x: cx + smileW, y: smileY),
-            control: CGPoint(x: cx, y: smileY + s * 0.14)
-        )
-        context.stroke(grin, with: .color(Color.orange), lineWidth: s * 0.015)
-
-        // --- Flame wisps at bottom ---
-        let flameColors: [Color] = [
-            Color(red: 1.0, green: 0.4, blue: 0.0),
-            Color(red: 1.0, green: 0.6, blue: 0.0),
-            Color(red: 1.0, green: 0.25, blue: 0.0)
-        ]
-        let flamePositions: [CGFloat] = [-0.15, 0.0, 0.15]
-        for (i, xOff) in flamePositions.enumerated() {
-            var flame = Path()
-            let fx = cx + s * xOff
-            let fy = cy + s * 0.36
-            flame.move(to: CGPoint(x: fx - s * 0.04, y: fy + s * 0.06))
-            flame.addQuadCurve(
-                to: CGPoint(x: fx, y: fy - s * 0.06),
-                control: CGPoint(x: fx - s * 0.06, y: fy - s * 0.02)
-            )
-            flame.addQuadCurve(
-                to: CGPoint(x: fx + s * 0.04, y: fy + s * 0.06),
-                control: CGPoint(x: fx + s * 0.06, y: fy - s * 0.02)
-            )
-            flame.closeSubpath()
-            context.fill(flame, with: .color(flameColors[i % flameColors.count].opacity(0.7)))
-        }
     }
 }
 
@@ -755,6 +887,35 @@ struct BlinkingModifier: ViewModifier {
 extension View {
     func blinking() -> some View {
         modifier(BlinkingModifier())
+    }
+}
+
+// MARK: - BitBuddy Document Picker
+
+/// A lightweight UIDocumentPickerViewController wrapper for uploading
+/// .txt and .pdf files into BitBuddy for joke extraction via HybridGagGrabber.
+private struct BitBuddyDocumentPicker: UIViewControllerRepresentable {
+    let completion: ([URL]) -> Void
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let types: [UTType] = [.plainText, .pdf, .utf8PlainText, .text]
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
+        picker.allowsMultipleSelection = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let completion: ([URL]) -> Void
+        init(completion: @escaping ([URL]) -> Void) { self.completion = completion }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            completion(urls)
+        }
     }
 }
 

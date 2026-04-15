@@ -15,6 +15,7 @@ final class BrainstormIdea: Identifiable {
     var dateCreated: Date = Date()
     var colorHex: String = "F5E6D3"  // Store color as hex for variety in grid
     var isVoiceNote: Bool = false  // Track if it was created via voice
+    var notes: String = ""  // Scratch notes / related thoughts
 
     // Soft-delete (trash) support — mirrors Joke model
     var isDeleted: Bool = false

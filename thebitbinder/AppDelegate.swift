@@ -116,25 +116,17 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         switch ckNotification.notificationType {
         case .recordZone, .query, .database:
             // This is a CloudKit data change notification
-            print(" [CloudKit] CloudKit data change notification - triggering sync")
+            print(" [CloudKit] CloudKit data change notification - triggering merge")
             
-            // Post notification to trigger iCloudSyncService remote change handler
+            // Post notification to trigger iCloudSyncService remote change handler.
+            // The handler debounces into processRemoteChangeAsync() which refreshes
+            // the SwiftData context. No additional syncNow() needed — that would
+            // cascade into a second full sync via performFullSync().
             NotificationCenter.default.post(
                 name: .NSPersistentStoreRemoteChange,
                 object: nil,
                 userInfo: userInfo
             )
-            
-            // Also trigger a manual sync to ensure changes are pulled
-            Task { @MainActor in
-                let syncService = iCloudSyncService.shared
-                if syncService.isSyncEnabled {
-                    // Fire-and-forget sync — runs on @MainActor since syncService is @MainActor
-                    _ = Task { @MainActor in
-                        await syncService.syncNow()
-                    }
-                }
-            }
             
             completionHandler(.newData)
             
@@ -232,16 +224,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         scheduleBackgroundSync()
         
         let syncTask = Task {
-            // Trigger iCloud sync merge
+            // Refresh background download status. SwiftData + CloudKit will
+            // automatically process any pending remote changes when the
+            // persistent store coordinator runs its history processing.
+            // Do NOT manually post .NSPersistentStoreRemoteChange — that
+            // cascades into handleRemoteChange and triggers a redundant sync cycle.
             await MainActor.run {
-                NotificationCenter.default.post(
-                    name: .NSPersistentStoreRemoteChange,
-                    object: nil
-                )
                 BackgroundDownloadScheduler.shared.refresh()
             }
             
-            // Allow a brief window for SwiftData to process the merge
+            // Allow a brief window for SwiftData to process any pending merges
             try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
             
             let elapsed = Date().timeIntervalSince(startTime)
@@ -272,13 +264,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         let request = BGAppRefreshTaskRequest(identifier: Self.refreshTaskIdentifier)
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 minutes
         do {
+            // BGTaskScheduler.submit replaces any existing pending request with the
+            // same identifier, so this is already idempotent. The flag prevents
+            // unnecessary submit calls.
             try BGTaskScheduler.shared.submit(request)
             isRefreshTaskScheduled = true
             print(" [BGTask] Scheduled background refresh")
         } catch let e as NSError where e.domain == "BGTaskSchedulerErrorDomain" && e.code == 3 {
-            // BGTaskSchedulerErrorCodeTooManyPendingTaskRequests
+            // BGTaskSchedulerErrorCodeTooManyPendingTaskRequests — already submitted
             isRefreshTaskScheduled = true
-            print(" [BGTask] Refresh already pending in system queue")
+            print(" [BGTask] Refresh task already pending (too many requests)")
         } catch {
             print(" [BGTask] Could not schedule refresh: \(error.localizedDescription)")
             isRefreshTaskScheduled = false
@@ -299,22 +294,26 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             isSyncTaskScheduled = true
             print(" [BGTask] Scheduled background sync")
         } catch let e as NSError where e.domain == "BGTaskSchedulerErrorDomain" && e.code == 3 {
-            // BGTaskSchedulerErrorCodeTooManyPendingTaskRequests
+            // Already submitted
             isSyncTaskScheduled = true
-            print(" [BGTask] Sync already pending in system queue")
+            print(" [BGTask] Sync task already pending (too many requests)")
         } catch {
             print(" [BGTask] Could not schedule sync: \(error.localizedDescription)")
             isSyncTaskScheduled = false
         }
     }
     
+    // MARK: - Audio Session Configuration
+    
     private func configureAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(
                 .playAndRecord,
+                mode: .default,
                 options: [
                     .defaultToSpeaker,
+                    .allowBluetoothHFP,
                     .allowBluetoothA2DP,
                     .allowAirPlay,
                     .mixWithOthers

@@ -301,10 +301,14 @@ struct TalkToTextView: View {
     }
     
     private func startRecording() {
-        // If permissions haven't been determined yet, re-check them before recording
+        // If permissions haven't been determined yet, request them and auto-start on success
         if permissionStatus == .notDetermined {
             Task {
                 await requestPermissions()
+                // After permissions are resolved, start recording automatically if granted
+                if permissionStatus == .authorized {
+                    beginRecordingSession()
+                }
             }
             return
         }
@@ -314,6 +318,11 @@ struct TalkToTextView: View {
             return
         }
         
+        beginRecordingSession()
+    }
+    
+    /// Actually kicks off the speech recognition session (call only when permissions are confirmed).
+    private func beginRecordingSession() {
         // Stop any prior session first
         speechRecognizer.stopTranscribing()
         
@@ -450,6 +459,11 @@ class SpeechRecognizer: ObservableObject {
     private var isRestarting = false
     /// Observer for memory warnings
     private var memoryWarningObserver: NSObjectProtocol?
+    /// Observer for audio session interruptions (phone calls, Siri, etc.)
+    private var interruptionObserver: NSObjectProtocol?
+    /// Tracks consecutive engine-start failures to avoid infinite retry loops
+    private var consecutiveStartFailures = 0
+    private let maxConsecutiveStartFailures = 3
     
     init() {
         // Stop the audio pipeline on memory warnings — AVAudioEngine + speech
@@ -465,9 +479,39 @@ class SpeechRecognizer: ObservableObject {
             // Preserve transcription so user doesn't lose work
             self.accumulatedText = self.transcribedText
             self.shouldBeRunning = false
-            self.tearDownAudioPipeline()
+            self.tearDownAudioPipeline(deactivateSession: true)
             self.isTranscribing = false
             self.error = "Recording paused due to low memory. Your text is preserved — tap Start to resume."
+        }
+        
+        // Handle audio session interruptions (phone calls, Siri, etc.)
+        // so recognition can resume automatically after the interruption ends.
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self, self.shouldBeRunning else { return }
+            guard let info = notification.userInfo,
+                  let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+            
+            switch type {
+            case .began:
+                print(" [SpeechRecognizer] Audio interrupted — preserving text")
+                self.accumulatedText = self.transcribedText
+                self.tearDownAudioPipeline(deactivateSession: false)
+            case .ended:
+                print(" [SpeechRecognizer] Interruption ended — restarting")
+                if self.shouldBeRunning {
+                    self.isRestarting = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        self?.startRecognitionSession()
+                    }
+                }
+            @unknown default:
+                break
+            }
         }
     }
     
@@ -477,6 +521,7 @@ class SpeechRecognizer: ObservableObject {
         shouldBeRunning = true
         isRestarting = false
         accumulatedText = transcribedText
+        consecutiveStartFailures = 0
         
         startRecognitionSession()
     }
@@ -486,15 +531,20 @@ class SpeechRecognizer: ObservableObject {
         // Prevent overlapping restart attempts that can stack sessions
         guard !isRestarting else { return }
         isRestarting = true
-        defer { isRestarting = false }
         
-        // Clean up any previous session without clearing state
-        tearDownAudioPipeline()
+        // Clean up any previous session without clearing state.
+        // Keep the audio session active across restarts — toggling it off/on
+        // causes iOS to reassign the audio route, which cancels the next request.
+        tearDownAudioPipeline(deactivateSession: false)
         
-        guard shouldBeRunning else { return }
+        guard shouldBeRunning else {
+            isRestarting = false
+            return
+        }
         
         // Check if speech recognizer is available
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            isRestarting = false
             DispatchQueue.main.async { [weak self] in
                 self?.error = "Speech recognition is not available"
                 self?.isTranscribing = false
@@ -513,6 +563,7 @@ class SpeechRecognizer: ObservableObject {
             )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
+            isRestarting = false
             DispatchQueue.main.async { [weak self] in
                 self?.error = "Failed to configure audio session: \(error.localizedDescription)"
                 self?.isTranscribing = false
@@ -535,6 +586,7 @@ class SpeechRecognizer: ObservableObject {
         
         // Guard against invalid format (sample rate of 0 on some devices)
         guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
+            isRestarting = false
             DispatchQueue.main.async { [weak self] in
                 self?.error = "Audio input format is invalid. Please check your microphone."
                 self?.isTranscribing = false
@@ -625,20 +677,33 @@ class SpeechRecognizer: ObservableObject {
         do {
             engine.prepare()
             try engine.start()
+            consecutiveStartFailures = 0
+            isRestarting = false
             DispatchQueue.main.async { [weak self] in
                 self?.isTranscribing = true
             }
         } catch {
-            DispatchQueue.main.async { [weak self] in
-                self?.error = "Failed to start audio engine: \(error.localizedDescription)"
-                self?.isTranscribing = false
+            consecutiveStartFailures += 1
+            tearDownAudioPipeline()
+            isRestarting = false
+            
+            if consecutiveStartFailures < maxConsecutiveStartFailures && shouldBeRunning {
+                // Transient failure — retry after a brief delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.startRecognitionSession()
+                }
+            } else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.error = "Failed to start audio engine: \(error.localizedDescription)"
+                    self?.isTranscribing = false
+                }
             }
         }
     }
     
     func stopTranscribing() {
         shouldBeRunning = false
-        tearDownAudioPipeline()
+        tearDownAudioPipeline(deactivateSession: true)
         accumulatedText = ""
         DispatchQueue.main.async { [weak self] in
             self?.isTranscribing = false
@@ -646,7 +711,10 @@ class SpeechRecognizer: ObservableObject {
     }
     
     /// Tears down audio engine and recognition without resetting user-facing state.
-    private func tearDownAudioPipeline() {
+    /// - Parameter deactivateSession: If `true` (full stop), deactivates the audio session
+    ///   and cancels the task. If `false` (restart), keeps the session active and calls
+    ///   `finish()` so iOS doesn't treat the next request as a rapid retry and cancel it.
+    private func tearDownAudioPipeline(deactivateSession: Bool = true) {
         // 1. Stop the audio engine first so no more buffers are appended
         if let engine = audioEngine {
             engine.stop()
@@ -658,20 +726,32 @@ class SpeechRecognizer: ObservableObject {
         recognitionRequest?.endAudio()
         recognitionRequest = nil
         
-        // 3. Cancel any in-flight recognition task
-        recognitionTask?.cancel()
+        // 3. During a restart, let the task finish gracefully with buffered audio.
+        //    On a full stop, cancel immediately.
+        if deactivateSession {
+            recognitionTask?.cancel()
+        } else {
+            recognitionTask?.finish()
+        }
         recognitionTask = nil
         
-        // 4. Deactivate the audio session to release hardware resources
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        // 4. Only deactivate the audio session on a full stop — keeping it active
+        //    across restarts prevents iOS from reassigning the audio route and
+        //    immediately cancelling the next recognition request.
+        if deactivateSession {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
     
     deinit {
         if let observer = memoryWarningObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = interruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         shouldBeRunning = false
-        tearDownAudioPipeline()
+        tearDownAudioPipeline(deactivateSession: true)
     }
 }
 

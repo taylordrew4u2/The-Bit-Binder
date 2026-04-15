@@ -350,22 +350,37 @@ struct AutoOrganizeView: View {
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
             
-            Button(action: { showReorganizeConfirmation = true }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("Reorganize All")
-                        .font(.subheadline.weight(.semibold))
+            VStack(spacing: 12) {
+                Button(action: { showReorganizeConfirmation = true }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Reorganize All Jokes")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .foregroundColor(.white)
+                    .padding(.vertical, 12)
+                    .background(Color.accentColor)
+                    .cornerRadius(8)
                 }
-                .foregroundColor(.blue)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.blue.opacity(0.1))
-                )
+                .disabled(isAnalyzing)
+                
+                Button(action: { showFolderSetup = true }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder.badge.gearshape")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Setup Folders First")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .foregroundColor(.blue)
+                    .padding(.vertical, 12)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
+                }
             }
-            .disabled(isAnalyzing)
+            .padding(.horizontal, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .padding()

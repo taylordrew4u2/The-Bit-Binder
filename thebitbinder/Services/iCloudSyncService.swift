@@ -161,22 +161,29 @@ final class iCloudSyncService: NSObject, ObservableObject {
     }
     
     @objc nonisolated private func handleAccountChange(_ notification: Notification) {
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            // Guard against rapid re-entry (e.g. multiple CKAccountChanged in quick
+            // succession during device unlock).
+            guard Date().timeIntervalSince(self.lastSyncCompletionDate) >= self.syncCooldown else {
+                print(" [iCloud] Account change ignored — cooldown active")
+                return
+            }
             print(" [iCloud] Account change detected")
-            syncStatus = .syncing
+            self.syncStatus = .syncing
             
-            let available = await checkiCloudAvailability()
+            let available = await self.checkiCloudAvailability()
             if available {
-                if isSyncEnabled {
-                    await performFullSync()
+                if self.isSyncEnabled {
+                    await self.performFullSync()
                     print(" [iCloud] Account changed — re-synced successfully")
                 } else {
                     print(" [iCloud] Account available but sync disabled")
-                    syncStatus = .idle
+                    self.syncStatus = .idle
                 }
             } else {
                 print(" [iCloud] Account changed but not available")
-                syncStatus = .error("iCloud account not available")
+                self.syncStatus = .error("iCloud account not available")
                 // Don't disable sync - just wait for account to become available
             }
         }
@@ -227,6 +234,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
         defer {
             let now = Date()
             lastSyncDate = now
+            lastSyncCompletionDate = now
             UserDefaults.standard.set(now.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
         }
         
@@ -281,16 +289,14 @@ final class iCloudSyncService: NSObject, ObservableObject {
             await syncImportBatches()
             await syncChatMessages()
             
-            // 6. Force context refresh to pull any remote changes
+            // 6. Final context save to persist any pending local changes.
+            // Do NOT post .NSPersistentStoreRemoteChange here — that triggers
+            // handleRemoteChange which cascades into another full sync.
             if let ctx = modelContext {
-                // Post notification to trigger CloudKit sync engine
-                NotificationCenter.default.post(
-                    name: .NSPersistentStoreRemoteChange,
-                    object: nil
-                )
-                
                 do {
-                    try ctx.save()
+                    if ctx.hasChanges {
+                        try ctx.save()
+                    }
                     
                     // Verify sync by checking counts
                     let jokeCount = try ctx.fetchCount(FetchDescriptor<Joke>())
@@ -419,6 +425,11 @@ final class iCloudSyncService: NSObject, ObservableObject {
     // MARK: - Manual Sync Trigger
     
     func syncNow() async {
+        // Guard against cascading calls — if a sync just completed, skip.
+        guard Date().timeIntervalSince(lastSyncCompletionDate) >= syncCooldown else {
+            print(" [iCloud] syncNow() skipped — cooldown active")
+            return
+        }
         await performFullSync()
     }
     
@@ -443,18 +454,15 @@ final class iCloudSyncService: NSObject, ObservableObject {
                 return
             }
             
-            // 2. Save any pending changes
+            // 3. Save any pending changes — SwiftData + CloudKit will
+            // automatically process pending remote changes via persistent
+            // history tracking. Do NOT post .NSPersistentStoreRemoteChange
+            // here — that cascades into handleRemoteChange and triggers a
+            // redundant sync cycle on top of this force refresh.
             if ctx.hasChanges {
                 try ctx.save()
                 print(" [iCloud] Saved pending changes before force refresh")
             }
-            
-            // 3. Post remote change notification to trigger CoreData's CloudKit
-            // integration to check for and import any pending remote changes
-            NotificationCenter.default.post(
-                name: .NSPersistentStoreRemoteChange,
-                object: nil
-            )
             
             // 4. Wait a moment for CloudKit to process
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds

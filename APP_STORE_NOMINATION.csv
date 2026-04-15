@@ -1,0 +1,84 @@
+Nomination ID,Related Apps,Nomination Name,Nomination Type,Nomination Description,Publish Date (Start),Publish Date (End),Relevant Countries or Regions,Do you plan to launch in certain markets first?,Do you intend to submit a new in-app event for this nomination?,Related In-App Events,Platforms,Localization,Supplemental Materials,Does this app or game include a pre-order?,Helpful Details
+"* Only required for nomination updates. If you are submitting a new 
+nomination, leave this blank.","Enter the Apple ID of the app this nomination is associated with. 
+You may also enter the Apple IDs of up to 9 additional apps related 
+to this nomination, separated by commas.","Enter a name to help you recognize this nomination later. 
+60 character maximum.","Enter the type of nomination exactly as it appears below:
+
+New Content
+App Enhancements
+App Launch
+","Enter a description for your nomination. 1,000 character maximum.","Enter either the date you plan to publish on the App Store or the 
+start date of a time frame in which you expect to publish. Use the 
+format YYYY-MM-DD. It's recommended you provide this date at least 
+3 weeks before your launch.","If providing a time frame for when you expect to publish on the 
+App Store, enter the last date of that time frame here. Use 
+the format YYYY-MM-DD.","Enter all relevant countries or regions, separated by commas and using 
+their 3-letter ISO code (https://developer.apple.com/help/app-store-connect/reference/app-store-localizations).",Enter Yes or No,Enter Yes or No,"Enter a maximum of 25 in-app event IDs, separated by commas.","Enter the name of all platforms supported in this nomination exactly 
+as they appear below. Separate each by a comma.
+
+iOS (iPhone)
+iOS (iPad)
+macOS
+tvOS
+watchOS
+visionOS
+","Enter all localized languages, separated by commas. 
+(https://developer.apple.com/documentation/appstoreconnectapi/
+app_store/app_metadata/app_info_localizations/managing_metadata_
+in_your_app_by_using_locale_shortcodes)","Enter up to 5 URL links to any additional materials you'd like to 
+include.",Enter Yes or No,"We want to know what makes you stand out from the crowd. For example, 
+a unique approach to helping users or a behind-the-scenes look at an 
+inclusive team. 500 character maximum."
+* Optional,Required,Required,Required,Required,Required,Optional,Optional,Optional,Optional,Optional,Optional,Optional,Optional,Optional,Optional
+"* Enter the details of your nominations below. Each nomination should have its own row. Keep in mind that any information you provide is not considered confidential. To learn more, go to https://developer.apple.com/help/app-store-connect/reference/nominations-template.",* ,* ,* ,* ,* ,* ,* ,* ,* ,* ,* ,* ,* ,* ,* 
+New,6743841937,BitBinder 10.4 — BitBuddy & Comedy Tools,App Enhancements,"BitBinder is a professional comedy writing notebook built natively for iOS. Version 10.4 introduces BitBuddy — a fully on-device comedy writing assistant that understands joke structure and comedy theory — now accessible from every screen including mid-edit via a floating corner button. Comedians can capture ideas instantly with voice or text, organize jokes into folders with inline tag editing, build performance-ready set lists, record and auto-transcribe performances, brainstorm with color-coded sticky notes, scan handwritten notebooks, and write targeted roast comedy in a dedicated dark-themed Roast Mode. All data is private with on-device storage and optional iCloud sync across devices. No account or subscription required.",2026-05-06,2026-05-20,"USA,CAN,GBR,AUS,IRL,NZL,ZAF,IND,DEU,FRA,BRA,MEX,JPN,KOR,SGP,PHL,NGA,KEN,GHA,SWE,NOR,DNK,NLD,ESP,ITA,PRT,POL,CHE,AUT,BEL",No,No,None,"iOS (iPhone),iOS (iPad)",en-US,https://github.com/taylordrew4u-llc/thebitbinderr,No,"BitBinder was built by a comedian for comedians. There is no other iOS app purpose-built for comedy writing with an on-device AI partner that understands setups, punchlines, callbacks, misdirection, rule of three, act-outs, and tagging. Every feature — voice capture, set list building, notebook scanning, Roast Mode — was designed around real stand-up workflows. We built this because we needed it ourselves, and nothing else existed."
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,

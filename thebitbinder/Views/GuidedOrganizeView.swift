@@ -22,9 +22,13 @@ struct GuidedOrganizeView: View {
     @State private var organizedCount = 0
     @State private var skippedCount = 0
     @State private var showingSummary = false
+    @State private var includeAlreadyOrganized = false
     
     private var unorganizedJokes: [Joke] {
-        allJokes.filter { ($0.folders ?? []).isEmpty && !$0.isDeleted }
+        if includeAlreadyOrganized {
+            return allJokes.filter { !$0.isDeleted }
+        }
+        return allJokes.filter { ($0.folders ?? []).isEmpty && !$0.isDeleted }
     }
     
     private var currentJoke: Joke? {
@@ -40,6 +44,21 @@ struct GuidedOrganizeView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Toggle to include already-organized jokes
+                if !showingSummary {
+                    HStack {
+                        Toggle("Include organized jokes", isOn: $includeAlreadyOrganized)
+                            .font(.subheadline)
+                            .tint(.accentColor)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(.bar)
+                    .onChange(of: includeAlreadyOrganized) {
+                        currentIndex = 0
+                    }
+                }
+                
                 if showingSummary {
                     summaryView
                 } else if let joke = currentJoke {
@@ -88,6 +107,18 @@ struct GuidedOrganizeView: View {
                             .font(.body)
                             .foregroundColor(.secondary)
                             .lineSpacing(4)
+                        
+                        // Show current folders if joke is already organized
+                        if let currentFolders = joke.folders, !currentFolders.isEmpty {
+                            HStack(spacing: 6) {
+                                Image(systemName: "folder.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                                Text("Currently in: \(currentFolders.map(\.name).joined(separator: ", "))")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
@@ -321,7 +352,7 @@ struct GuidedOrganizeView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.blue)
             
-            Text("All Jokes Organized!")
+            Text(includeAlreadyOrganized ? "All Jokes Reviewed!" : "All Jokes Organized!")
                 .font(.title2.bold())
             
             Text("Every joke has been assigned to a folder.")
@@ -333,6 +364,25 @@ struct GuidedOrganizeView: View {
                 Text("You organized \(organizedCount) joke\(organizedCount == 1 ? "" : "s") this session.")
                     .font(.subheadline)
                     .foregroundColor(.accentColor)
+            }
+            
+            if !includeAlreadyOrganized {
+                Button {
+                    includeAlreadyOrganized = true
+                    currentIndex = 0
+                    showingSummary = false
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Text("Re-Organize All Jokes")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(8)
+                }
+                .padding(.horizontal, 32)
             }
             
             Spacer()

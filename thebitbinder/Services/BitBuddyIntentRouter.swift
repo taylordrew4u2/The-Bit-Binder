@@ -1009,6 +1009,30 @@ final class BitBuddyIntentRouter: @unchecked Sendable {
                     "what are the usable angles here"
                 ]
             ),
+            BitBuddyIntent(
+                id: "explain_comedy_theory",
+                section: .bitbuddy, category: .help,
+                description: "Explain joke structure, comedy techniques, or what makes things funny.",
+                keywords: ["joke structure", "comedy", "funny", "humor", "technique", "punchline", "setup",
+                           "misdirection", "callback", "rule of three", "irony", "sarcasm", "timing",
+                           "act out", "tag line", "topper", "incongruity", "subversion", "deadpan",
+                           "observational", "self deprecation", "wordplay", "pun", "anti joke",
+                           "how to write", "types of jokes", "comedy theory", "what makes",
+                           "why is", "how does comedy", "how do jokes", "joke types", "kinds of humor"],
+                examplePatterns: [
+                    "what makes something funny", "explain joke structure",
+                    "how does misdirection work", "what is a callback",
+                    "what are the different types of jokes", "how do punchlines work",
+                    "teach me about comedy techniques", "what is the rule of three",
+                    "how do I write a setup", "what makes a good punchline",
+                    "explain irony vs sarcasm", "how does timing work in comedy",
+                    "what is observational humor", "how do tag lines work",
+                    "what are the ways something can be funny", "types of humor",
+                    "how to write jokes", "what is incongruity theory",
+                    "why do jokes work", "comedy writing basics",
+                    "what is an act out", "how do callbacks work in a set"
+                ]
+            ),
 
             // 
             // SECTION: NOTEBOOK (4 intents)

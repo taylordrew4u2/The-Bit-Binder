@@ -195,7 +195,7 @@ struct iCloudSyncSettingsView: View {
                     }
                     
                     Button(action: {
-                        diagnostics.forceKeyValueSync()
+                        Task { await diagnostics.forceKeyValueSync() }
                     }) {
                         HStack {
                             Image(systemName: "arrow.up.arrow.down")

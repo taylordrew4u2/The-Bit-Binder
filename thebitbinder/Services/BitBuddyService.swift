@@ -9,7 +9,9 @@ import Foundation
 import AVFoundation
 
 /// BitBuddy — Your on-device comedy writing assistant.
-/// Prefers an on-device MLX Phi-3 backend with a local rule-based fallback.
+/// 100% local and rule-based. NEVER uses AI providers.
+/// Extraction providers (OpenAI, Arcee, OpenRouter) are reserved exclusively for file-import
+/// joke extraction and are token-gated via `AIExtractionToken`.
 /// Powered by a 93-intent router that covers all 11 app sections.
 @MainActor
 final class BitBuddyService: NSObject, ObservableObject {
@@ -22,7 +24,7 @@ final class BitBuddyService: NSObject, ObservableObject {
     
     // MARK: - State
     @Published var isLoading = false
-    /// Whether the current backend is reachable for inference.
+    /// Whether the backend is reachable. Always `true` for the local engine.
     @Published var isConnected: Bool
     @Published private(set) var backendName: String
     /// Published so the UI can navigate to the section an intent targets.
@@ -36,6 +38,18 @@ final class BitBuddyService: NSObject, ObservableObject {
     private var conversationId: String?
     private var turnsByConversation: [String: [BitBuddyTurn]] = [:]
     private var recentJokeProvider: (() -> [BitBuddyJokeSummary])?
+    
+    /// Actions that modify user data and must NOT be dispatched from a route-only
+    /// match (i.e. when the backend response is conversational text, not a structured
+    /// JSON payload with validated fields).
+    private static let dataMutatingActions: Set<String> = [
+        "add_joke", "save_joke", "save_joke_in_folder",
+        "edit_joke", "rename_joke", "delete_joke", "restore_deleted_joke",
+        "delete_brainstorm_note", "delete_set_list", "delete_recording",
+        "delete_folder", "remove_joke_from_set", "reject_imported_joke",
+        "add_brainstorm_note", "add_roast_joke", "create_roast_target",
+        "save_notebook_text", "approve_imported_joke",
+    ]
     
     private override init() {
         let selectedBackend = BitBuddyBackendFactory.makeBackend()
@@ -51,14 +65,8 @@ final class BitBuddyService: NSObject, ObservableObject {
     func registerJokeDataProvider(_ provider: @escaping () -> [BitBuddyJokeSummary]) {
         recentJokeProvider = provider
     }
-
-    /// Warm up the selected backend (e.g., model load) to reduce first-response latency.
-    func preloadBackend() async {
-        await backend.preload()
-        isConnected = backend.isAvailable
-    }
     
-    /// Send a text message and get a response from the active BitBuddy backend.
+    /// Send a text message and get a response from the local BitBuddy backend.
     func sendMessage(_ message: String) async throws -> String {
         try await authService.ensureAuthenticated()
         
@@ -72,21 +80,13 @@ final class BitBuddyService: NSObject, ObservableObject {
         conversationId = activeConversationId
         appendTurn(.init(role: .user, text: message), conversationId: activeConversationId)
         
-        // Route first so FAQ only intercepts explicit help/FAQ requests.
-        let routeResult = intentRouter.route(message)
-
-        if shouldConsultFAQ(for: message, routeResult: routeResult),
-           let faqItem = FAQData.matchingAnswer(for: message) {
-            let response = "FAQ — \(faqItem.question)\n\n\(faqItem.answer)"
-            appendTurn(.init(role: .assistant, text: response), conversationId: activeConversationId)
-            isConnected = true
-            return response
-        }
-        
         let session = BitBuddySessionSnapshot(
             conversationId: activeConversationId,
             turns: turnsByConversation[activeConversationId] ?? []
         )
+        
+        // Route the intent
+        let routeResult = intentRouter.route(message)
         
         var dataContext = BitBuddyDataContext()
         dataContext.userName = UserDefaults.standard.string(forKey: "userName") ?? "Comedian"
@@ -96,23 +96,49 @@ final class BitBuddyService: NSObject, ObservableObject {
         dataContext.isRoastMode = UserDefaults.standard.bool(forKey: "roastModeEnabled")
         
         do {
-            let rawResponse = try await backend.send(message: message, session: session, dataContext: dataContext)
+            let rawResponse: String
+            do {
+                rawResponse = try await backend.send(message: message, session: session, dataContext: dataContext)
+            } catch {
+                // Primary backend failed (e.g. MLX model not downloaded).
+                // Fall through to the always-available local engine so the
+                // user never sees a blank error in chat.
+                if backend is LocalFallbackBitBuddyService {
+                    throw error   // already the fallback — nothing left to try
+                }
+                print(" [BitBuddy] Primary backend (\(backend.backendName)) failed: \(error.localizedDescription). Falling back to local engine.")
+                rawResponse = try await LocalFallbackBitBuddyService.shared.send(
+                    message: message, session: session, dataContext: dataContext
+                )
+            }
             
             // Process the response through our JSON handler (handles
-            // any future structured-JSON backends).
+            // any future structured-JSON backends). For the local
+            // rule-based backend this is a no-op pass-through.
             let displayText = handleBitBuddyResponse(rawResponse)
             
             // Dispatch the structured action from the routed intent.
-            // Current backends return plain text, so we dispatch
-            // directly from the route result.
+            // The local backend returns plain text (never JSON), so
+            // handleBitBuddyResponse's JSON path never fires. We
+            // dispatch directly from the route result instead.
+            //
+            // IMPORTANT: Only dispatch non-mutating actions from the route
+            // result alone. Data-mutating actions (save_joke, delete_joke, etc.)
+            // require a validated structured payload — executing them from a
+            // conversational response with no payload causes empty saves,
+            // "missing joke text" errors, and bad UI loops.
             if let route = routeResult {
-                let intentAction: [String: Any] = [
-                    "type": route.intent.id
-                ]
-                executeBitBuddyAction(intentAction)
+                if !Self.dataMutatingActions.contains(route.intent.id) {
+                    let intentAction: [String: Any] = [
+                        "type": route.intent.id
+                    ]
+                    executeBitBuddyAction(intentAction)
+                }
                 
-                // Publish navigation target for the UI
-                if route.section != .bitbuddy {
+                // Publish navigation target for the UI — only for explicit
+                // navigation intents. All other intents return a text response
+                // that the user should be able to read inside the chat.
+                if route.category == .navigation && route.section != .bitbuddy {
                     pendingNavigation = route.section
                 }
             }
@@ -133,7 +159,7 @@ final class BitBuddyService: NSObject, ObservableObject {
             turnsByConversation.removeValue(forKey: oldId)
         }
         conversationId = nil
-        // Keep current connectivity state based on the selected backend.
+        // isConnected stays true — the local backend is always available.
         pendingNavigation = nil
         lastActions = []
         
@@ -354,31 +380,75 @@ final class BitBuddyService: NSObject, ObservableObject {
     /// - Parameter rawResponse: The raw response string from the LLM
     /// - Returns: The cleaned response text to display in the chat UI
     func handleBitBuddyResponse(_ rawResponse: String) -> String {
-        print(" [BitBuddy] Raw response: \(rawResponse)")
+        print(" [BitBuddy] Raw response: \(rawResponse.prefix(120))")
         
-        // Try to parse as JSON
+        // Try to parse as JSON — only structured JSON responses can trigger actions.
+        // Plain-text conversational responses are returned as-is with NO action dispatch.
         guard let jsonData = rawResponse.data(using: .utf8),
               let jsonObject = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-            print(" [BitBuddy] Failed to parse JSON, returning raw response")
+            // Not JSON — this is a normal conversational response. Do NOT try to
+            // execute any action path. This prevents treating "Sure, Taylor! What's
+            // the next joke?" as a save_joke payload.
             return rawResponse
         }
         
         // Extract the response text
         let responseText = jsonObject["response"] as? String ?? rawResponse
         
-        // Handle single action
+        // Handle single action — requires valid JSON with explicit action payload
         if let actionDict = jsonObject["action"] as? [String: Any] {
-            executeBitBuddyAction(actionDict)
+            // Validate that data-mutating actions have required fields before dispatch
+            if validateActionPayload(actionDict) {
+                executeBitBuddyAction(actionDict)
+            } else {
+                print(" [BitBuddy] Skipping action dispatch — payload validation failed")
+            }
         }
         
         // Handle multiple actions
         if let actionsArray = jsonObject["actions"] as? [[String: Any]] {
             for actionDict in actionsArray {
-                executeBitBuddyAction(actionDict)
+                if validateActionPayload(actionDict) {
+                    executeBitBuddyAction(actionDict)
+                } else {
+                    print(" [BitBuddy] Skipping action in array — payload validation failed")
+                }
             }
         }
         
         return responseText
+    }
+    
+    /// Validates that a data-mutating action payload contains the required fields.
+    /// Non-mutating actions (navigation, status checks) pass through without validation.
+    private func validateActionPayload(_ action: [String: Any]) -> Bool {
+        guard let actionType = action["type"] as? String else { return false }
+        
+        // Non-mutating actions don't need payload validation
+        guard Self.dataMutatingActions.contains(actionType) else { return true }
+        
+        // Specific field requirements for data-mutating actions
+        switch actionType {
+        case "add_joke", "save_joke", "save_joke_in_folder":
+            guard let joke = action["joke"] as? String, !joke.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                print(" [BitBuddy] Blocked \(actionType): missing or empty 'joke' field")
+                return false
+            }
+        case "add_brainstorm_note", "save_notebook_text":
+            guard let text = action["text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                print(" [BitBuddy] Blocked \(actionType): missing or empty 'text' field")
+                return false
+            }
+        case "add_roast_joke":
+            guard let joke = action["joke"] as? String, !joke.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                print(" [BitBuddy] Blocked \(actionType): missing or empty 'joke' field")
+                return false
+            }
+        default:
+            // Other mutating actions pass if they have any non-type key
+            break
+        }
+        return true
     }
     
     /// Executes a single BitBuddy action
@@ -539,6 +609,8 @@ final class BitBuddyService: NSObject, ObservableObject {
             print(" [BitBuddy] compare_versions — handled by backend")
         case "extract_premises_from_notes":
             print(" [BitBuddy] extract_premises_from_notes — handled by backend")
+        case "explain_comedy_theory":
+            print(" [BitBuddy] explain_comedy_theory — handled by backend")
 
         //  Notebook 
         case "open_notebook":
@@ -571,7 +643,8 @@ final class BitBuddyService: NSObject, ObservableObject {
 
         //  Import 
         case "import_file":
-            print(" [BitBuddy] import_file routed")
+            print(" [BitBuddy] import_file routed — triggering file picker in chat")
+            NotificationCenter.default.post(name: .bitBuddyTriggerFileImport, object: nil)
         case "import_image":
             print(" [BitBuddy] import_image routed")
         case "review_import_queue":
@@ -677,24 +750,6 @@ final class BitBuddyService: NSObject, ObservableObject {
         line
             .replacingOccurrences(of: #"^[-•*]\s*"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"^\d+[\.)]\s*"#, with: "", options: .regularExpression)
-    }
-
-    private func shouldConsultFAQ(for message: String, routeResult: BitBuddyRouteResult?) -> Bool {
-        if let routeResult {
-            if routeResult.section == .help { return true }
-            if routeResult.intent.id == "open_help_faq" || routeResult.intent.id == "explain_feature" {
-                return true
-            }
-        }
-
-        let lower = message.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !lower.isEmpty else { return false }
-
-        if lower.contains("faq") || lower.contains("help") || lower.contains("how do i") {
-            return true
-        }
-
-        return false
     }
     
     private func inferCategory(from lower: String) -> String {

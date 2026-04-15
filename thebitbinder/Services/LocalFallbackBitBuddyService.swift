@@ -1,7 +1,7 @@
 import Foundation
 
-/// BitBuddy's local rule-based fallback engine.
-/// Used when the on-device MLX model runtime is unavailable.
+/// BitBuddy's local rule-based engine — the ONLY backend for chat.
+/// AI services are reserved exclusively for the GagGrabber joke-extraction pipeline.
 /// Powered by the 93-intent router for structured command handling across 11 app sections.
 final class LocalFallbackBitBuddyService: BitBuddyBackend {
     static let shared = LocalFallbackBitBuddyService()
@@ -19,13 +19,25 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
     nonisolated(unsafe) private var userProfile: UserStyleProfile = .empty()
     private let intentRouter = BitBuddyIntentRouter.shared
     
+    /// Intent IDs that actually need the user's joke profile data.
+    /// BitBuddy will only load and reference saved jokes when one of these is triggered.
+    private static let profileDependentIntents: Set<String> = [
+        "summarize_style", "suggest_unexplored_topics", "rewrite_in_my_style",
+        "find_similar_jokes", "generate_premise", "generate_joke"
+    ]
+    
     func send(
         message: String,
         session: BitBuddySessionSnapshot,
         dataContext: BitBuddyDataContext
     ) async throws -> String {
-        // Refresh profile on every request since it's local and fast
-        updateProfile(from: dataContext.recentJokes)
+        // Only refresh the joke profile when the intent actually needs it.
+        // This prevents BitBuddy from proactively referencing saved jokes
+        // in casual conversation — jokes are only used when the user asks.
+        let intentId = dataContext.routedIntent?.intent.id
+        if let intentId, Self.profileDependentIntents.contains(intentId) {
+            updateProfile(from: dataContext.recentJokes)
+        }
         
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -272,7 +284,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             **Pro Technique to Try:** \(technique)
             
             **Example (\(BitBuddyResources.roastIntensityDescriptions["medium"] ?? "Medium")):**
-            "\(example)"
+            \(example)
             
             **Vocab Power-Up:** Aim for "\(vocabHit)" delivery.
             
@@ -291,6 +303,8 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             """
         case "extract_premises_from_notes":
             return " Mining your notes for premises... Look for any sentence that starts with an observation or frustration — those are your premises. The formula: [Thing] + [What's weird about it] = premise."
+        case "explain_comedy_theory":
+            return buildComedyTheoryResponse(from: message)
             
         // ═══════════════════════════════════════════
         // NOTEBOOK
@@ -487,8 +501,10 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
              **BitBuddy** is your comedy writing partner.
             • Analyze jokes for structure and strengths.
             • Get rewrites, premises, and new joke ideas.
-            • Summarize your comedy style.
+            • Ask about joke structure, comedy techniques, and what makes things funny.
+            • Summarize your comedy style (when you ask).
             • Find gaps in your material.
+            • Available on every screen — tap my icon in the toolbar anytime.
             Just type naturally — I understand \(BitBuddyIntentRouter.shared.allIntents.count) different commands across \(BitBuddySection.allCases.count) app sections.
             """
         }
@@ -529,6 +545,398 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         return "I can explain any feature! Try asking about GagGrabber, Roast Mode, The Hits, Set Lists, Brainstorm, Recordings, Notebook, iCloud Sync, or BitBuddy commands."
     }
     
+    // MARK: - Comedy Theory Knowledge
+    
+    private func buildComedyTheoryResponse(from message: String) -> String {
+        let lower = message.lowercased()
+        
+        // Joke structure
+        if lower.contains("structure") || lower.contains("anatomy") || lower.contains("parts of a joke") || lower.contains("how to write") || lower.contains("writing basics") {
+            return """
+             **Joke Structure — The Building Blocks**
+            
+            Every joke has the same DNA, no matter the style:
+            
+            **1. Setup** — Establish a shared reality with the audience. The setup creates an expectation. It should feel natural, like you're just telling a story or making an observation.
+            
+            **2. Tension / Misdirection** — Build on that expectation. The audience thinks they know where you're going. This is the invisible part — when it's done right, nobody notices it.
+            
+            **3. Punchline** — Shatter the expectation. The laugh comes from the surprise of landing somewhere unexpected. End on the funniest word — everything after the punch dilutes it.
+            
+            **The Golden Rule:** Punchline = Shortest distance between setup and surprise. Cut every word that doesn't serve the laugh.
+            
+            **Common Structures:**
+            • **One-liner** — Setup and punch in one sentence. Maximum efficiency.
+            • **Setup-Punchline** — Classic two-part structure. Setup builds, punch flips.
+            • **Rule of Three** — Two items set the pattern, third breaks it.
+            • **Anecdote / Story** — Longer form. Multiple beats and tags. Character + situation + escalation.
+            • **Chunk / Bit** — A premise explored from multiple angles with tags building on each other.
+            
+            Say **techniques** to learn the specific tools, or try **analyze** on one of your jokes to see structure in action.
+            """
+        }
+        
+        // What makes things funny
+        if lower.contains("what makes") && (lower.contains("funny") || lower.contains("humor") || lower.contains("laugh")) ||
+           lower.contains("why do jokes work") || lower.contains("why is") && lower.contains("funny") ||
+           lower.contains("theory of comedy") || lower.contains("comedy theory") || lower.contains("incongruity") {
+            return """
+             **Why Things Are Funny — The Core Theories**
+            
+            Comedy scholars and working comics agree on a few key mechanisms:
+            
+            **1. Incongruity** — Something doesn't fit. The brain expects one thing and gets another. That gap = funny. This is the engine behind most jokes. A punchline works because it's logically connected to the setup but emotionally surprising.
+            
+            **2. Superiority** — We laugh when we feel cleverer or luckier than someone else. Roasts, slapstick, and embarrassment humor run on this. Self-deprecation flips it — you make yourself the target so the audience feels in on it.
+            
+            **3. Relief / Release** — Tension builds, then the punchline releases it. Taboo topics, dark humor, and awkward situations work this way. The laugh is a pressure valve.
+            
+            **4. Recognition** — The audience sees themselves in it. Observational humor lives here. The laugh is less surprise and more I thought I was the only one.
+            
+            **5. Absurdity** — Take something normal and crank it to 11. The humor is in the commitment to the ridiculous premise. Think Mitch Hedberg or Steven Wright.
+            
+            **The Ways Something Can Be Funny:**
+            • Surprise / twist / subversion of expectations
+            • Exaggeration to absurd proportions
+            • Specificity (precise details are funnier than vague ones)
+            • Contrast between what's said and what's meant (irony)
+            • Wordplay — double meanings, homophones, unexpected literalism
+            • Timing — the pause, the callback, the delayed punch
+            • Commitment — the more seriously you sell a ridiculous premise, the funnier it gets
+            • Status play — high-status person in low-status situation (or vice versa)
+            
+            Want me to break down a specific technique? Just name it.
+            """
+        }
+        
+        // Specific techniques
+        if lower.contains("misdirection") || lower.contains("surprise") || lower.contains("subversion") || lower.contains("twist") {
+            return """
+             **Misdirection / Subversion of Expectations**
+            
+            This is the #1 comedy tool. Here's how it works:
+            
+            Your setup leads the audience down one mental path. The punchline yanks them onto a completely different one. The bigger the gap between where they expected to land and where you took them, the bigger the laugh.
+            
+            **How to build it:**
+            • Write the obvious ending first — then throw it away
+            • Find a second meaning in a word or phrase from your setup
+            • Use the audience's assumptions against them
+            • The setup should feel 100% sincere — never tip the twist
+            
+            **Example pattern:**
+            Setup: I told my doctor I broke my arm in two places.
+            Expected: Medical advice
+            Actual: He told me to stop going to those places.
+            
+            The punchline reinterprets places from body locations to physical locations. Same word, different meaning = surprise.
+            """
+        }
+        
+        if lower.contains("callback") {
+            return """
+             **Callbacks**
+            
+            A callback references something from earlier in your set. The audience remembers the original context, so the callback gets a laugh from recognition + surprise combined.
+            
+            **Why they work:**
+            • The audience feels smart for catching the reference
+            • It makes your set feel intentional and connected
+            • Each callback gets a bigger laugh than the last because the audience anticipates the pattern
+            
+            **How to use them:**
+            • Plant a strong, memorable image or phrase early in your set
+            • Wait at least 2-3 jokes before calling back
+            • The callback should add a new twist, not just repeat the original joke
+            • Great closers often call back to the opener — it wraps the set in a bow
+            
+            Callbacks are the mark of a pro. If you're building a set list, look for opportunities to connect unrelated bits.
+            """
+        }
+        
+        if lower.contains("rule of three") {
+            return """
+             **Rule of Three**
+            
+            Two items set the pattern. The third breaks it.
+            
+            The brain loves patterns — it takes exactly two examples to establish an expectation. The third slot is where you put the surprise.
+            
+            **Pattern:**
+            Normal, Normal, Absurd
+            
+            **Example:**
+            I need three things to be happy: food, shelter, and the WiFi password.
+            
+            **Advanced version — Reverse Rule of Three:**
+            Absurd, Absurd, Normal — the normal one becomes the punchline because the audience expected another escalation.
+            
+            **Pro tip:** The third item should be the most specific and visual. Vague = mild chuckle. Specific = real laugh.
+            """
+        }
+        
+        if lower.contains("timing") || lower.contains("pause") || lower.contains("delivery") {
+            return """
+             **Timing & Delivery**
+            
+            Timing is the invisible craft. The words are the joke; the timing is the weapon.
+            
+            **Key principles:**
+            • **The pause before the punch** — Give the audience a beat to lean in. They should almost feel the punch coming, then BAM.
+            • **The pause after the punch** — Let the laugh breathe. Don't step on your own laugh by rushing to the next line.
+            • **Speed changes** — Fast setup, slow punch. Or slow build, rapid-fire punch. The contrast amplifies impact.
+            • **The throw-away** — Deliver a devastating punchline casually, like it's nothing. Deadpan power.
+            
+            **On paper vs on stage:**
+            Written jokes can use line breaks and formatting for timing. On stage, you control timing with your voice, pace, and body. A joke that reads flat on paper can destroy live with the right delivery.
+            
+            **The golden rule of timing:** If you're not sure whether to pause, pause. Silence is the most powerful comedy tool nobody uses enough.
+            """
+        }
+        
+        if lower.contains("self deprecat") || lower.contains("self-deprecat") {
+            return """
+             **Self-Deprecation**
+            
+            Making yourself the target is one of the most powerful comedy moves. It builds trust, disarms the audience, and gives you permission to go darker later.
+            
+            **Why it works:**
+            • The audience roots for someone who doesn't take themselves too seriously
+            • It establishes you as the underdog — and everyone loves an underdog
+            • You can't be heckled with something you already said about yourself
+            
+            **How to do it well:**
+            • Be specific — I'm bad at dating is weak. My last date asked if I was lost is strong.
+            • Don't wallow — self-deprecation should be confident, not sad
+            • Use it early to build rapport, then pivot to other targets
+            • The best self-deprecation has a hidden brag (I'm so bad at saving money I accidentally bought a boat)
+            """
+        }
+        
+        if lower.contains("wordplay") || lower.contains("pun") {
+            return """
+             **Wordplay & Puns**
+            
+            Wordplay is comedy at the language level. The laugh comes from a word meaning two things at once, or sounding like another word.
+            
+            **Types of wordplay:**
+            • **Double meaning** — A word has two valid interpretations in context
+            • **Homophone** — Words that sound alike but mean different things
+            • **Malapropism** — Intentionally using the wrong word for comic effect
+            • **Literalism** — Taking a figurative expression literally
+            • **Portmanteau** — Blending two words into a new one
+            
+            **Pro tip:** The best puns don't announce themselves. If the audience groans, you tipped it too early. If they laugh, the double meaning hit them by surprise.
+            
+            **The hierarchy:** Unintentional-sounding wordplay > clever wordplay > obvious pun. The less the audience sees it coming, the harder it hits.
+            """
+        }
+        
+        if lower.contains("tag") && (lower.contains("line") || lower.contains("topper")) {
+            return """
+             **Tag Lines / Toppers**
+            
+            A tag is an additional punchline that builds on the same setup. It extends the laugh without needing a new premise.
+            
+            **How they work:**
+            • After the initial punchline lands, add another angle on the same idea
+            • Each tag should escalate — funnier than the last
+            • Tags turn a single joke into a full bit
+            
+            **Structure:**
+            Setup → Punch → Tag 1 → Tag 2 → Tag 3 (callback)
+            
+            **Pro tip:** Write your tags AFTER the core joke works. Don't dilute a strong punchline with weak tags. 2 great tags beat 5 mediocre ones.
+            
+            **The best tags** either escalate the absurdity or flip the perspective. Think of each tag as a new punchline that rides the wave of the first laugh.
+            """
+        }
+        
+        if lower.contains("observational") || lower.contains("observation") {
+            return """
+             **Observational Humor**
+            
+            Observational comedy points out what everyone notices but nobody says. The laugh comes from recognition — the audience thinks, that's so true.
+            
+            **The formula:**
+            [Universal experience] + [The thing nobody talks about] + [Your unique take]
+            
+            **How to find observations:**
+            • Pay attention to daily frustrations — lines, traffic, apps, interactions
+            • Notice the gap between how things should work and how they actually work
+            • Ask yourself: what is everyone pretending is normal that is actually insane?
+            
+            **What separates good from great:**
+            • Good: Points out something relatable
+            • Great: Points out something relatable AND reveals why it's absurd
+            • Elite: Makes the audience see something they experience daily in a way they never considered
+            
+            **The key:** Specificity. Don't just say airports are weird. Say specifically WHAT is weird about them and WHY.
+            """
+        }
+        
+        if lower.contains("irony") || lower.contains("sarcasm") {
+            return """
+             **Irony vs Sarcasm**
+            
+            These get confused constantly. Here's the difference:
+            
+            **Irony** — The gap between expectation and reality. Things don't turn out the way they should. Irony can exist without anyone saying a word — it's situational.
+            Example: A fire station burns down.
+            
+            **Sarcasm** — Saying the opposite of what you mean, with tone doing the heavy lifting. Sarcasm is verbal. It requires delivery.
+            Example: Oh great, another meeting that could have been an email.
+            
+            **Dramatic irony** — The audience knows something the subject doesn't. This is gold for storytelling bits.
+            
+            **How to use irony in jokes:**
+            • Set up a sincere expectation, then reveal the ironic outcome
+            • Let the audience figure out the irony themselves — don't explain it
+            • Pair irony with deadpan delivery for maximum impact
+            """
+        }
+        
+        if lower.contains("act out") || lower.contains("actout") || lower.contains("physical") {
+            return """
+             **Act-Outs / Physical Comedy**
+            
+            An act-out is when you physicalize the joke — you become the character, mimic the action, or use your body to sell the bit. This is where written material becomes performance.
+            
+            **Why act-outs kill:**
+            • They add a visual dimension the audience didn't expect
+            • They make you memorable — people remember what they see AND hear
+            • They extend laughs — the audience reacts to the words, then the physical, double hit
+            
+            **Types:**
+            • **Character voice** — Become someone else mid-joke
+            • **Mime / gesture** — Physicalize an action instead of describing it
+            • **Facial reaction** — Your face reacts to your own joke (deadpan, shock, resignation)
+            • **Exaggerated movement** — Amplify a normal action for absurdity
+            
+            **On paper:** Write [act out] in brackets where you'd physically perform. It reminds you where the visual beats are when you practice.
+            """
+        }
+        
+        if lower.contains("exaggerat") || lower.contains("hyperbole") {
+            return """
+             **Exaggeration / Hyperbole**
+            
+            Take something real and blow it up to absurd proportions. The humor lives in the gap between reality and the exaggerated version.
+            
+            **How to calibrate:**
+            • 2x exaggeration = not funny (too close to reality)
+            • 10x exaggeration = mildly funny
+            • 100x exaggeration = comedy (so absurd it's obviously not literal)
+            
+            **The key:** Start from a truthful observation. The exaggeration only works if the seed is recognizable. My rent is high → weak. My rent is high enough that my landlord has a money room like Scrooge McDuck → strong.
+            
+            **Combine with specificity:** Don't just say it took forever. Say it took so long my phone died, charged, and died again. Specific exaggeration beats vague exaggeration every time.
+            """
+        }
+        
+        if lower.contains("anti joke") || lower.contains("anti-joke") || lower.contains("deadpan") {
+            return """
+             **Anti-Jokes & Deadpan**
+            
+            An anti-joke sets up the expectation of a joke, then delivers something mundane, literal, or depressingly real instead. The humor comes from the absence of a traditional punchline.
+            
+            **Example:**
+            A horse walks into a bar. Several people leave, recognizing the potential danger of the situation.
+            
+            **Why it works:** The audience's brain is primed for a punchline. When it doesn't come, the subverted expectation itself becomes the joke.
+            
+            **Deadpan:** Delivering absurd material with zero emotion. The contrast between what you're saying and how you're saying it creates tension that the audience releases as laughter.
+            
+            **Masters to study:** Norm Macdonald, Steven Wright, Mitch Hedberg, Demetri Martin.
+            
+            **Pro tip:** Anti-humor works best when the audience trusts you're funny. Open with proven material, then hit them with the anti-joke once they're on your side.
+            """
+        }
+        
+        // Catch-all for general "techniques" or "types" questions
+        if lower.contains("technique") || lower.contains("types of") || lower.contains("kinds of") ||
+           lower.contains("ways") && lower.contains("funny") || lower.contains("comedy tools") {
+            let techniques = BitBuddyResources.jokeProTechniques
+            return """
+             **Comedy Techniques — The Full Toolkit**
+            
+            Here's every major tool in the joke writer's arsenal:
+            
+            \(techniques.enumerated().map { "**\($0.offset + 1). \($0.element)**" }.joined(separator: "\n"))
+            
+            **The 5 Engines of Funny:**
+            • **Surprise** — They didn't see it coming
+            • **Recognition** — They've lived it but never said it
+            • **Exaggeration** — It's true, but cranked to 11
+            • **Wordplay** — Language doing double duty
+            • **Tension & Release** — Build discomfort, then pop it
+            
+            Ask about any specific technique and I'll break it down with examples and how to use it in your material.
+            """
+        }
+        
+        // Punchline specifically
+        if lower.contains("punchline") || lower.contains("punch line") {
+            return """
+             **Punchlines — The Art of the Landing**
+            
+            The punchline is the destination. Everything else is the journey to get there.
+            
+            **Rules of punchline writing:**
+            • **End on the funny word.** Rearrange the sentence if you have to. The last word the audience hears should be the one that triggers the laugh.
+            • **Shorter is almost always better.** If you can cut a word and keep the meaning, cut it.
+            • **Hard consonants hit harder.** Words ending in K, T, P, and B sound punchier than soft endings. Truck is funnier than vehicle.
+            • **Don't explain after the punch.** The moment you say because or I mean after the punchline, you're stepping on your own laugh.
+            • **Surprise is everything.** If the audience can predict your punchline, rewrite it.
+            
+            **Testing your punchline:**
+            • Cover the punchline and read just the setup. Is the expected ending obvious? If yes, your punch needs to go further.
+            • Read the punchline out loud. Does it feel like a landing or a continuation? Punchlines should feel final.
+            """
+        }
+        
+        // Setup specifically
+        if lower.contains("setup") && !lower.contains("set up a") {
+            return """
+             **Setups — Laying the Foundation**
+            
+            The setup is the invisible half of the joke. When it's done right, the audience doesn't even know they're being set up.
+            
+            **A great setup does 3 things:**
+            1. Establishes the world of the joke (who, what, where)
+            2. Creates an expectation the punchline will shatter
+            3. Contains only the information needed for the punch to land
+            
+            **Common setup mistakes:**
+            • Too long — By the time the punch hits, they've forgotten the setup
+            • Too obvious — The audience can see the punchline from a mile away
+            • Missing context — The punch doesn't land because the setup didn't establish enough
+            
+            **Pro tip:** Write the punchline first, then write the minimum setup needed to make it work. Most setups are 2x longer than they need to be.
+            """
+        }
+        
+        // General/default comedy knowledge
+        return """
+         **Comedy Knowledge Base**
+        
+        I know joke structure inside and out. Ask me about any of these:
+        
+        **Structure:** joke anatomy, setup, punchline, tags, bits, chunks
+        **Techniques:** misdirection, callbacks, rule of three, irony, wordplay, act-outs, exaggeration, anti-jokes, deadpan
+        **Theory:** what makes things funny, incongruity, surprise, recognition, tension & release
+        **Craft:** timing, delivery, self-deprecation, observational humor
+        
+        Try asking something like:
+        • What makes a good punchline?
+        • How do callbacks work?
+        • What are the different ways something can be funny?
+        • Explain the rule of three
+        
+        I'm your comedy encyclopedia — just ask.
+        """
+    }
+    
     // MARK: - Help Response Builder
     
     private func buildHelpResponse(for dataContext: BitBuddyDataContext) -> String {
@@ -541,14 +949,15 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
          **Set Lists**: create, reorder, shuffle, estimate time, present
          **Recordings**: record, play, transcribe, clip, attach to sets
          **Writing Help**: analyze, improve, punch up, generate premises, crowdwork
+         **Comedy Knowledge**: joke structure, techniques, what makes things funny
          **Notebook**: save notes, attach photos, search
          **Roast Mode**: targets, burns, roast sets, battle prep
-         **Import**: PDF/image import, review queue, daily limits
+         **Import**: PDF/image import, review queue
          **Sync**: iCloud status, manual sync, toggle
          **Settings**: export, clear cache
          **Help**: explain any feature
         
-        Try something like: "analyze this joke" or "create a set list for tonight"
+        Try something like: "analyze this joke" or "what makes a good punchline"
         """
     }
     
@@ -559,9 +968,8 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         
         let structure = JokeAnalyzer.structure(text)
         
-        // Step 1: Acknowledge & Quote
-        let preview = text.count > 80 ? String(text.prefix(80)) + "..." : text
-        var response = " **Viewing your joke:**\n\"\(preview)\"\n\n"
+        // Step 1: Acknowledge
+        var response = " **Analysis:**\n\n"
         
         // Step 2: Breakdown
         var strengths: [String] = []
@@ -748,7 +1156,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         let technique = BitBuddyResources.jokeProTechniques.randomElement() ?? "Misdirection"
         let twist = BitBuddyResources.vocabTwistPhrases.randomElement() ?? "except the plot twist is"
         var response = " **Technique: \(technique)**\n\n"
-        response += "\"\(joke)\"\n\n"
+        response += "\(joke)\n\n"
         response += " **Upgrade idea:** Try adding a tag line — \(twist)...\n"
         response += "Say **\"expand this\"** to build it into a full bit, or **\"analyze this\"** for a full breakdown."
 
@@ -820,7 +1228,16 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
     }
     
     private func extractContent(from message: String, prefix: String) -> String {
-        var content = message.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces)
+        let lower = message.lowercased()
+        // Find the prefix within the message (not necessarily at the start)
+        // so "can you analyze this joke" correctly extracts "this joke"
+        // instead of blindly dropping characters from the front.
+        guard let range = lower.range(of: prefix) else {
+            // Prefix not found at all — return the whole message trimmed
+            return message.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        var content = String(message[range.upperBound...])
+            .trimmingCharacters(in: .whitespaces)
         if content.starts(with: ":") {
             content = content.dropFirst().trimmingCharacters(in: .whitespaces)
         }

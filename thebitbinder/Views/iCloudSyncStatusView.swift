@@ -6,15 +6,22 @@
 //
 
 import SwiftUI
-import CloudKit
+import SwiftData
 
 struct iCloudSyncStatusView: View {
-    @StateObject private var syncService = iCloudSyncService.shared
-    @StateObject private var diagnostics = iCloudSyncDiagnostics.shared
-    private let kvStore = iCloudKeyValueStore.shared
+    @ObservedObject private var syncService = iCloudSyncService.shared
+    @ObservedObject private var diagnostics = iCloudSyncDiagnostics.shared
+    @Environment(\.modelContext) private var modelContext
     
     @State private var showingDiagnostics = false
     @State private var isRefreshing = false
+    @State private var isForceRefreshing = false
+    @State private var isForcingKVSync = false
+    @State private var accountStatusText = "Checking..."
+    @State private var jokeCount = 0
+    @State private var setListCount = 0
+    @State private var recordingCount = 0
+    @State private var brainstormCount = 0
     
     var body: some View {
         NavigationStack {
@@ -29,8 +36,17 @@ struct iCloudSyncStatusView: View {
                 // Quick Actions
                 Section("Quick Actions") {
                     syncNowRow
+                    forceRefreshRow
                     forceKVSyncRow
                     diagnosticsRow
+                }
+                
+                // Local Data Counts
+                Section("Local Data") {
+                    dataCountRow(label: "Jokes", count: jokeCount, icon: "text.quote")
+                    dataCountRow(label: "Set Lists", count: setListCount, icon: "list.bullet.rectangle.portrait")
+                    dataCountRow(label: "Recordings", count: recordingCount, icon: "waveform")
+                    dataCountRow(label: "Brainstorm Ideas", count: brainstormCount, icon: "lightbulb")
                 }
                 
                 // Account Status
@@ -56,6 +72,7 @@ struct iCloudSyncStatusView: View {
                 DiagnosticsDetailView()
             }
             .task {
+                refreshDataCounts()
                 if diagnostics.diagnosticResults.isEmpty {
                     await diagnostics.runComprehensiveDiagnostics()
                 }
@@ -149,17 +166,53 @@ struct iCloudSyncStatusView: View {
         .disabled(isRefreshing || !syncService.isSyncEnabled)
     }
     
+    private var forceRefreshRow: some View {
+        Button {
+            Task {
+                isForceRefreshing = true
+                await syncService.forceRefreshAllData()
+                refreshDataCounts()
+                isForceRefreshing = false
+            }
+        } label: {
+            HStack {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .foregroundColor(.blue)
+                Text("Force Refresh All Data")
+                    .foregroundColor(.primary)
+                
+                if isForceRefreshing {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+        }
+        .disabled(isForceRefreshing || !syncService.isSyncEnabled)
+    }
+    
     private var forceKVSyncRow: some View {
         Button {
-            diagnostics.forceKeyValueSync()
+            Task {
+                isForcingKVSync = true
+                await diagnostics.forceKeyValueSync()
+                isForcingKVSync = false
+            }
         } label: {
             HStack {
                 Image(systemName: "arrow.up.arrow.down")
                     .foregroundColor(.blue)
                 Text("Force Settings Sync")
                     .foregroundColor(.primary)
+                
+                if isForcingKVSync {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
             }
         }
+        .disabled(isForcingKVSync)
     }
     
     private var diagnosticsRow: some View {
@@ -189,13 +242,14 @@ struct iCloudSyncStatusView: View {
             VStack(alignment: .leading) {
                 Text("Account Status")
                     .font(.headline)
-                Text("Checking...")
+                Text(accountStatusText)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
         }
         .task {
-            _ = await syncService.checkiCloudAvailability()
+            let available = await syncService.checkiCloudAvailability()
+            accountStatusText = available ? "Signed In" : (syncService.errorMessage ?? "Unavailable")
         }
     }
     
@@ -221,7 +275,7 @@ struct iCloudSyncStatusView: View {
         case .syncing:
             return .blue
         case .success:
-            return .blue
+            return .green
         case .error:
             return .red
         }
@@ -251,7 +305,35 @@ struct iCloudSyncStatusView: View {
     }
     
     private func refreshStatus() async {
+        refreshDataCounts()
         await diagnostics.runComprehensiveDiagnostics()
+    }
+    
+    private func dataCountRow(label: String, count: Int, icon: String) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(.secondary)
+            
+            Text(label)
+                .font(.headline)
+            
+            Spacer()
+            
+            Text("\(count)")
+                .font(.body)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private func refreshDataCounts() {
+        do {
+            jokeCount = try modelContext.fetchCount(FetchDescriptor<Joke>())
+            setListCount = try modelContext.fetchCount(FetchDescriptor<SetList>())
+            recordingCount = try modelContext.fetchCount(FetchDescriptor<Recording>())
+            brainstormCount = try modelContext.fetchCount(FetchDescriptor<BrainstormIdea>())
+        } catch {
+            print(" [SyncStatus] Failed to fetch data counts: \(error)")
+        }
     }
 }
 
@@ -292,7 +374,7 @@ struct IssueRowView: View {
         case .critical:
             return .red
         case .warning:
-            return .blue
+            return .orange
         case .info:
             return .blue
         }
@@ -300,13 +382,57 @@ struct IssueRowView: View {
 }
 
 struct DiagnosticsDetailView: View {
-    @StateObject private var diagnostics = iCloudSyncDiagnostics.shared
+    @ObservedObject private var diagnostics = iCloudSyncDiagnostics.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var isManualSyncing = false
     
     var body: some View {
         NavigationStack {
             List {
+                if !diagnostics.syncIssuesFound.isEmpty {
+                    Section("Issues Found") {
+                        ForEach(diagnostics.syncIssuesFound.indices, id: \.self) { index in
+                            let issue = diagnostics.syncIssuesFound[index]
+                            IssueRowView(issue: issue)
+                        }
+                    }
+                }
+                
+                Section("Actions") {
+                    Button {
+                        Task {
+                            isManualSyncing = true
+                            await diagnostics.triggerManualSync()
+                            isManualSyncing = false
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(.blue)
+                            Text("Trigger Manual Sync")
+                                .foregroundColor(.primary)
+                            
+                            if isManualSyncing {
+                                Spacer()
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                        }
+                    }
+                    .disabled(isManualSyncing)
+                }
+                
                 Section("Diagnostic Results") {
+                    if diagnostics.isRunningDiagnostics {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Running diagnostics...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
                     ForEach(diagnostics.diagnosticResults, id: \.self) { result in
                         Text(result)
                             .font(.system(.caption, design: .monospaced))
@@ -328,6 +454,7 @@ struct DiagnosticsDetailView: View {
                             await diagnostics.runComprehensiveDiagnostics()
                         }
                     }
+                    .disabled(diagnostics.isRunningDiagnostics)
                 }
             }
         }

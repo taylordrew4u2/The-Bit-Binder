@@ -82,27 +82,30 @@ final class MemoryManager {
         clearingLock.unlock()
         
         print(" [MemoryManager] Memory warning received - clearing caches")
+        reportMemoryUsage()
         
         // Clear caches on main thread
         DispatchQueue.main.async { [weak self] in
-            // Clear URL caches
+            // 1. Clear URL caches
             URLCache.shared.removeAllCachedResponses()
-            
-            // Clear any system image caches by evicting all objects
-            // from Foundation's shared caches
             URLCache.shared.memoryCapacity = 0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                // Restore a small capacity after clearing
-                URLCache.shared.memoryCapacity = 4 * 1024 * 1024 // 4 MB
+                URLCache.shared.memoryCapacity = 2 * 1024 * 1024 // 2 MB (reduced from 4)
             }
             
-            // Notify listeners (SpeechRecognizer, import pipeline, etc.)
+            // 2. Clear BitBuddy conversation history — can be substantial after
+            //    many turns, and is not user-critical data.
+            Task { @MainActor in
+                BitBuddyService.shared.startNewConversation()
+            }
+            
+            // 3. Clear temp files (scratch recordings, import artifacts, etc.)
+            self?.clearTempFiles()
+            
+            // 4. Notify listeners (SpeechRecognizer, import pipeline, etc.)
             NotificationCenter.default.post(name: .appMemoryWarning, object: nil)
             
-            #if DEBUG
             self?.reportMemoryUsage()
-            #endif
-            
             print(" [MemoryManager] Caches cleared")
             
             self?.clearingLock.lock()
@@ -117,6 +120,14 @@ final class MemoryManager {
         
         // Clear URL caches
         URLCache.shared.removeAllCachedResponses()
+        
+        // Clear temp files to reduce footprint while backgrounded
+        clearTempFiles()
+        
+        // Release BitBuddy conversation history
+        Task { @MainActor in
+            BitBuddyService.shared.startNewConversation()
+        }
     }
     
     /// Called when app enters foreground
@@ -131,7 +142,7 @@ final class MemoryManager {
         handleMemoryWarning()
     }
     
-    /// Report current memory usage (for debugging)
+    /// Report current memory usage
     func reportMemoryUsage() {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
@@ -165,6 +176,36 @@ final class MemoryManager {
             return usedMB > 200
         }
         return false
+    }
+    
+    /// Call before starting an expensive operation (backup, validation, import).
+    /// If memory is already above threshold, triggers a cleanup first.
+    func ensureMemoryHeadroom() {
+        if isMemoryPressureHigh() {
+            print(" [MemoryManager] Memory pressure high before expensive operation — preemptive cleanup")
+            reduceMemoryUsage()
+        }
+    }
+    
+    /// Removes all files from the app's temporary directory.
+    /// Safe to call at any time — only affects throwaway caches/scratch files.
+    private func clearTempFiles() {
+        let tmpDir = FileManager.default.temporaryDirectory
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: tmpDir, includingPropertiesForKeys: nil
+        ) else { return }
+        var removed = 0
+        for file in files {
+            do {
+                try FileManager.default.removeItem(at: file)
+                removed += 1
+            } catch {
+                // Temp files in use — skip silently
+            }
+        }
+        if removed > 0 {
+            print(" [MemoryManager] Cleared \(removed) temp file(s)")
+        }
     }
 }
 

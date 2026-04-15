@@ -35,7 +35,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>10.4</string>
+	<string>10.6</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>CloudKitSchemaConfiguration</key>
@@ -149,5 +149,20 @@
 	</array>
 	<key>UISupportsDocumentBrowser</key>
 	<true/>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>BitBinder Joke</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.thebitbinder.joke</string>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
+	</array>
 </dict>
 </plist>

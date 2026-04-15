@@ -45,6 +45,13 @@ struct SetListsView: View {
                         NavigationLink(value: setList) {
                             SetListRowView(setList: setList)
                         }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                softDeleteSetList(setList)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
                     .onDelete(perform: deleteSetLists)
                 }
@@ -56,7 +63,7 @@ struct SetListsView: View {
         }
         .searchable(text: $searchText, prompt: roastMode ? "Search roast sets" : "Search sets")
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarLeading) {
                 Button {
                     showingCreateSetList = true
                 } label: {
@@ -107,6 +114,18 @@ struct SetListsView: View {
         do {
             try modelContext.save()
         } catch {
+            print("[SetListsView] Failed to save after soft-delete: \(error)")
+            persistenceError = "Could not delete set list: \(error.localizedDescription)"
+            showingPersistenceError = true
+        }
+    }
+    
+    private func softDeleteSetList(_ setList: SetList) {
+        setList.moveToTrash()
+        do {
+            try modelContext.save()
+        } catch {
+            setList.restoreFromTrash()
             print("[SetListsView] Failed to save after soft-delete: \(error)")
             persistenceError = "Could not delete set list: \(error.localizedDescription)"
             showingPersistenceError = true

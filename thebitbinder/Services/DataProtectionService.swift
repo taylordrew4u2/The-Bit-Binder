@@ -20,6 +20,13 @@ final class DataProtectionService: ObservableObject {
     private let backupDirectory: URL
     private let maxBackups = 10 // Keep maximum 10 backups
     
+    /// Prevents concurrent backup operations from running simultaneously.
+    private var isBackupInProgress = false
+    /// Timestamp of the last completed backup — enforces a minimum gap.
+    private var lastBackupCompletionDate: Date = .distantPast
+    /// Minimum seconds between backup operations (prevents near-simultaneous backups).
+    private let backupCooldown: TimeInterval = 30
+    
     // Current app version for tracking updates
     private var currentAppVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
@@ -75,6 +82,22 @@ final class DataProtectionService: ObservableObject {
     
     /// Creates a complete backup of all user data
     func createBackup(named name: String? = nil, reason: BackupReason = .manual) async {
+        // Guard: prevent concurrent backups
+        guard !isBackupInProgress else {
+            print(" [DataProtection] Backup already in progress — skipping duplicate request")
+            return
+        }
+        // Guard: prevent rapid back-to-back backups (e.g. two triggers within seconds)
+        guard Date().timeIntervalSince(lastBackupCompletionDate) >= backupCooldown else {
+            print(" [DataProtection] Backup ran recently (\(String(format: "%.0f", Date().timeIntervalSince(lastBackupCompletionDate)))s ago) — skipping")
+            return
+        }
+        isBackupInProgress = true
+        defer {
+            isBackupInProgress = false
+            lastBackupCompletionDate = Date()
+        }
+        
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let backupName = name ?? "Manual_\(timestamp)"
         let backupURL = backupDirectory.appending(path: backupName, directoryHint: .isDirectory)
@@ -677,8 +700,6 @@ final class DataProtectionService: ObservableObject {
         for (key, value) in dict {
             UserDefaults.standard.set(value, forKey: key)
         }
-        
-        UserDefaults.standard.synchronize()
     }
     
     private func restoreAppFiles(from sourceURL: URL) throws {

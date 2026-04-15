@@ -17,6 +17,9 @@ final class AppStartupCoordinator: ObservableObject {
     private let dataMigration = DataMigrationService.shared
     private let schemaDeployment = SchemaDeploymentService.shared
     
+    /// Prevents `completeDataProtectionWithContext` from running more than once.
+    private var hasCompletedDataProtection = false
+    
     func start() async {
         guard !isReady else { return }
 
@@ -89,7 +92,17 @@ final class AppStartupCoordinator: ObservableObject {
     
     /// Call this after ModelContainer is available to complete data validation and migration
     func completeDataProtectionWithContext(_ context: ModelContext) async {
+        // Guard: prevent this from running more than once per launch
+        guard !hasCompletedDataProtection else {
+            print(" [AppStartup] completeDataProtectionWithContext already ran — skipping")
+            return
+        }
+        hasCompletedDataProtection = true
+        
         print(" [AppStartup] Completing data protection with model context...")
+        
+        // Ensure memory headroom before running expensive validation/migration
+        MemoryManager.shared.ensureMemoryHeadroom()
         
         // ── Post-restore confirmation ─────────────────────────────────────
         // If the user restored from a backup and the app restarted, confirm
@@ -281,6 +294,40 @@ final class AppStartupCoordinator: ObservableObject {
                 context.delete(recording)
             }
             purgeCount += recordings.count
+        }
+
+        // Orphan recordings — active Recording entities whose backing audio
+        // file has been externally deleted. Soft-delete (move to trash) so the
+        // user can see what was cleaned up and restore if the file reappears
+        // (e.g. after an iCloud Drive sync completes). This matches the
+        // DataValidationService behavior and keeps recovery possible for 30 days.
+        // Soft-deleted recordings are excluded (their file may already have been
+        // removed by permanent-delete or auto-purge, which is expected).
+        //
+        // Also skip recordings already handled by DataValidationService to
+        // prevent the same orphans from being rediscovered every launch
+        // (e.g. when CloudKit re-syncs the record metadata).
+        let handledIDs = Set(UserDefaults.standard.stringArray(forKey: "DataValidation_HandledMissingRecordingIDs") ?? [])
+        if let activeRecordings = try? context.fetch(FetchDescriptor<Recording>(
+            predicate: #Predicate { $0.isDeleted == false }
+        )) {
+            var orphanCount = 0
+            var updatedHandledIDs = handledIDs
+            for recording in activeRecordings {
+                guard !handledIDs.contains(recording.id.uuidString) else { continue }
+                if !recording.fileURL.isEmpty && !recording.backingFileExists {
+                    print(" [OrphanCleanup] Recording '\(recording.title)' has no backing file — moving to trash")
+                    recording.moveToTrash()
+                    updatedHandledIDs.insert(recording.id.uuidString)
+                    orphanCount += 1
+                }
+            }
+            if orphanCount > 0 {
+                purgeCount += orphanCount
+                // Persist handled IDs (cap at 200)
+                UserDefaults.standard.set(Array(updatedHandledIDs.prefix(200)), forKey: "DataValidation_HandledMissingRecordingIDs")
+                print(" [OrphanCleanup] Moved \(orphanCount) orphan recording(s) to trash (recoverable for 30 days)")
+            }
         }
 
         if purgeCount > 0 {

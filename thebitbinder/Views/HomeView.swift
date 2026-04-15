@@ -58,25 +58,21 @@ struct HomeView: View {
 
     var body: some View {
         List {
-            // MARK: - Greeting Header with BitBuddy
+            // MARK: - Greeting Header
             Section {
-                HStack(spacing: 14) {
-                    BitBuddyAvatar(roastMode: roastMode, size: 48, symbolSize: 20)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(greetingName)
+                        .font(.title3.weight(.semibold))
+                        .foregroundColor(.primary)
                     
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(greetingName)
-                            .font(.title3.weight(.semibold))
-                            .foregroundColor(.primary)
-                        
-                        if allJokes.isEmpty {
-                            Text("Let's get your first joke on paper")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text(motivationalSubtitle)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
+                    if allJokes.isEmpty {
+                        Text("Let's get your first joke on paper")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(motivationalSubtitle)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                     }
                 }
                 .listRowBackground(Color.clear)

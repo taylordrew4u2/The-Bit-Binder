@@ -15,6 +15,7 @@ struct SetListDetailView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("showFullContent") private var showFullContent = true
     
+    @Environment(\.dismiss) private var dismiss
     @Bindable var setList: SetList
     @State private var showingAddJokes = false
     @State private var isEditing = false
@@ -23,6 +24,9 @@ struct SetListDetailView: View {
     @State private var showingFinalizeSheet = false
     @State private var showingLivePerformance = false
     @State private var showingUnfinalizeAlert = false
+    @State private var showingDeleteSetAlert = false
+    @State private var deleteError: String?
+    @State private var showingDeleteError = false
     
     // Recording inline
     @StateObject private var audioService = AudioRecordingService()
@@ -209,6 +213,14 @@ struct SetListDetailView: View {
                         Label(isEditing ? "Done" : "Edit Order", systemImage: "arrow.up.arrow.down")
                     }
                     .disabled(setList.isFinalized)
+                    
+                    Divider()
+                    
+                    Button(role: .destructive) {
+                        showingDeleteSetAlert = true
+                    } label: {
+                        Label("Delete Set", systemImage: "trash")
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -235,6 +247,19 @@ struct SetListDetailView: View {
             }
         } message: {
             Text("This will allow editing the set again. You can re-finalize anytime before your performance.")
+        }
+        .alert("Delete Set?", isPresented: $showingDeleteSetAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteSet()
+            }
+        } message: {
+            Text("\"\(setList.name)\" will be moved to trash. You can restore it later from the trash.")
+        }
+        .alert("Error", isPresented: $showingDeleteError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteError ?? "An unknown error occurred")
         }
         .alert("Save Recording", isPresented: $showingSaveAlert) {
             TextField("Recording name", text: $recordingName)
@@ -511,6 +536,22 @@ struct SetListDetailView: View {
             #if DEBUG
             print("⚠️ [SetListDetailView] Failed to unfinalize: \(error)")
             #endif
+        }
+    }
+    
+    private func deleteSet() {
+        setList.moveToTrash()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            // Restore state since save failed
+            setList.restoreFromTrash()
+            #if DEBUG
+            print("⚠️ [SetListDetailView] Failed to delete set: \(error)")
+            #endif
+            deleteError = "Could not delete set: \(error.localizedDescription)"
+            showingDeleteError = true
         }
     }
 }

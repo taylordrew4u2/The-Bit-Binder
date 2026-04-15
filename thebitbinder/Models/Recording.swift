@@ -56,6 +56,11 @@ final class Recording: Identifiable {
 
     // MARK: - Trash Helpers
 
+    /// True if the backing audio file exists on disk at `resolvedURL`.
+    var backingFileExists: Bool {
+        FileManager.default.fileExists(atPath: resolvedURL.path)
+    }
+
     /// Soft-deletes this recording record. The audio file is NOT deleted here.
     /// Permanent deletion (file + record) must be done explicitly by the caller.
     func moveToTrash() {

@@ -3,7 +3,9 @@
 //  thebitbinder
 //
 //  Craft your brainstorm thought into a joke.
-//  Familiar writer-focused experience with auto-save.
+//  Always-editable canvas — just tap and start writing.
+//  Includes a Notes scratchpad for related ideas.
+//  Auto-save keeps your work safe.
 //
 
 import SwiftUI
@@ -17,19 +19,28 @@ struct BrainstormDetailView: View {
     @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }, sort: \JokeFolder.name) private var folders: [JokeFolder]
 
     @Bindable var idea: BrainstormIdea
-    @State private var isEditing = false
     @State private var showingDeleteAlert = false
     @State private var showingMetadata = false
+    @State private var showingNotes = true
     @State private var showPromoteOptions = false
 
     // Auto-save
     @StateObject private var autoSave = AutoSaveManager.shared
-    @State private var showSavedToast = false
     @State private var saveError: String?
     @State private var showingSaveError = false
 
     // Promoted toast
     @State private var showPromotedToast = false
+    @State private var showColorPicker = false
+    
+    // BitBuddy floating chat
+    @State private var showBitBuddyChat = false
+
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable {
+        case content, notes
+    }
 
     private var accentColor: Color {
         .blue
@@ -40,21 +51,31 @@ struct BrainstormDetailView: View {
     }
 
     var body: some View {
+        ZStack(alignment: .bottomTrailing) {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // MARK: - Title Section
-                titleSection
+                // MARK: - Header (title + badges)
+                headerSection
 
-                // MARK: - Content Workspace
+                // MARK: - Content Workspace (always editable)
                 contentSection
+
+                // MARK: - Notes (scratchpad)
+                notesSection
+                    .padding(.top, 12)
+
+                // MARK: - Color Picker
+                colorPickerSection
+                    .padding(.top, 12)
 
                 // MARK: - Promote to Joke
                 promoteSection
-
-                // MARK: - Actions Bar
-                actionsBar
+                    .padding(.top, 16)
 
                 // MARK: - Metadata (collapsible)
+                actionsBar
+                    .padding(.top, 8)
+
                 if showingMetadata {
                     metadataSection
                 }
@@ -63,14 +84,31 @@ struct BrainstormDetailView: View {
             .padding(.top, 16)
             .padding(.bottom, 40)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(Color(UIColor.systemBackground))
+        
+            // Floating BitBuddy button — bottom-right corner
+            Button {
+                haptic(.light)
+                showBitBuddyChat = true
+            } label: {
+                BitBuddyAvatar(roastMode: roastMode, size: 44, symbolSize: 18)
+                    .background(
+                        Circle()
+                            .fill(Color(UIColor.systemBackground))
+                            .frame(width: 50, height: 50)
+                            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+                    )
+            }
+            .padding(.trailing, 20)
+            .padding(.bottom, 24)
+        }
         .navigationBarTitleDisplayMode(.inline)
         .bitBinderToolbar(roastMode: roastMode)
         .toolbar { toolbarContent }
         .tint(accentColor)
-        .successToast(message: "Changes saved", icon: "checkmark.circle.fill", isPresented: $showSavedToast, roastMode: roastMode)
         .successToast(message: "Promoted to Jokes", icon: "arrow.up.doc.fill", isPresented: $showPromotedToast, roastMode: roastMode)
-        .alert(showingDeleteAlert ? "Move to Trash" : "", isPresented: $showingDeleteAlert) {
+        .alert("Move to Trash", isPresented: $showingDeleteAlert) {
             Button("Move to Trash", role: .destructive) {
                 idea.moveToTrash()
                 do {
@@ -89,6 +127,11 @@ struct BrainstormDetailView: View {
         } message: {
             Text(saveError ?? "Your changes might not be saved. Try editing again.")
         }
+        .sheet(isPresented: $showBitBuddyChat) {
+            NavigationStack {
+                BitBuddyChatView()
+            }
+        }
         .confirmationDialog("Add to Folder", isPresented: $showPromoteOptions, titleVisibility: .visible) {
             ForEach(folders) { folder in
                 Button(folder.name) {
@@ -104,6 +147,17 @@ struct BrainstormDetailView: View {
         }
         .onChange(of: idea.content) { _, _ in
             scheduleAutoSave()
+        }
+        .onChange(of: idea.notes) { _, _ in
+            scheduleAutoSave()
+        }
+        .onAppear {
+            // Auto-focus so you can start typing right away
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                if idea.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    focusedField = .content
+                }
+            }
         }
         .onDisappear {
             saveIdeaNow()
@@ -132,9 +186,9 @@ struct BrainstormDetailView: View {
         }
     }
 
-    // MARK: - Title Section
+    // MARK: - Header Section
 
-    private var titleSection: some View {
+    private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
                 Text(KeywordTitleGenerator.displayTitle(from: idea.content))
@@ -171,54 +225,158 @@ struct BrainstormDetailView: View {
 
                 Spacer()
 
-                if isEditing {
-                    SaveStatusIndicator(roastMode: roastMode)
-                }
+                SaveStatusIndicator(roastMode: roastMode)
             }
         }
-        .padding(.bottom, 16)
+        .padding(.bottom, 12)
     }
 
-    // MARK: - Content Section
+    // MARK: - Content Section (always editable)
 
     private var contentSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if isEditing {
-                TextEditor(text: $idea.content)
-                    .scrollContentBackground(.hidden)
+        ZStack(alignment: .topLeading) {
+            if idea.content.isEmpty {
+                Text("Start writing your thought…")
                     .font(.body)
-                    .foregroundColor(.primary)
-                    .lineSpacing(6)
-                    .frame(minHeight: 250)
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color(UIColor.secondarySystemBackground))
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.99, anchor: .top)))
-            } else {
-                Text(idea.content)
-                    .font(.body)
-                    .foregroundColor(.primary)
-                    .lineSpacing(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color(UIColor.secondarySystemBackground).opacity(0.5))
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        withAnimation(EffortlessAnimation.snappy) {
-                            isEditing = true
-                        }
-                        HapticEngine.shared.tap()
+                    .foregroundColor(Color(UIColor.placeholderText))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .allowsHitTesting(false)
+            }
+
+            TextEditor(text: $idea.content)
+                .scrollContentBackground(.hidden)
+                .font(.body)
+                .foregroundColor(.primary)
+                .lineSpacing(6)
+                .frame(minHeight: 260)
+                .focused($focusedField, equals: .content)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(UIColor.secondarySystemBackground))
+        )
+    }
+
+    // MARK: - Notes Section (collapsible scratchpad)
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(EffortlessAnimation.smooth) {
+                    showingNotes.toggle()
+                }
+                HapticEngine.shared.tap()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "note.text")
+                        .font(.caption)
+                        .foregroundColor(accentColor)
+
+                    Text("Notes")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.primary)
+
+                    if !idea.notes.isEmpty && !showingNotes {
+                        Circle()
+                            .fill(accentColor)
+                            .frame(width: 6, height: 6)
                     }
-                    .transition(.opacity)
+
+                    Spacer()
+
+                    Image(systemName: showingNotes ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if showingNotes {
+                ZStack(alignment: .topLeading) {
+                    if idea.notes.isEmpty {
+                        Text("Related ideas, angles, connections…")
+                            .font(.subheadline)
+                            .foregroundColor(Color(UIColor.placeholderText))
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .allowsHitTesting(false)
+                    }
+
+                    TextEditor(text: $idea.notes)
+                        .font(.subheadline)
+                        .lineSpacing(5)
+                        .frame(minHeight: 80)
+                        .focused($focusedField, equals: .notes)
+                        .scrollContentBackground(.hidden)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(UIColor.secondarySystemBackground))
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .animation(EffortlessAnimation.smooth, value: isEditing)
-        .padding(.bottom, 16)
+    }
+
+    // MARK: - Color Picker
+
+    private var colorPickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(EffortlessAnimation.smooth) {
+                    showColorPicker.toggle()
+                }
+                HapticEngine.shared.tap()
+            } label: {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color(hex: idea.colorHex) ?? .gray)
+                        .frame(width: 14, height: 14)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
+                        )
+
+                    Text("Note Color")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    Image(systemName: showColorPicker ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if showColorPicker {
+                HStack(spacing: 10) {
+                    ForEach(BrainstormIdea.noteColors, id: \.self) { colorHex in
+                        Button {
+                            idea.colorHex = colorHex
+                            scheduleAutoSave()
+                            haptic(.light)
+                        } label: {
+                            Circle()
+                                .fill(Color(hex: colorHex) ?? .gray)
+                                .frame(width: 28, height: 28)
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(idea.colorHex == colorHex ? Color.blue : Color.clear, lineWidth: 2)
+                                )
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
     }
 
     // MARK: - Promote Section
@@ -235,7 +393,6 @@ struct BrainstormDetailView: View {
         .tint(.blue)
         .controlSize(.large)
         .disabled(idea.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .padding(.bottom, 16)
     }
 
     // MARK: - Actions Bar
@@ -257,7 +414,7 @@ struct BrainstormDetailView: View {
                     .symbolEffect(.bounce, value: showingMetadata)
             }
         }
-        .padding(.bottom, 16)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Metadata Section
@@ -306,29 +463,43 @@ struct BrainstormDetailView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            HStack(spacing: 16) {
-                Button(isEditing ? "Done" : "Edit") {
-                    if isEditing {
-                        saveIdeaNow()
-                        HapticEngine.shared.success()
-                        showSavedToast = true
-                    } else {
-                        HapticEngine.shared.tap()
-                    }
-                    withAnimation(EffortlessAnimation.snappy) {
-                        isEditing.toggle()
-                    }
-                }
-                .fontWeight(isEditing ? .semibold : .regular)
-                .foregroundColor(accentColor)
+            Button {
+                HapticEngine.shared.warning()
+                showingDeleteAlert = true
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
+            }
+        }
 
+        ToolbarItem(placement: .keyboard) {
+            HStack {
+                // Jump between fields
                 Button {
-                    HapticEngine.shared.warning()
-                    showingDeleteAlert = true
+                    switch focusedField {
+                    case .content:
+                        focusedField = .notes
+                        if !showingNotes {
+                            withAnimation(EffortlessAnimation.smooth) {
+                                showingNotes = true
+                            }
+                        }
+                    case .notes:
+                        focusedField = .content
+                    case .none:
+                        focusedField = .content
+                    }
                 } label: {
-                    Image(systemName: "trash")
-                        .foregroundColor(.red)
+                    Image(systemName: "arrow.right.arrow.left")
+                        .font(.subheadline)
                 }
+
+                Spacer()
+
+                Button("Done") {
+                    focusedField = nil
+                }
+                .fontWeight(.medium)
             }
         }
     }
@@ -342,6 +513,10 @@ struct BrainstormDetailView: View {
         let title = String(trimmed.prefix(60))
         let joke = Joke(content: trimmed, title: title, folder: folder)
         joke.importSource = "Brainstorm"
+        // Carry over notes if the brainstorm had any
+        if !idea.notes.isEmpty {
+            joke.notes = idea.notes
+        }
 
         modelContext.insert(joke)
 

@@ -2,9 +2,10 @@
 //  JokeDetailView.swift
 //  thebitbinder
 //
-//  Refactored for cleaner, writer-focused experience
-//  Progressive disclosure, distraction-free editing, clear hierarchy
-//   Now with auto-save and effortless interactions
+//  A comfortable, writer-first space for creating and editing jokes.
+//  Always-editable canvas — no mode-switching, just start writing.
+//  Includes a Notes & Ideas scratchpad for brainstorming.
+//  Auto-save keeps your work safe while you focus on the funny.
 //
 
 import SwiftUI
@@ -16,174 +17,161 @@ struct JokeDetailView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     @Bindable var joke: Joke
-    @State private var isEditing = false
     @State private var showingFolderPicker = false
     @State private var showingDeleteAlert = false
     @State private var showingMetadata = false
-    // Folders loaded lazily — only when the picker sheet opens
+    @State private var showingNotes = true
     @State private var folders: [JokeFolder] = []
+    
+    // BitBuddy floating chat
+    @State private var showBitBuddyChat = false
     
     // Auto-save state
     @StateObject private var autoSave = AutoSaveManager.shared
     @State private var saveError: String?
     @State private var showingSaveError = false
     
+    @FocusState private var focusedField: Field?
+    
+    // Inline tag editing
+    @State private var newTagText = ""
+    @State private var isAddingTag = false
+    
+    private enum Field: Hashable {
+        case title, content, notes, newTag
+    }
+    
     var body: some View {
-        Form {
-            // MARK: - Title Section
-            Section {
-                if isEditing {
-                    TextField("Title", text: $joke.title, axis: .vertical)
-                        .font(.title3.weight(.semibold))
-                        .lineLimit(3)
-                } else {
-                    HStack {
-                        Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
-                            .font(.title3.weight(.semibold))
-                        Spacer()
-                        if joke.isOpenMic {
-                            Image(systemName: "mic.fill")
-                                .foregroundColor(.blue)
-                        }
-                        if joke.isHit {
+        ZStack(alignment: .bottomTrailing) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                
+                // MARK: - Title Area (always editable)
+                TextField("Give it a name…", text: $joke.title, axis: .vertical)
+                    .font(.title2.weight(.semibold))
+                    .lineLimit(3)
+                    .focused($focusedField, equals: .title)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                
+                // MARK: - Badges & Word Count
+                HStack(spacing: 8) {
+                    if joke.isHit {
+                        HStack(spacing: 4) {
                             Image(systemName: roastMode ? "flame.fill" : "star.fill")
-                                .foregroundColor(.blue)
+                                .font(.caption2)
+                            Text(roastMode ? "Fire" : "Hit")
+                                .font(.caption2.weight(.medium))
                         }
+                        .foregroundColor(roastMode ? .orange : .yellow)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background((roastMode ? Color.orange : Color.yellow).opacity(0.12), in: Capsule())
+                    }
+                    
+                    if joke.isOpenMic {
+                        HStack(spacing: 4) {
+                            Image(systemName: "mic.fill")
+                                .font(.caption2)
+                            Text("Open Mic")
+                                .font(.caption2.weight(.medium))
+                        }
+                        .foregroundColor(.purple)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.purple.opacity(0.12), in: Capsule())
+                    }
+                    
+                    Spacer()
+                    
+                    if !joke.content.isEmpty {
+                        Text("\(joke.content.split(separator: " ").count) words")
+                            .font(.caption)
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
                     }
                 }
-            }
-            
-            // MARK: - Content Section
-            Section {
-                if isEditing {
+                .padding(.horizontal, 20)
+                .padding(.top, 6)
+                
+                Divider()
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                
+                // MARK: - Content Area (always editable, the main canvas)
+                ZStack(alignment: .topLeading) {
+                    if joke.content.isEmpty {
+                        Text("Start writing your joke…")
+                            .font(.body)
+                            .foregroundColor(Color(UIColor.placeholderText))
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .allowsHitTesting(false)
+                    }
+                    
                     TextEditor(text: $joke.content)
                         .font(.body)
-                        .lineSpacing(4)
-                        .frame(minHeight: 200)
-                } else {
-                    Text(joke.content)
-                        .font(.body)
-                        .lineSpacing(4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation {
-                                isEditing = true
-                            }
-                            HapticEngine.shared.tap()
-                        }
+                        .lineSpacing(6)
+                        .frame(minHeight: 300)
+                        .focused($focusedField, equals: .content)
+                        .scrollContentBackground(.hidden)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                 }
-            } header: {
-                if !joke.content.isEmpty {
-                    Text("\(joke.content.split(separator: " ").count) words")
-                }
-            }
-            
-            // MARK: - Tags Section
-            if !joke.tags.isEmpty {
-                Section("Tags") {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(joke.tags, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.caption)
-                                    .foregroundColor(.accentColor)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.accentColor.opacity(0.12), in: Capsule())
-                            }
-                        }
-                    }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                }
-            }
-            
-            // MARK: - Actions Section
-            Section {
-                Button {
-                    withAnimation {
-                        joke.isHit.toggle()
-                        joke.dateModified = Date()
-                    }
-                    HapticEngine.shared.starToggle(joke.isHit)
-                    do { try modelContext.save() } catch {
-                        saveError = "Couldn't save hit status: \(error.localizedDescription)"
-                        showingSaveError = true
-                    }
-                } label: {
-                    Label(
-                        joke.isHit ? "Remove from Hits" : "Add to Hits",
-                        systemImage: roastMode ? (joke.isHit ? "flame.fill" : "flame") : (joke.isHit ? "star.fill" : "star")
-                    )
-                    .foregroundColor(joke.isHit ? (.blue) : .accentColor)
-                }
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(UIColor.secondarySystemBackground))
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
                 
-                Button {
-                    withAnimation {
-                        joke.isOpenMic.toggle()
-                        joke.dateModified = Date()
-                    }
-                    haptic(.medium)
-                    do { try modelContext.save() } catch {
-                        saveError = "Couldn't save open mic status: \(error.localizedDescription)"
-                        showingSaveError = true
-                    }
-                } label: {
-                    Label(
-                        joke.isOpenMic ? "Remove from Open Mic" : "Label for Open Mic",
-                        systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill"
-                    )
-                    .foregroundColor(joke.isOpenMic ? .blue : .blue)
-                }
+                // MARK: - Tags (inline editing)
+                tagsSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
                 
-                Button {
-                    HapticEngine.shared.tap()
-                    showingFolderPicker = true
-                } label: {
-                    HStack {
-                        Label("Folders", systemImage: "folder")
-                        Spacer()
-                        let folderCount = (joke.folders ?? []).count
-                        if folderCount == 0 {
-                            Text("None")
-                                .foregroundColor(.secondary)
-                        } else if folderCount == 1 {
-                            Text((joke.folders ?? []).first?.name ?? "")
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("\(folderCount)")
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
+                // MARK: - Notes & Ideas (scratchpad)
+                notesSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                
+                Divider()
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                
+                // MARK: - Actions (low-key, below the fold)
+                actionsSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                
+                // MARK: - Metadata (collapsible)
+                metadataSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 40)
             }
-            
-            // MARK: - Metadata Section (collapsible)
-            Section {
-                DisclosureGroup("Details", isExpanded: $showingMetadata) {
-                    LabeledContent("Created") {
-                        Text(joke.dateCreated.formatted(date: .abbreviated, time: .shortened))
-                    }
-                    LabeledContent("Modified") {
-                        Text(joke.dateModified.formatted(date: .abbreviated, time: .shortened))
-                    }
-                    if let source = joke.importSource, !source.isEmpty {
-                        LabeledContent("Imported from") {
-                            Text(source)
-                        }
-                    }
-                    if let confidence = joke.importConfidence, !confidence.isEmpty {
-                        LabeledContent("Confidence") {
-                            Text(confidence.capitalized)
-                                .foregroundColor(confidence == "high" ? .blue : (confidence == "medium" ? .blue : .blue))
-                        }
-                    }
-                }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color(UIColor.systemBackground))
+        
+            // Floating BitBuddy button — bottom-right corner
+            Button {
+                haptic(.light)
+                showBitBuddyChat = true
+            } label: {
+                BitBuddyAvatar(roastMode: roastMode, size: 44, symbolSize: 18)
+                    .background(
+                        Circle()
+                            .fill(Color(UIColor.systemBackground))
+                            .frame(width: 50, height: 50)
+                            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+                    )
             }
+            .padding(.trailing, 20)
+            .padding(.bottom, 24)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
-        .tint(.blue)
+        .tint(roastMode ? .orange : .accentColor)
         .alert(joke.isDeleted ? "Restore Joke" : "Move to Trash", isPresented: $showingDeleteAlert) {
             deleteAlertButtons
         } message: {
@@ -205,6 +193,11 @@ struct JokeDetailView: View {
                 allFolders: folders
             )
         }
+        .sheet(isPresented: $showBitBuddyChat) {
+            NavigationStack {
+                BitBuddyChatView()
+            }
+        }
         .onChange(of: showingFolderPicker) { _, isOpen in
             if isOpen {
                 var descriptor = FetchDescriptor<JokeFolder>(predicate: #Predicate { !$0.isDeleted })
@@ -218,9 +211,288 @@ struct JokeDetailView: View {
         .onChange(of: joke.title) { _, _ in
             scheduleAutoSave()
         }
+        .onChange(of: joke.notes) { _, _ in
+            scheduleAutoSave()
+        }
+        .onAppear {
+            // Auto-focus content for new/empty jokes so you can write immediately
+            if joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    focusedField = .content
+                }
+            }
+        }
         .onDisappear {
             saveJokeNow()
             folders = []
+        }
+    }
+    
+    // MARK: - Tags
+    
+    private var tagsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Tags")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(joke.tags, id: \.self) { tag in
+                        HStack(spacing: 4) {
+                            Text(tag)
+                                .font(.caption)
+                            Button {
+                                var current = joke.tags
+                                current.removeAll { $0 == tag }
+                                joke.tags = current
+                                joke.dateModified = Date()
+                                scheduleAutoSave()
+                                haptic(.light)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                        }
+                        .foregroundColor(.accentColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                    }
+                    
+                    if isAddingTag {
+                        HStack(spacing: 4) {
+                            TextField("tag", text: $newTagText)
+                                .font(.caption)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .focused($focusedField, equals: .newTag)
+                                .frame(minWidth: 50, maxWidth: 120)
+                                .onSubmit {
+                                    commitNewTag()
+                                }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.accentColor.opacity(0.08), in: Capsule())
+                    } else {
+                        Button {
+                            isAddingTag = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                focusedField = .newTag
+                            }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 10, weight: .medium))
+                                Text("Add")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(UIColor.tertiarySystemFill), in: Capsule())
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func commitNewTag() {
+        let trimmed = newTagText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !trimmed.isEmpty && !joke.tags.contains(trimmed) {
+            var current = joke.tags
+            current.append(trimmed)
+            joke.tags = current
+            joke.dateModified = Date()
+            scheduleAutoSave()
+            haptic(.light)
+        }
+        newTagText = ""
+        isAddingTag = false
+    }
+    
+    // MARK: - Notes & Ideas
+    
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(EffortlessAnimation.smooth) {
+                    showingNotes.toggle()
+                }
+                HapticEngine.shared.tap()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.caption)
+                        .foregroundColor(.yellow)
+                    
+                    Text("Notes & Ideas")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(.primary)
+                    
+                    if !joke.notes.isEmpty && !showingNotes {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 6, height: 6)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: showingNotes ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+            
+            if showingNotes {
+                ZStack(alignment: .topLeading) {
+                    if joke.notes.isEmpty {
+                        Text("Jot down setups, tags, alternate punchlines…")
+                            .font(.subheadline)
+                            .foregroundColor(Color(UIColor.placeholderText))
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .allowsHitTesting(false)
+                    }
+                    
+                    TextEditor(text: $joke.notes)
+                        .font(.subheadline)
+                        .lineSpacing(5)
+                        .frame(minHeight: 100)
+                        .focused($focusedField, equals: .notes)
+                        .scrollContentBackground(.hidden)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(UIColor.secondarySystemBackground))
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private var actionsSection: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation {
+                    joke.isHit.toggle()
+                    joke.dateModified = Date()
+                }
+                HapticEngine.shared.starToggle(joke.isHit)
+                do { try modelContext.save() } catch {
+                    saveError = "Couldn't save hit status: \(error.localizedDescription)"
+                    showingSaveError = true
+                }
+            } label: {
+                HStack {
+                    Label(
+                        joke.isHit ? "Remove from Hits" : "Add to Hits",
+                        systemImage: roastMode ? (joke.isHit ? "flame.fill" : "flame") : (joke.isHit ? "star.fill" : "star")
+                    )
+                    .foregroundColor(joke.isHit ? (roastMode ? .orange : .yellow) : .accentColor)
+                    Spacer()
+                }
+                .padding(.vertical, 11)
+            }
+            
+            Divider()
+            
+            Button {
+                withAnimation {
+                    joke.isOpenMic.toggle()
+                    joke.dateModified = Date()
+                }
+                haptic(.medium)
+                do { try modelContext.save() } catch {
+                    saveError = "Couldn't save open mic status: \(error.localizedDescription)"
+                    showingSaveError = true
+                }
+            } label: {
+                HStack {
+                    Label(
+                        joke.isOpenMic ? "Remove from Open Mic" : "Label for Open Mic",
+                        systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill"
+                    )
+                    .foregroundColor(joke.isOpenMic ? .purple : .accentColor)
+                    Spacer()
+                }
+                .padding(.vertical, 11)
+            }
+            
+            Divider()
+            
+            Button {
+                HapticEngine.shared.tap()
+                showingFolderPicker = true
+            } label: {
+                HStack {
+                    Label("Folders", systemImage: "folder")
+                    Spacer()
+                    let folderCount = (joke.folders ?? []).count
+                    if folderCount == 0 {
+                        Text("None")
+                            .foregroundColor(.secondary)
+                    } else if folderCount == 1 {
+                        Text((joke.folders ?? []).first?.name ?? "")
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("\(folderCount)")
+                            .foregroundColor(.secondary)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
+                }
+                .padding(.vertical, 11)
+            }
+        }
+    }
+    
+    // MARK: - Metadata
+    
+    private var metadataSection: some View {
+        DisclosureGroup("Details", isExpanded: $showingMetadata) {
+            VStack(spacing: 8) {
+                metadataRow(label: "Created", value: joke.dateCreated.formatted(date: .abbreviated, time: .shortened))
+                metadataRow(label: "Modified", value: joke.dateModified.formatted(date: .abbreviated, time: .shortened))
+                if let source = joke.importSource, !source.isEmpty {
+                    metadataRow(label: "Imported from", value: source)
+                }
+                if let confidence = joke.importConfidence, !confidence.isEmpty {
+                    HStack {
+                        Text("Confidence")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(confidence.capitalized)
+                            .font(.caption)
+                            .foregroundColor(confidence == "high" ? .green : (confidence == "medium" ? .blue : .orange))
+                    }
+                }
+            }
+            .padding(.top, 8)
+        }
+        .font(.subheadline)
+        .foregroundColor(.secondary)
+    }
+    
+    private func metadataRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .font(.caption)
+                .foregroundColor(Color(UIColor.tertiaryLabel))
         }
     }
     
@@ -256,21 +528,12 @@ struct JokeDetailView: View {
     
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            SaveStatusIndicator(autoSave: autoSave, roastMode: roastMode)
+        }
+        
         ToolbarItem(placement: .navigationBarTrailing) {
             HStack(spacing: 16) {
-                Button(isEditing ? "Done" : "Edit") {
-                    if isEditing {
-                        saveJokeNow()
-                        HapticEngine.shared.success()
-                    } else {
-                        HapticEngine.shared.tap()
-                    }
-                    withAnimation {
-                        isEditing.toggle()
-                    }
-                }
-                .fontWeight(isEditing ? .semibold : .regular)
-                
                 if joke.isDeleted {
                     Button {
                         HapticEngine.shared.success()
@@ -278,7 +541,7 @@ struct JokeDetailView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "arrow.uturn.backward.circle.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(.green)
                     }
                 } else {
                     Button {
@@ -289,6 +552,42 @@ struct JokeDetailView: View {
                             .foregroundColor(.red)
                     }
                 }
+            }
+        }
+        
+        ToolbarItem(placement: .keyboard) {
+            HStack {
+                // Jump between fields
+                Button {
+                    switch focusedField {
+                    case .title:
+                        focusedField = .content
+                    case .content:
+                        focusedField = .notes
+                        if !showingNotes {
+                            withAnimation(EffortlessAnimation.smooth) {
+                                showingNotes = true
+                            }
+                        }
+                    case .notes:
+                        focusedField = .title
+                    case .newTag:
+                        commitNewTag()
+                        focusedField = .content
+                    case .none:
+                        focusedField = .content
+                    }
+                } label: {
+                    Image(systemName: "arrow.right.arrow.left")
+                        .font(.subheadline)
+                }
+                
+                Spacer()
+                
+                Button("Done") {
+                    focusedField = nil
+                }
+                .fontWeight(.medium)
             }
         }
     }
@@ -332,7 +631,7 @@ struct FolderPickerView: View {
                         Spacer()
                         if selectedFolder == nil {
                             Image(systemName: "checkmark")
-                                .foregroundColor(.blue)
+                                .foregroundColor(roastMode ? .orange : .accentColor)
                         }
                     }
                 }
@@ -347,7 +646,7 @@ struct FolderPickerView: View {
                             Spacer()
                             if selectedFolder?.id == folder.id {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(roastMode ? .orange : .accentColor)
                             }
                         }
                     }
@@ -428,7 +727,7 @@ struct MultiFolderPickerView: View {
                                 Label(folder.name, systemImage: "folder")
                                 Spacer()
                                 Image(systemName: "plus.circle")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(roastMode ? .orange : .accentColor)
                             }
                         }
                     }
