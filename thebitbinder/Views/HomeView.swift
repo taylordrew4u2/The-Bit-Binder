@@ -21,7 +21,6 @@ struct HomeView: View {
     @State private var showAddJoke = false
     @State private var showTalkToText = false
     @State private var showQuickRecord = false
-    @State private var showBitBuddyChat = false
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("userName") private var userName = ""
     
@@ -115,18 +114,6 @@ struct HomeView: View {
                     } icon: {
                         Image(systemName: "record.circle")
                             .foregroundColor(.blue)
-                    }
-                }
-
-                Button {
-                    haptic(.light)
-                    showBitBuddyChat = true
-                } label: {
-                    Label {
-                        Text("BitBuddy")
-                    } icon: {
-                        Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                            .foregroundColor(.purple)
                     }
                 }
             }
@@ -257,11 +244,6 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showQuickRecord) {
             StandaloneRecordingView()
-        }
-        .sheet(isPresented: $showBitBuddyChat) {
-            NavigationStack {
-                BitBuddyChatView()
-            }
         }
     }
     

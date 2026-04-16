@@ -278,7 +278,7 @@
 				CODE_SIGN_ENTITLEMENTS = thebitbinder/thebitbinder.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = R44WG942GS;
 				ENABLE_APP_SANDBOX = YES;
@@ -333,7 +333,7 @@
 				CODE_SIGN_ENTITLEMENTS = thebitbinder/thebitbinder.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = R44WG942GS;
 				ENABLE_APP_SANDBOX = YES;
@@ -506,7 +506,7 @@
 				CODE_SIGN_ENTITLEMENTS = bit/bit.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = R44WG942GS;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = bit/Info.plist;
@@ -539,7 +539,7 @@
 				CODE_SIGN_ENTITLEMENTS = bit/bit.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = R44WG942GS;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = bit/Info.plist;

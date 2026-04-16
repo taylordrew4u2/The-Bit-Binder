@@ -24,6 +24,7 @@ struct DataSafetyView: View {
     @State private var isValidating = false
     @State private var isCreatingBackup = false
     @State private var validationResult: DataValidationResult?
+    @State private var showValidationAlert = false
     @State private var showingBackups = false
     @State private var availableBackups: [BackupInfo] = []
     
@@ -80,7 +81,6 @@ struct DataSafetyView: View {
                 
                 // Actions Section
                 Section("Backups") {
-                    #if DEBUG
                     Button {
                         Task {
                             await validateData()
@@ -104,7 +104,6 @@ struct DataSafetyView: View {
                         }
                     }
                     .disabled(isValidating)
-                    #endif
                     
                     Button {
                         Task {
@@ -212,8 +211,7 @@ struct DataSafetyView: View {
                 }
                 
                 
-                #if DEBUG
-                // Information Section (debug only)
+                // Validation Results
                 if let result = validationResult {
                     Section("Last Validation Results") {
                         VStack(alignment: .leading, spacing: 8) {
@@ -252,7 +250,6 @@ struct DataSafetyView: View {
                         .padding(.vertical, 4)
                     }
                 }
-                #endif
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -319,6 +316,22 @@ struct DataSafetyView: View {
         } message: {
             Text("Mail is not configured on this device. Please set up a mail account in Settings, or use the Share option instead.")
         }
+        .alert(
+            validationResult?.isHealthy == true ? "All Good ✅" : "Validation Complete",
+            isPresented: $showValidationAlert
+        ) {
+            Button("OK") { }
+        } message: {
+            if let result = validationResult {
+                if result.isHealthy {
+                    Text("Your data looks healthy — \(result.totalEntities) items checked, no issues found.")
+                } else if result.significantDataLoss {
+                    Text("⚠️ Significant data loss detected. \(result.issues.joined(separator: " "))")
+                } else {
+                    Text("Found \(result.issues.count) issue(s): \(result.issues.joined(separator: ", "))")
+                }
+            }
+        }
         .sheet(isPresented: $showShareSheet) {
             if let url = exportedFileURL {
                 ShareSheet(activityItems: [url])
@@ -359,6 +372,7 @@ struct DataSafetyView: View {
         isValidating = true
         validationResult = await dataValidation.validateDataIntegrity(context: modelContext)
         isValidating = false
+        showValidationAlert = true
     }
     
     private func createBackup() async {
@@ -575,7 +589,7 @@ struct StatusRow: View {
 #endif
 
 struct BackupsView: View {
-    let backups: [BackupInfo]
+    @State var backups: [BackupInfo]
     @Environment(\.dismiss) private var dismiss
     @StateObject private var dataProtection = DataProtectionService.shared
     
@@ -815,6 +829,9 @@ struct BackupsView: View {
             } else {
                 // Structured / corrupted backups are directories — single remove suffices.
                 try fm.removeItem(at: backup.url)
+            }
+            withAnimation {
+                backups.removeAll { $0.id == backup.id }
             }
             backupToDelete = nil
             #if DEBUG
