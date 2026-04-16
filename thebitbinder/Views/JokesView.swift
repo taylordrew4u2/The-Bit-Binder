@@ -99,6 +99,7 @@ struct JokesView: View {
     @State private var showingMoveJokesSheet = false
     @State private var showingAudioImport = false
     @State private var showingTalkToText = false
+    @State private var showingGagGrabber = false
     
     @State private var reviewCandidates: [JokeImportCandidate] = []
     @State private var showingReviewSheet = false
@@ -388,6 +389,9 @@ struct JokesView: View {
                 ))
                 .sheet(isPresented: $showingImportHistory) {
                     ImportBatchHistoryView()
+                }
+                .sheet(isPresented: $showingGagGrabber) {
+                    HybridGagGrabberSheet()
                 }
                 .fullScreenCover(item: $smartImportResult) { result in
                     SmartImportReviewView(
@@ -851,6 +855,9 @@ struct JokesView: View {
                         }
                     }
                     Section("Import") {
+                        Button(action: { showingGagGrabber = true }) {
+                            Label("GagGrabber (Extract Jokes)", systemImage: "doc.text.magnifyingglass")
+                        }
                         Button(action: { showingFilePicker = true }) {
                             Label("Import from Files", systemImage: "doc.text")
                         }

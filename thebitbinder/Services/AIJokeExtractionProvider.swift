@@ -34,8 +34,18 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     var defaultModel: String {
         switch self {
         case .openAI:      return "gpt-4o-mini"
-        case .arceeAI:     return "openrouter/free"  // was a specific Mistral model that 404s when rotated out
-        case .openRouter:  return "openrouter/free"  // auto-routes to the best available free model
+        case .arceeAI:     return "mistralai/mistral-small-3.1-24b-instruct:free"
+        case .openRouter:  return "meta-llama/llama-4-scout:free"
+        }
+    }
+
+    /// Fallback free models to try if the default 404s or is unavailable.
+    /// Each slot tries its own list before the manager moves to the next provider.
+    var fallbackModels: [String] {
+        switch self {
+        case .openAI:      return []
+        case .arceeAI:     return ["google/gemma-3-27b-it:free", "openrouter/free"]
+        case .openRouter:  return ["google/gemma-3-12b-it:free", "openrouter/free"]
         }
     }
 
@@ -150,6 +160,10 @@ enum JokeExtractionPrompt {
            numbered items (1., 2., #1, Joke 1:), and bullet points.
         5. When in doubt, SPLIT into smaller entries rather than merging.
         6. Preserve the original wording exactly — do not paraphrase or clean up.
+        7. If the text begins with [USER FORMAT HINT: ...], use that hint to understand
+           how the document is structured (e.g. "one joke per line", "numbered 1-50",
+           "separated by blank lines"). This is the user telling you how they wrote it.
+           Do NOT include the hint itself as a joke entry.
 
         Return ONLY a valid JSON array with NO markdown fences and NO extra text:
         [{"jokeText":"<exact text>","humorMechanism":"<type or null>","confidence":<0.0-1.0>,"explanation":"<why this score, or null>","title":"<detected title or null>","tags":["tag1"]}]

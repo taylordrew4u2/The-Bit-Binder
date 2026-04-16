@@ -2,15 +2,15 @@
 //  GagGrabber.swift  (was HybridGagGrabber.swift)
 //  thebitbinder
 //
-//  Joke extractor: uses OpenAI (gpt-3.5-turbo, free-tier friendly) with a
-//  heuristic fallback when no API key is configured or the request fails.
+//  Joke extractor: tries all configured AI providers (Arcee → OpenRouter → OpenAI)
+//  via AIJokeExtractionManager with automatic fallback between them.
+//  If every AI provider fails, a fast heuristic extractor runs instead —
+//  extraction never silently fails.
 //
 //  Architecture:
-//  - OpenAI runs when `useOpenAI` is true AND a key is configured.
-//  - If OpenAI fails (rate limit, offline, bad key) or is disabled, a fast
-//    heuristic extractor runs instead — extraction never silently fails.
-//  - Long text is chunked (2 000 chars, sentence-boundary aware) before being
-//    sent to the API.
+//  - AI providers are tried in order via AIJokeExtractionManager.
+//  - If all AI providers fail (no keys, rate limit, offline), a heuristic
+//    extractor runs as the final fallback.
 //  - Results are deduplicated by exact match.
 //
 //  UI: `HybridGagGrabberSheet` — a toolbar-button-triggered sheet that lets the
@@ -25,7 +25,8 @@ import UniformTypeIdentifiers
 
 // MARK: - HybridGagGrabber (ObservableObject)
 
-/// Extracts jokes from raw text using OpenAI (remote) with a heuristic fallback.
+/// Extracts jokes from raw text using AI providers (Arcee, OpenRouter, OpenAI)
+/// with automatic fallback, plus a heuristic fallback when all AI fails.
 /// Published state drives the companion `HybridGagGrabberSheet` view.
 @MainActor
 final class HybridGagGrabber: ObservableObject {
@@ -40,6 +41,21 @@ final class HybridGagGrabber: ObservableObject {
 
     /// Human-readable description of the last error, or nil.
     @Published var lastError: String?
+
+    /// When AI is unavailable, the earliest time the user can retry.
+    @Published var retryAfterDate: Date?
+
+    /// The user's description of how their document is formatted.
+    /// Sent to the AI to improve extraction accuracy.
+    @Published var documentFormatHint: String = ""
+
+    /// Human-readable status message shown during extraction so the user
+    /// knows GagGrabber is working and not frozen.
+    @Published var statusMessage: String = ""
+
+    /// Elapsed seconds since extraction started — drives the UI timer.
+    @Published var elapsedSeconds: Int = 0
+    private var timerTask: Task<Void, Never>?
 
     // MARK: Private State
 
@@ -70,13 +86,10 @@ final class HybridGagGrabber: ObservableObject {
 
     // MARK: - Main Extraction Entry Point
 
-    /// Extract jokes from `rawText` using OpenAI (if enabled) with a heuristic
-    /// fallback that always guarantees results.
-    ///
-    /// - Parameters:
-    ///   - rawText: The full text of the document.
-    ///   - useOpenAI: When `true`, queries OpenAI if a key is available.
-    func extractJokes(from rawText: String, useOpenAI: Bool = false) async {
+    /// Extract jokes from `rawText` using AI providers (Arcee → OpenRouter → OpenAI)
+    /// with automatic fallback between them. If ALL AI providers are unavailable,
+    /// extraction stops and the user is told when to try again — no heuristic fallback.
+    func extractJokes(from rawText: String) async {
         guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             lastError = "Document is empty — nothing to extract."
             return
@@ -84,173 +97,241 @@ final class HybridGagGrabber: ObservableObject {
 
         isExtracting = true
         lastError = nil
+        retryAfterDate = nil
         extractedJokes = []
+        statusMessage = "Reading your document…"
+        startElapsedTimer()
 
-        let chunks = GagGrabberChunker.chunk(rawText, maxLength: 2000)
-        print(" [GagGrabber] Text length: \(rawText.count) chars → \(chunks.count) chunk(s)")
+        print(" [GagGrabber] Text length: \(rawText.count) chars")
+
+        // Build the text to send — prepend the user's format hint if provided
+        let hint = documentFormatHint.trimmingCharacters(in: .whitespacesAndNewlines)
+        let textToSend: String
+        if hint.isEmpty {
+            textToSend = rawText
+        } else {
+            textToSend = """
+            [USER FORMAT HINT: \(hint)]
+
+            \(rawText)
+            """
+        }
 
         // ------------------------------------------------------------------
-        // 1. OpenAI (optional)
+        // Try all configured AI providers via AIJokeExtractionManager
+        // (Arcee → OpenRouter → OpenAI, with automatic fallback)
         // ------------------------------------------------------------------
-        var openAIJokes: [String] = []
-        if useOpenAI {
-            let resolvedKey = openAIKey
-                ?? KeychainHelper.load(forKey: Self.keychainAccount)
+        let manager = AIJokeExtractionManager.shared
+        let token = AIExtractionToken(caller: "HybridGagGrabber")
 
-            if let key = resolvedKey, !key.isEmpty {
-                do {
-                    openAIJokes = try await extractViaOpenAI(chunks: chunks, apiKey: key)
-                    print(" [GagGrabber] OpenAI returned \(openAIJokes.count) joke(s)")
-                } catch {
-                    print(" [GagGrabber] OpenAI extraction failed: \(error.localizedDescription)")
-                    // Non-fatal — heuristic results will be used instead.
-                }
-            } else {
-                print(" [GagGrabber] OpenAI skipped — no API key configured")
+        if manager.availableProviders.isEmpty {
+            let earliest = manager.earliestRetryDate()
+            retryAfterDate = earliest
+            lastError = sillyRetryMessage(retryDate: earliest)
+            isExtracting = false
+            stopElapsedTimer()
+            statusMessage = ""
+            return
+        }
+
+        statusMessage = "GagGrabber is scanning for jokes…"
+
+        do {
+            let result = try await manager.extractJokes(from: textToSend, token: token)
+            let jokes = result.jokes.map(\.jokeText)
+            print(" [GagGrabber] \(result.provider.displayName) returned \(jokes.count) joke(s)")
+
+            statusMessage = "Cleaning up results…"
+            let deduped = Self.deduplicateJokes(jokes)
+            if deduped.isEmpty {
+                lastError = "GagGrabber read the whole file but couldn't spot any jokes. Try describing your document format above and give it another go!"
             }
+            extractedJokes = deduped
+        } catch {
+            print(" [GagGrabber] All providers failed: \(error.localizedDescription)")
+
+            let earliest = manager.earliestRetryDate()
+            retryAfterDate = earliest
+            lastError = sillyRetryMessage(retryDate: earliest)
         }
 
-        // ------------------------------------------------------------------
-        // 2. Heuristic fallback (when OpenAI is off or produced nothing)
-        // ------------------------------------------------------------------
-        var heuristicJokes: [String] = []
-        if openAIJokes.isEmpty {
-            print(" [GagGrabber] Running heuristic fallback")
-            heuristicJokes = Self.extractViaHeuristic(from: rawText)
-            print(" [GagGrabber] Heuristic returned \(heuristicJokes.count) joke(s)")
-        }
-
-        // ------------------------------------------------------------------
-        // 3. Merge & deduplicate
-        // ------------------------------------------------------------------
-        let merged = Self.deduplicateJokes(openAIJokes + heuristicJokes)
-
-        if merged.isEmpty {
-            lastError = "No jokes found. The document may not contain recognizable joke content."
-        }
-
-        extractedJokes = merged
         isExtracting = false
+        stopElapsedTimer()
+        statusMessage = ""
     }
 
-    // MARK: - OpenAI Extraction
+    // MARK: - Elapsed Timer
 
-    /// Sends each chunk to the OpenAI Chat Completions API and parses "JOKE:"
-    /// lines from the response. Includes basic rate-limit handling.
-    private func extractViaOpenAI(chunks: [String], apiKey: String) async throws -> [String] {
-        var results: [String] = []
-
-        for (index, chunk) in chunks.enumerated() {
-            print(" [GagGrabber/OpenAI] Processing chunk \(index + 1)/\(chunks.count)")
-
-            let body: [String: Any] = [
-                "model": "gpt-3.5-turbo",
-                "temperature": 0.2,
-                "max_tokens": 500,
-                "messages": [
-                    [
-                        "role": "system",
-                        "content": """
-                        You are a joke extraction tool. Read the user's text and output every joke you find.
-                        Output ONLY lines starting with "JOKE:" followed by the joke text.
-                        Do not add commentary, numbering, or any other text.
-                        """
-                    ],
-                    [
-                        "role": "user",
-                        "content": "Extract jokes from the following text:\n\n\(chunk)"
-                    ]
-                ]
-            ]
-
-            var request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-            request.timeoutInterval = 60
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            if let http = response as? HTTPURLResponse {
-                if http.statusCode == 429 {
-                    throw GagGrabberError.openAIRateLimited
-                }
-                guard (200...299).contains(http.statusCode) else {
-                    let detail = String(data: data, encoding: .utf8) ?? "Unknown error"
-                    throw GagGrabberError.openAIError("HTTP \(http.statusCode): \(detail)")
+    private func startElapsedTimer() {
+        elapsedSeconds = 0
+        timerTask?.cancel()
+        timerTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                elapsedSeconds += 1
+                // Rotate encouraging messages so user knows it's still working
+                if elapsedSeconds == 5 {
+                    statusMessage = "Still working — reading through your material…"
+                } else if elapsedSeconds == 12 {
+                    statusMessage = "Almost there — pulling out the jokes…"
+                } else if elapsedSeconds == 25 {
+                    statusMessage = "Big file! GagGrabber's still on it…"
+                } else if elapsedSeconds == 45 {
+                    statusMessage = "Hang tight — this one's a page-turner 📖"
                 }
             }
-
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let choices = json["choices"] as? [[String: Any]],
-                  let first = choices.first,
-                  let message = first["message"] as? [String: Any],
-                  let content = message["content"] as? String else {
-                throw GagGrabberError.openAIError("Unexpected response format")
-            }
-
-            let parsed = Self.parseJokeLines(from: content)
-            results.append(contentsOf: parsed)
         }
+    }
 
-        return results
+    private func stopElapsedTimer() {
+        timerTask?.cancel()
+        timerTask = nil
+    }
+
+    // MARK: - Silly Retry Messages
+
+    /// Returns a fun, non-technical message telling the user when GagGrabber is available next.
+    private func sillyRetryMessage(retryDate: Date?) -> String {
+        let phrases = [
+            "GagGrabber's taking a quick coffee break ☕️",
+            "GagGrabber needs a breather — even joke machines get tired 😴",
+            "GagGrabber's recharging its funny bone 🦴",
+            "Hold tight — GagGrabber's doing vocal warm-ups 🎤",
+            "GagGrabber stepped out for a smoke break (it doesn't smoke, but still) 🚬",
+            "GagGrabber's backstage getting hyped up 🎭",
+        ]
+        let phrase = phrases.randomElement() ?? phrases[0]
+
+        if let retryDate {
+            let formatter = DateFormatter()
+            formatter.timeStyle = .short
+            return "\(phrase)\n\nReady again at \(formatter.string(from: retryDate))"
+        } else {
+            return "\(phrase)\n\nTry again in a few minutes!"
+        }
     }
 
     // MARK: - Heuristic Extraction (always available)
 
-    /// Structural heuristic that splits text by blank lines, bullet points,
-    /// and numbered lists — mirrors `BitBuddyService.extractJokes(from:)`.
-    /// This guarantees the user always gets results even when OpenAI is
-    /// unavailable or disabled.
+    /// Heuristic extraction that preserves EVERY word from the file.
+    /// It only separates content into individual entries — it NEVER drops anything.
+    /// Handles: numbered lists, bullet lists, separator lines (---, ***, ===),
+    /// blank-line-separated blocks, and single-line-per-joke formats.
     private static func extractViaHeuristic(from text: String) -> [String] {
-        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
-        let rawParts = normalized
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
 
-        var jokes: [String] = []
-        var currentBlock: [String] = []
+        let allLines = trimmed.components(separatedBy: "\n")
 
-        for line in rawParts {
-            if line.isEmpty {
-                if !currentBlock.isEmpty {
-                    jokes.append(currentBlock.joined(separator: "\n"))
-                    currentBlock.removeAll()
+        // ── Helpers ──
+
+        let numberedRegex = try? NSRegularExpression(
+            pattern: #"^(?:(?:joke|bit|gag|#)\s*)?(\d+)\s*[.):\-–—]\s+"#,
+            options: [.caseInsensitive]
+        )
+        let separatorRegex = try? NSRegularExpression(
+            pattern: #"^[-–—=*]{3,}\s*$|^(NEXT JOKE|NEW BIT|//)\s*$"#,
+            options: [.caseInsensitive]
+        )
+
+        func isNumbered(_ t: String) -> Bool {
+            guard let r = numberedRegex else { return false }
+            return r.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)) != nil
+        }
+        func isBullet(_ t: String) -> Bool {
+            t.hasPrefix("- ") || t.hasPrefix("• ") || t.hasPrefix("* ")
+        }
+        func isSeparator(_ t: String) -> Bool {
+            guard let r = separatorRegex else { return false }
+            return r.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)) != nil
+        }
+
+        // Count structure signals
+        var numberedCount = 0, bulletCount = 0, nonEmpty = 0
+        for line in allLines {
+            let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !t.isEmpty else { continue }
+            nonEmpty += 1
+            if isNumbered(t) { numberedCount += 1 }
+            if isBullet(t)   { bulletCount += 1 }
+        }
+
+        // Generic splitter: flushes current block at each "break" line.
+        // `isBreak` determines what counts as the start of a new entry.
+        func split(using isBreak: (String) -> Bool) -> [String] {
+            var results: [String] = []
+            var current: [String] = []
+
+            for line in allLines {
+                let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if isSeparator(t) {
+                    if !current.isEmpty {
+                        results.append(current.joined(separator: "\n"))
+                        current.removeAll()
+                    }
+                    // Separator itself is structural — don't add as content
+                    continue
                 }
-                continue
-            }
 
-            let isBullet = line.hasPrefix("-") || line.hasPrefix("•") || line.hasPrefix("*")
-            let isNumbered = line.range(of: #"^\d+[\.)]\s"#, options: .regularExpression) != nil
-
-            if (isBullet || isNumbered), !currentBlock.isEmpty {
-                jokes.append(currentBlock.joined(separator: "\n"))
-                currentBlock = [stripListMarker(from: line)]
-            } else {
-                currentBlock.append(isBullet || isNumbered ? stripListMarker(from: line) : line)
+                if isBreak(t) && !current.isEmpty {
+                    results.append(current.joined(separator: "\n"))
+                    current = [stripAllMarkers(from: t)]
+                } else if t.isEmpty {
+                    if !current.isEmpty {
+                        results.append(current.joined(separator: "\n"))
+                        current.removeAll()
+                    }
+                } else {
+                    current.append(isBreak(t) ? stripAllMarkers(from: t) : t)
+                }
             }
+            if !current.isEmpty { results.append(current.joined(separator: "\n")) }
+
+            return results
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
         }
 
-        if !currentBlock.isEmpty {
-            jokes.append(currentBlock.joined(separator: "\n"))
+        // ── Strategy 1: Numbered list ──
+        if numberedCount >= 2 {
+            let result = split(using: isNumbered)
+            if result.count >= 2 { return result }
         }
 
-        let filtered = jokes
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        // ── Strategy 2: Bullet list ──
+        if bulletCount >= 2 && bulletCount >= nonEmpty / 3 {
+            let result = split(using: isBullet)
+            if result.count >= 2 { return result }
+        }
+
+        // ── Strategy 3: Blank-line / separator separated blocks ──
+        // Every blank line or separator = new entry
+        let blockResult = split(using: { _ in false }) // only blank lines & separators split
+        if blockResult.count >= 2 { return blockResult }
+
+        // ── Strategy 4: Every non-empty line is its own entry ──
+        let lines = allLines
+            .map { stripAllMarkers(from: $0.trimmingCharacters(in: .whitespacesAndNewlines)) }
             .filter { !$0.isEmpty }
+        if lines.count >= 2 { return lines }
 
-        if filtered.isEmpty, !normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return [normalized.trimmingCharacters(in: .whitespacesAndNewlines)]
-        }
-
-        return filtered
+        // ── Fallback: entire text as one entry (never lose anything) ──
+        return [trimmed]
     }
 
-    private static func stripListMarker(from line: String) -> String {
+    /// Strips numbered markers, bullets, and "Joke N:" prefixes
+    /// but preserves every word of actual content.
+    private static func stripAllMarkers(from line: String) -> String {
         line
-            .replacingOccurrences(of: #"^[-•*]\s*"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"^\d+[\.)]\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^[-•*]\s+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"^(?:joke|bit|gag|#)\s*\d+\s*[.):\-–—]\s*"#, with: "", options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: #"^\d+\s*[.):\-–—]\s*"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Parsing Helpers
@@ -396,13 +477,74 @@ struct HybridGagGrabberSheet: View {
     @StateObject private var grabber = HybridGagGrabber()
 
     @State private var showPicker = false
-    @State private var useOpenAI = false
-    @State private var openAIKeyInput = ""
     @State private var savedJokeIDs: Set<Int> = []
 
     var body: some View {
         NavigationStack {
             List {
+                // MARK: Welcome Hero
+                Section {
+                    VStack(spacing: 16) {
+                        // Fun visual icon cluster
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue.opacity(0.12))
+                                .frame(width: 90, height: 90)
+
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.system(size: 38, weight: .medium))
+                                .foregroundColor(.blue)
+                        }
+                        .padding(.top, 8)
+
+                        Text("GagGrabber")
+                            .font(.title2.weight(.bold))
+                            .foregroundColor(.primary)
+
+                        Text("Drop in a file with your jokes and GagGrabber will read through it and pull out each one individually — so you can add them to your library one by one.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        // Supported formats badges
+                        HStack(spacing: 8) {
+                            ForEach(["TXT", "PDF", "RTF", "CSV"], id: \.self) { fmt in
+                                Text(fmt)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundColor(.blue)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.blue.opacity(0.1))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                }
+
+                // MARK: Document Format Hint
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("How is your document set up?")
+                            .font(.subheadline.weight(.semibold))
+                        Text("This helps GagGrabber find every joke accurately.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("e.g. \"Each joke is numbered 1-50\" or \"One joke per line\"",
+                                  text: $grabber.documentFormatHint, axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                            .lineLimit(2...4)
+                            .font(.subheadline)
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Label("Format Hint (optional)", systemImage: "text.magnifyingglass")
+                }
+
                 // MARK: Source
                 Section("Document") {
                     Button {
@@ -413,54 +555,73 @@ struct HybridGagGrabberSheet: View {
                     .disabled(grabber.isExtracting)
                 }
 
-                // MARK: OpenAI Toggle
-                Section {
-                    Toggle("Use OpenAI", isOn: $useOpenAI)
-
-                    if useOpenAI {
-                        SecureField("OpenAI API Key (optional)", text: $openAIKeyInput)
-                            .textContentType(.password)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                            .onSubmit {
-                                grabber.setOpenAIKey(openAIKeyInput)
-                            }
-                            .onChange(of: openAIKeyInput) { _, newValue in
-                                grabber.setOpenAIKey(newValue)
-                            }
-
-                        Text("Key is stored securely in your device Keychain.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("AI Sources")
-                } footer: {
-                    Text("OpenAI is optional. Without it, a heuristic extractor splits the document by structure (blank lines, bullets, numbered lists).")
-                }
-
                 // MARK: Status
                 if grabber.isExtracting {
                     Section {
-                        HStack {
+                        VStack(spacing: 10) {
                             ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Extracting jokes…")
+                                .scaleEffect(0.9)
+                            Text(grabber.statusMessage.isEmpty ? "GagGrabber is extracting jokes…" : grabber.statusMessage)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .animation(.easeInOut(duration: 0.3), value: grabber.statusMessage)
+                            if grabber.elapsedSeconds > 0 {
+                                Text("\(grabber.elapsedSeconds)s")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                    .monospacedDigit()
+                            }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                     }
                 }
 
                 if let error = grabber.lastError {
-                    Section("Error") {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
+                    Section {
+                        VStack(spacing: 12) {
+                            Image(systemName: "moon.zzz.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(.blue.opacity(0.6))
+
+                            Text(error)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                     }
                 }
 
                 // MARK: Results
                 if !grabber.extractedJokes.isEmpty {
+                    let allSaved = grabber.extractedJokes.indices.allSatisfy { savedJokeIDs.contains($0) }
+
+                    Section {
+                        // Add All button
+                        if !allSaved {
+                            Button {
+                                addAllJokesToLibrary()
+                            } label: {
+                                Label("Add All \(grabber.extractedJokes.count) Jokes", systemImage: "plus.circle.fill")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .padding(.vertical, 4)
+                        } else {
+                            Label("All \(grabber.extractedJokes.count) jokes added!", systemImage: "checkmark.circle.fill")
+                                .font(.headline)
+                                .foregroundStyle(.green)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 4)
+                        }
+                    }
+
                     Section("Extracted Jokes (\(grabber.extractedJokes.count))") {
                         ForEach(Array(grabber.extractedJokes.enumerated()), id: \.offset) { index, joke in
                             HStack(alignment: .top) {
@@ -509,18 +670,14 @@ struct HybridGagGrabberSheet: View {
                     grabber.lastError = "Could not open file: \(error.localizedDescription)"
                 }
             }
-            .onAppear {
-                if let existing = KeychainHelper.load(forKey: HybridGagGrabber.keychainAccount),
-                   !existing.isEmpty {
-                    openAIKeyInput = existing
-                }
-            }
         }
     }
 
     // MARK: - Document Handling
 
     private func handlePickedDocument(_ url: URL) async {
+        grabber.statusMessage = "Opening your file…"
+        grabber.isExtracting = true
         let didAccess = url.startAccessingSecurityScopedResource()
         defer {
             if didAccess { url.stopAccessingSecurityScopedResource() }
@@ -559,7 +716,7 @@ struct HybridGagGrabberSheet: View {
                 }
             }
 
-            await grabber.extractJokes(from: text, useOpenAI: useOpenAI)
+            await grabber.extractJokes(from: text)
         } catch {
             grabber.lastError = "Failed to read document: \(error.localizedDescription)"
         }
@@ -582,6 +739,27 @@ struct HybridGagGrabberSheet: View {
         } catch {
             grabber.lastError = "Failed to save joke: \(error.localizedDescription)"
             print(" [GagGrabber] Save failed: \(error)")
+        }
+    }
+
+    /// Saves all extracted jokes that haven't been saved yet in one batch.
+    private func addAllJokesToLibrary() {
+        var count = 0
+        for (index, jokeText) in grabber.extractedJokes.enumerated() {
+            guard !savedJokeIDs.contains(index) else { continue }
+            let joke = Joke(content: jokeText)
+            joke.importSource = "GagGrabber"
+            joke.importTimestamp = Date()
+            modelContext.insert(joke)
+            savedJokeIDs.insert(index)
+            count += 1
+        }
+        do {
+            try modelContext.save()
+            print(" [GagGrabber] Batch-saved \(count) joke(s) to library")
+        } catch {
+            grabber.lastError = "Failed to save jokes: \(error.localizedDescription)"
+            print(" [GagGrabber] Batch save failed: \(error)")
         }
     }
 }

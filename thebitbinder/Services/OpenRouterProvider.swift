@@ -38,7 +38,31 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
         }
 
         let prompt = JokeExtractionPrompt.textPrompt(for: text)
+        let modelsToTry = [model] + AIProviderType.openRouter.fallbackModels.filter { $0 != model }
 
+        var lastError: Error?
+        for m in modelsToTry {
+            do {
+                print(" [OpenRouter] Trying model: \(m)")
+                return try await callOpenRouter(apiKey: apiKey, model: m, prompt: prompt)
+            } catch let error as AIProviderError {
+                switch error {
+                case .apiError(_, let msg) where msg.contains("HTTP 404") || msg.contains("HTTP 400"):
+                    print(" [OpenRouter] Model \(m) unavailable, trying next…")
+                    lastError = error
+                    continue
+                case .rateLimited:
+                    throw error
+                default:
+                    lastError = error
+                    continue
+                }
+            }
+        }
+        throw lastError ?? AIProviderError.apiError(.openRouter, "All free models unavailable")
+    }
+
+    private func callOpenRouter(apiKey: String, model: String, prompt: String) async throws -> [AIExtractedJoke] {
         let requestBody: [String: Any] = [
             "model": model,
             "messages": [
@@ -61,11 +85,11 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse {
-            if httpResponse.statusCode == 429 {
+            if httpResponse.statusCode == 429 || httpResponse.statusCode == 402 {
                 let retryAfter = (httpResponse.value(forHTTPHeaderField: "retry-after")
                     ?? httpResponse.value(forHTTPHeaderField: "Retry-After"))
                     .flatMap(Int.init)
-                throw AIProviderError.rateLimited(.openRouter, retryAfterSeconds: retryAfter)
+                throw AIProviderError.rateLimited(.openRouter, retryAfterSeconds: retryAfter ?? 3600)
             }
             guard (200...299).contains(httpResponse.statusCode) else {
                 let body = String(data: data, encoding: .utf8) ?? "Unknown error"
@@ -74,8 +98,21 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
         }
 
         // OpenRouter uses the OpenAI-compatible response format
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            let raw = String(data: data, encoding: .utf8) ?? "<empty>"
+            throw AIProviderError.apiError(.openRouter, "Unexpected response format: \(raw.prefix(300))")
+        }
+
+        // Check for inline error (credit/limit exhaustion can come as 200 + error body)
+        if let error = json["error"] as? [String: Any], let errMsg = error["message"] as? String {
+            let lower = errMsg.lowercased()
+            if lower.contains("credit") || lower.contains("limit") || lower.contains("quota") || lower.contains("budget") || lower.contains("free") {
+                throw AIProviderError.rateLimited(.openRouter, retryAfterSeconds: 3600)
+            }
+            throw AIProviderError.apiError(.openRouter, errMsg)
+        }
+
+        guard let choices = json["choices"] as? [[String: Any]],
               let firstChoice = choices.first,
               let message = firstChoice["message"] as? [String: Any] else {
             let raw = String(data: data, encoding: .utf8) ?? "<empty>"

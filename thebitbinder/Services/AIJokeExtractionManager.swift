@@ -52,7 +52,8 @@ final class AIJokeExtractionManager {
     /// Add an entry here only if a new *import* pathway is created.
     /// BitBuddy, chat, or any interactive feature must NEVER appear here.
     private static let allowedCallers: Set<String> = [
-        "ImportPipelineCoordinator"
+        "ImportPipelineCoordinator",
+        "HybridGagGrabber"
     ]
 
     /// Runtime gate — crashes in DEBUG if an unauthorised caller sneaks through.
@@ -115,8 +116,8 @@ final class AIJokeExtractionManager {
                let decoded = try? JSONDecoder().decode(Set<AIProviderType>.self, from: data) {
                 return decoded
             }
-            // OpenAI disabled out-of-the-box — only free providers active
-            return [.openAI]
+            // All providers enabled by default — free ones are tried first per providerOrder
+            return []
         }
         set {
             if let data = try? JSONEncoder().encode(newValue) {
@@ -181,6 +182,13 @@ final class AIJokeExtractionManager {
         rateLimitedUntil[provider] = Date().addingTimeInterval(duration)
     }
 
+    /// Returns the earliest date when any rate-limited provider becomes available again,
+    /// or nil if no providers are rate-limited (failure is due to something else).
+    func earliestRetryDate() -> Date? {
+        let future = rateLimitedUntil.values.filter { $0 > Date() }
+        return future.min()
+    }
+
     // MARK: - Extraction (import-only — AI always required)
 
     /// The main extraction method. Tries each configured provider in order.
@@ -199,7 +207,7 @@ final class AIJokeExtractionManager {
         if await !Self.hasNetworkConnectivity() {
             print(" [Extraction] No network — all AI providers unreachable")
             throw AIExtractionFailedError(
-                reason: "GagGrabber can't connect — no internet. Connect to Wi-Fi or cellular and try again.",
+                reason: "No internet — GagGrabber can't do its thing offline!",
                 underlyingErrors: [:]
             )
         }
@@ -269,7 +277,7 @@ final class AIJokeExtractionManager {
         // Every AI provider failed — surface a hard error.
         print(" [Extraction] All AI providers failed — throwing error (no local fallback)")
         throw AIExtractionFailedError(
-            reason: "GagGrabber struck out — none of its sources came through. Check your network and try again in a few minutes.",
+            reason: "GagGrabber struck out — try again in a bit!",
             underlyingErrors: errors
         )
     }
@@ -289,11 +297,9 @@ final class AIJokeExtractionManager {
     var statusMessage: String {
         let available = availableProviders
         if available.isEmpty {
-            return "GagGrabber needs setup — add an API key in Settings."
-        } else if available.count == 1 {
-            return "GagGrabber is ready! Add more sources for automatic fallback."
+            return "GagGrabber is warming up — try again in a few minutes."
         } else {
-            return "GagGrabber is ready with \(available.count) sources. If one's busy, it'll automatically switch."
+            return "GagGrabber is ready!"
         }
     }
 

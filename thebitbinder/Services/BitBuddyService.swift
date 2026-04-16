@@ -42,6 +42,10 @@ final class BitBuddyService: NSObject, ObservableObject {
     private var turnsByConversation: [String: [BitBuddyTurn]] = [:]
     private var recentJokeProvider: (() -> [BitBuddyJokeSummary])?
     
+    /// Stores a pending navigation section that BitBuddy suggested but is waiting
+    /// for the user to confirm (e.g. "yes", "take me there").
+    private var awaitingNavigationConfirmation: BitBuddySection?
+    
     /// Actions that modify user data and must NOT be dispatched from a route-only
     /// match (i.e. when the backend response is conversational text, not a structured
     /// JSON payload with validated fields).
@@ -83,6 +87,24 @@ final class BitBuddyService: NSObject, ObservableObject {
         
         lastActions = []
         pendingNavigation = nil
+        
+        // Check if the user is confirming a previously suggested navigation
+        let lowerMessage = message.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let confirmationPhrases = ["yes", "yeah", "yep", "sure", "ok", "okay", "take me there",
+                                   "go there", "let's go", "do it", "go ahead", "bring me there",
+                                   "navigate", "open it", "show me", "yes please", "yea"]
+        if let pendingSection = awaitingNavigationConfirmation,
+           confirmationPhrases.contains(where: { lowerMessage.contains($0) }) {
+            awaitingNavigationConfirmation = nil
+            pendingNavigation = pendingSection
+            let displayText = "Taking you there now! 👍"
+            let activeConversationId = conversationId ?? UUID().uuidString
+            conversationId = activeConversationId
+            appendTurn(.init(role: .user, text: message), conversationId: activeConversationId)
+            appendTurn(.init(role: .assistant, text: displayText), conversationId: activeConversationId)
+            return displayText
+        }
+        awaitingNavigationConfirmation = nil
         
         let activeConversationId = conversationId ?? UUID().uuidString
         conversationId = activeConversationId
@@ -154,11 +176,16 @@ final class BitBuddyService: NSObject, ObservableObject {
                     executeBitBuddyAction(intentAction)
                 }
                 
-                // Publish navigation target for the UI — only for explicit
-                // navigation intents. All other intents return a text response
-                // that the user should be able to read inside the chat.
+                // Store navigation target for confirmation — BitBuddy will ask
+                // the user before navigating. The user can say "yes" or "take me there"
+                // in their next message to trigger the navigation.
                 if route.category == .navigation && route.section != .bitbuddy {
-                    pendingNavigation = route.section
+                    awaitingNavigationConfirmation = route.section
+                }
+                
+                // For import_file / import_image, offer navigation to Jokes
+                if route.intent.id == "import_file" || route.intent.id == "import_image" {
+                    awaitingNavigationConfirmation = .importFlow
                 }
             }
             
@@ -180,6 +207,7 @@ final class BitBuddyService: NSObject, ObservableObject {
         conversationId = nil
         // isConnected stays true — the local backend is always available.
         pendingNavigation = nil
+        awaitingNavigationConfirmation = nil
         lastActions = []
         
         // Evict oldest conversations if we're retaining too many
@@ -630,12 +658,11 @@ final class BitBuddyService: NSObject, ObservableObject {
         // MARK: Import — Direct + Navigation
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "import_file":
-            print(" [BitBuddy] import_file → triggering file picker in chat")
-            NotificationCenter.default.post(name: .bitBuddyTriggerFileImport, object: nil)
+            // No longer triggers file picker — backend text response explains GagGrabber
+            print(" [BitBuddy] import_file → explained GagGrabber in text response")
         case "import_image":
-            // Image import also uses the file picker flow
-            print(" [BitBuddy] import_image → triggering file picker in chat")
-            NotificationCenter.default.post(name: .bitBuddyTriggerFileImport, object: nil)
+            // No longer triggers file picker — backend text response explains GagGrabber
+            print(" [BitBuddy] import_image → explained GagGrabber in text response")
         case "review_import_queue", "approve_imported_joke", "reject_imported_joke",
              "edit_imported_joke", "show_import_history":
             // Import review lives inside Jokes

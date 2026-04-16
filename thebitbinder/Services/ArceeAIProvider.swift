@@ -39,9 +39,33 @@ final class ArceeAIProvider: AIJokeExtractionProvider {
         }
 
         let prompt = JokeExtractionPrompt.textPrompt(for: text)
+        let modelsToTry = [AIProviderType.arceeAI.defaultModel] + AIProviderType.arceeAI.fallbackModels
 
+        var lastError: Error?
+        for model in modelsToTry {
+            do {
+                print(" [Arcee] Trying model: \(model)")
+                return try await callOpenRouter(apiKey: apiKey, model: model, prompt: prompt)
+            } catch let error as AIProviderError {
+                switch error {
+                case .apiError(_, let msg) where msg.contains("HTTP 404") || msg.contains("HTTP 400"):
+                    print(" [Arcee] Model \(model) unavailable, trying next…")
+                    lastError = error
+                    continue
+                case .rateLimited:
+                    throw error // don't retry, let manager fall back to next provider
+                default:
+                    lastError = error
+                    continue
+                }
+            }
+        }
+        throw lastError ?? AIProviderError.apiError(.arceeAI, "All free models unavailable")
+    }
+
+    private func callOpenRouter(apiKey: String, model: String, prompt: String) async throws -> [AIExtractedJoke] {
         let requestBody: [String: Any] = [
-            "model": AIProviderType.arceeAI.defaultModel,
+            "model": model,
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user",   "content": prompt]
@@ -61,11 +85,11 @@ final class ArceeAIProvider: AIJokeExtractionProvider {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse {
-            if httpResponse.statusCode == 429 {
+            if httpResponse.statusCode == 429 || httpResponse.statusCode == 402 {
                 let retryAfter = (httpResponse.value(forHTTPHeaderField: "retry-after")
                     ?? httpResponse.value(forHTTPHeaderField: "Retry-After"))
                     .flatMap(Int.init)
-                throw AIProviderError.rateLimited(.arceeAI, retryAfterSeconds: retryAfter)
+                throw AIProviderError.rateLimited(.arceeAI, retryAfterSeconds: retryAfter ?? 3600)
             }
             guard (200...299).contains(httpResponse.statusCode) else {
                 let body = String(data: data, encoding: .utf8) ?? "Unknown error"
@@ -74,8 +98,21 @@ final class ArceeAIProvider: AIJokeExtractionProvider {
         }
 
         // OpenRouter uses OpenAI-compatible response format
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            let raw = String(data: data, encoding: .utf8) ?? "<empty>"
+            throw AIProviderError.apiError(.arceeAI, "Unexpected response format: \(raw.prefix(300))")
+        }
+
+        // Check for inline error (OpenRouter returns 200 with error body for some limit cases)
+        if let error = json["error"] as? [String: Any], let errMsg = error["message"] as? String {
+            let lower = errMsg.lowercased()
+            if lower.contains("credit") || lower.contains("limit") || lower.contains("quota") || lower.contains("budget") || lower.contains("free") {
+                throw AIProviderError.rateLimited(.arceeAI, retryAfterSeconds: 3600)
+            }
+            throw AIProviderError.apiError(.arceeAI, errMsg)
+        }
+
+        guard let choices = json["choices"] as? [[String: Any]],
               let firstChoice = choices.first,
               let message = firstChoice["message"] as? [String: Any] else {
             let raw = String(data: data, encoding: .utf8) ?? "<empty>"

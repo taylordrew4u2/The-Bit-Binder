@@ -98,6 +98,41 @@ struct JokeDetailView: View {
                     .padding(.top, 8)
                 
                 // MARK: - Content Area (always editable, the main canvas)
+                
+                // Formatting toolbar
+                HStack(spacing: 12) {
+                    Button {
+                        insertBold()
+                        haptic(.light)
+                    } label: {
+                        Text("B")
+                            .font(.system(size: 16, weight: .bold, design: .default))
+                            .frame(width: 32, height: 32)
+                            .background(Color(UIColor.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        insertBullet()
+                        haptic(.light)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 14))
+                            Text("Beat")
+                                .font(.caption.weight(.medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .frame(height: 32)
+                        .background(Color(UIColor.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 6)
+                
                 ZStack(alignment: .topLeading) {
                     if joke.content.isEmpty {
                         Text("Start writing your joke…")
@@ -312,6 +347,30 @@ struct JokeDetailView: View {
         }
         newTagText = ""
         isAddingTag = false
+    }
+    
+    // MARK: - Formatting Helpers
+    
+    /// Wraps the last word (or appends) bold markers **text**
+    private func insertBold() {
+        if joke.content.hasSuffix("\n") || joke.content.isEmpty {
+            joke.content += "**bold**"
+        } else {
+            joke.content += " **bold**"
+        }
+        scheduleAutoSave()
+    }
+    
+    /// Inserts a bullet point on a new line for marking beats
+    private func insertBullet() {
+        if joke.content.isEmpty {
+            joke.content = "• "
+        } else if joke.content.hasSuffix("\n") {
+            joke.content += "• "
+        } else {
+            joke.content += "\n• "
+        }
+        scheduleAutoSave()
     }
     
     // MARK: - Notes & Ideas

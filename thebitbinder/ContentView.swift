@@ -124,7 +124,14 @@ struct MainTabView: View {
     @AppStorage("selectedTabRawValue") private var selectedTabRaw: String = AppScreen.home.rawValue
     @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore: Bool = false
     @State private var showAIChat = false
+    @State private var showGagGrabber = false
     @AppStorage("roastModeEnabled") private var roastMode = false
+    
+    // Draggable BitBuddy position (persisted)
+    @AppStorage("bitBuddyX") private var bitBuddyX: Double = -1
+    @AppStorage("bitBuddyY") private var bitBuddyY: Double = -1
+    @State private var dragOffset: CGSize = .zero
+    @State private var isDragging = false
     
     // Computed binding for the selected tab
     private var selectedTab: Binding<AppScreen> {
@@ -158,14 +165,18 @@ struct MainTabView: View {
                         .navigationTitle(screen == .home ? "" : (roastMode ? screen.roastName : screen.rawValue))
                         .navigationBarTitleDisplayMode(screen == .home ? .inline : screen.preferredTitleDisplayMode)
                         .toolbar {
-                            // BitBuddy available on every screen for quick questions
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button {
-                                    showAIChat = true
-                                } label: {
-                                    BitBuddyAvatar(roastMode: roastMode, size: 22, symbolSize: 10)
+                            // GagGrabber file upload — Jokes page only
+                            if screen == .jokes {
+                                ToolbarItem(placement: .navigationBarTrailing) {
+                                    Button {
+                                        showGagGrabber = true
+                                    } label: {
+                                        Image(systemName: "doc.text.magnifyingglass")
+                                            .font(.system(size: 14))
+                                    }
                                 }
                             }
+
                         }
                 }
                 .tabItem {
@@ -210,6 +221,53 @@ struct MainTabView: View {
             NavigationStack {
                 BitBuddyChatView()
             }
+        }
+        .sheet(isPresented: $showGagGrabber) {
+            HybridGagGrabberSheet()
+        }
+        .overlay(alignment: .topLeading) {
+            GeometryReader { geo in
+                let bubbleSize: CGFloat = 56
+                let defaultX = geo.size.width - bubbleSize - 16
+                let defaultY = geo.size.height - 160
+                let posX = bitBuddyX < 0 ? defaultX : bitBuddyX
+                let posY = bitBuddyY < 0 ? defaultY : bitBuddyY
+
+                BitBuddyAvatar(roastMode: roastMode, size: bubbleSize, symbolSize: 22)
+                    .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .scaleEffect(isDragging ? 1.15 : 1.0)
+                    .contentShape(Circle().inset(by: -10)) // bigger tap/drag target
+                    .position(
+                        x: min(max(bubbleSize / 2, posX + dragOffset.width), geo.size.width - bubbleSize / 2),
+                        y: min(max(bubbleSize / 2, posY + dragOffset.height), geo.size.height - bubbleSize / 2)
+                    )
+                    .gesture(
+                        DragGesture(minimumDistance: 6)
+                            .onChanged { value in
+                                isDragging = true
+                                dragOffset = value.translation
+                            }
+                            .onEnded { value in
+                                let newX = (bitBuddyX < 0 ? defaultX : bitBuddyX) + value.translation.width
+                                let newY = (bitBuddyY < 0 ? defaultY : bitBuddyY) + value.translation.height
+                                bitBuddyX = min(max(bubbleSize / 2, newX), geo.size.width - bubbleSize / 2)
+                                bitBuddyY = min(max(bubbleSize / 2, newY), geo.size.height - bubbleSize / 2)
+                                dragOffset = .zero
+                                isDragging = false
+                            }
+                    )
+                    .simultaneousGesture(
+                        TapGesture()
+                            .onEnded {
+                                if !isDragging {
+                                    showAIChat = true
+                                }
+                            }
+                    )
+                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
+                    .animation(.easeInOut(duration: 0.15), value: isDragging)
+            }
+            .ignoresSafeArea()
         }
     }
     

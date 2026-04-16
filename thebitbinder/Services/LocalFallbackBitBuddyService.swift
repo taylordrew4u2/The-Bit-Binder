@@ -310,7 +310,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // NOTEBOOK
         // ═══════════════════════════════════════════
         case "open_notebook":
-            return " Opening Notebook! This is your scratch pad — anything goes."
+            return " The **Notebook** is your scratch pad — anything goes. Quick notes, random thoughts, stage observations.\n\n**Would you like me to take you there?**"
         case "save_notebook_text":
             return " Saved to your Notebook! Quick notes add up — review them weekly for hidden gems."
         case "attach_photo_to_notebook":
@@ -349,44 +349,32 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             return """
              **GagGrabber — File Import**
             
-            Here's how to import jokes from a file:
-            1. Go to **Jokes** tab → tap the **+** button (top right)
-            2. Choose **"Import Files"** from the menu
-            3. Select your file — GagGrabber supports:
-               • **PDF** (text or scanned) — best results
-               • **Text files** (.txt, .md)
-               • **Documents** (.doc, .docx, .rtf)
-            4. GagGrabber will extract individual jokes automatically
-            5. Review each one — accept, edit, or skip
+            To import jokes from a file, you'll want to use **GagGrabber** — it's the dedicated import tool built right into the app.
             
-             **Tips for best results:**
-            • One joke per paragraph works best
-            • Clear line breaks between jokes help accuracy
-            • Typed text extracts better than handwritten
+            **Where to find it:**
+            • Go to the **Jokes** tab
+            • Tap the **+** button (top right)
+            • Choose **"Import Files"** from the menu
+            
+            GagGrabber supports **PDF**, **text files** (.txt, .md), and **documents** (.doc, .docx, .rtf). It'll extract individual jokes automatically and let you review each one before saving.
+            
+            **Would you like me to take you to the Jokes page so you can use GagGrabber?** Just say "yes" or "take me there."
             """
         case "import_image":
             return """
              **GagGrabber — Image Import**
             
-            Two ways to import from images:
+            For importing from images or scans, you'll want to use **GagGrabber** on the Jokes page.
             
-            **Option A — Camera Scan:**
-            1. Jokes tab → **+** → **"Scan from Camera"**
-            2. Point your camera at your notes
-            3. It auto-detects the page edges
-            4. Tap the shutter, then "Save"
+            **Where to find it:**
+            • Go to **Jokes** tab → tap **+** (top right)
+            • Choose **"Scan from Camera"** or **"Import Photos"**
             
-            **Option B — Photo Library:**
-            1. Jokes tab → **+** → **"Import Photos"**
-            2. Select one or more photos
+            GagGrabber uses OCR to read the text, then extracts individual jokes for you to review.
             
-            GagGrabber uses OCR to read the text, then extracts individual jokes.
+             **Tips:** Good lighting, flat page, and typed/printed text give the best results.
             
-             **Tips for best results:**
-            • Good lighting, minimal shadows
-            • Keep the page flat and square to the camera
-            • Typed/printed text works best; neat handwriting works too
-            • High-contrast (dark ink on white paper) gives the best OCR
+            **Would you like me to take you to the Jokes page?** Just say "yes" or "take me there."
             """
         case "review_import_queue":
             return """
@@ -447,7 +435,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // HELP
         // ═══════════════════════════════════════════
         case "open_help_faq":
-            return " Opening Help & FAQ! You'll find guides for every feature in the app."
+            return " **Help & FAQ** has guides for every feature in the app.\n\n**Would you like me to take you there?**"
         case "explain_feature":
             return buildFeatureExplanation(from: message)
             

@@ -7,8 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import UniformTypeIdentifiers
-import PDFKit
 
 /// Full-screen chat view accessed from the side menu
 struct BitBuddyChatView: View {
@@ -32,12 +30,6 @@ struct BitBuddyChatView: View {
     @State private var activeResponseTask: Task<Void, Never>?
     @FocusState private var isInputFocused: Bool
     
-    // MARK: - HybridGagGrabber Integration
-    @StateObject private var gagGrabber = HybridGagGrabber()
-    @State private var showDocumentPicker = false
-    @State private var extractedJokeResults: [String] = []
-    @State private var savedExtractedJokeIDs: Set<Int> = []
-    @State private var extractedFileName: String = ""
     
     private var accentColor: Color {
         roastMode ? .orange : .accentColor
@@ -66,32 +58,6 @@ struct BitBuddyChatView: View {
                                 )
                                 .id(message.id)
                             }
-                        }
-                        
-                        // HybridGagGrabber extraction progress
-                        if gagGrabber.isExtracting {
-                            HStack(alignment: .top, spacing: 8) {
-                                BitBuddyAvatar(roastMode: roastMode, size: 32, symbolSize: 14)
-                                HStack(spacing: 8) {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                    Text("Extracting jokes from \(extractedFileName)…")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(12)
-                                .background(Color(UIColor.secondarySystemBackground))
-                                .cornerRadius(16)
-                                .cornerRadius(4, corners: [.topRight, .bottomLeft, .bottomRight])
-                                Spacer(minLength: 60)
-                            }
-                            .id("extraction-progress")
-                        }
-                        
-                        // HybridGagGrabber extracted jokes results
-                        if !extractedJokeResults.isEmpty {
-                            extractedJokesSection
-                                .id("extracted-jokes")
                         }
                         
                         if isTyping {
@@ -145,8 +111,6 @@ struct BitBuddyChatView: View {
                     typingMessageId = nil
                     displayedText = ""
                     isTyping = false
-                    extractedJokeResults.removeAll()
-                    savedExtractedJokeIDs.removeAll()
                     bitBuddy.startNewConversation()
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
@@ -179,8 +143,6 @@ struct BitBuddyChatView: View {
             displayedText = ""
             isTyping = false
             messages.removeAll()
-            extractedJokeResults.removeAll()
-            savedExtractedJokeIDs.removeAll()
             bitBuddy.cleanupAudioResources()
         }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyAddJoke)) { notification in
@@ -288,22 +250,6 @@ struct BitBuddyChatView: View {
                 print(" [BitBuddy→SwiftData] Failed to save notebook text: \(error)")
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .bitBuddyTriggerFileImport)) { _ in
-            showDocumentPicker = true
-        }
-        .fileImporter(
-            isPresented: $showDocumentPicker,
-            allowedContentTypes: [.text, .plainText, .utf8PlainText, .pdf, .rtf, .html, .commaSeparatedText],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                Task { await handleDocumentPicked(url) }
-            case .failure(let error):
-                appendErrorMessage("Could not open file: \(error.localizedDescription)")
-            }
-        }
         .onChange(of: bitBuddy.pendingNavigation) { _, section in
             guard let section else { return }
             guard let appScreen = appScreen(for: section) else { return }
@@ -358,31 +304,6 @@ struct BitBuddyChatView: View {
                     suggestionChip("Give me a premise about dating apps")
                     suggestionChip("What makes a good punchline?")
                     suggestionChip("How do recordings work?")
-                    
-                    // File upload suggestion — opens document picker directly
-                    Button {
-                        showDocumentPicker = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "doc.text.magnifyingglass")
-                                .font(.subheadline)
-                            Text("Extract jokes from a file")
-                                .font(.subheadline)
-                        }
-                        .foregroundColor(.primary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .frame(maxWidth: 280, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color(UIColor.secondarySystemBackground))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .strokeBorder(Color.accentColor.opacity(0.15), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.top, 16)
@@ -425,17 +346,6 @@ struct BitBuddyChatView: View {
             Divider()
             
             HStack(spacing: 12) {
-                // Document upload button (HybridGagGrabber)
-                Button {
-                    showDocumentPicker = true
-                } label: {
-                    Image(systemName: "paperclip")
-                        .font(.system(size: 20))
-                        .foregroundColor(accentColor.opacity(0.8))
-                }
-                .disabled(gagGrabber.isExtracting || bitBuddy.isLoading)
-                .buttonStyle(.plain)
-                
                 // Text field
                 HStack {
                     TextField("Ask BitBuddy...", text: $inputText)
@@ -580,216 +490,10 @@ struct BitBuddyChatView: View {
         }
     }
     
-    // MARK: - HybridGagGrabber: Extracted Jokes Section
-    
-    private var extractedJokesSection: some View {
-        HStack(alignment: .top, spacing: 8) {
-            BitBuddyAvatar(roastMode: roastMode, size: 32, symbolSize: 14)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Found \(extractedJokeResults.count) joke\(extractedJokeResults.count == 1 ? "" : "s") in **\(extractedFileName)**")
-                    .font(.subheadline.bold())
-                    .foregroundColor(.primary)
-                
-                if let error = gagGrabber.lastError {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-                
-                ForEach(Array(extractedJokeResults.enumerated()), id: \.offset) { index, joke in
-                    HStack(alignment: .top, spacing: 8) {
-                        Text(joke)
-                            .font(.callout)
-                            .foregroundColor(.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        if savedExtractedJokeIDs.contains(index) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .font(.body)
-                        } else {
-                            Button {
-                                saveExtractedJoke(joke, index: index)
-                            } label: {
-                                Text("Add")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                            .tint(accentColor)
-                        }
-                    }
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color(UIColor.tertiarySystemBackground))
-                    )
-                }
-                
-                // Bulk action: add all remaining
-                if extractedJokeResults.count > 1,
-                   savedExtractedJokeIDs.count < extractedJokeResults.count {
-                    Button {
-                        saveAllExtractedJokes()
-                    } label: {
-                        Label("Add All to Library", systemImage: "plus.circle.fill")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(accentColor)
-                    .controlSize(.small)
-                    .padding(.top, 4)
-                }
-            }
-            .padding(12)
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(16)
-            .cornerRadius(4, corners: [.topRight, .bottomLeft, .bottomRight])
-            
-            Spacer(minLength: 20)
-        }
-    }
-    
-    // MARK: - HybridGagGrabber: Document Handling
-    
-    /// Reads a picked document (txt/pdf), runs HybridGagGrabber extraction,
-    /// and displays the results inline in the chat.
-    private func handleDocumentPicked(_ url: URL) async {
-        // Security-scoped resource access — required for files from
-        // Files app, iCloud Drive, and third-party file providers.
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer {
-            if didAccess { url.stopAccessingSecurityScopedResource() }
-        }
-
-        let fileName = url.lastPathComponent
-        extractedFileName = fileName
-        extractedJokeResults = []
-        savedExtractedJokeIDs = []
-        
-        // Add a user-style message to the chat showing the file was selected
-        let userMsg = ChatBubbleMessage(
-            text: "Extract jokes from \(fileName)",
-            isUser: true,
-            conversationId: conversationId
-        )
-        messages.append(userMsg)
-        
-        let ext = url.pathExtension.lowercased()
-        
-        do {
-            let text: String
-            if ext == "pdf" {
-                guard let document = PDFDocument(url: url) else {
-                    appendErrorMessage("Could not open PDF: \(fileName)")
-                    return
-                }
-                var pages: [String] = []
-                for i in 0..<document.pageCount {
-                    if let page = document.page(at: i), let content = page.string {
-                        pages.append(content)
-                    }
-                }
-                let combined = pages.joined(separator: "\n\n")
-                guard !combined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    appendErrorMessage("PDF has no extractable text: \(fileName)")
-                    return
-                }
-                text = combined
-            } else if ext == "rtf" || ext == "rtfd" {
-                let data = try Data(contentsOf: url)
-                let attributed = try NSAttributedString(
-                    data: data,
-                    options: [.documentType: NSAttributedString.DocumentType.rtf],
-                    documentAttributes: nil
-                )
-                text = attributed.string
-            } else if ext == "html" || ext == "htm" {
-                let data = try Data(contentsOf: url)
-                let attributed = try NSAttributedString(
-                    data: data,
-                    options: [
-                        .documentType: NSAttributedString.DocumentType.html,
-                        .characterEncoding: String.Encoding.utf8.rawValue
-                    ],
-                    documentAttributes: nil
-                )
-                text = attributed.string
-            } else {
-                // Try UTF-8 first, fall back to auto-detected encoding
-                if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
-                    text = utf8
-                } else {
-                    text = try String(contentsOf: url)
-                }
-            }
-            
-            await gagGrabber.extractJokes(from: text, useOpenAI: false)
-            
-            // Populate results for the in-chat display
-            extractedJokeResults = gagGrabber.extractedJokes
-            
-            if extractedJokeResults.isEmpty {
-                let noResultsMsg = ChatBubbleMessage(
-                    text: gagGrabber.lastError ?? "No jokes found in \(fileName). The document may not contain recognizable joke content.",
-                    isUser: false,
-                    conversationId: conversationId
-                )
-                messages.append(noResultsMsg)
-            }
-        } catch {
-            appendErrorMessage("Failed to read \(fileName): \(error.localizedDescription)")
-        }
-    }
-    
     /// Appends a BitBuddy error message to the chat.
     private func appendErrorMessage(_ text: String) {
         let msg = ChatBubbleMessage(text: text, isUser: false, conversationId: conversationId)
         messages.append(msg)
-    }
-    
-    // MARK: - HybridGagGrabber: Persistence
-    
-    /// Saves a single extracted joke to the library via SwiftData.
-    private func saveExtractedJoke(_ jokeText: String, index: Int) {
-        let joke = Joke(content: jokeText)
-        joke.importSource = "HybridGagGrabber"
-        joke.importTimestamp = Date()
-        modelContext.insert(joke)
-        
-        do {
-            try modelContext.save()
-            savedExtractedJokeIDs.insert(index)
-            print(" [BitBuddy→GagGrabber] Saved extracted joke #\(index + 1) to library")
-        } catch {
-            print(" [BitBuddy→GagGrabber] Save failed: \(error)")
-            appendErrorMessage("Failed to save joke: \(error.localizedDescription)")
-        }
-    }
-    
-    /// Saves all un-saved extracted jokes to the library in one batch.
-    private func saveAllExtractedJokes() {
-        var savedCount = 0
-        for (index, jokeText) in extractedJokeResults.enumerated() {
-            guard !savedExtractedJokeIDs.contains(index) else { continue }
-            
-            let joke = Joke(content: jokeText)
-            joke.importSource = "HybridGagGrabber"
-            joke.importTimestamp = Date()
-            modelContext.insert(joke)
-            savedExtractedJokeIDs.insert(index)
-            savedCount += 1
-        }
-        
-        do {
-            try modelContext.save()
-            print(" [BitBuddy→GagGrabber] Bulk saved \(savedCount) joke(s) to library")
-        } catch {
-            print(" [BitBuddy→GagGrabber] Bulk save failed: \(error)")
-            appendErrorMessage("Failed to save jokes: \(error.localizedDescription)")
-        }
     }
     
     // MARK: - Section → AppScreen Mapping
@@ -958,55 +662,18 @@ struct BitBuddyAvatar: View {
     let symbolSize: CGFloat
 
     var body: some View {
-        Canvas { context, canvasSize in
-            let w = canvasSize.width
-            let h = canvasSize.height
-            // 100×100 design space, scaled to square frame
-            let s = min(w, h) / 100.0
-            let ox = (w - 100.0 * s) / 2.0
-            let oy = (h - 100.0 * s) / 2.0
+        ZStack {
+            Circle()
+                .fill(Color.blue)
 
-            func r(_ v: CGFloat) -> CGFloat { v * s }
-
-            let blue: Color = .blue
-            let lineW = max(1.0, s * 2.4)
-
-            // ====== SMILEY FACE WITH CLOWN NOSE — ALL BLUE ======
-
-            // --- Face circle (stroked outline) ---
-            var face = Path()
-            face.addEllipse(in: CGRect(x: ox + 8 * s, y: oy + 8 * s,
-                                       width: r(84), height: r(84)))
-            context.stroke(face, with: .color(blue), lineWidth: lineW)
-
-            // --- Eyes (filled dots) ---
-            var leftEye = Path()
-            leftEye.addEllipse(in: CGRect(x: ox + 32 * s - r(4.5),
-                                          y: oy + 36 * s - r(4.5),
-                                          width: r(9), height: r(9)))
-            context.fill(leftEye, with: .color(blue))
-
-            var rightEye = Path()
-            rightEye.addEllipse(in: CGRect(x: ox + 68 * s - r(4.5),
-                                           y: oy + 36 * s - r(4.5),
-                                           width: r(9), height: r(9)))
-            context.fill(rightEye, with: .color(blue))
-
-            // --- Clown nose (filled, prominent round nose) ---
-            var nose = Path()
-            nose.addEllipse(in: CGRect(x: ox + 50 * s - r(7),
-                                       y: oy + 48 * s - r(6.5),
-                                       width: r(14), height: r(13)))
-            context.fill(nose, with: .color(blue))
-
-            // --- Smile (wide arc) ---
-            var smile = Path()
-            smile.move(to: CGPoint(x: ox + 28 * s, y: oy + 62 * s))
-            smile.addQuadCurve(to: CGPoint(x: ox + 72 * s, y: oy + 62 * s),
-                               control: CGPoint(x: ox + 50 * s, y: oy + 82 * s))
-            context.stroke(smile, with: .color(blue), lineWidth: lineW)
+            Image(systemName: "face.smiling.inverse")
+                .resizable()
+                .scaledToFit()
+                .foregroundColor(.white)
+                .padding(size * 0.18)
         }
         .frame(width: size, height: size)
+        .clipShape(Circle())
     }
 }
 
