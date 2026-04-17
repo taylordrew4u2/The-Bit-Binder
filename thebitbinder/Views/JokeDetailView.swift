@@ -658,11 +658,21 @@ struct JokeDetailView: View {
         if joke.isDeleted {
             Button("Restore") {
                 joke.restoreFromTrash()
+                do {
+                    try modelContext.save()
+                } catch {
+                    print(" [JokeDetailView] Failed to save after restore: \(error)")
+                }
                 dismiss()
             }
         } else {
             Button("Move to Trash", role: .destructive) {
                 joke.moveToTrash()
+                do {
+                    try modelContext.save()
+                } catch {
+                    print(" [JokeDetailView] Failed to save after trash: \(error)")
+                }
                 dismiss()
             }
         }
