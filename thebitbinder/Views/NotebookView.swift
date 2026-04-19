@@ -159,7 +159,7 @@ struct NotebookView: View {
         }
     }
     
-    let columns = [GridItem(.adaptive(minimum: 100), spacing: 16)]
+    let columns = [GridItem(.adaptive(minimum: 110), spacing: 14)]
     
     var body: some View {
         VStack(spacing: 0) {
@@ -174,7 +174,7 @@ struct NotebookView: View {
                     emptyStateView
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: columns, spacing: 16) {
+                        LazyVGrid(columns: columns, spacing: 14) {
                             ForEach(filteredPhotos, id: \.id) { photo in
                                 let cell = NotebookThumbnailCell(
                                     photo: photo,
@@ -210,7 +210,9 @@ struct NotebookView: View {
                                 }
                             }
                         }
-                        .padding()
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 20)
                     }
                 }
             }
@@ -404,7 +406,7 @@ struct NotebookView: View {
                 batchTrashSelectedPhotos()
             }
         } message: {
-            Text("This will move \(selectedPhotoIDs.count) selected photo\(selectedPhotoIDs.count == 1 ? "" : "s") to Notebook Trash.")
+            Text("This will move \(selectedPhotoIDs.count) selected photo\(selectedPhotoIDs.count == 1 ? "" : "s") to Trash.")
         }
         .onDisappear {
             // Memory cleanup handled by MemoryManager
@@ -492,29 +494,76 @@ struct NotebookView: View {
 
     @ViewBuilder
     private var emptyStateView: some View {
-        switch selectedFilter {
-        case .all:
-            BitBinderEmptyState(
-                icon: "book.fill",
-                title: roastMode ? "No Notebook Pages" : "No Pages Saved Yet",
-                subtitle: "Take photos of your physical notebook pages or import PDFs to back them up",
-                roastMode: roastMode
-            )
-        case .unfiled:
-            BitBinderEmptyState(
-                icon: "tray",
-                title: "No Unfiled Pages",
-                subtitle: "All your pages are organized into folders",
-                roastMode: roastMode
-            )
-        case .folder:
-            BitBinderEmptyState(
-                icon: "folder",
-                title: "Empty Folder",
-                subtitle: "Move pages here from All or another folder",
-                roastMode: roastMode
-            )
+        VStack(spacing: 24) {
+            Spacer()
+
+            switch selectedFilter {
+            case .all:
+                // Open notebook illustration
+                VStack(spacing: 16) {
+                    ZStack {
+                        // Notebook shape
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color(UIColor.tertiarySystemFill))
+                            .frame(width: 80, height: 100)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(Color(UIColor.separator), lineWidth: 0.5)
+                            )
+                        // Spine line
+                        Rectangle()
+                            .fill(Color(UIColor.separator))
+                            .frame(width: 1, height: 80)
+                            .offset(x: -20)
+                        // Faint lines
+                        VStack(spacing: 8) {
+                            ForEach(0..<4, id: \.self) { _ in
+                                Rectangle()
+                                    .fill(Color(UIColor.quaternaryLabel))
+                                    .frame(width: 36, height: 1)
+                            }
+                        }
+                        .offset(x: 8)
+                    }
+
+                    Text("Your Photo Notebook")
+                        .font(.title3.weight(.semibold))
+
+                    Text("Snap photos of your real notebooks, napkin jokes, and handwritten notes to keep a digital backup.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+
+            case .unfiled:
+                VStack(spacing: 12) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 36))
+                        .foregroundColor(.secondary)
+                    Text("No Unfiled Pages")
+                        .font(.headline)
+                    Text("All your pages are organized into folders")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+            case .folder:
+                VStack(spacing: 12) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 36))
+                        .foregroundColor(.secondary)
+                    Text("Empty Folder")
+                        .font(.headline)
+                    Text("Move pages here from All or another folder")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Spacer()
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Folder Actions

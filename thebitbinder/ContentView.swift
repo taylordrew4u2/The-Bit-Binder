@@ -26,7 +26,7 @@ enum AppScreen: String, CaseIterable {
     case jokes = "Jokes"
     case sets = "Sets"
     case recordings = "Recordings"
-    case notebookSaver = "Notebook"
+    case notebookSaver = "Photo Notebook"
     case settings = "Settings"
 
     static var roastScreens: [AppScreen] {
@@ -66,7 +66,7 @@ enum AppScreen: String, CaseIterable {
         case .jokes:         return "text.quote"
         case .sets:          return "list.bullet.rectangle.portrait"
         case .recordings:    return "waveform"
-        case .notebookSaver: return "book.closed"
+        case .notebookSaver: return "photo.on.rectangle"
         case .settings:      return "gearshape"
         }
     }
@@ -78,7 +78,7 @@ enum AppScreen: String, CaseIterable {
         case .jokes:         return "text.quote"
         case .sets:          return "list.bullet.rectangle.portrait.fill"
         case .recordings:    return "waveform"
-        case .notebookSaver: return "book.closed.fill"
+        case .notebookSaver: return "photo.on.rectangle.fill"
         case .settings:      return "gearshape.fill"
         }
     }
@@ -90,7 +90,7 @@ enum AppScreen: String, CaseIterable {
         case .jokes:         return "Roasts"
         case .sets:          return "Roast Sets"
         case .recordings:    return "Recordings"
-        case .notebookSaver: return "Notebook"
+        case .notebookSaver: return "Photo Notebook"
         case .settings:      return "Settings"
         }
     }
@@ -121,17 +121,6 @@ enum AppScreen: String, CaseIterable {
         }
     }
     
-    /// Content-heavy screens with VStack wrappers use `.inline` so the
-    /// title bar doesn't eat vertical space that can't be reclaimed by
-    /// scroll-collapse. Dashboard and list screens keep `.large`.
-    var preferredTitleDisplayMode: NavigationBarItem.TitleDisplayMode {
-        switch self {
-        case .home, .settings, .sets, .notebookSaver, .recordings:
-            return .large
-        case .jokes, .brainstorm:
-            return .inline
-        }
-    }
 }
 
 // MARK: - Main Tab View (Standard iOS TabView)
@@ -182,8 +171,8 @@ struct MainTabView: View {
             ForEach(visibleTabs, id: \.self) { screen in
                 NavigationStack {
                     screenView(for: screen)
-                        .navigationTitle(screen == .home ? "" : (roastMode ? screen.roastName : screen.rawValue))
-                        .navigationBarTitleDisplayMode(screen == .home ? .inline : screen.preferredTitleDisplayMode)
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             // GagGrabber file upload — Jokes page only
                             if screen == .jokes {

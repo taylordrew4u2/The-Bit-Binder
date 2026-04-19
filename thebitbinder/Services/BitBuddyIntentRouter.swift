@@ -33,7 +33,7 @@ enum BitBuddySection: String, CaseIterable, Codable, Sendable {
         case .setLists:   return "Set Lists"
         case .recordings: return "Recordings"
         case .bitbuddy:   return "BitBuddy"
-        case .notebook:   return "Notebook"
+        case .notebook:   return "Photo Notebook"
         case .roastMode:  return "Roast Mode"
         case .importFlow: return "GagGrabber Import"
         case .sync:       return "iCloud Sync"

@@ -223,7 +223,7 @@ struct iCloudSyncSettingsView: View {
                         SyncItemRow(icon: "flame.fill", label: "Roast Targets & Jokes", detail: "All roast targets and their jokes")
                         SyncItemRow(icon: "list.bullet.rectangle", label: "Set Lists", detail: "Your comedy set lists")
                         SyncItemRow(icon: "waveform", label: "Voice Recordings", detail: "All voice memos and recordings")
-                        SyncItemRow(icon: "photo.on.rectangle", label: "Notebook Photos", detail: "Scanned notebook pages")
+                        SyncItemRow(icon: "photo.on.rectangle", label: "Photo Notebook", detail: "Scanned notebook pages")
                         SyncItemRow(icon: "brain.head.profile", label: "Brainstorm Ideas", detail: "Your brainstorming sessions")
                         SyncItemRow(icon: "bubble.left.and.bubble.right", label: "Chat Messages", detail: "BitBuddy conversation history")
                     }

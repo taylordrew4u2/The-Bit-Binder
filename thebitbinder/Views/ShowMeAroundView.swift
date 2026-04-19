@@ -186,7 +186,7 @@ struct TourStep {
                 "Build set lists for your performances",
                 "Record yourself practicing material",
                 "Brainstorm new ideas and premises",
-                "Save notes and photos in your Notebook",
+                "Back up your real notebooks in the Photo Notebook",
                 "Chat with BitBuddy, your AI comedy partner"
             ],
             proTip: "Tap the floating BitBuddy bubble on any screen to open the AI chat."
@@ -234,17 +234,18 @@ struct TourStep {
             proTip: "Duplicate a set list to experiment with different orders without losing the original."
         ),
         TourStep(
-            title: "Notebook",
-            subtitle: "Save text notes and scan photos of scribbled ideas.",
+            title: "Photo Notebook",
+            subtitle: "Your digital backup for real-world notebooks and scribbles.",
             icon: "book.closed.fill",
             color: .brown,
             features: [
-                "Quick-save text notes from anywhere",
-                "Scan handwritten notes with your camera",
-                "All entries are saved to your library automatically",
-                "Great for capturing ideas on the go"
+                "Snap photos of your physical notebook pages",
+                "Import PDFs of handwritten material",
+                "Organize pages into folders",
+                "Add notes to any uploaded page",
+                "Reference your real notebooks anytime, anywhere"
             ],
-            proTip: "Use the document scanner to photograph napkin jokes — they'll be saved with the image."
+            proTip: "Photograph your napkin jokes and notebook pages so you always have a digital backup."
         ),
         TourStep(
             title: "Brainstorm",
