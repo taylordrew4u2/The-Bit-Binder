@@ -33,13 +33,30 @@ enum AppScreen: String, CaseIterable {
         [.jokes, .settings]
     }
     
-    // Screens visible in the tab bar (primary navigation)
-    static var tabBarScreens: [AppScreen] {
-        [.home, .jokes, .sets, .notebookSaver, .settings]
+    // Default screens for the tab bar when no custom selection exists
+    static var defaultTabBarScreens: [AppScreen] {
+        [.home, .jokes, .sets, .notebookSaver]
     }
-    
-    static var roastTabBarScreens: [AppScreen] {
-        [.jokes, .sets, .settings]
+
+    static var defaultRoastTabBarScreens: [AppScreen] {
+        [.jokes, .sets]
+    }
+
+    /// Ordered list of all screens that can appear in the tab bar.
+    /// Used to maintain a stable ordering regardless of selection order.
+    static var tabBarOrder: [AppScreen] {
+        [.home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver]
+    }
+
+    /// Returns the user's custom tab selection (plus Settings, always appended).
+    static func customTabBarScreens(from raw: String, roastMode: Bool) -> [AppScreen] {
+        let defaults = roastMode ? defaultRoastTabBarScreens : defaultTabBarScreens
+        guard !raw.isEmpty else { return defaults + [.settings] }
+
+        let selected = Set(raw.split(separator: ",").compactMap { AppScreen(rawValue: String($0)) })
+        // Filter to ordered list, always include Settings at the end
+        let ordered = tabBarOrder.filter { selected.contains($0) }
+        return (ordered.isEmpty ? defaults : ordered) + [.settings]
     }
 
     var icon: String {
@@ -123,16 +140,19 @@ struct MainTabView: View {
     // Persist the selected tab across app launches
     @AppStorage("selectedTabRawValue") private var selectedTabRaw: String = AppScreen.home.rawValue
     @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore: Bool = false
+    @AppStorage("hasCompletedSetup") private var hasCompletedSetup: Bool = false
+    @AppStorage("setupSelectedTabs") private var setupSelectedTabs: String = ""
     @State private var showAIChat = false
     @State private var showGagGrabber = false
+    @State private var showSetup = false
     @AppStorage("roastModeEnabled") private var roastMode = false
-    
+
     // Draggable BitBuddy position (persisted)
     @AppStorage("bitBuddyX") private var bitBuddyX: Double = -1
     @AppStorage("bitBuddyY") private var bitBuddyY: Double = -1
     @State private var dragOffset: CGSize = .zero
     @State private var isDragging = false
-    
+
     // Computed binding for the selected tab
     private var selectedTab: Binding<AppScreen> {
         Binding(
@@ -152,9 +172,9 @@ struct MainTabView: View {
             }
         )
     }
-    
+
     private var visibleTabs: [AppScreen] {
-        roastMode ? AppScreen.roastTabBarScreens : AppScreen.tabBarScreens
+        AppScreen.customTabBarScreens(from: setupSelectedTabs, roastMode: roastMode)
     }
     
     var body: some View {
@@ -192,21 +212,30 @@ struct MainTabView: View {
         }
         .tint(Color.bitbinderAccent)
         .onAppear {
+            if !hasCompletedSetup {
+                showSetup = true
+            }
             // Mark first launch complete after showing Home
             if !hasLaunchedBefore {
-                // Small delay to ensure Home is shown first
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     hasLaunchedBefore = true
                 }
             }
         }
+        .fullScreenCover(isPresented: $showSetup) {
+            AppSetupView(isFirstLaunch: !hasCompletedSetup)
+        }
         .onChange(of: roastMode) { _, isRoast in
             haptic(.medium)
             // Redirect to valid tab when mode changes
-            if isRoast && !AppScreen.roastTabBarScreens.contains(selectedTab.wrappedValue) {
-                selectedTabRaw = AppScreen.jokes.rawValue
-            } else if !isRoast && !AppScreen.tabBarScreens.contains(selectedTab.wrappedValue) {
-                selectedTabRaw = AppScreen.home.rawValue
+            if !visibleTabs.contains(selectedTab.wrappedValue) {
+                selectedTabRaw = (isRoast ? AppScreen.jokes : .home).rawValue
+            }
+        }
+        .onChange(of: setupSelectedTabs) { _, _ in
+            // If current tab was removed, redirect
+            if !visibleTabs.contains(selectedTab.wrappedValue) {
+                selectedTabRaw = (visibleTabs.first ?? .home).rawValue
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToScreen)) { notification in

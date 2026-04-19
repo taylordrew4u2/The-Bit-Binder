@@ -124,6 +124,20 @@ struct SettingsView: View {
             // MARK: - Notifications Section
             DailyNotificationSection()
             
+            // MARK: - Customize Section
+            Section {
+                NavigationLink {
+                    AppSetupView(isFirstLaunch: false)
+                        .environmentObject(userPreferences)
+                } label: {
+                    Label("Customize App", systemImage: "slider.horizontal.3")
+                }
+            } header: {
+                Text("Customize")
+            } footer: {
+                Text("Change your tabs, joke layout, and display preferences.")
+            }
+
             // MARK: - Support Section
             Section {
                 NavigationLink {
@@ -131,7 +145,7 @@ struct SettingsView: View {
                 } label: {
                     Label("Show Me Around", systemImage: "figure.walk")
                 }
-                
+
                 NavigationLink {
                     HelpFAQView()
                 } label: {
