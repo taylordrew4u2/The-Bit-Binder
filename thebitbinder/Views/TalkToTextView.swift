@@ -323,12 +323,20 @@ struct TalkToTextView: View {
     
     /// Actually kicks off the speech recognition session (call only when permissions are confirmed).
     private func beginRecordingSession() {
-        // Stop any prior session first
-        speechRecognizer.stopTranscribing()
+        // Reset any prior session without deactivating the audio session —
+        // rapidly toggling setActive(false) then setActive(true) can cause
+        // the new recognition request to fail silently on some iOS versions.
+        speechRecognizer.resetForNewSession()
         
         errorMessage = nil
         isRecording = true
-        speechRecognizer.startTranscribing()
+        
+        // Start with a small delay to allow reset to fully complete.
+        // `speechRecognizer` is an @StateObject (class) — captured safely by the closure.
+        let recognizer = speechRecognizer
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            recognizer.startTranscribing()
+        }
     }
     
     private func stopRecording() {
@@ -464,6 +472,8 @@ class SpeechRecognizer: ObservableObject {
     /// Tracks consecutive engine-start failures to avoid infinite retry loops
     private var consecutiveStartFailures = 0
     private let maxConsecutiveStartFailures = 3
+    /// Generation counter — incremented on every full stop / reset to invalidate stale async callbacks
+    private var sessionGeneration = 0
     
     init() {
         // Stop the audio pipeline on memory warnings — AVAudioEngine + speech
@@ -473,8 +483,8 @@ class SpeechRecognizer: ObservableObject {
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
-            guard let self = self, self.shouldBeRunning else { return }
+        ) { [self] _ in
+            guard self.shouldBeRunning else { return }
             print(" [SpeechRecognizer] Memory warning — stopping to free resources")
             // Preserve transcription so user doesn't lose work
             self.accumulatedText = self.transcribedText
@@ -490,8 +500,8 @@ class SpeechRecognizer: ObservableObject {
             forName: AVAudioSession.interruptionNotification,
             object: nil,
             queue: .main
-        ) { [weak self] notification in
-            guard let self = self, self.shouldBeRunning else { return }
+        ) { [self] notification in
+            guard self.shouldBeRunning else { return }
             guard let info = notification.userInfo,
                   let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
                   let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
@@ -526,6 +536,63 @@ class SpeechRecognizer: ObservableObject {
         startRecognitionSession()
     }
     
+    /// Tears down any active audio pipeline without deactivating the audio session.
+    /// Use this before `startTranscribing()` to avoid the rapid setActive(false)/setActive(true)
+    /// toggle that causes iOS to silently reject the next recognition request.
+    func resetForNewSession() {
+        shouldBeRunning = false
+        sessionGeneration += 1
+        tearDownAudioPipeline(deactivateSession: false)
+        accumulatedText = ""
+        isRestarting = false
+        DispatchQueue.main.async { [weak self] in
+            self?.isTranscribing = false
+        }
+    }
+    
+    /// Sets up a reliable audio session with fallback configurations.
+    /// Tries multiple strategies to ensure audio is configured correctly.
+    private func configureAudioSessionWithFallbacks() -> Bool {
+        let audioSession = AVAudioSession.sharedInstance()
+        
+        // Strategy 1: Try preferred configuration
+        do {
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .measurement,
+                options: [.defaultToSpeaker, .duckOthers, .allowBluetoothA2DP]
+            )
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            return true
+        } catch {
+            print(" [SpeechRecognizer] Preferred audio config failed: \(error)")
+        }
+        
+        // Strategy 2: Try without Bluetooth
+        do {
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .measurement,
+                options: [.defaultToSpeaker, .duckOthers]
+            )
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            return true
+        } catch {
+            print(" [SpeechRecognizer] Audio config without Bluetooth failed: \(error)")
+        }
+        
+        // Strategy 3: Minimal configuration
+        do {
+            try audioSession.setCategory(.record, mode: .measurement)
+            try audioSession.setActive(true)
+            return true
+        } catch {
+            print(" [SpeechRecognizer] Minimal audio config failed: \(error)")
+        }
+        
+        return false
+    }
+    
     /// Internal: starts or restarts one speech recognition session.
     private func startRecognitionSession() {
         // Prevent overlapping restart attempts that can stack sessions
@@ -552,20 +619,11 @@ class SpeechRecognizer: ObservableObject {
             return
         }
         
-        // Configure audio session — use playAndRecord to avoid conflicts with
-        // AudioRecordingService which also uses playAndRecord.
-        let audioSession = AVAudioSession.sharedInstance()
-        do {
-            try audioSession.setCategory(
-                .playAndRecord,
-                mode: .measurement,
-                options: [.defaultToSpeaker, .duckOthers, .allowBluetoothA2DP]
-            )
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-        } catch {
+        // Configure audio session — use multiple fallback strategies
+        guard configureAudioSessionWithFallbacks() else {
             isRestarting = false
             DispatchQueue.main.async { [weak self] in
-                self?.error = "Failed to configure audio session: \(error.localizedDescription)"
+                self?.error = "Cannot configure audio system. Please check audio settings and try again."
                 self?.isTranscribing = false
             }
             return
@@ -605,8 +663,9 @@ class SpeechRecognizer: ObservableObject {
         
         // Start recognition task — capture self weakly in the result handler
         // AND in every inner DispatchQueue closure to avoid retain cycles.
+        let generation = sessionGeneration
         recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self = self else { return }
+            guard let self = self, self.sessionGeneration == generation else { return }
             
             var isFinal = false
             
@@ -629,9 +688,33 @@ class SpeechRecognizer: ObservableObject {
                 // Code 216 = user cancelled, code 1110 = no speech detected (timeout)
                 let isTimeout = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110
                 let isCancelled = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216
+                let isRecognizerUnavailable = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1601
+                let isNetworkError = nsError.code == -1001 || nsError.code == -1004 // Network timeouts
+                
+                print(" [SpeechRecognizer] Recognition error — domain: \(nsError.domain), code: \(nsError.code), msg: \(error.localizedDescription)")
                 
                 if isCancelled {
                     // User explicitly stopped — do nothing
+                    return
+                }
+                
+                if isRecognizerUnavailable {
+                    // Speech recognizer service is unavailable (e.g., network issue, service down)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.accumulatedText = self.transcribedText
+                        self.error = "Speech service unavailable. Your text has been preserved."
+                        self.isTranscribing = false
+                    }
+                    return
+                }
+                
+                if isNetworkError {
+                    // Network connectivity issue
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.error = "Network connection issue. Your text has been preserved — tap Start to retry."
+                    }
                     return
                 }
                 
@@ -642,8 +725,9 @@ class SpeechRecognizer: ObservableObject {
                         guard let self = self else { return }
                         self.accumulatedText = self.transcribedText
                         if self.shouldBeRunning {
-                            // Brief delay then restart to keep listening
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                            // Brief delay with exponential backoff for retries
+                            let delaySeconds = Double(self.consecutiveStartFailures) * 0.3
+                            DispatchQueue.main.asyncAfter(deadline: .now() + max(0.5, delaySeconds)) { [weak self] in
                                 self?.startRecognitionSession()
                             }
                         }
@@ -651,9 +735,9 @@ class SpeechRecognizer: ObservableObject {
                     return
                 }
                 
-                // Real error — show it
+                // Real error — show it with recovery option
                 DispatchQueue.main.async { [weak self] in
-                    self?.error = error.localizedDescription
+                    self?.error = "Recognition error: \(error.localizedDescription). Tap Start to try again."
                     self?.isTranscribing = false
                 }
                 return
@@ -673,7 +757,7 @@ class SpeechRecognizer: ObservableObject {
             }
         }
         
-        // Start audio engine
+        // Start audio engine with enhanced error recovery
         do {
             engine.prepare()
             try engine.start()
@@ -682,19 +766,23 @@ class SpeechRecognizer: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 self?.isTranscribing = true
             }
+            print(" [SpeechRecognizer] Audio engine started successfully")
         } catch {
             consecutiveStartFailures += 1
+            let errorMsg = "Audio engine failed to start: \(error.localizedDescription)"
+            print(" [SpeechRecognizer] \(errorMsg) (attempt \(consecutiveStartFailures))")
             tearDownAudioPipeline()
             isRestarting = false
             
             if consecutiveStartFailures < maxConsecutiveStartFailures && shouldBeRunning {
-                // Transient failure — retry after a brief delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                // Retry with exponential backoff
+                let delaySeconds = Double(consecutiveStartFailures) * 0.5
+                DispatchQueue.main.asyncAfter(deadline: .now() + delaySeconds) { [weak self] in
                     self?.startRecognitionSession()
                 }
             } else {
                 DispatchQueue.main.async { [weak self] in
-                    self?.error = "Failed to start audio engine: \(error.localizedDescription)"
+                    self?.error = "Audio recording failed. Please restart the app and try again."
                     self?.isTranscribing = false
                 }
             }
@@ -703,6 +791,7 @@ class SpeechRecognizer: ObservableObject {
     
     func stopTranscribing() {
         shouldBeRunning = false
+        sessionGeneration += 1
         tearDownAudioPipeline(deactivateSession: true)
         accumulatedText = ""
         DispatchQueue.main.async { [weak self] in

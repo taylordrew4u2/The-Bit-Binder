@@ -404,7 +404,7 @@ struct BitBuddyChatView: View {
         // Greet the user on every fresh conversation
         if messages.isEmpty {
             let greeting = roastMode
-                ? "🔥 BitBuddy here — Roast Mode is ON. Give me a target and I'll load the burns."
+                ? "BitBuddy here — Roast Mode is ON. Give me a target and I'll load the burns."
                 : "Hey! I'm BitBuddy, your comedy writing partner. Ask me to analyze a joke, build a set list, brainstorm premises, or anything else — I'm ready when you are."
             let intro = ChatBubbleMessage(text: greeting, isUser: false, conversationId: conversationId)
             messages.append(intro)
@@ -663,14 +663,54 @@ struct BitBuddyAvatar: View {
 
     var body: some View {
         ZStack {
+            // Background circle
             Circle()
-                .fill(Color.blue)
-
-            Image(systemName: "face.smiling.inverse")
-                .resizable()
-                .scaledToFit()
-                .foregroundColor(.white)
-                .padding(size * 0.18)
+                .fill(roastMode ? Color(red: 0.8, green: 0.2, blue: 0.1) : Color.blue)
+            
+            if roastMode {
+                // Subtle glow ring for evil mode
+                Circle()
+                    .stroke(Color.red.opacity(0.4), lineWidth: 1)
+            }
+            
+            // Avatar content
+            if roastMode {
+                // Evil roast mode - using SF Symbols for iOS aesthetic
+                VStack(spacing: size * 0.08) {
+                    // Evil eyes using flame symbols
+                    HStack(spacing: size * 0.08) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: symbolSize * 0.5))
+                            .foregroundColor(.yellow)
+                        
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: symbolSize * 0.5))
+                            .foregroundColor(.yellow)
+                    }
+                    
+                    // Evil grin using system symbols
+                    HStack(spacing: 1) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: symbolSize * 0.35))
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: symbolSize * 0.3))
+                            .foregroundColor(.orange)
+                        
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: symbolSize * 0.35))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+            } else {
+                // Normal friendly mode
+                Image(systemName: "face.smiling.inverse")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundColor(.white)
+                    .padding(size * 0.18)
+            }
         }
         .frame(width: size, height: size)
         .clipShape(Circle())

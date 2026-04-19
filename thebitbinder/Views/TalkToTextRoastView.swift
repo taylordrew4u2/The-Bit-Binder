@@ -280,10 +280,14 @@ struct TalkToTextRoastView: View {
             return
         }
         
-        speechRecognizer.stopTranscribing()
+        speechRecognizer.resetForNewSession()
         errorMessage = nil
         isRecording = true
-        speechRecognizer.startTranscribing()
+        
+        // Start with a small delay to allow reset to fully complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
+            self.speechRecognizer.startTranscribing()
+        }
     }
     
     private func stopRecording() {

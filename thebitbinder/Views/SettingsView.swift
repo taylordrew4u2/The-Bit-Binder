@@ -127,6 +127,12 @@ struct SettingsView: View {
             // MARK: - Support Section
             Section {
                 NavigationLink {
+                    ShowMeAroundView()
+                } label: {
+                    Label("Show Me Around", systemImage: "figure.walk")
+                }
+                
+                NavigationLink {
                     HelpFAQView()
                 } label: {
                     Label("Help & FAQ", systemImage: "questionmark.circle")
