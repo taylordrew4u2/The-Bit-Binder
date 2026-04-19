@@ -663,57 +663,43 @@ struct BitBuddyAvatar: View {
 
     var body: some View {
         ZStack {
-            // Background circle
+            // Background circle — red in roast mode, blue otherwise
             Circle()
-                .fill(roastMode ? Color(red: 0.8, green: 0.2, blue: 0.1) : Color.blue)
-            
+                .fill(roastMode ? Color.red : Color.blue)
+
+            // Same friendly face in both modes
+            Image(systemName: "face.smiling.inverse")
+                .resizable()
+                .scaledToFit()
+                .foregroundColor(.white)
+                .padding(size * 0.18)
+
+            // Devil horns only in roast mode, sitting on top of the head
             if roastMode {
-                // Subtle glow ring for evil mode
-                Circle()
-                    .stroke(Color.red.opacity(0.4), lineWidth: 1)
-            }
-            
-            // Avatar content
-            if roastMode {
-                // Evil roast mode - using SF Symbols for iOS aesthetic
-                VStack(spacing: size * 0.08) {
-                    // Evil eyes using flame symbols
-                    HStack(spacing: size * 0.08) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: symbolSize * 0.5))
-                            .foregroundColor(.yellow)
-                        
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: symbolSize * 0.5))
-                            .foregroundColor(.yellow)
-                    }
-                    
-                    // Evil grin using system symbols
-                    HStack(spacing: 1) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: symbolSize * 0.35))
-                            .foregroundColor(.white.opacity(0.8))
-                        
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: symbolSize * 0.3))
-                            .foregroundColor(.orange)
-                        
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: symbolSize * 0.35))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
+                HStack(spacing: size * 0.22) {
+                    DevilHorn(size: size * 0.22)
+                    DevilHorn(size: size * 0.22)
                 }
-            } else {
-                // Normal friendly mode
-                Image(systemName: "face.smiling.inverse")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundColor(.white)
-                    .padding(size * 0.18)
+                .offset(y: -size * 0.44)
             }
         }
         .frame(width: size, height: size)
-        .clipShape(Circle())
+    }
+}
+
+/// A simple triangular devil horn drawn with a Path — stays native iOS styling.
+private struct DevilHorn: View {
+    let size: CGFloat
+
+    var body: some View {
+        Path { path in
+            path.move(to: CGPoint(x: size * 0.5, y: 0))           // tip
+            path.addLine(to: CGPoint(x: 0, y: size))              // bottom-left
+            path.addLine(to: CGPoint(x: size, y: size))           // bottom-right
+            path.closeSubpath()
+        }
+        .fill(Color.red)
+        .frame(width: size, height: size)
     }
 }
 
