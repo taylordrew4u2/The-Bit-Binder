@@ -810,7 +810,7 @@ struct DraggableRoastCard: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDragging)
                 .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isPressed)
                 .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: swipeOffset)
-                .gesture(swipeGesture)
+                .simultaneousGesture(swipeGesture)
                 .simultaneousGesture(combinedGesture)
         }
         .padding(.horizontal, 16)

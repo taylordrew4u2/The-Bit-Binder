@@ -351,7 +351,9 @@ struct JokesView: View {
             filtered = base.filter { matchesSearch($0, lower: lower) }
         }
 
-        cachedFilteredJokes = filtered.sorted { $0.dateModified > $1.dateModified }
+        // @Query already delivers jokes sorted by dateModified descending;
+        // filter() preserves that order, so no re-sort needed.
+        cachedFilteredJokes = filtered
     }
     
     var body: some View {
@@ -1520,14 +1522,11 @@ struct JokesView: View {
     }
     
     private func isLikelyDuplicate(_ content: String, title: String?) -> Bool {
-        let newKey = content.normalizedPrefix()
-        // Check against existing jokes in current filtered set and full list
-        if jokes.contains(where: { $0.content.normalizedPrefix() == newKey }) { return true }
-        if let title = title, !title.isEmpty {
-            let t = title.lowercased().trimmingCharacters(in: .whitespaces)
-            if jokes.contains(where: { $0.title.lowercased().trimmingCharacters(in: .whitespaces) == t }) { return true }
-        }
-        return false
+        DuplicateDetectionService.findDuplicate(
+            content: content,
+            title: title,
+            in: modelContext
+        ) != nil
     }
     
     /// Cached app group UserDefaults — created once to avoid repeated

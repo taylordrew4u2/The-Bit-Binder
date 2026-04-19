@@ -25,6 +25,7 @@ struct SmartImportReviewView: View {
     @State private var savedCount = 0
     @State private var brainstormCount = 0
     @State private var showingSaveError = false
+    @State private var skippedDuplicateCount = 0
     @State private var saveErrorMessage = ""
     @State private var showSwipeTutorial = false
     @State private var showingCancelConfirmation = false
@@ -89,10 +90,29 @@ struct SmartImportReviewView: View {
                         .padding(.top, 4)
                     }
                     
+                    // Duplicate warning banner
+                    if viewModel.duplicateCount > 0 {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text("\(viewModel.duplicateCount) possible duplicate\(viewModel.duplicateCount == 1 ? "" : "s") found — review carefully")
+                                .font(.caption.bold())
+                                .foregroundColor(.orange)
+                            Spacer()
+                        }
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.orange.opacity(0.12))
+                        )
+                        .padding(.horizontal, 12)
+                        .padding(.top, 4)
+                    }
+
                     // Prominent "Accept All" when there are pending items
                     if viewModel.pendingCount > 0 {
                         Button {
-                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            haptic(.success)
                             viewModel.approveAll()
                         } label: {
                             HStack(spacing: 8) {
@@ -194,10 +214,11 @@ struct SmartImportReviewView: View {
             } message: {
                 let jokeWord = savedCount == 1 ? "joke" : "jokes"
                 let ideaWord = brainstormCount == 1 ? "idea" : "ideas"
+                let dupNote = skippedDuplicateCount > 0 ? " (\(skippedDuplicateCount) duplicate\(skippedDuplicateCount == 1 ? "" : "s") skipped)" : ""
                 if brainstormCount > 0 {
-                    Text("Successfully saved \(savedCount) \(jokeWord) to your collection and sent \(brainstormCount) \(ideaWord) to Brainstorm. Your material is growing!")
+                    Text("Successfully saved \(savedCount) \(jokeWord) to your collection and sent \(brainstormCount) \(ideaWord) to Brainstorm.\(dupNote) Your material is growing!")
                 } else {
-                    Text("Successfully saved \(savedCount) \(jokeWord) to your collection. Head to Jokes to see your new material!")
+                    Text("Successfully saved \(savedCount) \(jokeWord) to your collection.\(dupNote) Head to Jokes to see your new material!")
                 }
             }
             .alert("Couldn't Save Jokes", isPresented: $showingSaveError) {
@@ -231,6 +252,7 @@ struct SmartImportReviewView: View {
         }
         .onAppear {
             viewModel.loadAllItems(from: importResult)
+            viewModel.checkForDuplicates(in: modelContext)
             if !hasSeenSwipeTutorial && !viewModel.reviewItems.isEmpty {
                 showSwipeTutorial = true
             }
@@ -363,7 +385,33 @@ struct SmartImportReviewView: View {
                     .font(.caption)
                     .foregroundColor(roastMode ? .white.opacity(0.5) : Color(UIColor.tertiaryLabel))
             }
-            
+
+            // Duplicate warning
+            if let match = item.duplicateMatch {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Possible duplicate (\(Int(match.similarity * 100))% match)")
+                            .font(.caption.bold())
+                            .foregroundColor(.orange)
+                        if !match.existingTitle.isEmpty {
+                            Text("Matches: \(match.existingTitle)")
+                                .font(.caption2)
+                                .foregroundColor(roastMode ? .white.opacity(0.5) : Color(UIColor.secondaryLabel))
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.orange.opacity(0.12))
+                )
+            }
+
             // Title
             if !item.editedTitle.isEmpty {
                 Text(item.editedTitle)
@@ -414,7 +462,7 @@ struct SmartImportReviewView: View {
                 
                 Text("or use buttons below")
                     .font(.system(size: 10))
-                    .foregroundColor(roastMode ? .white.opacity(0.25) : Color(UIColor.tertiaryLabel).opacity(0.5))
+                    .foregroundColor(roastMode ? .white.opacity(0.45) : Color(UIColor.tertiaryLabel).opacity(0.5))
                 
                 Spacer()
                 
@@ -477,21 +525,23 @@ struct SmartImportReviewView: View {
                 let threshold: CGFloat = 100
                 if value.translation.width > threshold {
                     // Swipe right  Accept
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    haptic(.medium)
                     withAnimation(.easeOut(duration: 0.3)) {
                         dragOffset = CGSize(width: 500, height: 0)
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 300_000_000)
                         viewModel.approveCurrentItem()
                         dragOffset = .zero
                     }
                 } else if value.translation.width < -threshold {
                     // Swipe left  Reject
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    haptic(.light)
                     withAnimation(.easeOut(duration: 0.3)) {
                         dragOffset = CGSize(width: -500, height: 0)
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 300_000_000)
                         viewModel.rejectCurrentItem()
                         dragOffset = .zero
                     }
@@ -527,7 +577,7 @@ struct SmartImportReviewView: View {
     
     private var undoBanner: some View {
         Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            haptic(.light)
             withAnimation(.easeInOut(duration: 0.25)) {
                 viewModel.undoLastAction()
             }
@@ -1244,13 +1294,30 @@ struct SmartImportReviewView: View {
     
     private func finishAndSave() async {
         let results = viewModel.getReviewResults()
-        
+
         // Build the objects to insert but track them so we can roll back on failure.
         var insertedJokes: [Joke] = []
         var insertedIdeas: [BrainstormIdea] = []
+        var skippedDuplicates = 0
 
-        // Insert approved jokes
+        // Batch duplicate check — one DB fetch for all approved jokes instead of one per joke.
+        let batchItems: [(id: UUID, content: String, title: String?)] = results.approvedJokes.map {
+            (id: $0.id, content: $0.body, title: $0.title)
+        }
+        let duplicateMatches = DuplicateDetectionService.findDuplicates(
+            for: batchItems,
+            in: modelContext,
+            threshold: 0.95
+        )
+
+        // Insert approved jokes (with final duplicate safety check)
         for importedJoke in results.approvedJokes {
+            // Skip near-exact matches automatically at save time
+            if let match = duplicateMatches[importedJoke.id], match.similarity >= 0.95 {
+                skippedDuplicates += 1
+                continue
+            }
+
             let joke = Joke(content: importedJoke.body, title: importedJoke.title ?? "")
             joke.dateCreated = importedJoke.sourceMetadata.importTimestamp
             joke.dateModified = Date()
@@ -1283,8 +1350,9 @@ struct SmartImportReviewView: View {
                 // Small delay to allow CloudKit activity to transition to DONE state
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                 
-                savedCount = results.approvedJokes.count
+                savedCount = insertedJokes.count
                 brainstormCount = results.brainstormItems.count
+                skippedDuplicateCount = skippedDuplicates
                 showingSaveConfirmation = true
                 
                 #if DEBUG

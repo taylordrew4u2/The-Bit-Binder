@@ -169,10 +169,9 @@ struct LivePerformanceView: View {
                 if showHint && !cachedItems.isEmpty {
                     hintOverlay
                         .transition(.opacity)
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                withAnimation { showHint = false }
-                            }
+                        .task {
+                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            withAnimation { showHint = false }
                         }
                 }
             }

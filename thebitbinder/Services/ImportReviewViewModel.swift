@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import SwiftData
 
 /// ViewModel for managing import review flow — joke-by-joke
 @MainActor
@@ -95,6 +96,23 @@ final class ImportReviewViewModel: ObservableObject {
         self.currentIndex = 0
     }
     
+    /// Run duplicate detection against existing jokes in the database.
+    /// Call after loadAllItems to flag potential duplicates.
+    func checkForDuplicates(in context: ModelContext) {
+        let items: [(id: UUID, content: String, title: String?)] = reviewItems.map {
+            (id: $0.id, content: $0.editedBody, title: $0.editedTitle.isEmpty ? nil : $0.editedTitle)
+        }
+        let matches = DuplicateDetectionService.findDuplicates(for: items, in: context)
+        for i in reviewItems.indices {
+            reviewItems[i].duplicateMatch = matches[reviewItems[i].id]
+        }
+    }
+
+    /// Number of items flagged as possible duplicates
+    var duplicateCount: Int {
+        reviewItems.filter { $0.duplicateMatch != nil }.count
+    }
+
     // MARK: - Navigation
     
     func goToNext() {
@@ -270,6 +288,7 @@ struct ImportReviewItem: Identifiable {
     var action: ReviewAction
     var splitPoints: [Int]
     var mergeWithNext: Bool
+    var duplicateMatch: DuplicateDetectionService.DuplicateMatch?
     
     var hasBeenEdited: Bool {
         return editedTitle != (originalJoke.title ?? "") ||

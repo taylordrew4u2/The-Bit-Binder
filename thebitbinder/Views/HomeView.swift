@@ -13,7 +13,7 @@ import UIKit
 // MARK: - HomeView
 
 struct HomeView: View {
-    @Query(filter: #Predicate<Joke> { !$0.isTrashed }) private var allJokes: [Joke]
+    @Query(filter: #Predicate<Joke> { !$0.isTrashed }, sort: \Joke.dateModified, order: .reverse) private var allJokes: [Joke]
     @Query(filter: #Predicate<SetList> { !$0.isTrashed }) private var allSets: [SetList]
     @Query(filter: #Predicate<BrainstormIdea> { !$0.isTrashed }) private var allIdeas: [BrainstormIdea]
     @Query(filter: #Predicate<Recording> { !$0.isTrashed }) private var allRecordings: [Recording]
@@ -52,9 +52,7 @@ struct HomeView: View {
         return allJokes.filter { $0.dateCreated >= weekAgo }.count
     }
     
-    private var recentJokes: [Joke] {
-        Array(allJokes.sorted(by: { $0.dateModified > $1.dateModified }).prefix(3))
-    }
+    private var recentJokes: [Joke] { Array(allJokes.prefix(3)) }
 
     var body: some View {
         List {

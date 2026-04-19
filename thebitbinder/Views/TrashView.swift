@@ -64,7 +64,7 @@ struct TrashView: View {
                 BitBinderEmptyState(
                     icon: "trash",
                     title: "Trash is Empty",
-                    subtitle: "Deleted jokes and roasts appear here until you empty trash."
+                    subtitle: "Deleted jokes and roasts appear here for 30 days before being permanently removed."
                 )
             } else {
                 List {
@@ -82,9 +82,7 @@ struct TrashView: View {
                                                 .foregroundStyle(.secondary)
                                         }
                                         if let deletedDate = joke.deletedDate {
-                                            Text("Deleted \(deletedDate.formatted(date: .abbreviated, time: .shortened))")
-                                                .font(.caption)
-                                                .foregroundStyle(.tertiary)
+                                            trashDateLabel(deletedDate)
                                         }
                                     }
                                     .padding(.vertical, 4)
@@ -154,9 +152,7 @@ struct TrashView: View {
                                     }
                                     
                                     if let deletedDate = roast.deletedDate {
-                                        Text("Deleted \(deletedDate.formatted(date: .abbreviated, time: .shortened))")
-                                            .font(.caption)
-                                            .foregroundStyle(.tertiary)
+                                        trashDateLabel(deletedDate)
                                     }
                                 }
                                 .padding(.vertical, 4)
@@ -253,6 +249,7 @@ struct TrashView: View {
         }
         .onAppear {
             logTrashCounts()
+            autoPurgeExpiredItems()
         }
     }
 
@@ -317,6 +314,66 @@ struct TrashView: View {
             print(" [TrashView] Failed to empty trash: \(error)")
             persistenceError = "Could not empty trash: \(error.localizedDescription)"
             showingErrorAlert = true
+        }
+    }
+
+    // MARK: - Trash Date Label
+
+    @ViewBuilder
+    private func trashDateLabel(_ deletedDate: Date) -> some View {
+        let formatted = deletedDate.formatted(date: .abbreviated, time: .shortened)
+        let daysLeft = daysUntilAutoPurge(deletedDate)
+        HStack(spacing: 4) {
+            Text("Deleted \(formatted)")
+            if let days = daysLeft {
+                Text("·")
+                Text("\(days)d left")
+                    .foregroundColor(days <= 3 ? .red : Color(UIColor.tertiaryLabel))
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.tertiary)
+    }
+
+    // MARK: - Auto-Purge (30-day retention)
+
+    private static let retentionDays = 30
+
+    private func daysUntilAutoPurge(_ deletedDate: Date) -> Int? {
+        let calendar = Calendar.current
+        let purgeDate = calendar.date(byAdding: .day, value: Self.retentionDays, to: deletedDate) ?? deletedDate
+        let daysLeft = calendar.dateComponents([.day], from: Date(), to: purgeDate).day ?? 0
+        return max(0, daysLeft)
+    }
+
+    /// Permanently delete items that have been in trash for more than 30 days.
+    /// Called on appear so stale trash is cleaned up automatically.
+    private func autoPurgeExpiredItems() {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -Self.retentionDays, to: Date()) ?? Date()
+        var purgedCount = 0
+
+        for joke in trashedJokes {
+            if let deleted = joke.deletedDate, deleted < cutoff {
+                modelContext.delete(joke)
+                purgedCount += 1
+            }
+        }
+        for roast in trashedRoastJokes {
+            if let deleted = roast.deletedDate, deleted < cutoff {
+                modelContext.delete(roast)
+                purgedCount += 1
+            }
+        }
+
+        if purgedCount > 0 {
+            do {
+                try modelContext.save()
+                #if DEBUG
+                print(" [TrashView] Auto-purged \(purgedCount) item(s) older than \(Self.retentionDays) days")
+                #endif
+            } catch {
+                print(" [TrashView] Auto-purge save failed: \(error)")
+            }
         }
     }
 }

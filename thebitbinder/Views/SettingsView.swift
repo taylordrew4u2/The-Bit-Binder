@@ -14,7 +14,13 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var jokes: [Joke]
     @EnvironmentObject private var userPreferences: UserPreferences
-    
+
+    @StateObject private var syncService = iCloudSyncService.shared
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f
+    }()
     @AppStorage("roastModeEnabled") private var roastMode = false
     @State private var isEditingName = false
     @State private var editingNameText = ""
@@ -92,9 +98,23 @@ struct SettingsView: View {
             // MARK: - Data Section
             Section {
                 NavigationLink {
+                    AISettingsView()
+                } label: {
+                    HStack {
+                        Label("GagGrabber AI Keys", systemImage: "key.fill")
+                        Spacer()
+                        aiKeysStatusBadge
+                    }
+                }
+
+                NavigationLink {
                     iCloudSyncSettingsView()
                 } label: {
-                    Label("iCloud Sync", systemImage: "icloud")
+                    HStack {
+                        Label("iCloud Sync", systemImage: "icloud")
+                        Spacer()
+                        syncStatusBadge
+                    }
                 }
                 
                 NavigationLink {
@@ -182,6 +202,36 @@ struct SettingsView: View {
         }
         isEditingName = false
         nameFieldFocused = false
+    }
+
+    @ViewBuilder
+    private var aiKeysStatusBadge: some View {
+        let configured = AIKeyLoader.loadKey(for: .openRouter) != nil
+        if configured {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundColor(.green)
+        } else {
+            Text("Not set")
+                .font(.caption)
+                .foregroundColor(.orange)
+        }
+    }
+
+    @ViewBuilder
+    private var syncStatusBadge: some View {
+        if case .syncing = syncService.syncStatus {
+            ProgressView()
+                .scaleEffect(0.7)
+        } else if case .error = syncService.syncStatus {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.caption)
+                .foregroundColor(.red)
+        } else if let lastSync = syncService.lastSyncDate {
+            Text(Self.relativeDateFormatter.localizedString(for: lastSync, relativeTo: Date()))
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
     }
 }
 

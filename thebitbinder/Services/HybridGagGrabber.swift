@@ -738,6 +738,13 @@ struct HybridGagGrabberSheet: View {
     /// Creates a new `Joke` from the extracted text and inserts it into
     /// SwiftData. Follows the existing `Joke.init(content:title:folder:)` pattern.
     private func addJokeToLibrary(_ jokeText: String, index: Int) {
+        if let match = DuplicateDetectionService.findDuplicate(content: jokeText, title: nil, in: modelContext),
+           match.similarity >= 0.90 {
+            grabber.lastError = "This joke looks like a duplicate of \"\(match.existingTitle)\" (\(Int(match.similarity * 100))% match). Skipped."
+            savedJokeIDs.insert(index) // Mark as handled so it doesn't show "Add" again
+            return
+        }
+
         let joke = Joke(content: jokeText)
         joke.importSource = "GagGrabber"
         joke.importTimestamp = Date()
@@ -756,8 +763,14 @@ struct HybridGagGrabberSheet: View {
     /// Saves all extracted jokes that haven't been saved yet in one batch.
     private func addAllJokesToLibrary() {
         var count = 0
+        var duplicateCount = 0
         for (index, jokeText) in grabber.extractedJokes.enumerated() {
             guard !savedJokeIDs.contains(index) else { continue }
+            if DuplicateDetectionService.findDuplicate(content: jokeText, title: nil, in: modelContext, threshold: 0.90) != nil {
+                savedJokeIDs.insert(index)
+                duplicateCount += 1
+                continue
+            }
             let joke = Joke(content: jokeText)
             joke.importSource = "GagGrabber"
             joke.importTimestamp = Date()
@@ -767,7 +780,12 @@ struct HybridGagGrabberSheet: View {
         }
         do {
             try modelContext.save()
-            print(" [GagGrabber] Batch-saved \(count) joke(s) to library")
+            var msg = "Saved \(count) joke(s) to library"
+            if duplicateCount > 0 { msg += " (\(duplicateCount) duplicate\(duplicateCount == 1 ? "" : "s") skipped)" }
+            print(" [GagGrabber] \(msg)")
+            if duplicateCount > 0 {
+                grabber.lastError = "\(duplicateCount) duplicate\(duplicateCount == 1 ? "" : "s") skipped — already in your library."
+            }
         } catch {
             grabber.lastError = "Failed to save jokes: \(error.localizedDescription)"
             print(" [GagGrabber] Batch save failed: \(error)")
