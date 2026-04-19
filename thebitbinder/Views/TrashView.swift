@@ -3,10 +3,10 @@ import SwiftData
 
 struct TrashView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Joke> { $0.isDeleted == true }, sort: \Joke.dateModified, order: .reverse)
+    @Query(filter: #Predicate<Joke> { $0.isTrashed == true }, sort: \Joke.dateModified, order: .reverse)
     private var trashedJokes: [Joke]
     
-    @Query(filter: #Predicate<RoastJoke> { $0.isDeleted == true }, sort: \RoastJoke.dateModified, order: .reverse)
+    @Query(filter: #Predicate<RoastJoke> { $0.isTrashed == true }, sort: \RoastJoke.dateModified, order: .reverse)
     private var trashedRoastJokes: [RoastJoke]
 
     @AppStorage("showFullContent") private var showFullContent = true
@@ -102,7 +102,7 @@ struct TrashView: View {
                                     } label: {
                                         Label("Restore", systemImage: "arrow.uturn.backward")
                                     }
-                                    .tint(.blue)
+                                    .tint(Color.bitbinderAccent)
                                 }
                                 .contextMenu {
                                     Button {
@@ -135,11 +135,11 @@ struct TrashView: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: "flame.fill")
                                             .font(.caption)
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(Color.bitbinderAccent)
                                         if let targetName = roast.target?.name {
                                             Text(targetName)
                                                 .font(.caption.bold())
-                                                .foregroundColor(.blue)
+                                                .foregroundColor(Color.bitbinderAccent)
                                         }
                                     }
                                     
@@ -173,7 +173,7 @@ struct TrashView: View {
                                     } label: {
                                         Label("Restore", systemImage: "arrow.uturn.backward")
                                     }
-                                    .tint(.blue)
+                                    .tint(Color.bitbinderAccent)
                                 }
                                 .contextMenu {
                                     Button {
@@ -193,7 +193,7 @@ struct TrashView: View {
                         } header: {
                             HStack {
                                 Image(systemName: "flame.fill")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                                 Text("Roasts (\(filteredRoastJokes.count))")
                             }
                         }

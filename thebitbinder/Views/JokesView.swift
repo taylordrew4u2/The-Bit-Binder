@@ -16,9 +16,9 @@ struct ImportErrorMessage: LocalizedError {
 
 struct JokesView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Joke> { !$0.isDeleted }, sort: \Joke.dateModified, order: .reverse) private var jokes: [Joke]
-    @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }) private var folders: [JokeFolder]
-    @Query(filter: #Predicate<RoastTarget> { !$0.isDeleted }, sort: \RoastTarget.dateModified, order: .reverse) private var roastTargets: [RoastTarget]
+    @Query(filter: #Predicate<Joke> { !$0.isTrashed }, sort: \Joke.dateModified, order: .reverse) private var jokes: [Joke]
+    @Query(filter: #Predicate<JokeFolder> { !$0.isTrashed }) private var folders: [JokeFolder]
+    @Query(filter: #Predicate<RoastTarget> { !$0.isTrashed }, sort: \RoastTarget.dateModified, order: .reverse) private var roastTargets: [RoastTarget]
     @Query(sort: \BrainstormIdea.dateCreated, order: .reverse) private var brainstormIdeas: [BrainstormIdea]
     
     // Roast mode — toggled from Settings
@@ -1350,7 +1350,7 @@ struct JokesView: View {
         if selectedFolder != nil {
             jokesToExport = filteredJokes
         } else {
-            jokesToExport = jokes.filter { !$0.isDeleted }
+            jokesToExport = jokes.filter { !$0.isTrashed }
         }
         if let url = PDFExportService.exportJokesToPDF(jokes: jokesToExport) {
             exportedPDFURL = url
@@ -1366,7 +1366,7 @@ struct JokesView: View {
     }
     
     private func exportEverythingToPDF() {
-        let jokesToExport = jokes.filter { !$0.isDeleted }
+        let jokesToExport = jokes.filter { !$0.isTrashed }
         if let url = PDFExportService.exportEverythingToPDF(jokes: jokesToExport, ideas: brainstormIdeas) {
             exportedPDFURL = url
             showingExportAlert = true
@@ -1391,7 +1391,7 @@ struct JokesView: View {
     // MARK: - Roast Export Methods
     
     private func exportAllRoastsToPDF() {
-        let targetsToExport = roastTargets.filter { !$0.isDeleted && $0.jokeCount > 0 }
+        let targetsToExport = roastTargets.filter { !$0.isTrashed && $0.jokeCount > 0 }
         guard !targetsToExport.isEmpty else { return }
         
         if let url = PDFExportService.exportRoastsToPDF(targets: targetsToExport, fileName: "BitBinder_AllRoasts") {
@@ -1400,7 +1400,7 @@ struct JokesView: View {
     }
     
     private func exportAllRoastsToText() {
-        let targetsToExport = roastTargets.filter { !$0.isDeleted && $0.jokeCount > 0 }
+        let targetsToExport = roastTargets.filter { !$0.isTrashed && $0.jokeCount > 0 }
         guard !targetsToExport.isEmpty else { return }
         
         var text = "THE BITBINDER - ALL ROASTS\n"

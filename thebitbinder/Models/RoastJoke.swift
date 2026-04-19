@@ -18,7 +18,7 @@ final class RoastJoke: Identifiable {
     var dateModified: Date = Date()
 
     // Soft-delete (trash) support
-    var isDeleted: Bool = false
+    var isTrashed: Bool = false
     var deletedDate: Date?
 
     /// The person this roast is about
@@ -76,7 +76,7 @@ final class RoastJoke: Identifiable {
     /// Safely checks if the model is in a valid state for UI access
     @Transient
     var isValid: Bool {
-        !id.uuidString.isEmpty && !isDeleted
+        !id.uuidString.isEmpty && !isTrashed
     }
     
     /// Word count for the joke content
@@ -101,13 +101,13 @@ final class RoastJoke: Identifiable {
 
     /// Moves this roast joke to trash. Use instead of modelContext.delete() for recoverability.
     func moveToTrash() {
-        isDeleted = true
+        isTrashed = true
         deletedDate = Date()
         dateModified = Date()
     }
 
     func restoreFromTrash() {
-        isDeleted = false
+        isTrashed = false
         deletedDate = nil
         dateModified = Date()
     }

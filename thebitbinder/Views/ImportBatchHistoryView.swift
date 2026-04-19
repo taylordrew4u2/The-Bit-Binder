@@ -75,7 +75,7 @@ struct ImportBatchHistoryView: View {
             HStack(alignment: .top) {
                 Image(systemName: fileIcon(for: batch.sourceFileName))
                     .font(.system(size: 18))
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.bitbinderAccent)
                     .frame(width: 28)
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -351,7 +351,7 @@ struct UnresolvedFragmentHistoryRow: View {
                         .padding(.vertical, 3)
                         .background(
                             Capsule().fill(
-                                (fragment.isResolved ? .blue : Color.blue).opacity(0.12)
+                                (fragment.isResolved ? .blue : Color.bitbinderAccent).opacity(0.12)
                             )
                         )
                     

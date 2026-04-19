@@ -20,7 +20,7 @@ final class NotebookPhotoRecord: Identifiable {
     var folder: NotebookFolder?
 
     // Soft-delete (trash) support
-    var isDeleted: Bool = false
+    var isTrashed: Bool = false
     var deletedDate: Date?
 
     init(notes: String, imageData: Data? = nil) {
@@ -38,12 +38,12 @@ final class NotebookPhotoRecord: Identifiable {
 
     /// Moves this photo to trash. The imageData is kept until permanent deletion.
     func moveToTrash() {
-        isDeleted = true
+        isTrashed = true
         deletedDate = Date()
     }
 
     func restoreFromTrash() {
-        isDeleted = false
+        isTrashed = false
         deletedDate = nil
     }
 }

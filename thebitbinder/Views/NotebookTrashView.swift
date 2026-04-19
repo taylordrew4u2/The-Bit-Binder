@@ -14,7 +14,7 @@ struct NotebookTrashView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("roastModeEnabled") private var roastMode = false
     @Query(
-        filter: #Predicate<NotebookPhotoRecord> { $0.isDeleted == true },
+        filter: #Predicate<NotebookPhotoRecord> { $0.isTrashed == true },
         sort: \NotebookPhotoRecord.deletedDate,
         order: .reverse
     ) private var trashedPhotos: [NotebookPhotoRecord]

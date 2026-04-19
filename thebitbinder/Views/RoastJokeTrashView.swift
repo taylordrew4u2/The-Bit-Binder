@@ -31,7 +31,7 @@ struct RoastJokeTrashView: View {
         // Safety check - return empty if target is invalid
         guard target.isValid, let jokes = target.jokes else { return [] }
         return jokes
-            .filter { $0.isDeleted }
+            .filter { $0.isTrashed }
             .sorted { ($0.deletedDate ?? .distantPast) > ($1.deletedDate ?? .distantPast) }
     }
 
@@ -87,7 +87,7 @@ struct RoastJokeTrashView: View {
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
-                            .tint(.blue)
+                            .tint(Color.bitbinderAccent)
                         }
                         .contextMenu {
                             Button {

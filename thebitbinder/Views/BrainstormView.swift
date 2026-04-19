@@ -12,7 +12,7 @@ import AVFoundation
 
 struct BrainstormView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<BrainstormIdea> { !$0.isDeleted }, sort: \BrainstormIdea.dateCreated, order: .reverse) private var ideas: [BrainstormIdea]
+    @Query(filter: #Predicate<BrainstormIdea> { !$0.isTrashed }, sort: \BrainstormIdea.dateCreated, order: .reverse) private var ideas: [BrainstormIdea]
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("showFullContent") private var showFullContent = true
     @AppStorage("brainstormGridScale") private var brainstormGridScale: Double = 1.0
@@ -137,7 +137,7 @@ struct BrainstormView: View {
         } message: {
             Text(persistenceError ?? "An unknown error occurred")
         }
-        .tint(.blue)
+        .tint(Color.bitbinderAccent)
         .onChange(of: speechManager.isRecording) { oldValue, newValue in
             if oldValue && !newValue && isRecording {
                 isRecording = false
@@ -547,79 +547,12 @@ class SpeechRecognitionManager: ObservableObject {
             }
         }
         
-        recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self = self else { return }
-            
-            var isFinal = false
-            
-            if let result = result {
-                isFinal = result.isFinal
-                let newText = result.bestTranscription.formattedString
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    if self.accumulatedText.isEmpty {
-                        self.transcribedText = newText
-                    } else {
-                        self.transcribedText = self.accumulatedText + " " + newText
-                    }
-                }
-            }
-            
-            if let error = error {
-                let nsError = error as NSError
-                // Code 216 = user cancelled, code 1110 = no speech detected (timeout)
-                let isTimeout = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110
-                let isCancelled = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216
-                
-                if isCancelled {
-                    return
-                }
-                
-                if isTimeout || isFinal {
-                    // Speech recognition timed out (~60s) or finished —
-                    // save what we have and restart automatically
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self = self else { return }
-                        self.accumulatedText = self.transcribedText
-                        if self.shouldBeRunning {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                                self?.startRecognitionSession()
-                            }
-                        }
-                    }
-                    return
-                }
-                
-                // Real error — show it
-                DispatchQueue.main.async { [weak self] in
-                    self?.error = error.localizedDescription
-                    self?.isRecording = false
-                }
-                return
-            }
-            
-            // If result is final (recognizer decided speech ended), auto-restart
-            if isFinal {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    self.accumulatedText = self.transcribedText
-                    if self.shouldBeRunning {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                            self?.startRecognitionSession()
-                        }
-                    }
-                }
-            }
-        }
-        
+        // Prepare and start engine BEFORE creating the recognition task
+        // so audio buffers flow immediately when the task begins consuming.
         engine.prepare()
-        
+
         do {
             try engine.start()
-            isRestarting = false
-            DispatchQueue.main.async { [weak self] in
-                self?.isRecording = true
-            }
         } catch {
             isRestarting = false
             tearDownAudioPipeline(deactivateSession: false)
@@ -636,6 +569,78 @@ class SpeechRecognitionManager: ObservableObject {
                 DispatchQueue.main.async { [weak self] in
                     self?.error = "Could not start recording: \(error.localizedDescription)"
                     self?.isRecording = false
+                }
+            }
+            return
+        }
+
+        isRestarting = false
+        DispatchQueue.main.async { [weak self] in
+            self?.isRecording = true
+        }
+
+        recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
+            guard let self = self else { return }
+
+            var isFinal = false
+
+            if let result = result {
+                isFinal = result.isFinal
+                let newText = result.bestTranscription.formattedString
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    if self.accumulatedText.isEmpty {
+                        self.transcribedText = newText
+                    } else {
+                        self.transcribedText = self.accumulatedText + " " + newText
+                    }
+                }
+            }
+
+            if let error = error {
+                let nsError = error as NSError
+                // Code 216 = user cancelled, code 1110 = no speech detected (timeout)
+                let isTimeout = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110
+                let isCancelled = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216
+
+                if isCancelled {
+                    return
+                }
+
+                if isTimeout || isFinal {
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.accumulatedText = self.transcribedText
+                        self.isRestarting = false
+                        if self.shouldBeRunning {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                                self?.startRecognitionSession()
+                            }
+                        }
+                    }
+                    return
+                }
+
+                // Real error — show it
+                DispatchQueue.main.async { [weak self] in
+                    self?.error = error.localizedDescription
+                    self?.isRecording = false
+                    self?.isRestarting = false
+                }
+                return
+            }
+
+            // If result is final (recognizer decided speech ended), auto-restart
+            if isFinal {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.accumulatedText = self.transcribedText
+                    self.isRestarting = false
+                    if self.shouldBeRunning {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                            self?.startRecognitionSession()
+                        }
+                    }
                 }
             }
         }
@@ -717,7 +722,7 @@ struct IdeaCard: View {
                         Text("Voice")
                             .font(.caption2.weight(.medium))
                     }
-                    .foregroundStyle(roastMode ? .blue.opacity(0.7) : .accentColor.opacity(0.6))
+                    .foregroundStyle(roastMode ? Color.bitbinderAccent.opacity(0.7) : .accentColor.opacity(0.6))
                 }
                 
                 // Content

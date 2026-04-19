@@ -13,7 +13,7 @@ import SwiftData
 struct RecordingTrashView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(
-        filter: #Predicate<Recording> { $0.isDeleted == true },
+        filter: #Predicate<Recording> { $0.isTrashed == true },
         sort: \Recording.deletedDate,
         order: .reverse
     ) private var trashedRecordings: [Recording]
@@ -69,7 +69,7 @@ struct RecordingTrashView: View {
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
-                            .tint(.blue)
+                            .tint(Color.bitbinderAccent)
                         }
                         .contextMenu {
                             Button {

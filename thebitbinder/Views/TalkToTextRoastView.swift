@@ -43,7 +43,7 @@ struct TalkToTextRoastView: View {
         case denied
     }
     
-    private let accentColor = Color.blue
+    private let accentColor = Color.bitbinderAccent
     
     var body: some View {
         NavigationStack {
@@ -146,7 +146,7 @@ struct TalkToTextRoastView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.blue)
+                        .tint(Color.bitbinderAccent)
                         .controlSize(.large)
                     }
                 }

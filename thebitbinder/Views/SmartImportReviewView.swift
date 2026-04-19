@@ -63,7 +63,7 @@ struct SmartImportReviewView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.blue.opacity(0.9))
+                                .fill(Color.bitbinderAccent.opacity(0.9))
                         )
                         .padding(.horizontal, 12)
                         .padding(.top, 4)
@@ -83,7 +83,7 @@ struct SmartImportReviewView: View {
                         .padding(.vertical, 10)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(.blue.opacity(0.85))
+                                .fill(Color.bitbinderAccent.opacity(0.85))
                         )
                         .padding(.horizontal, 12)
                         .padding(.top, 4)
@@ -106,7 +106,7 @@ struct SmartImportReviewView: View {
                             .padding(.vertical, 12)
                             .background(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(Color.blue)
+                                    .fill(Color.bitbinderAccent)
                             )
                         }
                         .padding(.horizontal, 12)
@@ -249,7 +249,7 @@ struct SmartImportReviewView: View {
         HStack(spacing: 10) {
             Image(systemName: "wand.and.stars")
                 .font(.system(size: 14))
-                .foregroundColor(Color.blue)
+                .foregroundColor(Color.bitbinderAccent)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text("GagGrabber found \(viewModel.reviewItems.count) joke\(viewModel.reviewItems.count == 1 ? "" : "s") in **\(importResult.sourceFile)**")
@@ -270,7 +270,7 @@ struct SmartImportReviewView: View {
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(
-                    (Color.blue)
+                    (Color.bitbinderAccent)
                         .opacity(0.08)
                 )
         )
@@ -304,7 +304,7 @@ struct SmartImportReviewView: View {
                         .fill(roastMode ? Color.white.opacity(0.1) : Color(UIColor.tertiarySystemBackground))
                     
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.blue)
+                        .fill(Color.bitbinderAccent)
                         .frame(width: geo.size.width * progressFraction)
                         .animation(.easeInOut(duration: 0.3), value: progressFraction)
                 }
@@ -391,10 +391,10 @@ struct SmartImportReviewView: View {
                                 .padding(.vertical, 3)
                                 .background(
                                     Capsule().fill(
-                                        roastMode ? .blue.opacity(0.2) : .accentColor.opacity(0.1)
+                                        roastMode ? Color.bitbinderAccent.opacity(0.2) : .accentColor.opacity(0.1)
                                     )
                                 )
-                                .foregroundColor(Color.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                         }
                     }
                 }
@@ -424,7 +424,7 @@ struct SmartImportReviewView: View {
                     Image(systemName: "hand.point.right.fill")
                         .font(.system(size: 10))
                 }
-                .foregroundColor(.blue.opacity(0.5))
+                .foregroundColor(Color.bitbinderAccent.opacity(0.5))
             }
         }
         .padding(20)
@@ -459,7 +459,7 @@ struct SmartImportReviewView: View {
     
     private var swipeBorderColor: Color {
         let opacity = min(Double(abs(dragOffset.width)) / 100.0, 0.8)
-        if dragOffset.width > 30 { return .blue.opacity(opacity) }
+        if dragOffset.width > 30 { return Color.bitbinderAccent.opacity(opacity) }
         if dragOffset.width < -30 { return .red.opacity(opacity) }
         return .clear
     }
@@ -555,13 +555,13 @@ struct SmartImportReviewView: View {
                     }
                 }
             }
-            .foregroundColor(Color.blue)
+            .foregroundColor(Color.bitbinderAccent)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(
                 Capsule()
                     .fill(
-                        (Color.blue)
+                        (Color.bitbinderAccent)
                             .opacity(0.1)
                     )
             )
@@ -603,11 +603,11 @@ struct SmartImportReviewView: View {
                 VStack(spacing: 6) {
                     ZStack {
                         Circle()
-                            .fill(.blue.opacity(0.15))
+                            .fill(Color.bitbinderAccent.opacity(0.15))
                             .frame(width: 50, height: 50)
                         Image(systemName: "lightbulb.fill")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                     Text("Idea")
                         .font(.system(size: 11, weight: .medium))
@@ -645,7 +645,7 @@ struct SmartImportReviewView: View {
                 VStack(spacing: 6) {
                     ZStack {
                         Circle()
-                            .fill(.blue)
+                            .fill(Color.bitbinderAccent)
                             .frame(width: 54, height: 54)
                         Image(systemName: "checkmark")
                             .font(.system(size: 22, weight: .bold))
@@ -653,7 +653,7 @@ struct SmartImportReviewView: View {
                     }
                     Text("Accept")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color.bitbinderAccent)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -690,7 +690,7 @@ struct SmartImportReviewView: View {
             }
             .font(.subheadline.bold())
             .buttonStyle(.borderedProminent)
-            .tint(Color.blue)
+            .tint(Color.bitbinderAccent)
             
             Spacer()
             
@@ -719,8 +719,8 @@ struct SmartImportReviewView: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    .blue.opacity(0.15),
-                                    .blue.opacity(0.03)
+                                    Color.bitbinderAccent.opacity(0.15),
+                                    Color.bitbinderAccent.opacity(0.03)
                                 ],
                                 center: .center, startRadius: 20, endRadius: 60
                             )
@@ -729,7 +729,7 @@ struct SmartImportReviewView: View {
                     
                     Image(systemName: "doc.text.magnifyingglass")
                         .font(.system(size: 44, weight: .medium))
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color.bitbinderAccent)
                 }
                 
                 VStack(spacing: 8) {
@@ -808,7 +808,7 @@ struct SmartImportReviewView: View {
                     .padding(.vertical, 13)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.blue)
+                            .fill(Color.bitbinderAccent)
                     )
                 }
                 .buttonStyle(.plain)
@@ -823,7 +823,7 @@ struct SmartImportReviewView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundColor(roastMode ? .blue.opacity(0.8) : .accentColor)
+                .foregroundColor(roastMode ? Color.bitbinderAccent.opacity(0.8) : .accentColor)
                 .frame(width: 20)
             
             Text(text)
@@ -836,13 +836,13 @@ struct SmartImportReviewView: View {
     private func formatBadge(_ format: String) -> some View {
         Text(format)
             .font(.system(size: 10, weight: .bold, design: .monospaced))
-            .foregroundColor(Color.blue)
+            .foregroundColor(Color.bitbinderAccent)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(
-                        (Color.blue)
+                        (Color.bitbinderAccent)
                             .opacity(0.1)
                     )
             )
@@ -855,11 +855,11 @@ struct SmartImportReviewView: View {
                 
                 ZStack {
                     Circle()
-                        .fill(.blue.opacity(0.15))
+                        .fill(Color.bitbinderAccent.opacity(0.15))
                         .frame(width: 110, height: 110)
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 50, weight: .medium))
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color.bitbinderAccent)
                 }
                 
                 VStack(spacing: 8) {
@@ -927,7 +927,7 @@ struct SmartImportReviewView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 12))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Text("\(viewModel.autoAcceptedCount) auto-accepted (high confidence)")
                                 .font(.system(size: 12))
                                 .foregroundColor(roastMode ? .white.opacity(0.5) : Color(UIColor.tertiaryLabel))
@@ -959,7 +959,7 @@ struct SmartImportReviewView: View {
                     .padding(.vertical, 14)
                     .background(
                         RoundedRectangle(cornerRadius: CGFloat(12), style: .continuous)
-                            .fill(Color.blue)
+                            .fill(Color.bitbinderAccent)
                     )
                 }
                 .buttonStyle(.plain)
@@ -1022,11 +1022,11 @@ struct SmartImportReviewView: View {
                     VStack(spacing: 10) {
                         ZStack {
                             Circle()
-                                .fill(.blue.opacity(0.2))
+                                .fill(Color.bitbinderAccent.opacity(0.2))
                                 .frame(width: 60, height: 60)
                             Image(systemName: "hand.point.right.fill")
                                 .font(.system(size: 24))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                         }
                         Text("Swipe Right")
                             .font(.system(size: 13, weight: .semibold))
@@ -1061,7 +1061,7 @@ struct SmartImportReviewView: View {
                         .padding(.vertical, 12)
                         .background(
                             Capsule()
-                                .fill(Color.blue)
+                                .fill(Color.bitbinderAccent)
                         )
                 }
                 .buttonStyle(.plain)
@@ -1187,10 +1187,10 @@ struct SmartImportReviewView: View {
                                         .padding(.vertical, 5)
                                         .background(
                                             Capsule().fill(
-                                                roastMode ? .blue.opacity(0.2) : .accentColor.opacity(0.1)
+                                                roastMode ? Color.bitbinderAccent.opacity(0.2) : .accentColor.opacity(0.1)
                                             )
                                         )
-                                        .foregroundColor(Color.blue)
+                                        .foregroundColor(Color.bitbinderAccent)
                                     }
                                 }
                             }

@@ -13,10 +13,10 @@ import UIKit
 // MARK: - HomeView
 
 struct HomeView: View {
-    @Query(filter: #Predicate<Joke> { !$0.isDeleted }) private var allJokes: [Joke]
-    @Query(filter: #Predicate<SetList> { !$0.isDeleted }) private var allSets: [SetList]
-    @Query(filter: #Predicate<BrainstormIdea> { !$0.isDeleted }) private var allIdeas: [BrainstormIdea]
-    @Query(filter: #Predicate<Recording> { !$0.isDeleted }) private var allRecordings: [Recording]
+    @Query(filter: #Predicate<Joke> { !$0.isTrashed }) private var allJokes: [Joke]
+    @Query(filter: #Predicate<SetList> { !$0.isTrashed }) private var allSets: [SetList]
+    @Query(filter: #Predicate<BrainstormIdea> { !$0.isTrashed }) private var allIdeas: [BrainstormIdea]
+    @Query(filter: #Predicate<Recording> { !$0.isTrashed }) private var allRecordings: [Recording]
 
     @State private var showAddJoke = false
     @State private var showTalkToText = false
@@ -101,7 +101,7 @@ struct HomeView: View {
                         Text("Capture Idea")
                     } icon: {
                         Image(systemName: "mic.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                 }
 
@@ -113,7 +113,7 @@ struct HomeView: View {
                         Text("Record Set")
                     } icon: {
                         Image(systemName: "record.circle")
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                 }
             }
@@ -158,7 +158,7 @@ struct HomeView: View {
                             HStack(spacing: 12) {
                                 // Hit indicator
                                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                    .fill(joke.isHit ? Color.blue : Color(UIColor.separator))
+                                    .fill(joke.isHit ? Color.bitbinderAccent : Color(UIColor.separator))
                                     .frame(width: 3, height: 32)
                                 
                                 VStack(alignment: .leading, spacing: 3) {
@@ -175,7 +175,7 @@ struct HomeView: View {
                                         if joke.isHit {
                                             Label("Hit", systemImage: "star.fill")
                                                 .font(.caption2.weight(.medium))
-                                                .foregroundColor(.blue)
+                                                .foregroundColor(Color.bitbinderAccent)
                                         }
                                     }
                                 }
@@ -203,7 +203,7 @@ struct HomeView: View {
                                     Text("Brainstorm Ideas")
                                 } icon: {
                                     Image(systemName: "lightbulb.fill")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(Color.bitbinderAccent)
                                 }
                             }
                         }
@@ -224,7 +224,7 @@ struct HomeView: View {
                                     Text("Recordings")
                                 } icon: {
                                     Image(systemName: "waveform")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(Color.bitbinderAccent)
                                 }
                             }
                         }

@@ -116,22 +116,22 @@ final class DataValidationService: ObservableObject {
     // These prevent false data-loss alerts when trash purge removes old items.
     
     private func countActiveJokes(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<Joke>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
+        (try? context.fetchCount(FetchDescriptor<Joke>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
     }
     private func countActiveRecordings(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<Recording>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
+        (try? context.fetchCount(FetchDescriptor<Recording>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
     }
     private func countActiveSetLists(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<SetList>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
+        (try? context.fetchCount(FetchDescriptor<SetList>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
     }
     private func countActiveRoastJokes(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<RoastJoke>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
+        (try? context.fetchCount(FetchDescriptor<RoastJoke>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
     }
     private func countActiveBrainstormIdeas(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<BrainstormIdea>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
+        (try? context.fetchCount(FetchDescriptor<BrainstormIdea>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
     }
     private func countActiveNotebookPhotos(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<NotebookPhotoRecord>(predicate: #Predicate { $0.isDeleted == false }))) ?? 0
+        (try? context.fetchCount(FetchDescriptor<NotebookPhotoRecord>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
     }
     
     // MARK: - Entity-Specific Validation
@@ -191,7 +191,7 @@ final class DataValidationService: ObservableObject {
             
             for recording in recordings {
                 // Skip soft-deleted recordings — they may have had their file removed already
-                if recording.isDeleted { continue }
+                if recording.isTrashed { continue }
                 
                 // Check if file URL is valid
                 if recording.fileURL.isEmpty {
@@ -473,7 +473,7 @@ final class DataValidationService: ObservableObject {
     private func repairRecordingsWithMissingFiles(context: ModelContext) async -> Bool {
         do {
             let recordings = try context.fetch(
-                FetchDescriptor<Recording>(predicate: #Predicate { $0.isDeleted == false })
+                FetchDescriptor<Recording>(predicate: #Predicate { $0.isTrashed == false })
             )
             
             var trashedCount = 0

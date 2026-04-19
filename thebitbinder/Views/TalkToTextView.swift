@@ -445,12 +445,14 @@ struct TalkToTextView: View {
 // NOT @MainActor-isolated — audio tap callback fires on real-time audio
 // thread and recognition result handler is called from an internal queue.
 // All UI-facing @Published updates are explicitly dispatched to main.
-final class SpeechRecognizer: ObservableObject {
+final class SpeechRecognizer: NSObject, ObservableObject {
     @Published var transcribedText = ""
     @Published var error: String?
     @Published var isTranscribing = false
 
-    private let audioEngine = AVAudioEngine()
+    // New engine created per session — AVAudioEngine doesn't always restart
+    // cleanly after stop(), so a fresh instance is the most reliable approach.
+    private var audioEngine: AVAudioEngine?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
@@ -460,73 +462,146 @@ final class SpeechRecognizer: ObservableObject {
     private var accumulatedText = ""
     /// True while the user wants to be recording. Controls auto-restart.
     private var shouldBeRunning = false
+    /// Prevents overlapping startRecognitionSession calls.
+    private var isStarting = false
+    /// Observer token for audio session interruptions.
+    private var interruptionObserver: NSObjectProtocol?
+
+    override init() {
+        super.init()
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleInterruption(notification)
+        }
+    }
 
     deinit {
-        audioEngine.stop()
+        if let observer = interruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        shouldBeRunning = false
         recognitionTask?.cancel()
+        audioEngine?.stop()
+        audioEngine = nil
+    }
+
+    // MARK: - Interruption Handling
+
+    private func handleInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+
+        switch type {
+        case .began:
+            accumulatedText = transcribedText
+            tearDown(deactivateSession: false)
+            isTranscribing = false
+        case .ended:
+            guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
+            let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+            if options.contains(.shouldResume) && shouldBeRunning {
+                isStarting = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.startRecognitionSession()
+                }
+            }
+        @unknown default:
+            break
+        }
     }
 
     // MARK: - Public API
 
     /// Start / resume transcription. Preserves any text already in `transcribedText`.
     func startTranscribing() {
-        error = nil
-        shouldBeRunning = true
-        accumulatedText = transcribedText
-        startRecognitionSession()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.error = nil
+            self.shouldBeRunning = true
+            self.accumulatedText = self.transcribedText
+            self.startRecognitionSession()
+        }
     }
 
     /// Fully stop transcription. Tears down audio and clears accumulated state.
     func stopTranscribing() {
         shouldBeRunning = false
-        tearDown()
+        isStarting = false
+        tearDown(deactivateSession: true)
         accumulatedText = ""
-        isTranscribing = false
+        DispatchQueue.main.async { [weak self] in
+            self?.isTranscribing = false
+        }
     }
 
     /// Prepare for a fresh recording session. Clears prior transcription.
     func resetForNewSession() {
         shouldBeRunning = false
-        tearDown()
+        isStarting = false
+        tearDown(deactivateSession: true)
         accumulatedText = ""
-        transcribedText = ""
-        isTranscribing = false
+        DispatchQueue.main.async { [weak self] in
+            self?.transcribedText = ""
+            self?.isTranscribing = false
+        }
     }
 
     // MARK: - Internals
 
     private func startRecognitionSession() {
-        // 1. Clean up any prior task/request.
-        recognitionTask?.cancel()
-        recognitionTask = nil
-        recognitionRequest?.endAudio()
-        recognitionRequest = nil
+        guard !isStarting else { return }
+        isStarting = true
+
+        // 1. Clean up any prior session (keep audio session active for fast restart).
+        tearDown(deactivateSession: false)
+
+        guard shouldBeRunning else {
+            isStarting = false
+            return
+        }
 
         // 2. Confirm the recognizer is available.
-        guard let speechRecognizer = speechRecognizer else {
-            error = "Speech recognition is not supported on this device."
-            isTranscribing = false
-            return
-        }
-        guard speechRecognizer.isAvailable else {
-            error = "Speech recognition is not available right now. Please try again in a moment."
-            isTranscribing = false
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            DispatchQueue.main.async { [weak self] in
+                self?.error = "Speech recognition is not available right now. Please try again in a moment."
+                self?.isTranscribing = false
+            }
+            isStarting = false
             return
         }
 
-        // 3. Configure the audio session. `.record` + `.measurement` is what
-        //    Apple's SFSpeechRecognizer sample uses and produces the best results.
+        // 3. Configure the audio session.
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             print(" [SpeechRecognizer] Audio session setup failed: \(error)")
-            self.error = "Could not start the microphone. Please try again."
-            isTranscribing = false
+            // Retry once after a brief async delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self, self.shouldBeRunning else { return }
+                do {
+                    try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
+                    try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+                    self.continueStartingSession(speechRecognizer: speechRecognizer)
+                } catch {
+                    self.error = "Could not start the microphone. Please try again."
+                    self.isTranscribing = false
+                    self.isStarting = false
+                }
+            }
             return
         }
 
+        continueStartingSession(speechRecognizer: speechRecognizer)
+    }
+
+    /// Completes starting a recognition session after the audio session is confirmed active.
+    private func continueStartingSession(speechRecognizer: SFSpeechRecognizer) {
         // 4. Create the recognition request.
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -535,19 +610,49 @@ final class SpeechRecognizer: ObservableObject {
         }
         recognitionRequest = request
 
-        // 5. Wire the input node into the request.
-        let inputNode = audioEngine.inputNode
+        // 5. Create a fresh AVAudioEngine for this session.
+        let engine = AVAudioEngine()
+        audioEngine = engine
+
+        let inputNode = engine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
-        // Always remove any existing tap first — re-installing on the same bus
-        // while a tap is present will crash the app.
-        inputNode.removeTap(onBus: 0)
+        guard recordingFormat.channelCount > 0, recordingFormat.sampleRate > 0 else {
+            DispatchQueue.main.async { [weak self] in
+                self?.error = "Microphone is not available. Please check your audio settings."
+                self?.isTranscribing = false
+            }
+            audioEngine = nil
+            isStarting = false
+            return
+        }
+
+        // 6. Install tap, prepare, and start engine.
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             self?.recognitionRequest?.append(buffer)
         }
 
-        // 6. Kick off the recognition task. The handler runs on an internal
-        //    queue — we hop to main with DispatchQueue.main.async where needed.
+        engine.prepare()
+
+        do {
+            try engine.start()
+        } catch {
+            print(" [SpeechRecognizer] Engine start failed: \(error)")
+            DispatchQueue.main.async { [weak self] in
+                self?.error = "Audio engine failed to start. Please try again."
+                self?.isTranscribing = false
+            }
+            tearDown(deactivateSession: false)
+            isStarting = false
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.isTranscribing = true
+        }
+        print(" [SpeechRecognizer] Audio engine started, listening…")
+
+        // 7. Kick off the recognition task.
         recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self = self else { return }
 
@@ -570,11 +675,15 @@ final class SpeechRecognizer: ObservableObject {
                 let isCancelled = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216
                 let isTimeout   = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110
 
-                if isCancelled { return }
+                if isCancelled {
+                    self.isStarting = false
+                    return
+                }
 
                 if isTimeout || isFinal {
                     DispatchQueue.main.async {
                         self.accumulatedText = self.transcribedText
+                        self.isStarting = false
                         if self.shouldBeRunning {
                             self.startRecognitionSession()
                         } else {
@@ -588,6 +697,7 @@ final class SpeechRecognizer: ObservableObject {
                 DispatchQueue.main.async {
                     self.error = "Recognition paused. Tap Start Recording to continue."
                     self.isTranscribing = false
+                    self.isStarting = false
                 }
                 return
             }
@@ -595,6 +705,7 @@ final class SpeechRecognizer: ObservableObject {
             if isFinal {
                 DispatchQueue.main.async {
                     self.accumulatedText = self.transcribedText
+                    self.isStarting = false
                     if self.shouldBeRunning {
                         self.startRecognitionSession()
                     }
@@ -602,32 +713,32 @@ final class SpeechRecognizer: ObservableObject {
             }
         }
 
-        // 7. Start the audio engine.
-        audioEngine.prepare()
-        do {
-            try audioEngine.start()
-            isTranscribing = true
-            print(" [SpeechRecognizer] Audio engine started, listening…")
-        } catch {
-            print(" [SpeechRecognizer] Engine start failed: \(error)")
-            self.error = "Audio engine failed to start. Please try again."
-            isTranscribing = false
-            tearDown()
-        }
+        isStarting = false
     }
 
     /// Stop the audio engine, remove the tap, and cancel any in-flight request.
-    private func tearDown() {
-        if audioEngine.isRunning {
-            audioEngine.stop()
+    private func tearDown(deactivateSession: Bool) {
+        if let engine = audioEngine {
+            if engine.isRunning {
+                engine.stop()
+            }
+            engine.inputNode.removeTap(onBus: 0)
         }
-        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine = nil
 
         recognitionRequest?.endAudio()
         recognitionRequest = nil
 
-        recognitionTask?.cancel()
+        if deactivateSession {
+            recognitionTask?.cancel()
+        } else {
+            recognitionTask?.finish()
+        }
         recognitionTask = nil
+
+        if deactivateSession {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 }
 

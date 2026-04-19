@@ -12,7 +12,7 @@ import SwiftData
 struct AddRoastJokesToSetListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query(filter: #Predicate<RoastTarget> { !$0.isDeleted }, sort: \RoastTarget.name) private var roastTargets: [RoastTarget]
+    @Query(filter: #Predicate<RoastTarget> { !$0.isTrashed }, sort: \RoastTarget.name) private var roastTargets: [RoastTarget]
 
     @Bindable var setList: SetList
     var currentRoastJokeIDs: [UUID]
@@ -22,7 +22,7 @@ struct AddRoastJokesToSetListView: View {
     @State private var expandedTargets: Set<UUID> = []
     @State private var searchText = ""
 
-    private let accent = Color.blue
+    private let accent = Color.bitbinderAccent
 
     // MARK: - Filtered Data
 
@@ -40,7 +40,7 @@ struct AddRoastJokesToSetListView: View {
         guard target.isValid else { return [] }
         
         let all = (target.jokes ?? [])
-            .filter { !$0.isDeleted && !currentRoastJokeIDs.contains($0.id) }
+            .filter { !$0.isTrashed && !currentRoastJokeIDs.contains($0.id) }
             .sorted { $0.dateCreated > $1.dateCreated }
 
         guard !searchText.isEmpty else { return all }

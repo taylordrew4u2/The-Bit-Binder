@@ -42,7 +42,7 @@ struct MoveJokeToFolderSheet: View {
                             Spacer()
                             if currentFolderIDs.isEmpty {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                             }
                         }
                     }
@@ -56,13 +56,13 @@ struct MoveJokeToFolderSheet: View {
                         } label: {
                             HStack {
                                 Image(systemName: "folder.fill")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                                 Text(folder.name)
                                     .foregroundColor(.primary)
                                 Spacer()
                                 if currentFolderIDs.contains(folder.id) {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(Color.bitbinderAccent)
                                 }
                             }
                         }

@@ -134,7 +134,7 @@ struct ShowMeAroundView: View {
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(roastMode ? Color.orange : Color.blue)
+                        .background(roastMode ? Color.orange : Color.bitbinderAccent)
                         .foregroundColor(.white)
                         .clipShape(Capsule())
                     }

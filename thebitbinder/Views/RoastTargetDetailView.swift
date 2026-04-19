@@ -63,7 +63,7 @@ struct RoastTargetDetailView: View {
     private var jokesForTarget: [RoastJoke] {
         guard target.isValid else { return [] }
         return allRoastJokes.filter { joke in
-            !joke.isDeleted && joke.target?.id == target.id
+            !joke.isTrashed && joke.target?.id == target.id
         }
     }
     
@@ -734,7 +734,7 @@ struct DraggableRoastCard: View {
             HStack {
                 ZStack {
                     RoundedRectangle(cornerRadius: cardCornerRadius)
-                        .fill(Color.blue)
+                        .fill(Color.bitbinderAccent)
                     
                     HStack(spacing: 8) {
                         Image(systemName: joke.isKiller ? "star.slash.fill" : "star.fill")
@@ -798,7 +798,7 @@ struct DraggableRoastCard: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
                         .strokeBorder(
-                            isDragging ? accentColor : (joke.isKiller ? Color.blue.opacity(0.4) : Color.clear),
+                            isDragging ? accentColor : (joke.isKiller ? Color.bitbinderAccent.opacity(0.4) : Color.clear),
                             lineWidth: isDragging ? 2 : 1
                         )
                 )
@@ -911,7 +911,7 @@ struct DraggableRoastCard: View {
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(joke.isKiller ? Color.blue.opacity(0.2) : accentColor.opacity(0.12))
+                        .fill(joke.isKiller ? Color.bitbinderAccent.opacity(0.2) : accentColor.opacity(0.12))
                         .frame(width: 44, height: 44)
                     Image(systemName: joke.isKiller ? "star.fill" : "flame.fill")
                         .font(.system(size: 20))
@@ -1195,7 +1195,7 @@ struct RoastJokeRow: View {
                 ZStack(alignment: .bottomTrailing) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(joke.isKiller ? Color.blue.opacity(0.2) : accentColor.opacity(0.12))
+                            .fill(joke.isKiller ? Color.bitbinderAccent.opacity(0.2) : accentColor.opacity(0.12))
                             .frame(width: 42, height: 42)
                         Image(systemName: joke.isKiller ? "star.fill" : "flame.fill")
                             .font(.system(size: 18))
@@ -1229,19 +1229,19 @@ struct RoastJokeRow: View {
                         HStack(spacing: 2) {
                             Image(systemName: "star.circle.fill")
                                 .font(.system(size: 9))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Text("OPENER")
                                 .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                         }
                     } else if joke.parentOpeningRoastID != nil {
                         HStack(spacing: 2) {
                             Image(systemName: "arrow.turn.down.right")
                                 .font(.system(size: 8))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Text("BACKUP")
                                 .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                         }
                     }
                     
@@ -1253,10 +1253,10 @@ struct RoastJokeRow: View {
                             HStack(spacing: 2) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 9))
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                                 Text("\(joke.performanceCount)x")
                                     .font(.caption2)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                             }
                         }
                         .buttonStyle(.plain)
@@ -1275,7 +1275,7 @@ struct RoastJokeRow: View {
                     if joke.hasStructure {
                         Image(systemName: "text.alignleft")
                             .font(.system(size: 9))
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                 }
             }
@@ -1437,7 +1437,7 @@ struct RoastExportSheet: View {
                         if target.killerCount > 0 {
                             Text("Including \(target.killerCount) killer\(target.killerCount == 1 ? "" : "s") ⭐️")
                                 .font(.caption)
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                         }
                     }
                 }
@@ -1750,7 +1750,7 @@ struct EditRoastJokeView: View {
     private var openingRoastsForTarget: [RoastJoke] {
         guard let targetName = joke.target?.name else { return [] }
         return allRoastJokes.filter { roast in
-            guard !roast.isDeleted,
+            guard !roast.isTrashed,
                   roast.isOpeningRoast,
                   roast.id != joke.id,
                   let name = roast.target?.name else { return false }
@@ -1761,7 +1761,7 @@ struct EditRoastJokeView: View {
     /// Get the opening roast this joke is a backup for
     private var parentOpeningRoast: RoastJoke? {
         guard let parentID = joke.parentOpeningRoastID else { return nil }
-        return allRoastJokes.first { $0.id == parentID && !$0.isDeleted }
+        return allRoastJokes.first { $0.id == parentID && !$0.isTrashed }
     }
 
     var body: some View {
@@ -1889,7 +1889,7 @@ struct EditRoastJokeView: View {
                                     .labelsHidden()
                                 }
                                 .padding(12)
-                                .background(joke.isOpeningRoast ? Color.blue.opacity(0.1) : Color(.secondarySystemBackground))
+                                .background(joke.isOpeningRoast ? Color.bitbinderAccent.opacity(0.1) : Color(.secondarySystemBackground))
                                 .cornerRadius(10)
                                 
                                 // Backup assignment (only if not an opening roast)
@@ -1921,7 +1921,7 @@ struct EditRoastJokeView: View {
                                                     Spacer()
                                                     if joke.parentOpeningRoastID == nil {
                                                         Image(systemName: "checkmark.circle.fill")
-                                                            .foregroundColor(.blue)
+                                                            .foregroundColor(Color.bitbinderAccent)
                                                     }
                                                 }
                                                 .padding(12)
@@ -1940,7 +1940,7 @@ struct EditRoastJokeView: View {
                                                             .font(.system(size: 14, weight: .bold, design: .rounded))
                                                             .foregroundColor(.black)
                                                             .frame(width: 24, height: 24)
-                                                            .background(Color.blue)
+                                                            .background(Color.bitbinderAccent)
                                                             .clipShape(Circle())
                                                         
                                                         Text(opening.content.prefix(40) + (opening.content.count > 40 ? "..." : ""))
@@ -1953,11 +1953,11 @@ struct EditRoastJokeView: View {
                                                         
                                                         if joke.parentOpeningRoastID == opening.id {
                                                             Image(systemName: "checkmark.circle.fill")
-                                                                .foregroundColor(.blue)
+                                                                .foregroundColor(Color.bitbinderAccent)
                                                         }
                                                     }
                                                     .padding(12)
-                                                    .background(joke.parentOpeningRoastID == opening.id ? Color.blue.opacity(0.15) : Color(.secondarySystemBackground))
+                                                    .background(joke.parentOpeningRoastID == opening.id ? Color.bitbinderAccent.opacity(0.15) : Color(.secondarySystemBackground))
                                                     .cornerRadius(8)
                                                 }
                                                 .buttonStyle(.plain)
@@ -2117,7 +2117,7 @@ struct EditRoastJokeView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "chart.line.uptrend.xyaxis")
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.bitbinderAccent)
                 Text("Performance")
                     .font(.subheadline.bold())
                 Spacer()
@@ -2127,7 +2127,7 @@ struct EditRoastJokeView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(joke.performanceCount)")
                         .font(.title2.bold().monospacedDigit())
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color.bitbinderAccent)
                     Text("times")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -2147,7 +2147,7 @@ struct EditRoastJokeView: View {
             }
         }
         .padding(12)
-        .background(Color.blue.opacity(0.08))
+        .background(Color.bitbinderAccent.opacity(0.08))
         .cornerRadius(12)
         .padding(.horizontal, 16)
     }

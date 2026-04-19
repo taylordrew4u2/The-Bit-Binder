@@ -21,7 +21,7 @@ final class SetList: Identifiable {
     var notes: String = ""  // Added per CD_SetList schema
 
     // Soft-delete (trash) support
-    var isDeleted: Bool = false
+    var isTrashed: Bool = false
     var deletedDate: Date?
     
     // MARK: - Finalization for Live Performance
@@ -86,13 +86,13 @@ final class SetList: Identifiable {
 
     /// Moves this set list to trash. Use instead of modelContext.delete() for recoverability.
     func moveToTrash() {
-        isDeleted = true
+        isTrashed = true
         deletedDate = Date()
         dateModified = Date()
     }
 
     func restoreFromTrash() {
-        isDeleted = false
+        isTrashed = false
         deletedDate = nil
         dateModified = Date()
     }

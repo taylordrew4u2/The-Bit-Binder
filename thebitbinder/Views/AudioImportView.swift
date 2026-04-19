@@ -120,7 +120,7 @@ struct AudioImportView: View {
                     if !authorizationStatus.isEmpty {
                         Text(authorizationStatus)
                             .font(.caption)
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                             .padding(.horizontal)
                     }
                 }
@@ -378,7 +378,7 @@ struct AudioImportResultsView: View {
                             Text("\(successCount)")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Text("Imported")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -405,7 +405,7 @@ struct AudioImportResultsView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(Color.bitbinderAccent)
                                     Text(result.filename)
                                         .font(.subheadline)
                                         .fontWeight(.medium)

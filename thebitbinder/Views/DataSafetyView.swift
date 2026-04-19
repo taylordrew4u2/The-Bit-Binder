@@ -17,7 +17,7 @@ struct DataSafetyView: View {
     
     @Query private var jokes: [Joke]
     @Query private var recordings: [Recording]
-    @Query(filter: #Predicate<RoastTarget> { !$0.isDeleted }) private var roastTargets: [RoastTarget]
+    @Query(filter: #Predicate<RoastTarget> { !$0.isTrashed }) private var roastTargets: [RoastTarget]
     
     @AppStorage("roastModeEnabled") private var roastMode = false
     
@@ -88,7 +88,7 @@ struct DataSafetyView: View {
                     } label: {
                         HStack {
                             Image(systemName: "checkmark.shield")
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             VStack(alignment: .leading) {
                                 Text("Validate Data Integrity")
                                     .foregroundColor(.primary)
@@ -112,7 +112,7 @@ struct DataSafetyView: View {
                     } label: {
                         HStack {
                             Image(systemName: "externaldrive.badge.plus")
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             VStack(alignment: .leading) {
                                 Text("Create Backup")
                                     .foregroundColor(.primary)
@@ -134,7 +134,7 @@ struct DataSafetyView: View {
                     } label: {
                         HStack {
                             Image(systemName: "externaldrive")
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Text("View Backups")
                                 .foregroundColor(.primary)
                             Spacer()
@@ -153,7 +153,7 @@ struct DataSafetyView: View {
                     } label: {
                         HStack {
                             Image(systemName: "doc.text")
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             VStack(alignment: .leading) {
                                 Text("Export All Jokes")
                                     .foregroundColor(.primary)
@@ -190,7 +190,7 @@ struct DataSafetyView: View {
                         } label: {
                             HStack {
                                 Image(systemName: "flame.fill")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                                 VStack(alignment: .leading) {
                                     Text("Export Roasts")
                                         .foregroundColor(.primary)
@@ -663,7 +663,7 @@ struct BackupsView: View {
                                                 .padding(.vertical, 7)
                                                 .background(
                                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                        .fill(Color.blue)
+                                                        .fill(Color.bitbinderAccent)
                                                 )
                                         }
                                         .buttonStyle(.plain)

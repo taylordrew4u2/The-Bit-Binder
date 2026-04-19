@@ -16,7 +16,7 @@ struct BrainstormDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("roastModeEnabled") private var roastMode = false
 
-    @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }, sort: \JokeFolder.name) private var folders: [JokeFolder]
+    @Query(filter: #Predicate<JokeFolder> { !$0.isTrashed }, sort: \JokeFolder.name) private var folders: [JokeFolder]
 
     @Bindable var idea: BrainstormIdea
     @State private var showingDeleteAlert = false
@@ -368,7 +368,7 @@ struct BrainstormDetailView: View {
                                 .frame(width: 28, height: 28)
                                 .overlay(
                                     Circle()
-                                        .strokeBorder(idea.colorHex == colorHex ? Color.blue : Color.clear, lineWidth: 2)
+                                        .strokeBorder(idea.colorHex == colorHex ? Color.bitbinderAccent : Color.clear, lineWidth: 2)
                                 )
                         }
                     }
@@ -390,7 +390,7 @@ struct BrainstormDetailView: View {
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.blue)
+        .tint(Color.bitbinderAccent)
         .controlSize(.large)
         .disabled(idea.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }

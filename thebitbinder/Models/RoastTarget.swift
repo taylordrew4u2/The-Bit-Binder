@@ -47,7 +47,7 @@ final class RoastTarget: Identifiable {
     var openingRoastCount: Int = 3
 
     // Soft-delete (trash) support
-    var isDeleted: Bool = false
+    var isTrashed: Bool = false
     var deletedDate: Date?
 
     @Relationship(deleteRule: .cascade, inverse: \RoastJoke.target)
@@ -61,7 +61,7 @@ final class RoastTarget: Identifiable {
         // Filter out faulted/invalid objects that can crash during sync
         return jokeArray.compactMap { joke -> RoastJoke? in
             // Access a property to trigger fault resolution - if it fails, skip this object
-            guard !joke.isDeleted else { return nil }
+            guard !joke.isTrashed else { return nil }
             return joke
         }.sorted { $0.dateCreated > $1.dateCreated }
     }
@@ -71,7 +71,7 @@ final class RoastTarget: Identifiable {
     var jokesByOrder: [RoastJoke] {
         guard let jokeArray = jokes else { return [] }
         return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isDeleted else { return nil }
+            guard !joke.isTrashed else { return nil }
             return joke
         }.sorted { $0.displayOrder < $1.displayOrder }
     }
@@ -81,7 +81,7 @@ final class RoastTarget: Identifiable {
     var jokesByPerformance: [RoastJoke] {
         guard let jokeArray = jokes else { return [] }
         return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isDeleted else { return nil }
+            guard !joke.isTrashed else { return nil }
             return joke
         }.sorted { $0.performanceCount > $1.performanceCount }
     }
@@ -91,7 +91,7 @@ final class RoastTarget: Identifiable {
     var jokesByRelatability: [RoastJoke] {
         guard let jokeArray = jokes else { return [] }
         return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isDeleted else { return nil }
+            guard !joke.isTrashed else { return nil }
             return joke
         }.sorted { $0.relatabilityScore > $1.relatabilityScore }
     }
@@ -101,7 +101,7 @@ final class RoastTarget: Identifiable {
     var killerJokes: [RoastJoke] {
         guard let jokeArray = jokes else { return [] }
         return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isDeleted && joke.isKiller else { return nil }
+            guard !joke.isTrashed && joke.isKiller else { return nil }
             return joke
         }.sorted { $0.dateCreated > $1.dateCreated }
     }
@@ -111,7 +111,7 @@ final class RoastTarget: Identifiable {
     var testedJokes: [RoastJoke] {
         guard let jokeArray = jokes else { return [] }
         return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isDeleted && joke.isTested else { return nil }
+            guard !joke.isTrashed && joke.isTested else { return nil }
             return joke
         }.sorted { $0.performanceCount > $1.performanceCount }
     }
@@ -121,7 +121,7 @@ final class RoastTarget: Identifiable {
     var untestedJokes: [RoastJoke] {
         guard let jokeArray = jokes else { return [] }
         return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isDeleted && !joke.isTested else { return nil }
+            guard !joke.isTrashed && !joke.isTested else { return nil }
             return joke
         }.sorted { $0.dateCreated > $1.dateCreated }
     }
@@ -150,7 +150,7 @@ final class RoastTarget: Identifiable {
     @Transient
     var jokeCount: Int {
         guard let jokeArray = jokes else { return 0 }
-        return jokeArray.filter { !$0.isDeleted }.count
+        return jokeArray.filter { !$0.isTrashed }.count
     }
     
     @Transient
@@ -167,7 +167,7 @@ final class RoastTarget: Identifiable {
     @Transient
     var isValid: Bool {
         // Check if we can safely access properties
-        !id.uuidString.isEmpty && !isDeleted
+        !id.uuidString.isEmpty && !isTrashed
     }
 
     init(name: String, notes: String = "", traits: [String] = [], photoData: Data? = nil) {
@@ -184,13 +184,13 @@ final class RoastTarget: Identifiable {
     // MARK: - Trash Helpers
 
     func moveToTrash() {
-        isDeleted = true
+        isTrashed = true
         deletedDate = Date()
         dateModified = Date()
     }
 
     func restoreFromTrash() {
-        isDeleted = false
+        isTrashed = false
         deletedDate = nil
         dateModified = Date()
     }

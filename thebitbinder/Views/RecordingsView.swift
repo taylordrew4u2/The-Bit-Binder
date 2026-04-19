@@ -11,7 +11,7 @@ import AVFoundation
 
 struct RecordingsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Recording> { !$0.isDeleted }, sort: \Recording.dateCreated, order: .reverse) private var recordings: [Recording]
+    @Query(filter: #Predicate<Recording> { !$0.isTrashed }, sort: \Recording.dateCreated, order: .reverse) private var recordings: [Recording]
     @AppStorage("roastModeEnabled") private var roastMode = false
 
     @State private var searchText = ""
@@ -88,8 +88,10 @@ struct RecordingsView: View {
     /// Soft-deletes the recording DB record. Audio file is preserved until permanent purge.
     /// This prevents the scenario where the audio file is deleted but the DB save fails.
     private func deleteRecordings(at offsets: IndexSet) {
+        let snapshot = filteredRecordings
         for index in offsets {
-            filteredRecordings[index].moveToTrash()
+            guard index < snapshot.count else { continue }
+            snapshot[index].moveToTrash()
         }
         do {
             try modelContext.save()
@@ -134,7 +136,7 @@ struct RecordingRowView: View {
             // Play icon
             Image(systemName: "play.circle.fill")
                 .font(.title)
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.bitbinderAccent)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(recording.title)
@@ -150,7 +152,7 @@ struct RecordingRowView: View {
                     if recording.transcription != nil {
                         Text("Transcribed")
                             .font(.caption2)
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                 }
             }

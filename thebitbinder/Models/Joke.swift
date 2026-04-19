@@ -41,7 +41,7 @@ final class Joke: Identifiable {
     }
     
     // Soft-delete (trash) support
-    var isDeleted: Bool = false
+    var isTrashed: Bool = false
     var deletedDate: Date?
     
     // Smart categorization fields - stored as strings to avoid SwiftData array issues
@@ -173,7 +173,7 @@ final class Joke: Identifiable {
         self.structureScore = 0.0
         self.wordCount = content.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
         // New jokes start active (not in trash)
-        self.isDeleted = false
+        self.isTrashed = false
         self.deletedDate = nil
         
         loadCategorizationResults()
@@ -187,13 +187,13 @@ final class Joke: Identifiable {
     // MARK: - Trash Helpers
     
     func moveToTrash() {
-        isDeleted = true
+        isTrashed = true
         deletedDate = Date()
         dateModified = Date()
     }
     
     func restoreFromTrash() {
-        isDeleted = false
+        isTrashed = false
         deletedDate = nil
         dateModified = Date()
     }

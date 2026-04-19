@@ -36,6 +36,15 @@ class CloudKitResetUtility {
     /// v4: Added soft-delete fields (CD_isDeleted, CD_deletedDate) to
     ///     Recording, SetList, RoastJoke, BrainstormIdea, NotebookPhotoRecord
     ///     and CD_wordCount to Joke.
+    ///
+    /// NOTE (post-v4): The soft-delete flag was later renamed
+    /// `isDeleted` -> `isTrashed` on every @Model because the old name
+    /// shadowed `PersistentModel.isDeleted` and never round-tripped through
+    /// SwiftData/CloudKit. That rename does NOT need a zone wipe — CoreData
+    /// adds the new `CD_isTrashed` column via lightweight schema migration
+    /// and the orphaned `CD_isDeleted` column is harmlessly ignored. We
+    /// intentionally do NOT bump the cleanup key for the rename so that
+    /// existing local + remote user data is preserved untouched.
     static let cleanupVersionKey = "cloudkit_schema_cleanup_v4"
 
     // MARK: - Public Entry Point
@@ -178,12 +187,12 @@ extension CloudKitResetUtility {
         print("    UnresolvedImportFragment.batch       → CD_UnresolvedImportFragment.CD_batch (REFERENCE)")
         print("    ImportBatch.importedRecords          → cascade, inverse of CD_batch")
         print("    ImportBatch.unresolvedFragments      → cascade, inverse of CD_batch")
-        print("    Joke.isDeleted / deletedDate         → soft-delete (v2.2.0)")
-        print("    Recording.isDeleted / deletedDate    → soft-delete (v2.3.0)")
-        print("    SetList.isDeleted / deletedDate      → soft-delete (v2.3.0)")
-        print("    RoastJoke.isDeleted / deletedDate    → soft-delete (v2.3.0)")
-        print("    BrainstormIdea.isDeleted / deletedDate → soft-delete (v2.3.0)")
-        print("    NotebookPhotoRecord.isDeleted / deletedDate → soft-delete (v2.3.0)")
+        print("    Joke.isTrashed / deletedDate         → soft-delete (v2.2.0)")
+        print("    Recording.isTrashed / deletedDate    → soft-delete (v2.3.0)")
+        print("    SetList.isTrashed / deletedDate      → soft-delete (v2.3.0)")
+        print("    RoastJoke.isTrashed / deletedDate    → soft-delete (v2.3.0)")
+        print("    BrainstormIdea.isTrashed / deletedDate → soft-delete (v2.3.0)")
+        print("    NotebookPhotoRecord.isTrashed / deletedDate → soft-delete (v2.3.0)")
     }
 }
 #endif

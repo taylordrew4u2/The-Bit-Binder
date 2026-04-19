@@ -12,7 +12,7 @@ struct AddJokesToSetListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var jokes: [Joke]
-    @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }) private var folders: [JokeFolder]
+    @Query(filter: #Predicate<JokeFolder> { !$0.isTrashed }) private var folders: [JokeFolder]
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("showFullContent") private var showFullContent = true
     
@@ -123,7 +123,7 @@ struct AddJokesToSetListView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.bitbinderAccent)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -131,11 +131,11 @@ struct AddJokesToSetListView: View {
                         addJokes()
                     }
                     .disabled(selectedJokeIDs.isEmpty)
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.bitbinderAccent)
                 }
             }
         }
-        .tint(.blue)
+        .tint(Color.bitbinderAccent)
     }
     
     private func addJokes() {

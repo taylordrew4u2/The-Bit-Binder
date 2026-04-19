@@ -19,7 +19,7 @@ final class Recording: Identifiable {
     var isProcessed: Bool = false  // Added per CD_Recording schema
 
     // Soft-delete (trash) support
-    var isDeleted: Bool = false
+    var isTrashed: Bool = false
     var deletedDate: Date?
 
     init(title: String, fileURL: String, duration: TimeInterval = 0) {
@@ -64,12 +64,12 @@ final class Recording: Identifiable {
     /// Soft-deletes this recording record. The audio file is NOT deleted here.
     /// Permanent deletion (file + record) must be done explicitly by the caller.
     func moveToTrash() {
-        isDeleted = true
+        isTrashed = true
         deletedDate = Date()
     }
 
     func restoreFromTrash() {
-        isDeleted = false
+        isTrashed = false
         deletedDate = nil
     }
 }

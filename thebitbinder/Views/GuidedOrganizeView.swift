@@ -13,7 +13,7 @@ struct GuidedOrganizeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) var dismiss
     
-    @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }) private var folders: [JokeFolder]
+    @Query(filter: #Predicate<JokeFolder> { !$0.isTrashed }) private var folders: [JokeFolder]
     @Query private var allJokes: [Joke]
     
     @State private var currentIndex = 0
@@ -26,9 +26,9 @@ struct GuidedOrganizeView: View {
     
     private var unorganizedJokes: [Joke] {
         if includeAlreadyOrganized {
-            return allJokes.filter { !$0.isDeleted }
+            return allJokes.filter { !$0.isTrashed }
         }
-        return allJokes.filter { ($0.folders ?? []).isEmpty && !$0.isDeleted }
+        return allJokes.filter { ($0.folders ?? []).isEmpty && !$0.isTrashed }
     }
     
     private var currentJoke: Joke? {
@@ -113,10 +113,10 @@ struct GuidedOrganizeView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "folder.fill")
                                     .font(.caption)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                                 Text("Currently in: \(currentFolders.map(\.name).joined(separator: ", "))")
                                     .font(.caption)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                             }
                         }
                     }
@@ -295,7 +295,7 @@ struct GuidedOrganizeView: View {
             
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(Color.bitbinderAccent)
             
             Text("Guided Organize Complete!")
                 .font(.title2.bold())
@@ -350,7 +350,7 @@ struct GuidedOrganizeView: View {
             
             Image(systemName: "party.popper.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(Color.bitbinderAccent)
             
             Text(includeAlreadyOrganized ? "All Jokes Reviewed!" : "All Jokes Organized!")
                 .font(.title2.bold())
@@ -378,8 +378,8 @@ struct GuidedOrganizeView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue.opacity(0.1))
-                    .foregroundColor(.blue)
+                    .background(Color.bitbinderAccent.opacity(0.1))
+                    .foregroundColor(Color.bitbinderAccent)
                     .cornerRadius(8)
                 }
                 .padding(.horizontal, 32)

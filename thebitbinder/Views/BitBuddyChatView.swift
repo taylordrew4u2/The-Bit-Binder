@@ -153,7 +153,7 @@ struct BitBuddyChatView: View {
             // If a folder was specified, try to find or create it
             if let folderName = folderName, !folderName.isEmpty {
                 let existingFolders = (try? modelContext.fetch(FetchDescriptor<JokeFolder>())) ?? []
-                if let folder = existingFolders.first(where: { $0.name.lowercased() == folderName.lowercased() && !$0.isDeleted }) {
+                if let folder = existingFolders.first(where: { $0.name.lowercased() == folderName.lowercased() && !$0.isTrashed }) {
                     newJoke.folder = folder
                 } else {
                     let folder = JokeFolder(name: folderName)
@@ -195,7 +195,7 @@ struct BitBuddyChatView: View {
             guard let name = notification.userInfo?["name"] as? String, !name.isEmpty else { return }
             // Check for duplicate folder names before creating
             let existingFolders = (try? modelContext.fetch(FetchDescriptor<JokeFolder>())) ?? []
-            if existingFolders.contains(where: { $0.name.lowercased() == name.lowercased() && !$0.isDeleted }) {
+            if existingFolders.contains(where: { $0.name.lowercased() == name.lowercased() && !$0.isTrashed }) {
                 print(" [BitBuddy→SwiftData] Folder '\(name)' already exists — skipping create")
                 return
             }
@@ -227,7 +227,7 @@ struct BitBuddyChatView: View {
             // If a target was named, find it and attach
             if let targetName = targetName, !targetName.isEmpty {
                 let allTargets = (try? modelContext.fetch(FetchDescriptor<RoastTarget>())) ?? []
-                if let target = allTargets.first(where: { $0.name.lowercased() == targetName.lowercased() && !$0.isDeleted }) {
+                if let target = allTargets.first(where: { $0.name.lowercased() == targetName.lowercased() && !$0.isTrashed }) {
                     roastJoke.target = target
                 }
             }

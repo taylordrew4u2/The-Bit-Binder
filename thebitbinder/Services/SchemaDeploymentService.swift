@@ -297,7 +297,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
         Schema Changes in v\(schemaVersion):
         
         v2.3.0 — Soft-Delete Fields (trash support):
-        Added isDeleted (QUERYABLE) + deletedDate to all remaining model types.
+        Added isTrashed (QUERYABLE) + deletedDate to all remaining model types.
         Mirrors the existing Joke soft-delete pattern introduced in v2.2.0.
         
           • CD_Recording:          CD_isDeleted [Q], CD_deletedDate
@@ -306,7 +306,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
           • CD_BrainstormIdea:    _isDeleted [Q], CD_deletedDate
           • CD_NotebookPhotoRecord: CD_isDeleted [Q], CD_deletedDate
         
-        All active @Query filters now include isDeleted==false predicates.
+        All active @Query filters now include isTrashed==false predicates.
         Trash views added for all types. Auto-purge after 30 days at launch.
         
         v2.2.0 — QUERYABLE Index Additions:

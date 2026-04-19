@@ -61,22 +61,22 @@ struct iCloudSyncSettingsView: View {
                                 .scaleEffect(0.8, anchor: .center)
                             Text("Syncing to iCloud...")
                                 .font(.system(size: 13))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Spacer()
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.bitbinderAccent.opacity(0.1)))
                     } else if case .success = syncService.syncStatus {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Text("Sync complete")
                                 .font(.system(size: 13))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Spacer()
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.bitbinderAccent.opacity(0.1)))
                     } else if case .error(let message) = syncService.syncStatus {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.circle.fill")
@@ -95,10 +95,10 @@ struct iCloudSyncSettingsView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                                 Text("Issues Found")
                                     .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.bitbinderAccent)
                             }
                             
                             ForEach(diagnostics.syncIssuesFound.prefix(3).indices, id: \.self) { index in
@@ -122,7 +122,7 @@ struct iCloudSyncSettingsView: View {
                             }
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.bitbinderAccent.opacity(0.1)))
                     }
                 }
                 
@@ -187,7 +187,7 @@ struct iCloudSyncSettingsView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(14)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(.blue))
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.bitbinderAccent))
                             .foregroundColor(.white)
                         }
                         .disabled(syncService.syncStatus == .syncing || !syncService.isSyncEnabled)
@@ -236,7 +236,7 @@ struct iCloudSyncSettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: "info.circle.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                                 .font(.system(size: 13))
                             Text("Automatic Syncing")
                                 .font(.system(size: 12, weight: .semibold))
@@ -248,12 +248,12 @@ struct iCloudSyncSettingsView: View {
                             .lineSpacing(1.5)
                     }
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.08)))
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.bitbinderAccent.opacity(0.08)))
                     
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             Image(systemName: "lock.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                                 .font(.system(size: 13))
                             Text("End-to-End Encrypted")
                                 .font(.system(size: 12, weight: .semibold))
@@ -265,7 +265,7 @@ struct iCloudSyncSettingsView: View {
                             .lineSpacing(1.5)
                     }
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.08)))
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.bitbinderAccent.opacity(0.08)))
                 }
                 
                 // Diagnostics
@@ -381,7 +381,7 @@ struct SyncItemRow: View {
             Spacer()
             
             Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.blue)
+                .foregroundColor(Color.bitbinderAccent)
                 .font(.system(size: 14))
         }
         .padding(10)

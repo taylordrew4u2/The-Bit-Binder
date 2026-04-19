@@ -22,8 +22,8 @@ private enum NotebookFilter: Equatable, Hashable {
 
 struct NotebookView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<NotebookPhotoRecord> { !$0.isDeleted }, sort: \NotebookPhotoRecord.sortOrder) private var allPhotos: [NotebookPhotoRecord]
-    @Query(filter: #Predicate<NotebookFolder> { !$0.isDeleted }, sort: \NotebookFolder.sortOrder) private var folders: [NotebookFolder]
+    @Query(filter: #Predicate<NotebookPhotoRecord> { !$0.isTrashed }, sort: \NotebookPhotoRecord.sortOrder) private var allPhotos: [NotebookPhotoRecord]
+    @Query(filter: #Predicate<NotebookFolder> { !$0.isTrashed }, sort: \NotebookFolder.sortOrder) private var folders: [NotebookFolder]
     @AppStorage("roastModeEnabled") private var roastMode = false
 
     @State private var showingDetail: NotebookPhotoRecord?
@@ -480,7 +480,7 @@ struct NotebookView: View {
             .background(
                 Capsule()
                     .fill(isSelected
-                          ? (Color.blue)
+                          ? (Color.bitbinderAccent)
                           : Color(UIColor.secondarySystemGroupedBackground))
             )
             .foregroundColor(isSelected ? .white : .primary)
@@ -745,7 +745,7 @@ struct NotebookDetailView: View {
     @Bindable var photo: NotebookPhotoRecord
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<NotebookPhotoRecord> { !$0.isDeleted }, sort: \NotebookPhotoRecord.sortOrder) private var allPhotos: [NotebookPhotoRecord]
+    @Query(filter: #Predicate<NotebookPhotoRecord> { !$0.isTrashed }, sort: \NotebookPhotoRecord.sortOrder) private var allPhotos: [NotebookPhotoRecord]
     
     @State private var currentIndex: Int = 0
     @State private var showingNotes = false
@@ -1128,7 +1128,7 @@ struct CreateNotebookFolderSheet: View {
                         .fontWeight(.semibold)
                 }
             }
-            .tint(.blue)
+            .tint(Color.bitbinderAccent)
             .alert("Save Failed", isPresented: $showSaveError) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -1209,7 +1209,7 @@ struct MoveToNotebookFolderSheet: View {
     @Bindable var photo: NotebookPhotoRecord
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Query(filter: #Predicate<NotebookFolder> { !$0.isDeleted }, sort: \NotebookFolder.name) private var folders: [NotebookFolder]
+    @Query(filter: #Predicate<NotebookFolder> { !$0.isTrashed }, sort: \NotebookFolder.name) private var folders: [NotebookFolder]
     @AppStorage("roastModeEnabled") private var roastMode = false
 
     @State private var showSaveError = false
@@ -1257,7 +1257,7 @@ struct MoveToNotebookFolderSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-            .tint(.blue)
+            .tint(Color.bitbinderAccent)
             .alert("Save Failed", isPresented: $showSaveError) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -1304,7 +1304,7 @@ private struct NotebookDropDelegate: DropDelegate {
 
 private struct BatchMoveNotebookPhotosSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Query(filter: #Predicate<NotebookFolder> { !$0.isDeleted }, sort: \.name) private var folders: [NotebookFolder]
+    @Query(filter: #Predicate<NotebookFolder> { !$0.isTrashed }, sort: \.name) private var folders: [NotebookFolder]
 
     let selectedCount: Int
     let onMove: (NotebookFolder?) -> Void

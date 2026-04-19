@@ -120,7 +120,7 @@ struct iCloudSyncStatusView: View {
     private var syncToggleRow: some View {
         HStack {
             Image(systemName: "icloud")
-                .foregroundColor(.blue)
+                .foregroundColor(Color.bitbinderAccent)
             
             Text("iCloud Sync")
                 .font(.headline)
@@ -152,7 +152,7 @@ struct iCloudSyncStatusView: View {
         } label: {
             HStack {
                 Image(systemName: "arrow.clockwise")
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.bitbinderAccent)
                 Text("Sync Now")
                     .foregroundColor(.primary)
                 
@@ -177,7 +177,7 @@ struct iCloudSyncStatusView: View {
         } label: {
             HStack {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.bitbinderAccent)
                 Text("Force Refresh All Data")
                     .foregroundColor(.primary)
                 
@@ -201,7 +201,7 @@ struct iCloudSyncStatusView: View {
         } label: {
             HStack {
                 Image(systemName: "arrow.up.arrow.down")
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.bitbinderAccent)
                 Text("Force Settings Sync")
                     .foregroundColor(.primary)
                 
@@ -221,7 +221,7 @@ struct iCloudSyncStatusView: View {
         } label: {
             HStack {
                 Image(systemName: "stethoscope")
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.bitbinderAccent)
                 Text("Run Diagnostics")
                     .foregroundColor(.primary)
                 
@@ -237,7 +237,7 @@ struct iCloudSyncStatusView: View {
     private var accountStatusRow: some View {
         HStack {
             Image(systemName: "person.icloud")
-                .foregroundColor(.blue)
+                .foregroundColor(Color.bitbinderAccent)
             
             VStack(alignment: .leading) {
                 Text("Account Status")
@@ -408,7 +408,7 @@ struct DiagnosticsDetailView: View {
                     } label: {
                         HStack {
                             Image(systemName: "arrow.clockwise")
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Text("Trigger Manual Sync")
                                 .foregroundColor(.primary)
                             

@@ -19,12 +19,12 @@ final class NotebookFolder: Identifiable {
     var photos: [NotebookPhotoRecord]?
 
     // Soft-delete (trash) support
-    var isDeleted: Bool = false
+    var isTrashed: Bool = false
     var deletedDate: Date?
 
     /// Count of non-trashed photos in this folder
     var activePhotoCount: Int {
-        (photos ?? []).filter { !$0.isDeleted }.count
+        (photos ?? []).filter { !$0.isTrashed }.count
     }
 
     init(name: String) {
@@ -39,12 +39,12 @@ final class NotebookFolder: Identifiable {
     /// Moves folder to trash. Photos are NOT deleted — their folder reference
     /// is nullified by the .nullify delete rule so they become unfiled.
     func moveToTrash() {
-        isDeleted = true
+        isTrashed = true
         deletedDate = Date()
     }
 
     func restoreFromTrash() {
-        isDeleted = false
+        isTrashed = false
         deletedDate = nil
     }
 }

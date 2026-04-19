@@ -351,7 +351,7 @@ struct SetListDetailView: View {
     }
     
     private func deleteJokes(at offsets: IndexSet) {
-        for index in offsets {
+        for index in offsets.sorted(by: >) {
             if index < setList.jokeIDs.count {
                 setList.jokeIDs.remove(at: index)
             }
@@ -411,7 +411,7 @@ struct SetListDetailView: View {
     }
     
     private func deleteRoastJokes(at offsets: IndexSet) {
-        for index in offsets {
+        for index in offsets.sorted(by: >) {
             if index < setList.roastJokeIDs.count {
                 setList.roastJokeIDs.remove(at: index)
             }
@@ -545,13 +545,15 @@ struct SetListDetailView: View {
             try modelContext.save()
             dismiss()
         } catch {
-            // Restore state since save failed
-            setList.restoreFromTrash()
+            // IMPORTANT: Do NOT restore on save failure - this causes deleted items
+            // to reappear unexpectedly. The delete stays in memory and will persist
+            // on next successful save. User is notified of the issue.
             #if DEBUG
             print("⚠️ [SetListDetailView] Failed to delete set: \(error)")
             #endif
-            deleteError = "Could not delete set: \(error.localizedDescription)"
+            deleteError = "Delete may not have saved. The set will stay deleted but please check later."
             showingDeleteError = true
+            dismiss()  // Still dismiss - the item is deleted in memory
         }
     }
 }

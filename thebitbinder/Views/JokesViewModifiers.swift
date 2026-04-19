@@ -258,7 +258,7 @@ struct ReviewImportsSheet: View {
                                     if !possibleDuplicates.isEmpty {
                                         Text("\(possibleDuplicates.count) possible duplicate\(possibleDuplicates.count == 1 ? "" : "s") detected")
                                             .font(.caption)
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(Color.bitbinderAccent)
                                     }
                                 }
                                 Spacer()
@@ -271,7 +271,7 @@ struct ReviewImportsSheet: View {
                                     HStack(spacing: 10) {
                                         Image(systemName: "exclamationmark.triangle.fill")
                                             .font(.subheadline)
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(Color.bitbinderAccent)
                                         Text(dup)
                                             .font(.subheadline)
                                     }

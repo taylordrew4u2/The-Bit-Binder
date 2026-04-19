@@ -207,10 +207,10 @@ struct JokeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
         .tint(roastMode ? .orange : .accentColor)
-        .alert(joke.isDeleted ? "Restore Joke" : "Move to Trash", isPresented: $showingDeleteAlert) {
+        .alert(joke.isTrashed ? "Restore Joke" : "Move to Trash", isPresented: $showingDeleteAlert) {
             deleteAlertButtons
         } message: {
-            Text(joke.isDeleted
+            Text(joke.isTrashed
                 ? "Restore this joke from Trash?"
                 : "Are you sure? You can restore it from Trash later.")
         }
@@ -235,7 +235,7 @@ struct JokeDetailView: View {
         }
         .onChange(of: showingFolderPicker) { _, isOpen in
             if isOpen {
-                var descriptor = FetchDescriptor<JokeFolder>(predicate: #Predicate { !$0.isDeleted })
+                var descriptor = FetchDescriptor<JokeFolder>(predicate: #Predicate { !$0.isTrashed })
                 descriptor.sortBy = [SortDescriptor(\JokeFolder.name)]
                 folders = (try? modelContext.fetch(descriptor)) ?? []
             }
@@ -394,7 +394,7 @@ struct JokeDetailView: View {
                     
                     if !joke.notes.isEmpty && !showingNotes {
                         Circle()
-                            .fill(Color.blue)
+                            .fill(Color.bitbinderAccent)
                             .frame(width: 6, height: 6)
                     }
                     
@@ -593,7 +593,7 @@ struct JokeDetailView: View {
         
         ToolbarItem(placement: .navigationBarTrailing) {
             HStack(spacing: 16) {
-                if joke.isDeleted {
+                if joke.isTrashed {
                     Button {
                         HapticEngine.shared.success()
                         joke.restoreFromTrash()
@@ -655,7 +655,7 @@ struct JokeDetailView: View {
     
     @ViewBuilder
     private var deleteAlertButtons: some View {
-        if joke.isDeleted {
+        if joke.isTrashed {
             Button("Restore") {
                 joke.restoreFromTrash()
                 do {

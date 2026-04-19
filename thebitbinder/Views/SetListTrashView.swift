@@ -14,7 +14,7 @@ struct SetListTrashView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("roastModeEnabled") private var roastMode = false
     @Query(
-        filter: #Predicate<SetList> { $0.isDeleted == true },
+        filter: #Predicate<SetList> { $0.isTrashed == true },
         sort: \SetList.deletedDate,
         order: .reverse
     ) private var trashedSetLists: [SetList]
@@ -72,7 +72,7 @@ struct SetListTrashView: View {
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
-                            .tint(.blue)
+                            .tint(Color.bitbinderAccent)
                         }
                         .contextMenu {
                             Button {

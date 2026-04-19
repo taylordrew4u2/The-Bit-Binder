@@ -15,7 +15,7 @@ struct BrainstormTrashView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("showFullContent") private var showFullContent = true
     @Query(
-        filter: #Predicate<BrainstormIdea> { $0.isDeleted == true },
+        filter: #Predicate<BrainstormIdea> { $0.isTrashed == true },
         sort: \BrainstormIdea.deletedDate,
         order: .reverse
     ) private var trashedIdeas: [BrainstormIdea]
@@ -74,7 +74,7 @@ struct BrainstormTrashView: View {
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward")
                             }
-                            .tint(.blue)
+                            .tint(Color.bitbinderAccent)
                         }
                         .contextMenu {
                             Button {

@@ -223,7 +223,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // Jokes
         if let jokes = try? context.fetch(FetchDescriptor<Joke>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+            predicate: #Predicate { $0.isTrashed == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for joke in jokes { context.delete(joke) }
             purgeCount += jokes.count
@@ -231,7 +231,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // BrainstormIdeas
         if let ideas = try? context.fetch(FetchDescriptor<BrainstormIdea>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+            predicate: #Predicate { $0.isTrashed == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for idea in ideas { context.delete(idea) }
             purgeCount += ideas.count
@@ -239,7 +239,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // SetLists
         if let setLists = try? context.fetch(FetchDescriptor<SetList>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+            predicate: #Predicate { $0.isTrashed == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for setList in setLists { context.delete(setList) }
             purgeCount += setLists.count
@@ -247,7 +247,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // RoastJokes
         if let roastJokes = try? context.fetch(FetchDescriptor<RoastJoke>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+            predicate: #Predicate { $0.isTrashed == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for joke in roastJokes { context.delete(joke) }
             purgeCount += roastJokes.count
@@ -255,7 +255,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // NotebookPhotoRecords
         if let photos = try? context.fetch(FetchDescriptor<NotebookPhotoRecord>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+            predicate: #Predicate { $0.isTrashed == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for photo in photos { context.delete(photo) }
             purgeCount += photos.count
@@ -263,7 +263,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // RoastTargets — cascade deletes their RoastJokes
         if let targets = try? context.fetch(FetchDescriptor<RoastTarget>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+            predicate: #Predicate { $0.isTrashed == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for target in targets { context.delete(target) }
             purgeCount += targets.count
@@ -271,7 +271,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // JokeFolders — nullifies joke relationships on delete
         if let folders = try? context.fetch(FetchDescriptor<JokeFolder>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+            predicate: #Predicate { $0.isTrashed == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for folder in folders { context.delete(folder) }
             purgeCount += folders.count
@@ -279,7 +279,7 @@ final class AppStartupCoordinator: ObservableObject {
 
         // Recordings — delete audio file first, then DB record
         if let recordings = try? context.fetch(FetchDescriptor<Recording>(
-            predicate: #Predicate { $0.isDeleted == true && ($0.deletedDate ?? distantFuture) < cutoff }
+            predicate: #Predicate { $0.isTrashed == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for recording in recordings {
                 // Resolve audio file URL (handles stale absolute paths)
@@ -309,7 +309,7 @@ final class AppStartupCoordinator: ObservableObject {
         // (e.g. when CloudKit re-syncs the record metadata).
         let handledIDs = Set(UserDefaults.standard.stringArray(forKey: "DataValidation_HandledMissingRecordingIDs") ?? [])
         if let activeRecordings = try? context.fetch(FetchDescriptor<Recording>(
-            predicate: #Predicate { $0.isDeleted == false }
+            predicate: #Predicate { $0.isTrashed == false }
         )) {
             var orphanCount = 0
             var updatedHandledIDs = handledIDs

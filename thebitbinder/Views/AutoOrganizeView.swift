@@ -13,7 +13,7 @@ struct AutoOrganizeView: View {
     @Environment(\.dismiss) var dismiss
     
     @Query private var jokes: [Joke]
-    @Query(filter: #Predicate<JokeFolder> { !$0.isDeleted }) private var folders: [JokeFolder]
+    @Query(filter: #Predicate<JokeFolder> { !$0.isTrashed }) private var folders: [JokeFolder]
     
     private let categorizationService = BitBuddyService.shared
     
@@ -42,7 +42,7 @@ struct AutoOrganizeView: View {
     @State private var hasPopulatedCategorizationResults = false
     
     var unorganizedJokes: [Joke] {
-        jokes.filter { ($0.folders ?? []).isEmpty && !$0.isDeleted }
+        jokes.filter { ($0.folders ?? []).isEmpty && !$0.isTrashed }
     }
     
     var body: some View {
@@ -99,7 +99,7 @@ struct AutoOrganizeView: View {
                     VStack(spacing: 12) {
                          Image(systemName: "checkmark.circle.fill")
                              .font(.system(size: 60))
-                             .foregroundColor(.blue)
+                             .foregroundColor(Color.bitbinderAccent)
                          
                          Text("Auto-Organization Complete!")
                              .font(.title2.bold())
@@ -243,7 +243,7 @@ struct AutoOrganizeView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.blue)
+            .background(Color.bitbinderAccent)
             .cornerRadius(10)
             
             // Auto-Organize Button
@@ -310,7 +310,7 @@ struct AutoOrganizeView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.blue)
+            .background(Color.bitbinderAccent)
             .cornerRadius(10)
         }
     }
@@ -342,7 +342,7 @@ struct AutoOrganizeView: View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 50))
-                .foregroundColor(.blue)
+                .foregroundColor(Color.bitbinderAccent)
             Text("All Jokes Organized!")
                 .font(.headline)
             Text("Your jokes have been sorted into categories with confidence scoring")
@@ -374,9 +374,9 @@ struct AutoOrganizeView: View {
                             .font(.subheadline.weight(.semibold))
                     }
                     .frame(maxWidth: .infinity)
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.bitbinderAccent)
                     .padding(.vertical, 12)
-                    .background(Color.blue.opacity(0.1))
+                    .background(Color.bitbinderAccent.opacity(0.1))
                     .cornerRadius(8)
                 }
             }
@@ -634,7 +634,7 @@ struct AutoOrganizeView: View {
         isAnalyzing = true
         
         // Get all non-deleted jokes (not just unorganized)
-        let allActiveJokes = jokes.filter { !$0.isDeleted }
+        let allActiveJokes = jokes.filter { !$0.isTrashed }
         analysisTotal = allActiveJokes.count
         analysisProgress = 0
         errorMessage = nil
@@ -840,7 +840,7 @@ struct JokeOrganizationCard: View {
                              .foregroundColor(.white)
                              .padding(.horizontal, 12)
                              .padding(.vertical, 6)
-                             .background(.blue)
+                             .background(Color.bitbinderAccent)
                              .cornerRadius(6)
                         }
                         
@@ -903,7 +903,7 @@ struct JokeOrganizationCard: View {
             }
         }
         .padding(12)
-        .background(Color.blue.opacity(0.05))
+        .background(Color.bitbinderAccent.opacity(0.05))
         .cornerRadius(8)
             }
         }
@@ -1154,7 +1154,7 @@ struct FolderSetupView: View {
                                 Spacer()
                                 if customFolders.contains(folder) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(Color.bitbinderAccent)
                                 } else {
                                     Button("Add") {
                                         if !customFolders.contains(folder) {
@@ -1224,7 +1224,7 @@ struct FolderSetupView: View {
                                 Spacer()
                                 if customFolders.contains(folder) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(Color.bitbinderAccent)
                                 } else {
                                     Button("Use") {
                                         if !customFolders.contains(folder) {

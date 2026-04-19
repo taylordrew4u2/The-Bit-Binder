@@ -42,7 +42,7 @@ struct CreateFolderView: View {
                 }
             }
         }
-        .tint(.blue)
+        .tint(Color.bitbinderAccent)
         .alert("Save Failed", isPresented: $showSaveError) {
             Button("OK", role: .cancel) { }
         } message: {

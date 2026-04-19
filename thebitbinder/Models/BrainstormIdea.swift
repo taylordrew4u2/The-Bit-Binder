@@ -18,7 +18,7 @@ final class BrainstormIdea: Identifiable {
     var notes: String = ""  // Scratch notes / related thoughts
 
     // Soft-delete (trash) support — mirrors Joke model
-    var isDeleted: Bool = false
+    var isTrashed: Bool = false
     var deletedDate: Date?
 
     init(content: String, colorHex: String = "F5E6D3", isVoiceNote: Bool = false) {
@@ -27,7 +27,7 @@ final class BrainstormIdea: Identifiable {
         self.dateCreated = Date()
         self.colorHex = colorHex
         self.isVoiceNote = isVoiceNote
-        self.isDeleted = false
+        self.isTrashed = false
         self.deletedDate = nil
     }
     
@@ -53,12 +53,12 @@ final class BrainstormIdea: Identifiable {
 
     /// Moves this idea to trash. Use instead of modelContext.delete() for recoverability.
     func moveToTrash() {
-        isDeleted = true
+        isTrashed = true
         deletedDate = Date()
     }
 
     func restoreFromTrash() {
-        isDeleted = false
+        isTrashed = false
         deletedDate = nil
     }
 }

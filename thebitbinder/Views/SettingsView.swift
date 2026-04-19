@@ -28,12 +28,12 @@ struct SettingsView: View {
                     // Avatar circle with initial
                     ZStack {
                         Circle()
-                            .fill(roastMode ? Color.blue.opacity(0.15) : Color.accentColor.opacity(0.12))
+                            .fill(roastMode ? Color.bitbinderAccent.opacity(0.15) : Color.accentColor.opacity(0.12))
                             .frame(width: 52, height: 52)
                         
                         Text(userPreferences.userName.isEmpty ? "?" : String(userPreferences.userName.prefix(1)).uppercased())
                             .font(.title2.weight(.semibold))
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
@@ -50,7 +50,7 @@ struct SettingsView: View {
                                 .foregroundColor(userPreferences.userName.isEmpty ? .secondary : .primary)
                         }
                         
-                        Text("\(jokes.filter { !$0.isDeleted }.count) jokes")
+                        Text("\(jokes.filter { !$0.isTrashed }.count) jokes")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -84,7 +84,7 @@ struct SettingsView: View {
                 Toggle(isOn: $roastMode) {
                     Label("Roast Mode", systemImage: roastMode ? "flame.fill" : "flame")
                 }
-                .tint(.blue)
+                .tint(Color.bitbinderAccent)
             } footer: {
                 Text("Organize material by roast target instead of folder.")
             }
@@ -109,7 +109,7 @@ struct SettingsView: View {
                     HStack {
                         Label("Trash", systemImage: "trash")
                         Spacer()
-                        let trashedCount = jokes.filter { $0.isDeleted }.count
+                        let trashedCount = jokes.filter { $0.isTrashed }.count
                         if trashedCount > 0 {
                             Text("\(trashedCount)")
                                 .foregroundColor(.secondary)

@@ -127,7 +127,7 @@ struct RecordRoastSetView: View {
                             }
                             .frame(maxWidth: .infinity)
                              .padding(.vertical, 16)
-                             .background(.blue)
+                             .background(Color.bitbinderAccent)
                              .foregroundColor(.white)
                              .clipShape(RoundedRectangle(cornerRadius: 14))
                         }

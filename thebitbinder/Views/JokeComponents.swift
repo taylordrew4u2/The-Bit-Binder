@@ -23,7 +23,7 @@ struct JokeCardView: View {
         HStack(spacing: 0) {
             // Hit / Open Mic accent strip
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(isHit ? Color.blue : (isOpenMic ? Color.blue : .clear))
+                .fill(isHit ? Color.bitbinderAccent : (isOpenMic ? Color.bitbinderAccent : .clear))
                 .frame(width: 3)
                 .padding(.vertical, 8)
             
@@ -40,13 +40,13 @@ struct JokeCardView: View {
                     if isOpenMic {
                         Image(systemName: "mic.fill")
                             .font(.caption)
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                     
                     if isHit {
                         Image(systemName: "star.fill")
                             .font(.caption)
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                 }
                 
@@ -100,7 +100,7 @@ struct JokeRowView: View {
         HStack(alignment: .top, spacing: 12) {
             // Hit / Open Mic accent strip
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(isHit ? Color.blue : (isOpenMic ? Color.blue : .clear))
+                .fill(isHit ? Color.bitbinderAccent : (isOpenMic ? Color.bitbinderAccent : .clear))
                 .frame(width: 3, height: showFullContent ? 36 : 20)
                 .padding(.top, 2)
             
@@ -115,13 +115,13 @@ struct JokeRowView: View {
                     if isOpenMic {
                         Image(systemName: "mic.fill")
                             .font(.caption2)
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                     
                     if isHit {
                         Image(systemName: "star.fill")
                             .font(.caption2)
-                            .foregroundColor(.blue)
+                            .foregroundColor(Color.bitbinderAccent)
                     }
                 }
                 
@@ -211,7 +211,7 @@ struct TheHitsChip: View {
                 if count > 0 && !isSelected {
                     Text("\(count)")
                         .font(.caption.weight(.bold))
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color.bitbinderAccent)
                 }
             }
             .foregroundColor(isSelected ? .white : .primary)
@@ -219,7 +219,7 @@ struct TheHitsChip: View {
             .padding(.vertical, 8)
             .background(
                 isSelected
-                    ? AnyShapeStyle(Color.blue)
+                    ? AnyShapeStyle(Color.bitbinderAccent)
                     : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
             )
             .clipShape(Capsule())
@@ -253,7 +253,7 @@ struct OpenMicChip: View {
                 if count > 0 && !isSelected {
                     Text("\(count)")
                         .font(.caption.weight(.bold))
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color.bitbinderAccent)
                 }
             }
             .foregroundColor(isSelected ? .white : .primary)
@@ -261,7 +261,7 @@ struct OpenMicChip: View {
             .padding(.vertical, 8)
             .background(
                 isSelected
-                    ? AnyShapeStyle(Color.blue)
+                    ? AnyShapeStyle(Color.bitbinderAccent)
                     : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
             )
             .clipShape(Capsule())
@@ -369,7 +369,7 @@ struct ImportProgressCard: View {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.caption2)
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.bitbinderAccent)
                             Text(name)
                                 .font(.caption)
                                 .lineLimit(1)
@@ -417,7 +417,7 @@ struct ImportProgressCard: View {
             isActive
                 ? AnyShapeStyle(Color.accentColor)
                 : (isComplete
-                    ? AnyShapeStyle(Color.blue.opacity(0.12))
+                    ? AnyShapeStyle(Color.bitbinderAccent.opacity(0.12))
                     : AnyShapeStyle(Color(UIColor.tertiarySystemFill)))
         )
         .clipShape(Capsule())

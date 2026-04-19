@@ -211,6 +211,11 @@ struct thebitbinderApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    /// When Roast Mode is on, flip the app-wide tint from blue → red so every
+    /// SwiftUI control that uses the environment tint (.accentColor, Buttons,
+    /// Toggles, Links, ProgressViews, navigation tint, etc.) turns red.
+    @AppStorage("roastModeEnabled") private var roastMode: Bool = false
+
     var body: some Scene {
         WindowGroup {
             ZStack {
@@ -221,6 +226,7 @@ struct thebitbinderApp: App {
                     LaunchScreenView(statusText: startup.statusText, userName: userPreferences.userName)
                 }
             }
+            .tint(roastMode ? .red : .blue)
             .animation(.easeOut(duration: 0.35), value: startup.isReady)
             .task {
                 // Wire the main context into the sync service so remote change

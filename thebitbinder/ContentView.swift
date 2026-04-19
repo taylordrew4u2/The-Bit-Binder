@@ -190,7 +190,7 @@ struct MainTabView: View {
                 .tag(screen)
             }
         }
-        .tint(.blue)
+        .tint(Color.bitbinderAccent)
         .onAppear {
             // Mark first launch complete after showing Home
             if !hasLaunchedBefore {

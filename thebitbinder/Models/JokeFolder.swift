@@ -17,7 +17,7 @@ final class JokeFolder: Identifiable {
     @Relationship(deleteRule: .nullify) var jokes: [Joke]?
 
     // Soft-delete (trash) support
-    var isDeleted: Bool = false
+    var isTrashed: Bool = false
     var deletedDate: Date?
 
     init(name: String, isRecentlyAdded: Bool = false) {
@@ -30,12 +30,12 @@ final class JokeFolder: Identifiable {
     // MARK: - Trash Helpers
 
     func moveToTrash() {
-        isDeleted = true
+        isTrashed = true
         deletedDate = Date()
     }
 
     func restoreFromTrash() {
-        isDeleted = false
+        isTrashed = false
         deletedDate = nil
     }
 }

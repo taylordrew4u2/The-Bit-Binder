@@ -10,7 +10,7 @@ import SwiftData
 
 struct SetListsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<SetList> { !$0.isDeleted }) private var setLists: [SetList]
+    @Query(filter: #Predicate<SetList> { !$0.isTrashed }) private var setLists: [SetList]
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     @State private var showingCreateSetList = false
@@ -108,8 +108,10 @@ struct SetListsView: View {
     }
     
     private func deleteSetLists(at offsets: IndexSet) {
+        let snapshot = filteredSetLists
         for index in offsets {
-            filteredSetLists[index].moveToTrash()
+            guard index < snapshot.count else { continue }
+            snapshot[index].moveToTrash()
         }
         do {
             try modelContext.save()
@@ -125,9 +127,11 @@ struct SetListsView: View {
         do {
             try modelContext.save()
         } catch {
-            setList.restoreFromTrash()
+            // IMPORTANT: Do NOT restore on save failure - this causes "undeleted" items
+            // to reappear unexpectedly. Instead, the delete stays in memory and will
+            // be retried on next save. User sees the error and item stays visually deleted.
             print("[SetListsView] Failed to save after soft-delete: \(error)")
-            persistenceError = "Could not delete set list: \(error.localizedDescription)"
+            persistenceError = "Delete may not have saved. Please try again or check your connection."
             showingPersistenceError = true
         }
     }
