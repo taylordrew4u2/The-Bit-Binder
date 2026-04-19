@@ -42,10 +42,18 @@ enum BackgroundDownloadConstants {
 @main
 struct DownloaderExtension: BADownloaderExtension {
     
-    /// Shared UserDefaults for communicating state with the main app.
-    private var sharedDefaults: UserDefaults? {
-        UserDefaults(suiteName: BackgroundDownloadConstants.appGroupIdentifier)
-    }
+    /// Cached shared UserDefaults — created once to avoid repeated
+    /// CFPrefs "kCFPreferencesAnyUser" console warnings.
+    private static let _sharedDefaults: UserDefaults? = {
+        let id = BackgroundDownloadConstants.appGroupIdentifier
+        guard FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil else {
+            logger.warning("App Group container unavailable for: \(id, privacy: .public)")
+            return nil
+        }
+        return UserDefaults(suiteName: id)
+    }()
+
+    private var sharedDefaults: UserDefaults? { Self._sharedDefaults }
     
     /// Shared container URL for storing downloaded assets.
     private var sharedContainerURL: URL? {
