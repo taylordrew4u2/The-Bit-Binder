@@ -555,12 +555,15 @@ class SpeechRecognizer: ObservableObject {
     private func configureAudioSessionWithFallbacks() -> Bool {
         let audioSession = AVAudioSession.sharedInstance()
         
-        // Strategy 1: Try preferred configuration
+        // Strategy 1: Preferred configuration for speech recognition.
+        // Using `.default` mode (NOT `.measurement`) so iOS applies its built-in
+        // AGC, noise suppression, and echo cancellation — critical for getting
+        // clean audio that the speech recognizer can actually transcribe.
         do {
             try audioSession.setCategory(
                 .playAndRecord,
-                mode: .measurement,
-                options: [.defaultToSpeaker, .duckOthers, .allowBluetoothA2DP]
+                mode: .default,
+                options: [.defaultToSpeaker, .duckOthers, .allowBluetooth]
             )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
             return true
@@ -568,11 +571,11 @@ class SpeechRecognizer: ObservableObject {
             print(" [SpeechRecognizer] Preferred audio config failed: \(error)")
         }
         
-        // Strategy 2: Try without Bluetooth
+        // Strategy 2: Without Bluetooth options (some devices reject Bluetooth combo)
         do {
             try audioSession.setCategory(
                 .playAndRecord,
-                mode: .measurement,
+                mode: .default,
                 options: [.defaultToSpeaker, .duckOthers]
             )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
@@ -581,9 +584,9 @@ class SpeechRecognizer: ObservableObject {
             print(" [SpeechRecognizer] Audio config without Bluetooth failed: \(error)")
         }
         
-        // Strategy 3: Minimal configuration
+        // Strategy 3: Minimal record-only configuration
         do {
-            try audioSession.setCategory(.record, mode: .measurement)
+            try audioSession.setCategory(.record, mode: .default)
             try audioSession.setActive(true)
             return true
         } catch {
@@ -609,12 +612,34 @@ class SpeechRecognizer: ObservableObject {
             return
         }
         
-        // Check if speech recognizer is available
-        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+        // Check if speech recognizer is available. On cold launch, `isAvailable`
+        // can briefly return false while the system initializes — retry a few
+        // times with short delays before giving up.
+        guard let speechRecognizer = speechRecognizer else {
             isRestarting = false
             DispatchQueue.main.async { [weak self] in
-                self?.error = "Speech recognition is not available"
+                self?.error = "Speech recognition is not supported on this device."
                 self?.isTranscribing = false
+            }
+            return
+        }
+        
+        if !speechRecognizer.isAvailable {
+            isRestarting = false
+            // Retry up to 3 times with increasing delay — handles cold-launch
+            // and post-interruption race where isAvailable flips true shortly.
+            if consecutiveStartFailures < maxConsecutiveStartFailures && shouldBeRunning {
+                consecutiveStartFailures += 1
+                let delay = 0.3 * Double(consecutiveStartFailures)
+                print(" [SpeechRecognizer] Not yet available — retrying in \(delay)s (attempt \(consecutiveStartFailures))")
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    self?.startRecognitionSession()
+                }
+            } else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.error = "Speech recognition is not available right now. Please check your internet connection and try again."
+                    self?.isTranscribing = false
+                }
             }
             return
         }
