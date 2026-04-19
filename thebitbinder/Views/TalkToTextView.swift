@@ -442,7 +442,9 @@ struct TalkToTextView: View {
 // Simplified, reliable speech recognition based on Apple's canonical
 // SFSpeechRecognizer sample. Uses a single long-lived AVAudioEngine and
 // avoids layered defensive logic that can interfere with recognition.
-@MainActor
+// NOT @MainActor-isolated — audio tap callback fires on real-time audio
+// thread and recognition result handler is called from an internal queue.
+// All UI-facing @Published updates are explicitly dispatched to main.
 final class SpeechRecognizer: ObservableObject {
     @Published var transcribedText = ""
     @Published var error: String?
@@ -460,7 +462,6 @@ final class SpeechRecognizer: ObservableObject {
     private var shouldBeRunning = false
 
     deinit {
-        // MainActor deinit: synchronous teardown only.
         audioEngine.stop()
         recognitionTask?.cancel()
     }
@@ -545,50 +546,54 @@ final class SpeechRecognizer: ObservableObject {
             self?.recognitionRequest?.append(buffer)
         }
 
-        // 6. Kick off the recognition task.
+        // 6. Kick off the recognition task. The handler runs on an internal
+        //    queue — we hop to main with DispatchQueue.main.async where needed.
         recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
+            guard let self = self else { return }
 
-                var isFinal = false
+            var isFinal = false
 
-                if let result = result {
-                    isFinal = result.isFinal
-                    let spoken = result.bestTranscription.formattedString
+            if let result = result {
+                isFinal = result.isFinal
+                let spoken = result.bestTranscription.formattedString
+                DispatchQueue.main.async {
                     if self.accumulatedText.isEmpty {
                         self.transcribedText = spoken
                     } else {
                         self.transcribedText = self.accumulatedText + " " + spoken
                     }
                 }
+            }
 
-                if let error = error {
-                    let nsError = error as NSError
-                    let isCancelled = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216
-                    let isTimeout = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110
+            if let error = error {
+                let nsError = error as NSError
+                let isCancelled = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216
+                let isTimeout   = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110
 
-                    if isCancelled {
-                        return
-                    }
+                if isCancelled { return }
 
-                    if isTimeout || isFinal {
-                        // 60-second limit or natural finish — save and restart.
+                if isTimeout || isFinal {
+                    DispatchQueue.main.async {
                         self.accumulatedText = self.transcribedText
                         if self.shouldBeRunning {
                             self.startRecognitionSession()
                         } else {
                             self.isTranscribing = false
                         }
-                        return
                     }
-
-                    print(" [SpeechRecognizer] Recognition error: \(nsError.domain) code \(nsError.code) — \(error.localizedDescription)")
-                    self.error = "Recognition paused. Tap Start Recording to continue."
-                    self.isTranscribing = false
                     return
                 }
 
-                if isFinal {
+                print(" [SpeechRecognizer] Recognition error: \(nsError.domain) code \(nsError.code) — \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.error = "Recognition paused. Tap Start Recording to continue."
+                    self.isTranscribing = false
+                }
+                return
+            }
+
+            if isFinal {
+                DispatchQueue.main.async {
                     self.accumulatedText = self.transcribedText
                     if self.shouldBeRunning {
                         self.startRecognitionSession()
