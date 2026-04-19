@@ -115,7 +115,7 @@ struct SetListDetailView: View {
                     } actions: {
                         Button("Add Roast Jokes") { showingAddJokes = true }
                             .buttonStyle(.borderedProminent)
-                            .tint(.blue)
+                            .tint(Color.accentColor)
                     }
                 } else {
                     List {
@@ -168,7 +168,7 @@ struct SetListDetailView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(setList.isFinalized ? Color.blue : Color.blue)
+                        .background(Color.accentColor)
                         .clipShape(Capsule())
                     }
                 }
@@ -373,7 +373,7 @@ struct SetListDetailView: View {
             HStack(alignment: .top, spacing: 12) {
                  Image(systemName: "flame.fill")
                      .font(.system(size: 14))
-                     .foregroundColor(.blue)
+                     .foregroundColor(Color.accentColor)
                      .padding(.top, 3)
                  
                  VStack(alignment: .leading, spacing: 4) {
@@ -391,7 +391,7 @@ struct SetListDetailView: View {
                      if let targetName = joke.target?.name {
                          Text("for \(targetName)")
                              .font(.system(size: 12, weight: .medium))
-                             .foregroundColor(.blue.opacity(0.8))
+                             .foregroundColor(Color.accentColor.opacity(0.8))
                      }
                  }
              }
@@ -471,7 +471,7 @@ struct SetListDetailView: View {
             } label: {
                 Text("GO LIVE")
                     .font(.caption.bold())
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.accentColor)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(Color.white)
@@ -479,9 +479,9 @@ struct SetListDetailView: View {
             }
         }
         .padding()
-        .background(Color.blue)
+        .background(Color.accentColor)
     }
-    
+
     // MARK: - Quick Perform Banner (for unfinalized sets)
     
     private var quickPerformBanner: some View {
@@ -508,13 +508,13 @@ struct SetListDetailView: View {
                 } label: {
                     Text("GO LIVE")
                         .font(.caption.bold())
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color.accentColor)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Color.white)
                         .clipShape(Capsule())
                 }
-                
+
                 Button {
                     showingFinalizeSheet = true
                 } label: {
@@ -525,7 +525,7 @@ struct SetListDetailView: View {
             }
         }
         .padding()
-        .background(Color.blue)
+        .background(Color.accentColor)
     }
     
     private func unfinalizeSet() {

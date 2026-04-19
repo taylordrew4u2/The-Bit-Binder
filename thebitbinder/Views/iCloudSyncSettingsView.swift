@@ -332,11 +332,11 @@ struct iCloudSyncSettingsView: View {
     private var syncStatusColor: Color {
         switch syncService.syncStatus {
         case .idle:
-            return syncService.isSyncEnabled ? .blue : .gray
+            return syncService.isSyncEnabled ? Color.accentColor : .gray
         case .syncing:
-            return .blue
+            return Color.accentColor
         case .success:
-            return .blue
+            return Color.accentColor
         case .error:
             return .red
         }

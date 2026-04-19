@@ -533,7 +533,7 @@ struct JokeDetailView: View {
                         Spacer()
                         Text(confidence.capitalized)
                             .font(.caption)
-                            .foregroundColor(confidence == "high" ? .green : (confidence == "medium" ? .blue : .orange))
+                            .foregroundColor(confidence == "high" ? .green : (confidence == "medium" ? Color.accentColor : .orange))
                     }
                 }
             }

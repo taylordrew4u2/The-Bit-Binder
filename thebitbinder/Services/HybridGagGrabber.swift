@@ -493,12 +493,12 @@ struct HybridGagGrabberSheet: View {
                         // Fun visual icon cluster
                         ZStack {
                             Circle()
-                                .fill(Color.blue.opacity(0.12))
+                                .fill(Color.accentColor.opacity(0.12))
                                 .frame(width: 90, height: 90)
 
                             Image(systemName: "doc.text.magnifyingglass")
                                 .font(.system(size: 38, weight: .medium))
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.accentColor)
                         }
                         .padding(.top, 8)
 
@@ -517,10 +517,10 @@ struct HybridGagGrabberSheet: View {
                             ForEach(["TXT", "PDF", "RTF", "CSV"], id: \.self) { fmt in
                                 Text(fmt)
                                     .font(.caption2.weight(.semibold))
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(Color.accentColor)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(Color.blue.opacity(0.1))
+                                    .background(Color.accentColor.opacity(0.1))
                                     .clipShape(Capsule())
                             }
                         }
@@ -592,7 +592,7 @@ struct HybridGagGrabberSheet: View {
                         VStack(spacing: 12) {
                             Image(systemName: "moon.zzz.fill")
                                 .font(.system(size: 32))
-                                .foregroundStyle(.blue.opacity(0.6))
+                                .foregroundStyle(Color.accentColor.opacity(0.6))
 
                             Text(error)
                                 .font(.subheadline)

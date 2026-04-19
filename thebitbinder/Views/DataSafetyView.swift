@@ -572,7 +572,7 @@ struct StatusRow: View {
     var body: some View {
         HStack {
             Image(systemName: isHealthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundColor(isHealthy ? .blue : .red)
+                .foregroundColor(isHealthy ? Color.accentColor : .red)
             
             VStack(alignment: .leading) {
                 Text(title)

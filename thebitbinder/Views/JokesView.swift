@@ -703,14 +703,14 @@ struct JokesView: View {
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
+                    .foregroundColor(isSelected ? Color.accentColor : .gray.opacity(0.5))
                     .padding(6)
             }
         }
         .aspectRatio(1, contentMode: .fit)
         .buttonStyle(.plain)
     }
-    
+
     @ViewBuilder
     private func jokeListSelectableRow(joke: Joke) -> some View {
         let isSelected = selectedJokeIDs.contains(joke.id)
@@ -720,7 +720,7 @@ struct JokesView: View {
             HStack {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
+                    .foregroundColor(isSelected ? Color.accentColor : .gray.opacity(0.5))
                 
                 JokeRowView(joke: joke, showFullContent: showFullContent)
             }

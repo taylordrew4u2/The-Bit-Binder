@@ -273,14 +273,14 @@ struct iCloudSyncStatusView: View {
         case .idle:
             return .secondary
         case .syncing:
-            return .blue
+            return Color.accentColor
         case .success:
             return .green
         case .error:
             return .red
         }
     }
-    
+
     private var syncStatusText: String {
         switch syncService.syncStatus {
         case .idle:
@@ -376,7 +376,7 @@ struct IssueRowView: View {
         case .warning:
             return .orange
         case .info:
-            return .blue
+            return Color.accentColor
         }
     }
 }

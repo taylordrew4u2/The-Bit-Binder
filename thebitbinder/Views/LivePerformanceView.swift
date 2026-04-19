@@ -1226,7 +1226,7 @@ struct JokeListRow: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(item.isRoast ? .blue : Color.bitbinderAccent)
+                        .background(item.isRoast ? Color.accentColor : Color.bitbinderAccent)
                         .cornerRadius(8)
                     }
                 }

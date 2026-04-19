@@ -340,13 +340,13 @@ struct SmartImportReviewView: View {
     
     private func dotColor(for item: ImportReviewItem, isActive: Bool) -> Color {
         if isActive {
-            return .blue
+            return Color.accentColor
         }
         switch item.action {
-        case .approved: return .blue
+        case .approved: return Color.accentColor
         case .rejected: return .red.opacity(0.5)
-        case .sendToBrainstorm: return .blue
-        case .needsSplitting: return .blue
+        case .sendToBrainstorm: return Color.accentColor
+        case .needsSplitting: return Color.accentColor
         case .pending: return roastMode ? .white.opacity(0.2) : Color(UIColor.tertiaryLabel).opacity(0.4)
         }
     }
@@ -452,7 +452,7 @@ struct SmartImportReviewView: View {
     }
     
     private var swipeColor: Color {
-        if dragOffset.width > 30 { return .blue }
+        if dragOffset.width > 30 { return Color.accentColor }
         if dragOffset.width < -30 { return .red }
         return .clear
     }
@@ -517,9 +517,9 @@ struct SmartImportReviewView: View {
     
     private func confidenceColor(_ confidence: ImportConfidence) -> Color {
         switch confidence {
-        case .high: return .blue
+        case .high: return Color.accentColor
         case .medium: return .accentColor
-        case .low: return .blue
+        case .low: return Color.accentColor
         }
     }
     
@@ -897,7 +897,7 @@ struct SmartImportReviewView: View {
                     
                     summaryStatRow(
                         icon: "checkmark.circle.fill",
-                        color: .blue,
+                        color: Color.accentColor,
                         label: "Accepted",
                         count: results.approvedJokes.count
                     )
@@ -914,7 +914,7 @@ struct SmartImportReviewView: View {
                     if results.brainstormItems.count > 0 {
                         summaryStatRow(
                             icon: "lightbulb.fill",
-                            color: .blue,
+                            color: Color.accentColor,
                             label: "Sent to Brainstorm",
                             count: results.brainstormItems.count
                         )
@@ -1045,9 +1045,9 @@ struct SmartImportReviewView: View {
                     
                     HStack(spacing: 16) {
                         tutorialButtonHint(icon: "xmark", label: "Skip", color: .red)
-                        tutorialButtonHint(icon: "lightbulb.fill", label: "Idea", color: .blue)
+                        tutorialButtonHint(icon: "lightbulb.fill", label: "Idea", color: Color.accentColor)
                         tutorialButtonHint(icon: "pencil", label: "Edit", color: .accentColor)
-                        tutorialButtonHint(icon: "checkmark", label: "Keep", color: .blue)
+                        tutorialButtonHint(icon: "checkmark", label: "Keep", color: Color.accentColor)
                     }
                 }
                 

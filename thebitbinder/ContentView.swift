@@ -116,7 +116,7 @@ enum AppScreen: String, CaseIterable {
 
     var roastColor: Color {
         switch self {
-        case .jokes:         return .blue
+        case .jokes:         return .accentColor
         default:             return .accentColor
         }
     }

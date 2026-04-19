@@ -25,7 +25,7 @@ struct RecordRoastSetView: View {
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
     
-    private let accentColor: Color = .blue
+    private let accentColor: Color = .accentColor
     
     /// Safe access to target name
     private var safeTargetName: String {

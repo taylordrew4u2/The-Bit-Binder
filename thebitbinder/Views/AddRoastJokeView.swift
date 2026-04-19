@@ -21,7 +21,7 @@ struct AddRoastJokeView: View {
     @State private var showSavedFeedback = false
     @FocusState private var isTextFocused: Bool
 
-    private let accentColor: Color = .blue
+    private let accentColor: Color = .accentColor
     
     /// Safe property accessors to prevent crashes on invalidated models
     private var safeName: String { target.isValid ? target.name : "Target" }

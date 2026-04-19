@@ -25,7 +25,7 @@ struct ShowMeAroundView: View {
         VStack(spacing: 0) {
             // Progress bar
             ProgressView(value: Double(currentStep + 1), total: Double(steps.count))
-                .tint(roastMode ? .orange : .blue)
+                .tint(roastMode ? .orange : Color.accentColor)
                 .padding(.horizontal)
                 .padding(.top, 8)
 
@@ -180,7 +180,7 @@ struct TourStep {
             title: "Welcome to BitBinder!",
             subtitle: "Your all-in-one comedy writing toolkit. Let's walk through everything.",
             icon: "sparkles",
-            color: .blue,
+            color: Color.accentColor,
             features: [
                 "Write, organize, and refine jokes",
                 "Build set lists for your performances",
@@ -195,7 +195,7 @@ struct TourStep {
             title: "Home",
             subtitle: "Your dashboard — see everything at a glance.",
             icon: "house.fill",
-            color: .blue,
+            color: Color.accentColor,
             features: [
                 "Quick stats on your jokes, sets, and recordings",
                 "Jump to any section with one tap",
@@ -275,8 +275,8 @@ struct TourStep {
         TourStep(
             title: "BitBuddy — Your AI Partner",
             subtitle: "Tap the floating bubble to chat anytime.",
-            icon: "face.smiling.inverse",
-            color: .blue,
+            icon: "sparkles",
+            color: Color.accentColor,
             features: [
                 "Analyze any joke — get feedback on structure and punchlines",
                 "Generate new premises and punchlines on demand",
@@ -361,7 +361,7 @@ struct TourStep {
         TourStep(
             title: "BitBuddy — Roast Partner",
             subtitle: "Your AI is in roast mode too.",
-            icon: "face.smiling.inverse",
+            icon: "flame.fill",
             color: .orange,
             features: [
                 "Get roast lines for any target on demand",

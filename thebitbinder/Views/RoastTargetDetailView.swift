@@ -39,7 +39,7 @@ struct RoastTargetDetailView: View {
     // Edit mode for drag-to-reorder
     @State private var isEditMode = false
 
-    private let accentColor: Color = .blue
+    private let accentColor: Color = .accentColor
     
     enum RoastFilterMode: String, CaseIterable {
         case all = "All"
@@ -260,7 +260,7 @@ struct RoastTargetDetailView: View {
                         count: target.killerCount,
                         label: "killer",
                         icon: "star.fill",
-                        color: .blue
+                        color: Color.accentColor
                     )
                 }
                 
@@ -269,7 +269,7 @@ struct RoastTargetDetailView: View {
                         count: target.testedCount,
                         label: "tested",
                         icon: "checkmark.circle.fill",
-                        color: .blue
+                        color: Color.accentColor
                     )
                 }
             }
@@ -915,11 +915,11 @@ struct DraggableRoastCard: View {
                         .frame(width: 44, height: 44)
                     Image(systemName: joke.isKiller ? "star.fill" : "flame.fill")
                         .font(.system(size: 20))
-                        .foregroundColor(joke.isKiller ? .blue : accentColor)
+                        .foregroundColor(accentColor)
                 }
             }
             .buttonStyle(.plain)
-            
+
             // Content
             VStack(alignment: .leading, spacing: 6) {
                 if showFullContent {
@@ -938,17 +938,17 @@ struct DraggableRoastCard: View {
                 HStack(spacing: 6) {
                     // Opening roast badge
                     if joke.isOpeningRoast {
-                        BadgePill(text: "OPENER", icon: "star.circle.fill", color: .blue)
+                        BadgePill(text: "OPENER", icon: "star.circle.fill", color: Color.accentColor)
                     } else if joke.parentOpeningRoastID != nil {
-                        BadgePill(text: "BACKUP", icon: "arrow.turn.down.right", color: .blue)
+                        BadgePill(text: "BACKUP", icon: "arrow.turn.down.right", color: Color.accentColor)
                     }
-                    
+
                     // Tested badge - tappable
                     if joke.isTested {
                         Button {
                             onToggleTested?()
                         } label: {
-                            BadgePill(text: "\(joke.performanceCount)×", icon: "checkmark.circle.fill", color: .blue)
+                            BadgePill(text: "\(joke.performanceCount)×", icon: "checkmark.circle.fill", color: Color.accentColor)
                         }
                         .buttonStyle(.plain)
                     }
@@ -1199,7 +1199,7 @@ struct RoastJokeRow: View {
                             .frame(width: 42, height: 42)
                         Image(systemName: joke.isKiller ? "star.fill" : "flame.fill")
                             .font(.system(size: 18))
-                            .foregroundColor(joke.isKiller ? .blue : accentColor)
+                            .foregroundColor(accentColor)
                     }
                 }
             }
@@ -1267,7 +1267,7 @@ struct RoastJokeRow: View {
                             ForEach(0..<5, id: \.self) { i in
                                 Image(systemName: i < joke.relatabilityScore ? "person.fill" : "person")
                                     .font(.system(size: 7))
-                                    .foregroundColor(i < joke.relatabilityScore ? .blue : .gray.opacity(0.3))
+                                    .foregroundColor(i < joke.relatabilityScore ? Color.accentColor : .gray.opacity(0.3))
                             }
                         }
                     }
@@ -1735,7 +1735,7 @@ struct EditRoastJokeView: View {
     @State private var showOpeningAssignment = false
     @FocusState private var isContentFocused: Bool
     
-    private let accentColor: Color = .blue
+    private let accentColor: Color = .accentColor
     
     /// Safe content accessor
     private var safeContent: String {
@@ -1839,7 +1839,7 @@ struct EditRoastJokeView: View {
                                             } label: {
                                                 Image(systemName: score <= joke.relatabilityScore ? "person.fill" : "person")
                                                     .font(.title2)
-                                                    .foregroundColor(score <= joke.relatabilityScore ? .blue : .gray.opacity(0.3))
+                                                    .foregroundColor(score <= joke.relatabilityScore ? Color.accentColor : .gray.opacity(0.3))
                                             }
                                             .buttonStyle(.plain)
                                         }
@@ -1885,7 +1885,7 @@ struct EditRoastJokeView: View {
                                             }
                                         }
                                     ))
-                                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                                    .toggleStyle(SwitchToggleStyle(tint: Color.accentColor))
                                     .labelsHidden()
                                 }
                                 .padding(12)
@@ -1971,11 +1971,11 @@ struct EditRoastJokeView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: joke.isOpeningRoast ? "star.circle.fill" : "arrow.turn.down.right")
                                     .font(.subheadline)
-                                    .foregroundColor(joke.isOpeningRoast ? .blue : .blue)
+                                    .foregroundColor(Color.accentColor)
                                 Text(joke.isOpeningRoast ? "Opening Roast" : (joke.parentOpeningRoastID != nil ? "Backup Roast" : "Set Type"))
                                     .font(.subheadline.weight(.medium))
                             }
-                            .foregroundColor(joke.isOpeningRoast ? .blue : (joke.parentOpeningRoastID != nil ? .blue : accentColor))
+                            .foregroundColor(Color.accentColor)
                         }
                         .padding(.horizontal, 16)
                         
@@ -2040,18 +2040,18 @@ struct EditRoastJokeView: View {
                 isOn: $joke.isKiller,
                 icon: "star.fill",
                 label: "Killer",
-                activeColor: .blue
+                activeColor: Color.accentColor
             )
-            
+
             Divider()
                 .frame(height: 30)
-            
+
             // Tested toggle
             QuickToggleButton(
                 isOn: $joke.isTested,
                 icon: "checkmark.circle.fill",
                 label: "Tested",
-                activeColor: .blue
+                activeColor: Color.accentColor
             )
             
             Divider()
@@ -2075,7 +2075,7 @@ struct EditRoastJokeView: View {
                     Text("-1")
                         .font(.caption2)
                 }
-                .foregroundColor(joke.performanceCount > 0 ? .blue : .secondary.opacity(0.3))
+                .foregroundColor(joke.performanceCount > 0 ? Color.accentColor : .secondary.opacity(0.3))
                 .frame(width: 44)
                 .padding(.vertical, 8)
             }
@@ -2100,7 +2100,7 @@ struct EditRoastJokeView: View {
                     Text("Performed")
                         .font(.caption2)
                 }
-                .foregroundColor(joke.performanceCount > 0 ? .blue : .secondary)
+                .foregroundColor(joke.performanceCount > 0 ? Color.accentColor : .secondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             }
@@ -2213,7 +2213,7 @@ struct EditRoastTargetView: View {
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
 
-    private let accentColor: Color = .blue
+    private let accentColor: Color = .accentColor
 
     var body: some View {
         NavigationStack {

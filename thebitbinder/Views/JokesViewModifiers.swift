@@ -368,8 +368,8 @@ struct UnresolvedFragmentRow: View {
     
     private var confidenceColor: Color {
         switch fragment.confidence.lowercased() {
-        case "high": return .blue
-        case "medium": return .blue
+        case "high": return Color.accentColor
+        case "medium": return Color.accentColor
         default: return .red
         }
     }

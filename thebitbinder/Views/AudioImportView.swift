@@ -250,12 +250,12 @@ struct DropZoneView: View {
         VStack(spacing: 16) {
             Image(systemName: "arrow.down.doc.fill")
                 .font(.largeTitle)
-                .foregroundColor(isTargeted ? .blue : .gray)
-            
+                .foregroundColor(isTargeted ? Color.accentColor : .gray)
+
             Text("Drag & Drop Voice Memos Here")
                 .font(.headline)
-                .foregroundColor(isTargeted ? .blue : .primary)
-            
+                .foregroundColor(isTargeted ? Color.accentColor : .primary)
+
             Text("or use Share from Voice Memos app")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -265,7 +265,7 @@ struct DropZoneView: View {
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8]))
-                .foregroundColor(isTargeted ? .blue : .gray.opacity(0.5))
+                .foregroundColor(isTargeted ? Color.accentColor : .gray.opacity(0.5))
         )
         .background(isTargeted ? .accentColor.opacity(0.1) : Color.clear)
         .cornerRadius(16)

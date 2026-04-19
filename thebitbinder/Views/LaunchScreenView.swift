@@ -33,10 +33,11 @@ struct LaunchScreenView: View {
                 Spacer()
                 
                 // App icon with gentle scale-in
-                Image(systemName: "book.closed.fill")
-                    .font(.system(size: 60, weight: .medium))
-                    .foregroundStyle(.accent)
-                    .symbolRenderingMode(.hierarchical)
+                Image("BitBuddyIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 80, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .scaleEffect(iconVisible ? 1 : 0.6)
                     .opacity(iconVisible ? 1 : 0)
 

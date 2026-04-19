@@ -203,8 +203,8 @@ struct TheHitsChip: View {
             HStack(spacing: 4) {
                 Image(systemName: "star.fill")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(isSelected ? .white : .blue)
-                
+                    .foregroundColor(isSelected ? .white : Color.accentColor)
+
                 Text("Hits")
                     .font(.subheadline.weight(.semibold))
                 
@@ -245,8 +245,8 @@ struct OpenMicChip: View {
             HStack(spacing: 4) {
                 Image(systemName: "mic.fill")
                     .font(.caption.weight(.semibold))
-                    .foregroundColor(isSelected ? .white : .blue)
-                
+                    .foregroundColor(isSelected ? .white : Color.accentColor)
+
                 Text("Open Mic")
                     .font(.subheadline.weight(.semibold))
                 
@@ -409,7 +409,7 @@ struct ImportProgressCard: View {
                 .fontWeight(isActive ? .semibold : .regular)
         }
         .foregroundColor(
-            isActive ? .white : (isComplete ? .blue : .secondary)
+            isActive ? .white : (isComplete ? Color.accentColor : .secondary)
         )
         .padding(.horizontal, 6)
         .padding(.vertical, 3)

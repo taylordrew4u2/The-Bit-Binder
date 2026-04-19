@@ -228,13 +228,13 @@ struct BrainstormView: View {
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundColor(isSelected ? .blue : .gray.opacity(0.5))
+                    .foregroundColor(isSelected ? Color.accentColor : .gray.opacity(0.5))
                     .padding(6)
             }
         }
         .buttonStyle(.plain)
     }
-    
+
     private var brainstormBatchActionBar: some View {
         HStack(spacing: 16) {
             Button {
@@ -703,9 +703,9 @@ struct IdeaCard: View {
         if !hex.isEmpty, let parsed = Color(hex: hex) {
             return parsed
         }
-        return .blue
+        return Color.accentColor
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Thin color accent bar at the top

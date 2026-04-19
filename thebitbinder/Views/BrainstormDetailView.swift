@@ -43,7 +43,7 @@ struct BrainstormDetailView: View {
     }
 
     private var accentColor: Color {
-        .blue
+        Color.accentColor
     }
 
     private var wordCount: Int {

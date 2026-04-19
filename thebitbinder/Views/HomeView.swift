@@ -131,19 +131,19 @@ struct HomeView: View {
                         label: "Hits",
                         value: hitsCount,
                         icon: "star.fill",
-                        tint: .blue
+                        tint: Color.accentColor
                     )
                     StatCard(
                         label: "Sets",
                         value: allSets.count,
                         icon: "list.bullet.rectangle.portrait",
-                        tint: .blue
+                        tint: Color.accentColor
                     )
                     StatCard(
                         label: "This Week",
                         value: thisWeekCount,
                         icon: "flame.fill",
-                        tint: .blue
+                        tint: Color.accentColor
                     )
                 }
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))

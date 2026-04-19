@@ -236,10 +236,10 @@ final class ImportReviewViewModel: ObservableObject {
         GagGrabberBudgetStatus(
             shortStatusText: "Unlimited",
             statusIcon: "infinity",
-            statusColor: .blue
+            statusColor: Color.accentColor
         )
     }
-    
+
     var allItemsReviewed: Bool {
         return reviewItems.allSatisfy { $0.action != .pending }
     }
@@ -337,7 +337,7 @@ struct ImportReviewResults {
         GagGrabberBudgetStatus(
             shortStatusText: "Unlimited",
             statusIcon: "infinity",
-            statusColor: .blue
+            statusColor: Color.accentColor
         )
     }
 

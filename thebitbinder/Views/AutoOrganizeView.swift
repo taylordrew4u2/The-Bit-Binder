@@ -915,11 +915,11 @@ struct JokeOrganizationCard: View {
     private func confidenceColor(_ confidence: Double) -> Color {
         switch confidence {
         case 0.8...:
-            return .blue
+            return Color.accentColor
         case 0.6..<0.8:
-            return .blue
+            return Color.accentColor
         case 0.4..<0.6:
-            return .blue
+            return Color.accentColor
         default:
             return .gray
         }
@@ -1055,11 +1055,11 @@ struct CategorySuggestionDetail: View {
     private func confidenceColor(_ confidence: Double) -> Color {
         switch confidence {
         case 0.8...:
-            return .blue
+            return Color.accentColor
         case 0.6..<0.8:
-            return .blue
+            return Color.accentColor
         case 0.4..<0.6:
-            return .blue
+            return Color.accentColor
         default:
             return .gray
         }

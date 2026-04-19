@@ -45,7 +45,7 @@ struct AsyncAvatarView: View {
     let photoData: Data?
     let size: CGFloat
     let fallbackInitial: String
-    var accentColor: Color = .blue
+    var accentColor: Color = .accentColor
 
     @State private var thumbnail: UIImage?
 
