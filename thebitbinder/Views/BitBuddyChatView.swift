@@ -663,19 +663,19 @@ struct BitBuddyAvatar: View {
 
     var body: some View {
         ZStack {
-            // Background circle — red in roast mode, blue otherwise
-            Circle()
-                .fill(roastMode ? Color.red : Color.blue)
-
-            // Same friendly face in both modes
-            Image(systemName: "face.smiling.inverse")
+            // Use the full-color BitBuddy icon (blue rounded-rect with white glyph)
+            Image("BitBuddyIcon")
                 .resizable()
-                .scaledToFit()
-                .foregroundColor(.white)
-                .padding(size * 0.18)
+                .scaledToFill()
+                .clipShape(Circle())
 
-            // Devil horns only in roast mode, sitting on top of the head
+            // Tint overlay for roast mode — red wash over the blue icon
             if roastMode {
+                Circle()
+                    .fill(Color.red.opacity(0.7))
+                    .blendMode(.sourceAtop)
+
+                // Devil horns in roast mode
                 HStack(spacing: size * 0.22) {
                     DevilHorn(size: size * 0.22)
                     DevilHorn(size: size * 0.22)
@@ -684,6 +684,7 @@ struct BitBuddyAvatar: View {
             }
         }
         .frame(width: size, height: size)
+        .compositingGroup()
     }
 }
 
