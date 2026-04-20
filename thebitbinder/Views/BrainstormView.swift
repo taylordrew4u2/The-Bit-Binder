@@ -26,6 +26,13 @@ struct BrainstormView: View {
     // Batch select/delete mode
     @State private var isSelectMode = false
     @State private var selectedIdeaIDs: Set<UUID> = []
+
+    // Destructive-action confirmations — tapping Delete on a thought (or on
+    // the batch-delete button) stages the action here and presents a
+    // confirmation alert before anything is actually removed. Prevents
+    // accidental data loss from a fat-fingered context-menu tap.
+    @State private var ideaToDelete: BrainstormIdea?
+    @State private var showingBatchDeleteConfirmation = false
     
     // Programmatic navigation — avoids NavigationLink gesture conflicts with MagnifyGesture
     @State private var selectedIdea: BrainstormIdea?
@@ -137,6 +144,43 @@ struct BrainstormView: View {
         } message: {
             Text(persistenceError ?? "An unknown error occurred")
         }
+        // Single-idea delete confirmation. Bound to `ideaToDelete` being
+        // non-nil so we don't need a separate @State Bool.
+        .alert("Delete This Thought?", isPresented: Binding(
+            get: { ideaToDelete != nil },
+            set: { if !$0 { ideaToDelete = nil } }
+        )) {
+            Button("Cancel", role: .cancel) { ideaToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let idea = ideaToDelete {
+                    withAnimation {
+                        idea.moveToTrash()
+                    }
+                    do {
+                        try modelContext.save()
+                    } catch {
+                        print(" [BrainstormView] Failed to save after soft-delete: \(error)")
+                        persistenceError = "Could not delete thought: \(error.localizedDescription)"
+                        showingErrorAlert = true
+                    }
+                    ideaToDelete = nil
+                }
+            }
+        } message: {
+            Text("This thought will be moved to the Trash. You can restore it from there.")
+        }
+        // Batch-delete confirmation. Title adapts to count for grammar.
+        .alert(
+            "Delete \(selectedIdeaIDs.count) Thought\(selectedIdeaIDs.count == 1 ? "" : "s")?",
+            isPresented: $showingBatchDeleteConfirmation
+        ) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                batchDeleteSelectedIdeas()
+            }
+        } message: {
+            Text("These thoughts will be moved to the Trash. You can restore them from there.")
+        }
         .tint(Color.bitbinderAccent)
         .onChange(of: speechManager.isRecording) { oldValue, newValue in
             if oldValue && !newValue && isRecording {
@@ -186,16 +230,9 @@ struct BrainstormView: View {
                                 Divider()
                                 
                                 Button(role: .destructive) {
-                                    withAnimation {
-                                        idea.moveToTrash()
-                                        do {
-                                            try modelContext.save()
-                                        } catch {
-                                            print(" [BrainstormView] Failed to save after soft-delete: \(error)")
-                                            persistenceError = "Could not delete thought: \(error.localizedDescription)"
-                                            showingErrorAlert = true
-                                        }
-                                    }
+                                    // Stage for confirmation — actual
+                                    // moveToTrash happens in the alert handler.
+                                    ideaToDelete = idea
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -253,7 +290,9 @@ struct BrainstormView: View {
             Spacer()
             
             Button(role: .destructive) {
-                batchDeleteSelectedIdeas()
+                // Stage for confirmation — actual batch delete happens
+                // in the alert handler below.
+                showingBatchDeleteConfirmation = true
             } label: {
                 Label("Delete", systemImage: "trash")
                     .font(.subheadline.bold())
