@@ -10,11 +10,13 @@
 import SwiftUI
 
 extension Color {
-    /// The app's main accent color. Returns red when Roast Mode is enabled,
-    /// otherwise the system blue tint. Reads the same `@AppStorage` key as
-    /// the global tint in `thebitbinderApp`, so it stays in sync automatically.
+    /// The app's main accent color. Returns the fire-palette core
+    /// (OrangeRed) when Roast Mode is enabled, otherwise the system blue
+    /// tint so the rest of the app stays on native iOS conventions.
+    /// Reads the same `@AppStorage` key as the global tint in
+    /// `thebitbinderApp`, so it stays in sync automatically.
     static var bitbinderAccent: Color {
-        UserDefaults.standard.bool(forKey: "roastModeEnabled") ? .red : .blue
+        UserDefaults.standard.bool(forKey: "roastModeEnabled") ? FirePalette.core : .blue
     }
 }
 
@@ -25,7 +27,7 @@ struct RoastModeTint: ViewModifier {
     @AppStorage("roastModeEnabled") private var roastMode: Bool = false
 
     func body(content: Content) -> some View {
-        content.tint(roastMode ? .red : .blue)
+        content.tint(roastMode ? FirePalette.core : .blue)
     }
 }
 

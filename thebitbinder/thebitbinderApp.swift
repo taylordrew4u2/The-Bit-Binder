@@ -226,7 +226,7 @@ struct thebitbinderApp: App {
                     LaunchScreenView(statusText: startup.statusText, userName: userPreferences.userName)
                 }
             }
-            .tint(roastMode ? .red : .blue)
+            .tint(roastMode ? FirePalette.core : .blue)
             .animation(.easeOut(duration: 0.35), value: startup.isReady)
             .task {
                 // Wire the main context into the sync service so remote change
