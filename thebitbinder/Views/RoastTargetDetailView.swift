@@ -458,8 +458,7 @@ struct RoastTargetDetailView: View {
     
     private func startDragging(_ joke: RoastJoke) {
         draggingJoke = joke
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        haptic(.light)
     }
     
     private func endDragging(_ sourceJoke: RoastJoke, onto targetJoke: RoastJoke?) {
@@ -486,9 +485,7 @@ struct RoastTargetDetailView: View {
             j.displayOrder = index
         }
         
-        // Haptic feedback for successful drop
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        haptic(.success)
         
         saveContext("drag reorder")
         draggingJoke = nil
@@ -837,18 +834,16 @@ struct DraggableRoastCard: View {
                     // Left swipe - delete threshold (only haptic when crossing into delete zone)
                     if swipeOffset < deleteThreshold && !isSwipeDeleting {
                         isSwipeDeleting = true
-                        let generator = UIImpactFeedbackGenerator(style: .medium)
-                        generator.impactOccurred()
+                        haptic(.medium)
                     } else if swipeOffset > deleteThreshold && isSwipeDeleting {
                         isSwipeDeleting = false
                         // No haptic on retreat - too sensitive
                     }
-                    
+
                     // Right swipe - killer threshold
                     if swipeOffset > killerThreshold && !isSwipeKiller {
                         isSwipeKiller = true
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
+                        haptic(.light)
                     } else if swipeOffset < killerThreshold && isSwipeKiller {
                         isSwipeKiller = false
                         // No haptic on retreat - too sensitive
@@ -858,20 +853,17 @@ struct DraggableRoastCard: View {
             .onEnded { value in
                 if swipeOffset < deleteThreshold {
                     // Delete with animation
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
-                    
+                    haptic(.success)
                     withAnimation(.easeOut(duration: 0.2)) {
                         swipeOffset = -500
                     }
-                    
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 200_000_000)
                         onTrash?()
                     }
                 } else if swipeOffset > killerThreshold {
                     // Toggle killer with bounce animation
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
+                    haptic(.success)
                     
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                         swipeOffset = 0
@@ -2065,8 +2057,7 @@ struct EditRoastJokeView: View {
                         joke.isTested = false
                         joke.lastPerformedDate = nil
                     }
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
+                    haptic(.light)
                 }
             } label: {
                 VStack(spacing: 2) {
@@ -2087,8 +2078,7 @@ struct EditRoastJokeView: View {
                 joke.performanceCount += 1
                 joke.lastPerformedDate = Date()
                 joke.isTested = true
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
+                haptic(.light)
             } label: {
                 VStack(spacing: 2) {
                     HStack(spacing: 2) {
@@ -2184,8 +2174,7 @@ struct QuickToggleButton: View {
     var body: some View {
         Button {
             isOn.toggle()
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
+            haptic(.light)
         } label: {
             VStack(spacing: 2) {
                 Image(systemName: icon)

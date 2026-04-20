@@ -210,11 +210,9 @@ struct AddRoastJokeView: View {
                     content = ""
                     showSavedFeedback = true
                 }
-                // Brief haptic feedback
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                haptic(.light)
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 500_000_000)
                     showSavedFeedback = false
                 }
             } else {
