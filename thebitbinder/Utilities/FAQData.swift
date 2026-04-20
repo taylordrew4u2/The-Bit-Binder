@@ -29,7 +29,7 @@ enum FAQData {
             FAQItem("What is the Home screen for?",
                     "Home is your launchpad — see recent work, quick-capture new jokes, and jump to your set lists. Tap 'New Joke' to write or 'Quick Idea' to dictate."),
             FAQItem("How do I switch between sections?",
-                    "Tap the menu icon (three lines, top-right) to open the side menu. Choose any section. Use the back button (top-left) when it appears to return."),
+                    "Tap any tab along the bottom of the screen. Settings is always the last tab. Customize which tabs appear in Settings → Customize App."),
         ]),
         FAQSectionModel(title: "Jokes & Folders", icon: "theatermask.and.paintbrush.fill", items: [
             FAQItem("How do I create a folder for jokes?",
@@ -119,7 +119,7 @@ enum FAQData {
             FAQItem("What is BitBuddy?",
                     "BitBuddy is your on-device comedy writing sidekick. It handles analyze / improve / premise / generate commands, plus quick workflow help — all from a chat pane that rides alongside whatever you're working on."),
             FAQItem("How do I open BitBuddy?",
-                    "Tap the BitBuddy avatar or open the side menu and choose 'BitBuddy'. It slides in as a chat pane so you can ask things without leaving your current joke."),
+                    "Tap the BitBuddy avatar floating on any screen. A chat pane slides in from the right so you can ask things without leaving your current joke."),
             FAQItem("What commands can I use?",
                     "• analyze: [joke] — Get structure, strengths, and edit suggestions\n• improve: [joke] — Get 2-3 concrete edit suggestions\n• premise [topic] — Generate a premise for a topic\n• generate [topic] — Create a joke matching your style\n• style — See your writing style summary"),
             FAQItem("Does BitBuddy use the internet?",

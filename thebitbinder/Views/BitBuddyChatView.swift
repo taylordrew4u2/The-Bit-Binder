@@ -8,9 +8,11 @@
 import SwiftUI
 import SwiftData
 
-/// Full-screen chat view accessed from the side menu
+/// Chat view hosted inside BitBuddyDrawer — slides in from the right edge so
+/// you can chat alongside whatever you're working on.
 struct BitBuddyChatView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismissBitBuddyDrawer) private var dismissDrawer
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject var userPreferences: UserPreferences
     @Query(sort: \Joke.dateCreated, order: .reverse) private var jokes: [Joke]
@@ -97,6 +99,7 @@ struct BitBuddyChatView: View {
                     isInputFocused = false
                     // Brief delay lets keyboard frame animation complete
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        dismissDrawer()
                         dismiss()
                     }
                 }

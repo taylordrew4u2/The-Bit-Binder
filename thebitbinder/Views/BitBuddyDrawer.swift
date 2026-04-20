@@ -11,6 +11,22 @@
 
 import SwiftUI
 
+// MARK: - Environment action for closing the drawer
+
+/// Environment value that any view inside the drawer (e.g. BitBuddyChatView's
+/// "Done" button) can call to request the drawer close itself. Default is a
+/// no-op so previews and non-drawer call sites don't crash.
+private struct DismissBitBuddyDrawerKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var dismissBitBuddyDrawer: () -> Void {
+        get { self[DismissBitBuddyDrawerKey.self] }
+        set { self[DismissBitBuddyDrawerKey.self] = newValue }
+    }
+}
+
 // MARK: - Controller
 
 /// Shared state for the BitBuddy drawer. Inject via `.environmentObject`
@@ -105,34 +121,24 @@ struct BitBuddyDrawerOverlay: View {
     }
 
     private func drawerPanel(width: CGFloat) -> some View {
+        // BitBuddyChatView has its own "Done" button in the nav bar — wire it
+        // to close this drawer via the environment action. A thin drag-handle
+        // sits above the chat so the swipe-to-close affordance stays visible
+        // without a separate close button cluttering the top bar.
         VStack(spacing: 0) {
-            // Drag handle + close row
-            HStack {
-                Capsule()
-                    .fill(Color.secondary.opacity(0.3))
-                    .frame(width: 36, height: 5)
-                    .padding(.leading, 8)
-
-                Spacer()
-
-                Button {
-                    haptic(.light)
-                    withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.86)) {
-                        controller.close()
-                    }
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(Color.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 6)
+            Capsule()
+                .fill(Color.secondary.opacity(0.3))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
 
             NavigationStack {
                 BitBuddyChatView()
+            }
+        }
+        .environment(\.dismissBitBuddyDrawer) {
+            withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.86)) {
+                controller.close()
             }
         }
     }
