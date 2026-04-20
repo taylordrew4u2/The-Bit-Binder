@@ -993,7 +993,7 @@ struct SmartImportReviewView: View {
                 .padding(.horizontal, 16)
                 
                 Button {
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    haptic(.success)
                     Task {
                         await finishAndSave()
                     }
