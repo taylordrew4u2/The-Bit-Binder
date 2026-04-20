@@ -312,17 +312,17 @@ struct iCloudSyncSettingsView: View {
         .sheet(isPresented: $showingDetailedDiagnostics) {
             DiagnosticsDetailView()
         }
-        .onAppear {
-            Task {
-                iCloudAvailable = await syncService.checkiCloudAvailability()
-                if !iCloudAvailable {
-                    syncService.errorMessage = "Sign in to iCloud in Settings to enable sync"
-                }
-                
-                // Run initial diagnostics if not done yet
-                if diagnostics.diagnosticResults.isEmpty {
-                    await diagnostics.runComprehensiveDiagnostics()
-                }
+        .task {
+            // .task cancels automatically when the view disappears — important
+            // because checkiCloudAvailability() + runComprehensiveDiagnostics()
+            // can take several seconds and the user may navigate away.
+            iCloudAvailable = await syncService.checkiCloudAvailability()
+            if !iCloudAvailable {
+                syncService.errorMessage = "Sign in to iCloud in Settings to enable sync"
+            }
+
+            if diagnostics.diagnosticResults.isEmpty {
+                await diagnostics.runComprehensiveDiagnostics()
             }
         }
     }

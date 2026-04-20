@@ -315,6 +315,7 @@ enum AIKeyLoader {
         // 1b. User-entered key (stored in Keychain)
         if let key = KeychainHelper.load(forKey: provider.keychainKey),
            !key.isEmpty {
+            print(" [AIKeyLoader] \(provider.displayName): loaded key from Keychain")
             return key
         }
 
@@ -324,6 +325,7 @@ enum AIKeyLoader {
            let key = dict[provider.plistKey] as? String,
            !key.isEmpty,
            !key.hasPrefix("YOUR_") {
+            print(" [AIKeyLoader] \(provider.displayName): loaded key from \(provider.secretsPlistName).plist")
             return key
         }
 
@@ -334,15 +336,18 @@ enum AIKeyLoader {
            let key = dict[provider.plistKey] as? String,
            !key.isEmpty,
            !key.hasPrefix("YOUR_") {
+            print(" [AIKeyLoader] \(provider.displayName): loaded key from Secrets.plist fallback")
             return key
         }
 
         // 4. Environment variable
         if let key = ProcessInfo.processInfo.environment[provider.plistKey],
            !key.isEmpty {
+            print(" [AIKeyLoader] \(provider.displayName): loaded key from environment variable \(provider.plistKey)")
             return key
         }
 
+        print(" [AIKeyLoader] \(provider.displayName): no API key found (checked Keychain, \(provider.secretsPlistName).plist, Secrets.plist, env)")
         return nil
     }
 
