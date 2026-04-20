@@ -413,27 +413,46 @@ struct BrainstormView: View {
 
 // MARK: - Speech Recognition Manager
 
-final class SpeechRecognitionManager: ObservableObject {
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+final class SpeechRecognitionManager: NSObject, ObservableObject, SFSpeechRecognizerDelegate {
+    /// Resolved lazily via `SFSpeechRecognizer.preferred()` so the feature
+    /// keeps working when en-US models aren't installed — we fall back to
+    /// the user's current locale, then any supported locale.
+    private lazy var speechRecognizer: SFSpeechRecognizer? = {
+        let r = SFSpeechRecognizer.preferred()
+        r?.delegate = self
+        return r
+    }()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     // Lazy — only created when recording starts to avoid blocking the main thread on view init
     private var audioEngine: AVAudioEngine?
-    
+
     @Published var transcribedText = ""
     @Published var isRecording = false
     @Published var error: String?
-    
+
     /// Whether the manager should keep restarting after iOS's ~60s recognition limit
     private var shouldBeRunning = false
     /// Accumulated text from previous recognition segments (auto-restart appends here)
     private var accumulatedText = ""
     /// Guard against overlapping restart attempts
     private var isRestarting = false
+    /// Counts consecutive auto-restarts that produced no new text. Reset
+    /// when real speech arrives. Capped by
+    /// `SpeechReliability.maxConsecutiveEmptyRestarts`.
+    private var consecutiveEmptyRestarts = 0
+    /// Snapshot of `transcribedText` when the current segment started.
+    private var segmentStartText = ""
+
     /// Observer for audio session interruptions
     private var interruptionObserver: NSObjectProtocol?
-    
-    init() {
+    /// Observer for audio route changes (headphones, Bluetooth).
+    private var routeChangeObserver: NSObjectProtocol?
+    /// Observer for media-services-reset (audio stack crash).
+    private var mediaResetObserver: NSObjectProtocol?
+
+    override init() {
+        super.init()
         // Handle audio session interruptions so recognition can resume automatically
         interruptionObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification,
@@ -444,7 +463,7 @@ final class SpeechRecognitionManager: ObservableObject {
             guard let info = notification.userInfo,
                   let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
                   let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
-            
+
             switch type {
             case .began:
                 self.accumulatedText = self.transcribedText
@@ -460,16 +479,76 @@ final class SpeechRecognitionManager: ObservableObject {
                 break
             }
         }
+
+        // Route changes (headphones unplug / Bluetooth drop / speaker swap)
+        // invalidate the current audio tap — the only clean recovery is a
+        // fresh engine. Tear down and restart on the same `shouldBeRunning`
+        // contract as the interruption path.
+        routeChangeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self, self.shouldBeRunning else { return }
+            guard let info = notification.userInfo,
+                  let reasonValue = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
+            switch reason {
+            case .oldDeviceUnavailable, .newDeviceAvailable, .override, .routeConfigurationChange:
+                self.accumulatedText = self.transcribedText
+                self.isRestarting = false
+                self.tearDownAudioPipeline(deactivateSession: false)
+                DispatchQueue.main.asyncAfter(deadline: .now() + SpeechReliability.restartDelay) { [weak self] in
+                    self?.startRecognitionSession()
+                }
+            default:
+                break
+            }
+        }
+
+        // Media-services-reset — the whole audio stack was rebuilt. Tear
+        // down completely and re-activate the session.
+        mediaResetObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.mediaServicesWereResetNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self, self.shouldBeRunning else { return }
+            self.accumulatedText = self.transcribedText
+            self.isRestarting = false
+            self.tearDownAudioPipeline(deactivateSession: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + SpeechReliability.restartDelay) { [weak self] in
+                self?.startRecognitionSession()
+            }
+        }
+    }
+
+    // MARK: - SFSpeechRecognizerDelegate
+
+    /// If the recognizer goes unavailable mid-session (network dropped on
+    /// a server-backed locale, for example), stop cleanly and surface a
+    /// friendly message instead of silently producing no text.
+    func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
+        guard !available, shouldBeRunning else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.error = "Speech recognition is temporarily unavailable. Tap Start Recording to try again."
+            self.shouldBeRunning = false
+            self.isRestarting = false
+            self.tearDownAudioPipeline(deactivateSession: true)
+            self.isRecording = false
+        }
     }
     
     func startRecording() {
         error = nil
         shouldBeRunning = true
         isRestarting = false
+        consecutiveEmptyRestarts = 0
         // Don't reset transcribedText — preserve any existing text
         accumulatedText = transcribedText.isEmpty ? "" : transcribedText
         if accumulatedText.isEmpty { transcribedText = "" }
-        
+
         startRecognitionSession()
     }
     
@@ -486,6 +565,13 @@ final class SpeechRecognitionManager: ObservableObject {
             return
         }
         
+        // Attempt to re-resolve a recognizer once if our cached one is nil —
+        // models may have been downloaded since the last access.
+        if speechRecognizer == nil {
+            let resolved = SFSpeechRecognizer.preferred()
+            resolved?.delegate = self
+            speechRecognizer = resolved
+        }
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
             isRestarting = false
             DispatchQueue.main.async { [weak self] in
@@ -494,6 +580,9 @@ final class SpeechRecognitionManager: ObservableObject {
             }
             return
         }
+
+        // Snapshot text for empty-segment detection.
+        segmentStartText = transcribedText
         
         let audioSession = AVAudioSession.sharedInstance()
         do {
@@ -599,31 +688,22 @@ final class SpeechRecognitionManager: ObservableObject {
 
             if let error = error {
                 let nsError = error as NSError
-                // Code 216 = user cancelled, code 1110 = no speech detected (timeout)
-                let isTimeout = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110
-                let isCancelled = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216
 
-                if isCancelled {
+                if SpeechErrorCode.isCancelled(nsError) {
                     return
                 }
 
-                if isTimeout || isFinal {
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self = self else { return }
-                        self.accumulatedText = self.transcribedText
-                        self.isRestarting = false
-                        if self.shouldBeRunning {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                                self?.startRecognitionSession()
-                            }
-                        }
-                    }
+                if SpeechErrorCode.isNoSpeechTimeout(nsError) || isFinal {
+                    self.scheduleAutoRestart()
                     return
                 }
 
-                // Real error — show it
+                // Real error — surface a friendly message and stop.
+                #if DEBUG
+                print(" [SpeechRecognitionManager] Recognition error: \(nsError.domain) code \(nsError.code) — \(error.localizedDescription)")
+                #endif
                 DispatchQueue.main.async { [weak self] in
-                    self?.error = error.localizedDescription
+                    self?.error = SpeechErrorMapper.userMessage(for: error)
                     self?.isRecording = false
                     self?.isRestarting = false
                 }
@@ -632,22 +712,57 @@ final class SpeechRecognitionManager: ObservableObject {
 
             // If result is final (recognizer decided speech ended), auto-restart
             if isFinal {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    self.accumulatedText = self.transcribedText
-                    self.isRestarting = false
-                    if self.shouldBeRunning {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                            self?.startRecognitionSession()
-                        }
-                    }
-                }
+                self.scheduleAutoRestart()
+            }
+        }
+    }
+
+    /// Shared auto-restart path — enforces the empty-restart cap from
+    /// `SpeechReliability` so a broken mic can't loop forever. Called
+    /// whenever a segment ends cleanly (isFinal) or hits the "no speech"
+    /// timeout.
+    private func scheduleAutoRestart() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            let trimmedNow = self.transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedStart = self.segmentStartText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedNow == trimmedStart {
+                self.consecutiveEmptyRestarts += 1
+            } else {
+                self.consecutiveEmptyRestarts = 0
+            }
+
+            self.accumulatedText = self.transcribedText
+            self.isRestarting = false
+
+            guard self.shouldBeRunning else {
+                self.isRecording = false
+                return
+            }
+
+            if self.consecutiveEmptyRestarts >= SpeechReliability.maxConsecutiveEmptyRestarts {
+                #if DEBUG
+                print(" [SpeechRecognitionManager] Hit empty-restart cap — stopping")
+                #endif
+                self.shouldBeRunning = false
+                self.tearDownAudioPipeline(deactivateSession: true)
+                self.isRecording = false
+                self.error = "Paused — we didn't hear anything. Tap the mic when you're ready."
+                return
+            }
+
+            let extra = Double(self.consecutiveEmptyRestarts) * SpeechReliability.restartBackoffStep
+            let delay = SpeechReliability.restartDelay + extra
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.startRecognitionSession()
             }
         }
     }
     
     func stopRecording() {
         shouldBeRunning = false
+        consecutiveEmptyRestarts = 0
         tearDownAudioPipeline(deactivateSession: true)
         accumulatedText = ""
         DispatchQueue.main.async { [weak self] in
@@ -681,6 +796,12 @@ final class SpeechRecognitionManager: ObservableObject {
     
     deinit {
         if let observer = interruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = routeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = mediaResetObserver {
             NotificationCenter.default.removeObserver(observer)
         }
         shouldBeRunning = false

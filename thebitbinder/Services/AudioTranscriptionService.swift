@@ -56,15 +56,22 @@ class AudioTranscriptionService {
     /// Supported audio file extensions
     static let supportedExtensions: Set<String> = ["m4a", "wav", "mp3", "aac", "caf", "aiff", "aif"]
     
-    private let speechRecognizer: SFSpeechRecognizer?
-    
+    private var speechRecognizer: SFSpeechRecognizer?
+
     private init() {
-        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        // Locale fallback: en-US → current locale → any supported locale.
+        // See SpeechRecognitionHelpers.swift. This means imported audio still
+        // transcribes even when en-US models aren't downloaded.
+        speechRecognizer = SFSpeechRecognizer.preferred()
     }
-    
-    /// Check if speech recognition is available
+
+    /// Check if speech recognition is available. Re-resolves the recognizer
+    /// on each call so newly-downloaded models get picked up without needing
+    /// to relaunch the app.
     var isAvailable: Bool {
-        speechRecognizer?.isAvailable ?? false
+        if speechRecognizer?.isAvailable == true { return true }
+        speechRecognizer = SFSpeechRecognizer.preferred()
+        return speechRecognizer?.isAvailable ?? false
     }
     
     /// Request speech recognition authorization
@@ -103,7 +110,12 @@ class AudioTranscriptionService {
             }
         }
         
-        // Check if recognizer is available
+        // Check if recognizer is available. Re-resolve once via locale
+        // fallback if our cached recognizer is nil or temporarily unavailable
+        // — models may have downloaded since init.
+        if speechRecognizer == nil || speechRecognizer?.isAvailable == false {
+            speechRecognizer = SFSpeechRecognizer.preferred()
+        }
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
             throw AudioTranscriptionError.transcriptionFailed("Speech recognizer is not available")
         }
@@ -143,7 +155,8 @@ class AudioTranscriptionService {
             var lastResult: SFSpeechRecognitionResult?
             var task: SFSpeechRecognitionTask?
             
-            // 60-second hard timeout – SFSpeechRecognizer can hang on some files
+            // Hard timeout – SFSpeechRecognizer can hang on some files.
+            // Pulled from SpeechReliability so we can tune in one place.
             let timeoutWork = DispatchWorkItem {
                 guard_lock.lock()
                 defer { guard_lock.unlock() }
@@ -156,7 +169,7 @@ class AudioTranscriptionService {
                     continuation.resume(throwing: AudioTranscriptionError.transcriptionFailed("Transcription timed out"))
                 }
             }
-            DispatchQueue.global().asyncAfter(deadline: .now() + 60, execute: timeoutWork)
+            DispatchQueue.global().asyncAfter(deadline: .now() + SpeechReliability.fileTranscriptionTimeout, execute: timeoutWork)
             
             task = recognizer.recognitionTask(with: request) { result, error in
                 guard_lock.lock()

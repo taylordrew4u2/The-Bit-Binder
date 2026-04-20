@@ -440,12 +440,28 @@ struct TalkToTextView: View {
 // MARK: - Speech Recognizer
 //
 // Simplified, reliable speech recognition based on Apple's canonical
-// SFSpeechRecognizer sample. Uses a single long-lived AVAudioEngine and
-// avoids layered defensive logic that can interfere with recognition.
-// NOT @MainActor-isolated — audio tap callback fires on real-time audio
-// thread and recognition result handler is called from an internal queue.
-// All UI-facing @Published updates are explicitly dispatched to main.
-final class SpeechRecognizer: NSObject, ObservableObject {
+// SFSpeechRecognizer sample. Uses a fresh AVAudioEngine per recognition
+// window (AVAudioEngine doesn't always restart cleanly after stop()) and
+// keeps the AVAudioSession active across auto-restart cycles so the
+// microphone stays "warm" between the ~60s SFSpeechRecognizer windows.
+//
+// Reliability hardening (see SpeechRecognitionHelpers.swift):
+//   • Locale fallback via `SFSpeechRecognizer.preferred()` — if en-US
+//     models aren't installed, try current-locale, then any supported one.
+//   • Conforms to SFSpeechRecognizerDelegate so we react when the
+//     recognizer's availability toggles mid-session (network loss, etc.).
+//   • Observes AVAudioSession.routeChange + mediaServicesWereReset so we
+//     can tear down cleanly when the audio route changes (headphones
+//     unplug, Bluetooth drop) or the media server crashes.
+//   • Caps consecutive empty auto-restarts so a broken session can't
+//     infinitely loop and burn battery.
+//   • User-facing errors go through SpeechErrorMapper so we never show
+//     developer-speak like "kAFAssistantErrorDomain error 1700".
+//
+// NOT @MainActor-isolated — the audio tap callback fires on the real-time
+// audio thread and recognition result handler is called from an internal
+// queue. All UI-facing @Published updates are explicitly dispatched to main.
+final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDelegate {
     @Published var transcribedText = ""
     @Published var error: String?
     @Published var isTranscribing = false
@@ -455,7 +471,14 @@ final class SpeechRecognizer: NSObject, ObservableObject {
     private var audioEngine: AVAudioEngine?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    /// Resolved via locale fallback so the feature still works when en-US
+    /// models aren't downloaded. Lazy because `SFSpeechRecognizer.preferred()`
+    /// touches `isAvailable` which may block briefly on first access.
+    private lazy var speechRecognizer: SFSpeechRecognizer? = {
+        let r = SFSpeechRecognizer.preferred()
+        r?.delegate = self
+        return r
+    }()
 
     /// Text already finalised from previous recognition segments. Used when the
     /// recognizer auto-restarts (~60s limit) so the user doesn't lose text.
@@ -464,8 +487,21 @@ final class SpeechRecognizer: NSObject, ObservableObject {
     private var shouldBeRunning = false
     /// Prevents overlapping startRecognitionSession calls.
     private var isStarting = false
+    /// Counts consecutive auto-restarts that produced no new text. Reset
+    /// when the user actually speaks. Capped by
+    /// `SpeechReliability.maxConsecutiveEmptyRestarts`.
+    private var consecutiveEmptyRestarts = 0
+    /// Snapshot of `transcribedText` at the start of the current recognition
+    /// segment. Used to decide whether the segment produced real text or was
+    /// silent — for the empty-restart counter.
+    private var segmentStartText = ""
+
     /// Observer token for audio session interruptions.
     private var interruptionObserver: NSObjectProtocol?
+    /// Observer token for audio route changes (headphones, Bluetooth).
+    private var routeChangeObserver: NSObjectProtocol?
+    /// Observer token for media-services-reset (audio stack crash).
+    private var mediaResetObserver: NSObjectProtocol?
 
     override init() {
         super.init()
@@ -476,16 +512,93 @@ final class SpeechRecognizer: NSObject, ObservableObject {
         ) { [weak self] notification in
             self?.handleInterruption(notification)
         }
+        routeChangeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleRouteChange(notification)
+        }
+        mediaResetObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.mediaServicesWereResetNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleMediaServicesReset()
+        }
     }
 
     deinit {
         if let observer = interruptionObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = routeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = mediaResetObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         shouldBeRunning = false
         recognitionTask?.cancel()
         audioEngine?.stop()
         audioEngine = nil
+    }
+
+    // MARK: - SFSpeechRecognizerDelegate
+
+    /// Called by the speech framework when `isAvailable` changes — e.g. the
+    /// recognizer loses its network path. If we're mid-session and it
+    /// becomes unavailable, surface a friendly message and stop cleanly so
+    /// the user knows recording isn't working.
+    func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
+        guard !available, shouldBeRunning else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.error = "Speech recognition is temporarily unavailable. Tap Start Recording to try again."
+            self.shouldBeRunning = false
+            self.isStarting = false
+            self.tearDown(deactivateSession: true)
+            self.isTranscribing = false
+        }
+    }
+
+    // MARK: - Route Change / Media Reset
+
+    /// Handle headphone unplug / Bluetooth drop / speaker switch. On an
+    /// `.oldDeviceUnavailable` change the previous input node's format
+    /// silently stops producing buffers, so the only safe recovery is to
+    /// tear down and restart.
+    private func handleRouteChange(_ notification: Notification) {
+        guard shouldBeRunning,
+              let info = notification.userInfo,
+              let reasonValue = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
+
+        switch reason {
+        case .oldDeviceUnavailable, .newDeviceAvailable, .override, .routeConfigurationChange:
+            // Capture what we have, then restart on a fresh engine.
+            accumulatedText = transcribedText
+            isStarting = false
+            tearDown(deactivateSession: false)
+            DispatchQueue.main.asyncAfter(deadline: .now() + SpeechReliability.restartDelay) { [weak self] in
+                self?.startRecognitionSession()
+            }
+        default:
+            break
+        }
+    }
+
+    /// Handle rare but real media-services-reset. Everything audio-related
+    /// is invalidated — we have to tear down fully and reactivate the
+    /// session from scratch.
+    private func handleMediaServicesReset() {
+        guard shouldBeRunning else { return }
+        accumulatedText = transcribedText
+        isStarting = false
+        tearDown(deactivateSession: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + SpeechReliability.restartDelay) { [weak self] in
+            self?.startRecognitionSession()
+        }
     }
 
     // MARK: - Interruption Handling
@@ -522,6 +635,7 @@ final class SpeechRecognizer: NSObject, ObservableObject {
             guard let self else { return }
             self.error = nil
             self.shouldBeRunning = true
+            self.consecutiveEmptyRestarts = 0
             self.accumulatedText = self.transcribedText
             self.startRecognitionSession()
         }
@@ -531,6 +645,7 @@ final class SpeechRecognizer: NSObject, ObservableObject {
     func stopTranscribing() {
         shouldBeRunning = false
         isStarting = false
+        consecutiveEmptyRestarts = 0
         tearDown(deactivateSession: true)
         accumulatedText = ""
         DispatchQueue.main.async { [weak self] in
@@ -542,6 +657,7 @@ final class SpeechRecognizer: NSObject, ObservableObject {
     func resetForNewSession() {
         shouldBeRunning = false
         isStarting = false
+        consecutiveEmptyRestarts = 0
         tearDown(deactivateSession: true)
         accumulatedText = ""
         DispatchQueue.main.async { [weak self] in
@@ -564,7 +680,14 @@ final class SpeechRecognizer: NSObject, ObservableObject {
             return
         }
 
-        // 2. Confirm the recognizer is available.
+        // 2. Confirm the recognizer is available. Attempt a locale-fallback
+        //    re-resolve once if our cached recognizer is nil — models may
+        //    have been downloaded since we first asked.
+        if speechRecognizer == nil {
+            let resolved = SFSpeechRecognizer.preferred()
+            resolved?.delegate = self
+            speechRecognizer = resolved
+        }
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
             DispatchQueue.main.async { [weak self] in
                 self?.error = "Speech recognition is not available right now. Please try again in a moment."
@@ -580,9 +703,12 @@ final class SpeechRecognizer: NSObject, ObservableObject {
             try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
+            #if DEBUG
             print(" [SpeechRecognizer] Audio session setup failed: \(error)")
-            // Retry once after a brief async delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            #endif
+            // Retry once after a brief async delay — another app may have
+            // briefly held the audio category (e.g. a phone-app pre-roll).
+            DispatchQueue.main.asyncAfter(deadline: .now() + SpeechReliability.audioSessionRetryDelay) { [weak self] in
                 guard let self, self.shouldBeRunning else { return }
                 do {
                     try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
@@ -602,6 +728,10 @@ final class SpeechRecognizer: NSObject, ObservableObject {
 
     /// Completes starting a recognition session after the audio session is confirmed active.
     private func continueStartingSession(speechRecognizer: SFSpeechRecognizer) {
+        // Snapshot the text we're starting with so we can tell later whether
+        // this segment actually captured any new speech.
+        segmentStartText = transcribedText
+
         // 4. Create the recognition request.
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -672,30 +802,22 @@ final class SpeechRecognizer: NSObject, ObservableObject {
 
             if let error = error {
                 let nsError = error as NSError
-                let isCancelled = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216
-                let isTimeout   = nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 1110
 
-                if isCancelled {
+                if SpeechErrorCode.isCancelled(nsError) {
                     self.isStarting = false
                     return
                 }
 
-                if isTimeout || isFinal {
-                    DispatchQueue.main.async {
-                        self.accumulatedText = self.transcribedText
-                        self.isStarting = false
-                        if self.shouldBeRunning {
-                            self.startRecognitionSession()
-                        } else {
-                            self.isTranscribing = false
-                        }
-                    }
+                if SpeechErrorCode.isNoSpeechTimeout(nsError) || isFinal {
+                    self.scheduleAutoRestart()
                     return
                 }
 
+                #if DEBUG
                 print(" [SpeechRecognizer] Recognition error: \(nsError.domain) code \(nsError.code) — \(error.localizedDescription)")
+                #endif
                 DispatchQueue.main.async {
-                    self.error = "Recognition paused. Tap Start Recording to continue."
+                    self.error = SpeechErrorMapper.userMessage(for: error)
                     self.isTranscribing = false
                     self.isStarting = false
                 }
@@ -703,17 +825,60 @@ final class SpeechRecognizer: NSObject, ObservableObject {
             }
 
             if isFinal {
-                DispatchQueue.main.async {
-                    self.accumulatedText = self.transcribedText
-                    self.isStarting = false
-                    if self.shouldBeRunning {
-                        self.startRecognitionSession()
-                    }
-                }
+                self.scheduleAutoRestart()
             }
         }
 
         isStarting = false
+    }
+
+    /// Common auto-restart path used by both the timeout/no-speech error and
+    /// the `isFinal` success. Enforces the consecutive-empty-restart cap
+    /// from `SpeechReliability` so a broken mic can't loop forever.
+    private func scheduleAutoRestart() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+
+            // Did this segment actually produce new text? If not, bump the
+            // empty-restart counter. Speech resetting the counter means we
+            // only stop when genuinely stuck.
+            let trimmedNow = self.transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedStart = self.segmentStartText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedNow == trimmedStart {
+                self.consecutiveEmptyRestarts += 1
+            } else {
+                self.consecutiveEmptyRestarts = 0
+            }
+
+            self.accumulatedText = self.transcribedText
+            self.isStarting = false
+
+            guard self.shouldBeRunning else {
+                self.isTranscribing = false
+                return
+            }
+
+            // Safety valve: too many silent cycles in a row means something
+            // is wrong (mic stuck, user walked away). Stop cleanly.
+            if self.consecutiveEmptyRestarts >= SpeechReliability.maxConsecutiveEmptyRestarts {
+                #if DEBUG
+                print(" [SpeechRecognizer] Hit empty-restart cap (\(self.consecutiveEmptyRestarts)) — stopping")
+                #endif
+                self.shouldBeRunning = false
+                self.tearDown(deactivateSession: true)
+                self.isTranscribing = false
+                self.error = "Paused — we didn't hear anything. Tap Start Recording when you're ready."
+                return
+            }
+
+            // Schedule the next restart with a small backoff that grows with
+            // each empty cycle so we don't thrash the audio stack.
+            let extra = Double(self.consecutiveEmptyRestarts) * SpeechReliability.restartBackoffStep
+            let delay = SpeechReliability.restartDelay + extra
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.startRecognitionSession()
+            }
+        }
     }
 
     /// Stop the audio engine, remove the tap, and cancel any in-flight request.
