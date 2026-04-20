@@ -10,6 +10,26 @@ import SwiftUI
 import UIKit
 import Combine
 
+// MARK: - UX Delay Constants
+
+/// Named timing constants for UI work that must be deferred a few beats
+/// (e.g. wait for a sheet dismissal animation before pushing the next view).
+/// Prefer animation/transaction modifiers where possible, but when a
+/// DispatchQueue.main.asyncAfter is genuinely needed, pull the delay from
+/// here so the timing vocabulary stays consistent across the app.
+enum UXDelay {
+    /// ~2 frames at 60fps — "next runloop-ish", for layout-settle tasks.
+    static let hairline: TimeInterval = 0.08
+    /// Short — after a menu dismiss, haptic-to-action chain, etc.
+    static let short: TimeInterval = 0.1
+    /// Medium — matches a default SwiftUI `.easeInOut` duration.
+    static let medium: TimeInterval = 0.3
+    /// Long — enough for a modal sheet dismiss animation to finish.
+    static let sheetDismiss: TimeInterval = 0.5
+    /// Toast dwell — how long a confirmation toast stays visible.
+    static let toastDwell: TimeInterval = 1.0
+}
+
 // MARK: - Haptic Engine
 
 /// Centralized haptic feedback - feel every action

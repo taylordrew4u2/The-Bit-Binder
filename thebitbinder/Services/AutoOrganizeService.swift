@@ -174,7 +174,10 @@ class AutoOrganizeService {
             "max_tokens": 1024
         ]
 
-        var request = URLRequest(url: URL(string: endpoint)!)
+        guard let endpointURL = URL(string: endpoint) else {
+            throw AIProviderError.apiError(provider, "Invalid endpoint URL: \(endpoint)")
+        }
+        var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)

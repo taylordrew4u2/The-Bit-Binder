@@ -11,7 +11,18 @@ import Foundation
 /// Centralized memory management for the app
 final class MemoryManager {
     static let shared = MemoryManager()
-    
+
+    // MARK: - Tunables
+
+    /// Resident size (MB) above which we treat memory as "under pressure"
+    /// and trigger preemptive cleanups before expensive operations.
+    /// Chosen empirically for ~3x headroom vs. a 600MB jetsam on older devices.
+    private static let memoryPressureThresholdMB: Double = 200
+
+    /// Memory capacity URLCache is restored to after a pressure-triggered flush.
+    /// Deliberately small — we prefer cold disk fetches over holding memory for images.
+    private static let postFlushURLCacheBytes: Int = 2 * 1024 * 1024
+
     /// Track if we're currently clearing caches to avoid duplicate work
     private var isClearing = false
     private let clearingLock = NSLock()
@@ -90,7 +101,7 @@ final class MemoryManager {
             URLCache.shared.removeAllCachedResponses()
             URLCache.shared.memoryCapacity = 0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                URLCache.shared.memoryCapacity = 2 * 1024 * 1024 // 2 MB (reduced from 4)
+                URLCache.shared.memoryCapacity = MemoryManager.postFlushURLCacheBytes
             }
             
             // 2. Clear BitBuddy conversation history — can be substantial after
@@ -172,8 +183,7 @@ final class MemoryManager {
         
         if kerr == KERN_SUCCESS {
             let usedMB = Double(info.resident_size) / 1024.0 / 1024.0
-            // Consider memory pressure high if using more than 200MB
-            return usedMB > 200
+            return usedMB > MemoryManager.memoryPressureThresholdMB
         }
         return false
     }

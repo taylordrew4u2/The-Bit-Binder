@@ -89,15 +89,22 @@ final class iCloudSyncService: NSObject, ObservableObject {
     }
     
     @objc nonisolated private func handleRemoteChange(_ notification: Notification) {
+        // Capture weak self once at the top of the outer Task; reuse that
+        // binding inside the debounce Task rather than re-capturing weak
+        // self a second time. This avoids a brief window where the outer
+        // `guard let self` succeeds but the inner re-weakified self could
+        // become nil mid-chain, which was confusing to reason about.
         Task { @MainActor [weak self] in
             guard let self else { return }
-            // Cancel any pending debounce and schedule a new one.
-            // Using Task.sleep keeps the debounce inside structured
-            // concurrency on @MainActor — avoids the unsafeForcedSync
-            // that occurred when a Timer callback captured @MainActor self.
             self.debouncedSyncTask?.cancel()
             self.debouncedSyncTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second debounce
+                // Use try/catch instead of try? so cancellation is a clean
+                // early-return rather than a swallowed error.
+                do {
+                    try await Task.sleep(nanoseconds: 1_000_000_000) // 1s debounce
+                } catch {
+                    return // cancelled — expected path, no work to do
+                }
                 guard !Task.isCancelled else { return }
                 await self?.processRemoteChangeAsync()
             }

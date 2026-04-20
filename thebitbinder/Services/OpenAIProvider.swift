@@ -98,7 +98,10 @@ final class OpenAIProvider: AIJokeExtractionProvider {
             "response_format": responseFormatSchema
         ]
 
-        var request = URLRequest(url: URL(string: baseURL)!)
+        guard let endpointURL = URL(string: baseURL) else {
+            throw AIProviderError.apiError(.openAI, "Invalid OpenAI endpoint URL: \(baseURL)")
+        }
+        var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")

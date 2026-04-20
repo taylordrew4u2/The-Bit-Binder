@@ -413,7 +413,7 @@ struct BrainstormView: View {
 
 // MARK: - Speech Recognition Manager
 
-class SpeechRecognitionManager: ObservableObject {
+final class SpeechRecognitionManager: ObservableObject {
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?

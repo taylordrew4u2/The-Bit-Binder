@@ -39,8 +39,14 @@ final class BackgroundDownloadScheduler: ObservableObject {
     @Published private(set) var pendingDownloads: [String] = []
     
     // MARK: - Init
-    
+
     private init() {
+        // Eagerly resolve the shared UserDefaults on init (on the main actor)
+        // so later accesses do not race to initialize `lazy var sharedDefaults`
+        // from concurrent contexts and we avoid CFPrefs "container lookup"
+        // warnings that can fire when the suite is created from a background
+        // queue mid-launch.
+        _ = sharedDefaults
         refresh()
     }
     

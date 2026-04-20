@@ -51,11 +51,18 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
 
     /// Where users can get a free API key
     var keySignupURL: URL {
+        let raw: String
         switch self {
-        case .openAI:      return URL(string: "https://platform.openai.com/api-keys")!
-        case .arceeAI:     return URL(string: "https://openrouter.ai/keys")!
-        case .openRouter:  return URL(string: "https://openrouter.ai/keys")!
+        case .openAI:      raw = "https://platform.openai.com/api-keys"
+        case .arceeAI:     raw = "https://openrouter.ai/keys"
+        case .openRouter:  raw = "https://openrouter.ai/keys"
         }
+        // These are compile-time constants; guard lets us fail safe instead of crash.
+        guard let url = URL(string: raw) else {
+            assertionFailure("keySignupURL has an invalid hardcoded URL: \(raw)")
+            return URL(string: "https://openrouter.ai/keys") ?? URL(fileURLWithPath: "/")
+        }
+        return url
     }
 
     /// SF Symbol for the provider

@@ -73,7 +73,10 @@ final class OpenRouterProvider: AIJokeExtractionProvider {
             "max_tokens": 16384
         ]
 
-        var request = URLRequest(url: URL(string: baseURL)!)
+        guard let endpointURL = URL(string: baseURL) else {
+            throw AIProviderError.apiError(.openRouter, "Invalid OpenRouter endpoint URL: \(baseURL)")
+        }
+        var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
