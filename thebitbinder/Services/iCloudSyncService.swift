@@ -416,21 +416,27 @@ final class iCloudSyncService: NSObject, ObservableObject {
     
     func fetchThoughtsFromCloud() async -> String? {
         guard isSyncEnabled else { return nil }
-        
+
+        // Mirror syncThoughts: fetch the single stable "UserThoughts" record
+        // directly rather than running a sort-by-timestamp query. This avoids
+        // surfacing any lingering duplicate records from before the upsert
+        // fix, and is a round-trip cheaper than CKQuery.
         do {
             let database = container.privateCloudDatabase
-            let query = CKQuery(recordType: "Thoughts", predicate: NSPredicate(value: true))
-            query.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
-            
-            let results = try await database.records(matching: query, resultsLimit: 1)
-            if let latestRecord = try results.matchResults.first?.1.get() {
-                return latestRecord["content"] as? String
-            }
+            let zoneID = CKRecordZone.ID(
+                zoneName: "com.apple.coredata.cloudkit.zone",
+                ownerName: CKCurrentUserDefaultName
+            )
+            let recordID = CKRecord.ID(recordName: "UserThoughts", zoneID: zoneID)
+            let record = try await database.record(for: recordID)
+            return record["content"] as? String
+        } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
+            // No thoughts record yet — normal for a fresh install.
+            return nil
         } catch {
             print(" Failed to fetch thoughts: \(error)")
+            return nil
         }
-        
-        return nil
     }
     
     // MARK: - Manual Sync Trigger
