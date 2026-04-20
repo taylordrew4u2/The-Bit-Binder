@@ -32,7 +32,7 @@ struct BitBuddyChatView: View {
     
     
     private var accentColor: Color {
-        roastMode ? .orange : .accentColor
+        roastMode ? FirePalette.core : .accentColor
     }
 
     @ViewBuilder
@@ -331,7 +331,7 @@ struct BitBuddyChatView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(
-                            roastMode ? Color.orange.opacity(0.25) : Color.accentColor.opacity(0.15),
+                            roastMode ? FirePalette.core.opacity(0.22) : Color.accentColor.opacity(0.15),
                             lineWidth: 1
                         )
                 )
@@ -363,7 +363,7 @@ struct BitBuddyChatView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(roastMode ? Color.orange.opacity(0.3) : Color.clear, lineWidth: 1)
+                        .strokeBorder(roastMode ? FirePalette.core.opacity(0.3) : Color.clear, lineWidth: 1)
                 )
                 
                 // Send button
@@ -556,7 +556,7 @@ struct ChatBubble: View {
                 .padding(12)
                 .background(
                     message.isUser
-                    ? (roastMode ? Color.orange : Color.accentColor)
+                    ? (roastMode ? FirePalette.core : Color.accentColor)
                     : Color(UIColor.secondarySystemBackground)
                 )
                 .foregroundColor(
@@ -669,10 +669,10 @@ struct BitBuddyAvatar: View {
                 .scaledToFill()
                 .clipShape(Circle())
 
-            // Tint overlay for roast mode — red wash over the blue icon
+            // Tint overlay for roast mode — matches FirePalette.core used elsewhere
             if roastMode {
                 Circle()
-                    .fill(Color.red.opacity(0.7))
+                    .fill(FirePalette.core.opacity(0.7))
                     .blendMode(.sourceAtop)
 
                 // Devil horns in roast mode
@@ -699,7 +699,7 @@ private struct DevilHorn: View {
             path.addLine(to: CGPoint(x: size, y: size))           // bottom-right
             path.closeSubpath()
         }
-        .fill(Color.red)
+        .fill(FirePalette.core)
         .frame(width: size, height: size)
     }
 }

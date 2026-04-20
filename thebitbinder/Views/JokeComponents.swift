@@ -350,7 +350,7 @@ struct ImportProgressCard: View {
                 }
                 
                 ProgressView(value: Double(importFileIndex), total: Double(max(1, importFileCount)))
-                    .tint(roastMode ? .orange : .accentColor)
+                    .tint(roastMode ? FirePalette.core : .accentColor)
                 
                 Text(importStatusMessage)
                     .font(.subheadline)

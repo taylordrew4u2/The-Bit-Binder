@@ -20,12 +20,9 @@ struct JokeDetailView: View {
     @State private var showingFolderPicker = false
     @State private var showingDeleteAlert = false
     @State private var showingMetadata = false
-    @State private var showingNotes = true
+    @State private var showingNotes = false
     @State private var folders: [JokeFolder] = []
-    
-    // BitBuddy floating chat
-    @State private var showBitBuddyChat = false
-    
+
     // Auto-save state
     @StateObject private var autoSave = AutoSaveManager.shared
     @State private var saveError: String?
@@ -42,10 +39,9 @@ struct JokeDetailView: View {
     }
     
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                
+
                 // MARK: - Title Area (always editable)
                 TextField("Give it a name…", text: $joke.title, axis: .vertical)
                     .font(.title2.weight(.semibold))
@@ -53,86 +49,21 @@ struct JokeDetailView: View {
                     .focused($focusedField, equals: .title)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
-                
-                // MARK: - Badges & Word Count
-                HStack(spacing: 8) {
-                    if joke.isHit {
-                        HStack(spacing: 4) {
-                            Image(systemName: roastMode ? "flame.fill" : "star.fill")
-                                .font(.caption2)
-                            Text(roastMode ? "Fire" : "Hit")
-                                .font(.caption2.weight(.medium))
-                        }
-                        .foregroundColor(roastMode ? .orange : .yellow)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background((roastMode ? Color.orange : Color.yellow).opacity(0.12), in: Capsule())
-                    }
-                    
-                    if joke.isOpenMic {
-                        HStack(spacing: 4) {
-                            Image(systemName: "mic.fill")
-                                .font(.caption2)
-                            Text("Open Mic")
-                                .font(.caption2.weight(.medium))
-                        }
-                        .foregroundColor(.purple)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.purple.opacity(0.12), in: Capsule())
-                    }
-                    
-                    Spacer()
-                    
-                    if !joke.content.isEmpty {
-                        Text("\(joke.content.split(separator: " ").count) words")
-                            .font(.caption)
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 6)
-                
+
+                // MARK: - Tappable status pills + word count
+                //
+                // Hit / Fire and Open Mic used to live both here as read-only
+                // badges AND as toggle rows further down the page — one pill
+                // per state is enough. Tap to toggle.
+                statusPillsRow
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+
                 Divider()
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
-                
+
                 // MARK: - Content Area (always editable, the main canvas)
-                
-                // Formatting toolbar
-                HStack(spacing: 12) {
-                    Button {
-                        insertBold()
-                        haptic(.light)
-                    } label: {
-                        Text("B")
-                            .font(.system(size: 16, weight: .bold, design: .default))
-                            .frame(width: 32, height: 32)
-                            .background(Color(UIColor.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button {
-                        insertBullet()
-                        haptic(.light)
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "list.bullet")
-                                .font(.system(size: 14))
-                            Text("Beat")
-                                .font(.caption.weight(.medium))
-                        }
-                        .padding(.horizontal, 10)
-                        .frame(height: 32)
-                        .background(Color(UIColor.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 6)
-                
                 ZStack(alignment: .topLeading) {
                     if joke.content.isEmpty {
                         Text("Start writing your joke…")
@@ -142,7 +73,7 @@ struct JokeDetailView: View {
                             .padding(.top, 12)
                             .allowsHitTesting(false)
                     }
-                    
+
                     TextEditor(text: $joke.content)
                         .font(.body)
                         .lineSpacing(6)
@@ -157,27 +88,27 @@ struct JokeDetailView: View {
                         .fill(Color(UIColor.secondarySystemBackground))
                 )
                 .padding(.horizontal, 20)
-                .padding(.top, 4)
-                
+                .padding(.top, 8)
+
                 // MARK: - Tags (inline editing)
                 tagsSection
                     .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                
-                // MARK: - Notes & Ideas (scratchpad)
+                    .padding(.top, 12)
+
+                // MARK: - Notes & Ideas (scratchpad — collapsed by default)
                 notesSection
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
-                
+
                 Divider()
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
-                
-                // MARK: - Actions (low-key, below the fold)
-                actionsSection
+
+                // MARK: - Folders
+                foldersRow
                     .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                
+                    .padding(.top, 8)
+
                 // MARK: - Metadata (collapsible)
                 metadataSection
                     .padding(.horizontal, 20)
@@ -187,26 +118,9 @@ struct JokeDetailView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Color(UIColor.systemBackground))
-        
-            // Floating BitBuddy button — bottom-right corner
-            Button {
-                haptic(.light)
-                showBitBuddyChat = true
-            } label: {
-                BitBuddyAvatar(roastMode: roastMode, size: 44, symbolSize: 18)
-                    .background(
-                        Circle()
-                            .fill(Color(UIColor.systemBackground))
-                            .frame(width: 50, height: 50)
-                            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
-                    )
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 24)
-        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
-        .tint(roastMode ? .orange : .accentColor)
+        .tint(roastMode ? FirePalette.core : .accentColor)
         .alert(joke.isTrashed ? "Restore Joke" : "Move to Trash", isPresented: $showingDeleteAlert) {
             deleteAlertButtons
         } message: {
@@ -227,11 +141,6 @@ struct JokeDetailView: View {
                 ),
                 allFolders: folders
             )
-        }
-        .sheet(isPresented: $showBitBuddyChat) {
-            NavigationStack {
-                BitBuddyChatView()
-            }
         }
         .onChange(of: showingFolderPicker) { _, isOpen in
             if isOpen {
@@ -436,11 +345,17 @@ struct JokeDetailView: View {
         }
     }
     
-    // MARK: - Actions
-    
-    private var actionsSection: some View {
-        VStack(spacing: 0) {
-            Button {
+    // MARK: - Status pills (tappable toggles + word count)
+
+    private var statusPillsRow: some View {
+        HStack(spacing: 8) {
+            statusPill(
+                isOn: joke.isHit,
+                onSymbol: roastMode ? "flame.fill" : "star.fill",
+                offSymbol: roastMode ? "flame" : "star",
+                label: roastMode ? "Fire" : "Hit",
+                tint: roastMode ? FirePalette.core : .yellow
+            ) {
                 withAnimation {
                     joke.isHit.toggle()
                     joke.dateModified = Date()
@@ -450,21 +365,15 @@ struct JokeDetailView: View {
                     saveError = "Couldn't save hit status: \(error.localizedDescription)"
                     showingSaveError = true
                 }
-            } label: {
-                HStack {
-                    Label(
-                        joke.isHit ? "Remove from Hits" : "Add to Hits",
-                        systemImage: roastMode ? (joke.isHit ? "flame.fill" : "flame") : (joke.isHit ? "star.fill" : "star")
-                    )
-                    .foregroundColor(joke.isHit ? (roastMode ? .orange : .yellow) : .accentColor)
-                    Spacer()
-                }
-                .padding(.vertical, 11)
             }
-            
-            Divider()
-            
-            Button {
+
+            statusPill(
+                isOn: joke.isOpenMic,
+                onSymbol: "mic.fill",
+                offSymbol: "mic",
+                label: "Open Mic",
+                tint: .purple
+            ) {
                 withAnimation {
                     joke.isOpenMic.toggle()
                     joke.dateModified = Date()
@@ -474,44 +383,70 @@ struct JokeDetailView: View {
                     saveError = "Couldn't save open mic status: \(error.localizedDescription)"
                     showingSaveError = true
                 }
-            } label: {
-                HStack {
-                    Label(
-                        joke.isOpenMic ? "Remove from Open Mic" : "Label for Open Mic",
-                        systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill"
-                    )
-                    .foregroundColor(joke.isOpenMic ? .purple : .accentColor)
-                    Spacer()
-                }
-                .padding(.vertical, 11)
             }
-            
-            Divider()
-            
-            Button {
-                HapticEngine.shared.tap()
-                showingFolderPicker = true
-            } label: {
-                HStack {
-                    Label("Folders", systemImage: "folder")
-                    Spacer()
-                    let folderCount = (joke.folders ?? []).count
-                    if folderCount == 0 {
-                        Text("None")
-                            .foregroundColor(.secondary)
-                    } else if folderCount == 1 {
-                        Text((joke.folders ?? []).first?.name ?? "")
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("\(folderCount)")
-                            .foregroundColor(.secondary)
-                    }
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
-                }
-                .padding(.vertical, 11)
+
+            Spacer()
+
+            if !joke.content.isEmpty {
+                Text("\(joke.content.split(separator: " ").count) words")
+                    .font(.caption)
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
             }
+        }
+    }
+
+    private func statusPill(
+        isOn: Bool,
+        onSymbol: String,
+        offSymbol: String,
+        label: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: isOn ? onSymbol : offSymbol)
+                    .font(.caption2)
+                Text(label)
+                    .font(.caption2.weight(.medium))
+            }
+            .foregroundColor(isOn ? tint : .secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill((isOn ? tint : Color(UIColor.tertiaryLabel)).opacity(isOn ? 0.14 : 0.10))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Folders row
+
+    private var foldersRow: some View {
+        Button {
+            HapticEngine.shared.tap()
+            showingFolderPicker = true
+        } label: {
+            HStack {
+                Label("Folders", systemImage: "folder")
+                Spacer()
+                let folderCount = (joke.folders ?? []).count
+                if folderCount == 0 {
+                    Text("None")
+                        .foregroundColor(.secondary)
+                } else if folderCount == 1 {
+                    Text((joke.folders ?? []).first?.name ?? "")
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("\(folderCount)")
+                        .foregroundColor(.secondary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
+            }
+            .padding(.vertical, 11)
         }
     }
     
@@ -615,7 +550,35 @@ struct JokeDetailView: View {
         }
         
         ToolbarItem(placement: .keyboard) {
-            HStack {
+            HStack(spacing: 14) {
+                // Bold + Beat formatting shortcuts — only the content editor
+                // benefits from these, so we keep them on the keyboard bar
+                // instead of a persistent row on the page.
+                if focusedField == .content {
+                    Button {
+                        insertBold()
+                        haptic(.light)
+                    } label: {
+                        Text("B")
+                            .font(.system(size: 16, weight: .bold))
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        insertBullet()
+                        haptic(.light)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 13))
+                            Text("Beat")
+                                .font(.caption.weight(.medium))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 // Jump between fields
                 Button {
                     switch focusedField {
@@ -640,9 +603,9 @@ struct JokeDetailView: View {
                     Image(systemName: "arrow.right.arrow.left")
                         .font(.subheadline)
                 }
-                
+
                 Spacer()
-                
+
                 Button("Done") {
                     focusedField = nil
                 }
@@ -700,7 +663,7 @@ struct FolderPickerView: View {
                         Spacer()
                         if selectedFolder == nil {
                             Image(systemName: "checkmark")
-                                .foregroundColor(roastMode ? .orange : .accentColor)
+                                .foregroundColor(roastMode ? FirePalette.core : .accentColor)
                         }
                     }
                 }
@@ -715,7 +678,7 @@ struct FolderPickerView: View {
                             Spacer()
                             if selectedFolder?.id == folder.id {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(roastMode ? .orange : .accentColor)
+                                    .foregroundColor(roastMode ? FirePalette.core : .accentColor)
                             }
                         }
                     }
@@ -796,7 +759,7 @@ struct MultiFolderPickerView: View {
                                 Label(folder.name, systemImage: "folder")
                                 Spacer()
                                 Image(systemName: "plus.circle")
-                                    .foregroundColor(roastMode ? .orange : .accentColor)
+                                    .foregroundColor(roastMode ? FirePalette.core : .accentColor)
                             }
                         }
                     }

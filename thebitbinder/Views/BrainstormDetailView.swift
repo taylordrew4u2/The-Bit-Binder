@@ -32,9 +32,6 @@ struct BrainstormDetailView: View {
     // Promoted toast
     @State private var showPromotedToast = false
     @State private var showColorPicker = false
-    
-    // BitBuddy floating chat
-    @State private var showBitBuddyChat = false
 
     @FocusState private var focusedField: Field?
 
@@ -51,7 +48,6 @@ struct BrainstormDetailView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 // MARK: - Header (title + badges)
@@ -86,23 +82,6 @@ struct BrainstormDetailView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Color(UIColor.systemBackground))
-        
-            // Floating BitBuddy button — bottom-right corner
-            Button {
-                haptic(.light)
-                showBitBuddyChat = true
-            } label: {
-                BitBuddyAvatar(roastMode: roastMode, size: 44, symbolSize: 18)
-                    .background(
-                        Circle()
-                            .fill(Color(UIColor.systemBackground))
-                            .frame(width: 50, height: 50)
-                            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
-                    )
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 24)
-        }
         .navigationBarTitleDisplayMode(.inline)
         .bitBinderToolbar(roastMode: roastMode)
         .toolbar { toolbarContent }
@@ -126,11 +105,6 @@ struct BrainstormDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(saveError ?? "Your changes might not be saved. Try editing again.")
-        }
-        .sheet(isPresented: $showBitBuddyChat) {
-            NavigationStack {
-                BitBuddyChatView()
-            }
         }
         .confirmationDialog("Add to Folder", isPresented: $showPromoteOptions, titleVisibility: .visible) {
             ForEach(folders) { folder in

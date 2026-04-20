@@ -131,10 +131,13 @@ struct MainTabView: View {
     @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore: Bool = false
     @AppStorage("hasCompletedSetup") private var hasCompletedSetup: Bool = false
     @AppStorage("setupSelectedTabs") private var setupSelectedTabs: String = ""
-    @State private var showAIChat = false
     @State private var showGagGrabber = false
     @State private var showSetup = false
     @AppStorage("roastModeEnabled") private var roastMode = false
+
+    // BitBuddy side drawer — replaces the old .sheet so users can chat
+    // alongside whatever they're working on.
+    @StateObject private var bitBuddyDrawer = BitBuddyDrawerController()
 
     // Draggable BitBuddy position (persisted)
     @AppStorage("bitBuddyX") private var bitBuddyX: Double = -1
@@ -235,11 +238,6 @@ struct MainTabView: View {
                 }
             }
         }
-        .sheet(isPresented: $showAIChat) {
-            NavigationStack {
-                BitBuddyChatView()
-            }
-        }
         .sheet(isPresented: $showGagGrabber) {
             HybridGagGrabberSheet()
         }
@@ -254,6 +252,7 @@ struct MainTabView: View {
                 BitBuddyAvatar(roastMode: roastMode, size: bubbleSize, symbolSize: 22)
                     .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
                     .scaleEffect(isDragging ? 1.15 : 1.0)
+                    .opacity(bitBuddyDrawer.isOpen ? 0 : 1)
                     .contentShape(Circle().inset(by: -10)) // bigger tap/drag target
                     .position(
                         x: min(max(bubbleSize / 2, posX + dragOffset.width), geo.size.width - bubbleSize / 2),
@@ -278,15 +277,19 @@ struct MainTabView: View {
                         TapGesture()
                             .onEnded {
                                 if !isDragging {
-                                    showAIChat = true
+                                    haptic(.light)
+                                    bitBuddyDrawer.open()
                                 }
                             }
                     )
+                    .animation(.easeInOut(duration: 0.2), value: bitBuddyDrawer.isOpen)
                     .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
                     .animation(.easeInOut(duration: 0.15), value: isDragging)
+                    .allowsHitTesting(!bitBuddyDrawer.isOpen)
             }
             .ignoresSafeArea()
         }
+        .bitBuddyDrawer(controller: bitBuddyDrawer, roastMode: roastMode)
     }
     
     @ViewBuilder
