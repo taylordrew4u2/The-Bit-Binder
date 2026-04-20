@@ -117,13 +117,13 @@ enum FAQData {
         ]),
         FAQSectionModel(title: "BitBuddy", icon: "bubble.left.and.bubble.right.fill", items: [
             FAQItem("What is BitBuddy?",
-                    "BitBuddy is your on-device comedy writing assistant. It can use a local Phi-3 model for chat plus app-aware routing for practical joke writing and workflow help."),
+                    "BitBuddy is your on-device comedy writing sidekick. It handles analyze / improve / premise / generate commands, plus quick workflow help — all from a chat pane that rides alongside whatever you're working on."),
             FAQItem("How do I open BitBuddy?",
-                    "Open the side menu and tap 'BitBuddy' at the bottom. It opens a chat interface where you can ask for help."),
+                    "Tap the BitBuddy avatar or open the side menu and choose 'BitBuddy'. It slides in as a chat pane so you can ask things without leaving your current joke."),
             FAQItem("What commands can I use?",
                     "• analyze: [joke] — Get structure, strengths, and edit suggestions\n• improve: [joke] — Get 2-3 concrete edit suggestions\n• premise [topic] — Generate a premise for a topic\n• generate [topic] — Create a joke matching your style\n• style — See your writing style summary"),
             FAQItem("Does BitBuddy use the internet?",
-                    "BitBuddy chat runs on-device. Model files may need to be downloaded once, but your joke content stays on your device unless you explicitly export or share it."),
+                    "BitBuddy runs entirely on your device. Your joke content stays on your phone unless you explicitly export or share it."),
         ]),
         FAQSectionModel(title: "Importing Jokes", icon: "square.and.arrow.down.fill", items: [
             FAQItem("What file types can I import?",

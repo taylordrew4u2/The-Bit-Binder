@@ -2,107 +2,145 @@
 //  AISettingsView.swift
 //  thebitbinder
 //
-//  Manage API keys for GagGrabber AI extraction providers.
-//  Keys are stored in Keychain — never persisted to disk or iCloud.
+//  Manages the Snack Vouchers GagGrabber uses to fuel its joke-extraction Gremlins.
+//  User-facing copy intentionally contains no technical / provider names — the
+//  underlying keys live in Keychain and nothing is sent to BitBinder servers.
 //
 
 import SwiftUI
 
 struct AISettingsView: View {
-    // OpenRouter key (covers both OpenRouter and Arcee AI providers)
-    @State private var openRouterKey = ""
-    @State private var openRouterConfigured = false
-    @State private var showOpenRouterKey = false
+    // House-blend voucher (free tier — keeps the Gremlins fed with no card on file)
+    @State private var houseBlendKey = ""
+    @State private var houseBlendConfigured = false
+    @State private var showHouseBlendKey = false
 
-    // OpenAI key (optional)
-    @State private var openAIKey = ""
-    @State private var openAIConfigured = false
-    @State private var showOpenAIKey = false
+    // Premium voucher (optional — faster / pickier Gremlins)
+    @State private var premiumKey = ""
+    @State private var premiumConfigured = false
+    @State private var showPremiumKey = false
 
     @State private var savedProvider: AIProviderType? = nil
+    @State private var showTutorial = false
 
     var body: some View {
         List {
-            // MARK: - OpenRouter (powers GagGrabber)
+            // MARK: - Tutorial banner
             Section {
-                statusRow(configured: openRouterConfigured, providerName: "OpenRouter")
+                Button {
+                    showTutorial = true
+                } label: {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.bitbinderAccent.opacity(0.15))
+                                .frame(width: 44, height: 44)
+                            Image(systemName: "sparkles")
+                                .font(.title3)
+                                .foregroundColor(Color.bitbinderAccent)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Feed the Gremlins — 60 sec tour")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.primary)
+                            Text("Not sure what any of this means? Start here.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+            }
 
-                if openRouterConfigured {
+            // MARK: - House Blend (free)
+            Section {
+                statusRow(configured: houseBlendConfigured)
+
+                if houseBlendConfigured {
                     Button(role: .destructive) {
                         AIKeyLoader.clearKey(for: .openRouter)
                         AIKeyLoader.clearKey(for: .arceeAI)
-                        openRouterConfigured = false
-                        openRouterKey = ""
+                        houseBlendConfigured = false
+                        houseBlendKey = ""
                     } label: {
-                        Label("Remove Key", systemImage: "trash")
+                        Label("Return Voucher", systemImage: "trash")
                             .foregroundColor(.red)
                     }
                 } else {
                     keyField(
-                        value: $openRouterKey,
-                        show: $showOpenRouterKey,
-                        placeholder: "sk-or-v1-…",
+                        value: $houseBlendKey,
+                        show: $showHouseBlendKey,
+                        placeholder: "Paste your House Blend voucher",
                         onSave: {
-                            let trimmed = openRouterKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let trimmed = houseBlendKey.trimmingCharacters(in: .whitespacesAndNewlines)
                             guard !trimmed.isEmpty else { return }
                             AIKeyLoader.saveKey(trimmed, for: .openRouter)
                             AIKeyLoader.saveKey(trimmed, for: .arceeAI)
-                            openRouterConfigured = true
-                            openRouterKey = ""
-                            showOpenRouterKey = false
+                            houseBlendConfigured = true
+                            houseBlendKey = ""
+                            showHouseBlendKey = false
                             savedProvider = .openRouter
                         }
                     )
                 }
 
                 Link(destination: AIProviderType.openRouter.keySignupURL) {
-                    Label("Get a free key at openrouter.ai", systemImage: "key.radiowaves.forward")
+                    Label("Grab a free House Blend voucher", systemImage: "leaf.fill")
                         .font(.subheadline)
                 }
             } header: {
-                Text("GagGrabber AI (OpenRouter)")
+                Text("House Blend (Free)")
             } footer: {
-                Text("Powers joke extraction from text, PDFs, and photos. Free models available — no credit card required.")
+                Text("Keeps GagGrabber's Gremlins fed for text, PDFs, and photos — no card required.")
             }
 
-            // MARK: - OpenAI (optional)
+            // MARK: - Premium Snack Voucher (optional)
             Section {
-                statusRow(configured: openAIConfigured, providerName: "OpenAI")
+                statusRow(configured: premiumConfigured)
 
-                if openAIConfigured {
+                if premiumConfigured {
                     Button(role: .destructive) {
                         AIKeyLoader.clearKey(for: .openAI)
-                        openAIConfigured = false
-                        openAIKey = ""
+                        premiumConfigured = false
+                        premiumKey = ""
                     } label: {
-                        Label("Remove Key", systemImage: "trash")
+                        Label("Return Voucher", systemImage: "trash")
                             .foregroundColor(.red)
                     }
                 } else {
                     keyField(
-                        value: $openAIKey,
-                        show: $showOpenAIKey,
-                        placeholder: "sk-…",
+                        value: $premiumKey,
+                        show: $showPremiumKey,
+                        placeholder: "Paste your Premium Snack voucher",
                         onSave: {
-                            let trimmed = openAIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let trimmed = premiumKey.trimmingCharacters(in: .whitespacesAndNewlines)
                             guard !trimmed.isEmpty else { return }
                             AIKeyLoader.saveKey(trimmed, for: .openAI)
-                            openAIConfigured = true
-                            openAIKey = ""
-                            showOpenAIKey = false
+                            premiumConfigured = true
+                            premiumKey = ""
+                            showPremiumKey = false
                             savedProvider = .openAI
                         }
                     )
                 }
 
-                Link(destination: AIProviderType.openAI.keySignupURL) {
-                    Label("Get a key at platform.openai.com", systemImage: "key.radiowaves.forward")
+                Button {
+                    showTutorial = true
+                } label: {
+                    Label("Show me how (60 sec tour)", systemImage: "questionmark.bubble.fill")
                         .font(.subheadline)
+                        .foregroundColor(Color.bitbinderAccent)
                 }
+                .buttonStyle(.plain)
             } header: {
-                Text("OpenAI (Optional)")
+                Text("Premium Snack Voucher (Optional)")
             } footer: {
-                Text("Enables GPT-4 extraction for higher accuracy. OpenRouter covers most use cases without this.")
+                Text("Feed the Gremlins premium snacks for sharper, pickier joke extraction. Costs pennies per use.")
             }
 
             // MARK: - Security note
@@ -112,9 +150,9 @@ struct AISettingsView: View {
                         .foregroundColor(Color.bitbinderAccent)
                         .font(.title3)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Stored Securely in Keychain")
+                        Text("Locked in Your Keychain")
                             .font(.subheadline.weight(.semibold))
-                        Text("Keys are never sent to BitBinder servers, stored in iCloud, or included in backups.")
+                        Text("Vouchers never touch BitBinder servers, never ride along to iCloud, and never show up in backups.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -122,7 +160,7 @@ struct AISettingsView: View {
                 .padding(.vertical, 4)
             }
         }
-        .navigationTitle("AI Settings")
+        .navigationTitle("GagGrabber Fuel")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { refreshStatus() }
         .overlay(alignment: .bottom) {
@@ -137,21 +175,25 @@ struct AISettingsView: View {
                 savedProvider = nil
             }
         }
+        .sheet(isPresented: $showTutorial) {
+            GagGrabberFuelTutorialView()
+                .onDisappear { refreshStatus() }
+        }
     }
 
     // MARK: - Subviews
 
-    private func statusRow(configured: Bool, providerName: String) -> some View {
+    private func statusRow(configured: Bool) -> some View {
         HStack {
             Text("Status")
                 .foregroundStyle(.secondary)
             Spacer()
             if configured {
-                Label("Configured", systemImage: "checkmark.circle.fill")
+                Label("Gremlins fed", systemImage: "checkmark.circle.fill")
                     .foregroundColor(.green)
                     .font(.subheadline)
             } else {
-                Label("Not configured", systemImage: "xmark.circle")
+                Label("Hungry", systemImage: "circle.dotted")
                     .foregroundColor(.secondary)
                     .font(.subheadline)
             }
@@ -186,7 +228,7 @@ struct AISettingsView: View {
                 .buttonStyle(.plain)
             }
 
-            Button("Save Key") {
+            Button("Feed 'Em") {
                 onSave()
                 haptic(.success)
             }
@@ -201,7 +243,7 @@ struct AISettingsView: View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(Color.bitbinderAccent)
-            Text("Key saved to Keychain")
+            Text("Gremlins are stuffed")
                 .font(.subheadline.weight(.medium))
         }
         .padding(.horizontal, 20)
@@ -219,8 +261,8 @@ struct AISettingsView: View {
     // MARK: - Helpers
 
     private func refreshStatus() {
-        openRouterConfigured = AIKeyLoader.loadKey(for: .openRouter) != nil
-        openAIConfigured     = AIKeyLoader.loadKey(for: .openAI) != nil
+        houseBlendConfigured = AIKeyLoader.loadKey(for: .openRouter) != nil
+        premiumConfigured    = AIKeyLoader.loadKey(for: .openAI) != nil
     }
 }
 

@@ -775,7 +775,7 @@ struct TourStep {
                 "Record yourself practicing material",
                 "Brainstorm premises in a freeform space",
                 "Back up your paper notebooks in the Photo Notebook",
-                "Chat with BitBuddy, your AI comedy partner"
+                "Chat with BitBuddy, your on-device comedy sidekick"
             ],
             howTo: [
                 "Swipe left or tap Next to move through the tour",
@@ -783,7 +783,7 @@ struct TourStep {
                 "When you're done, tap Get Started to begin writing"
             ],
             preview: .confetti,
-            proTip: "Tap the floating BitBuddy bubble on any screen to open the AI chat."
+            proTip: "Tap the BitBuddy avatar to slide open the chat pane from any screen."
         ),
         TourStep(
             title: "Home",
@@ -886,26 +886,26 @@ struct TourStep {
         ),
         TourStep(
             title: "Recordings",
-            subtitle: "Capture sets as audio, then let AI turn them into searchable jokes.",
+            subtitle: "Capture sets as audio, then let GagGrabber turn them into searchable jokes.",
             icon: "waveform",
             color: .red,
             features: [
                 "One-tap audio recording from any screen",
                 "Auto-transcription runs on-device",
-                "AI pulls individual jokes out of transcribed audio",
+                "GagGrabber pulls individual jokes out of transcribed audio",
                 "Tag recordings by venue and date",
                 "Clip, trim, and share highlight audio"
             ],
             howTo: [
                 "Open the Recordings tab, tap the red record button",
                 "Do your set — tap Stop when you're done",
-                "Run AI Extract to pull jokes directly from the transcript"
+                "Run GagGrabber Extract to pull jokes directly from the transcript"
             ],
             preview: .waveform,
-            proTip: "Record your open mic sets and use AI extraction to pull jokes from the transcript."
+            proTip: "Record your open mic sets and let GagGrabber pull the jokes out of the transcript."
         ),
         TourStep(
-            title: "BitBuddy — Your AI Partner",
+            title: "BitBuddy — Your Comedy Sidekick",
             subtitle: "A comedy collaborator that actually knows your app.",
             icon: "sparkles",
             color: Color.accentColor,
@@ -917,7 +917,7 @@ struct TourStep {
                 "Adapts tone to match your voice over time"
             ],
             howTo: [
-                "Tap the floating BitBuddy bubble on any screen",
+                "Tap the BitBuddy avatar to slide open the chat pane",
                 "Type naturally — \"analyze this joke\" or \"write a set opener\"",
                 "Tap any suggested joke to save it to your library"
             ],
@@ -1029,20 +1029,20 @@ struct TourStep {
             features: [
                 "Record a full roast set with one tap",
                 "Auto-transcription pulls every line out",
-                "AI extracts individual burns into the Roasts tab",
+                "GagGrabber extracts individual burns into the Roasts tab",
                 "Tag by opponent and event"
             ],
             howTo: [
                 "Open the Recordings tab, tap record",
                 "Do the set — the waveform shows you're live",
-                "Stop, then run AI Extract to turn it into searchable burns"
+                "Stop, then run GagGrabber Extract to turn it into searchable burns"
             ],
             preview: .waveform,
             proTip: "Listen back for audience silence — that's where the next rewrite lives."
         ),
         TourStep(
             title: "BitBuddy — Roast Partner",
-            subtitle: "Your AI is in roast mode too, tuned for sharper, meaner, funnier.",
+            subtitle: "BitBuddy's in roast mode too, tuned for sharper, meaner, funnier.",
             icon: "flame.fill",
             color: FirePalette.core,
             features: [
@@ -1052,7 +1052,7 @@ struct TourStep {
                 "Auto-tunes tone: light ribbing vs. take-no-prisoners"
             ],
             howTo: [
-                "Tap the floating BitBuddy bubble",
+                "Tap the BitBuddy avatar to slide open the chat pane",
                 "Say \"Give me roast lines for a finance bro\"",
                 "Tap any reply to save it as a new burn"
             ],

@@ -131,7 +131,7 @@ struct GuidedOrganizeView: View {
                         HStack {
                             Image(systemName: AutoOrganizeService.isAIAvailable ? "sparkles" : "lightbulb.fill")
                                 .foregroundColor(.accentColor)
-                            Text(AutoOrganizeService.isAIAvailable ? "AI Suggestions" : "Suggestions")
+                            Text(AutoOrganizeService.isAIAvailable ? "Smart Suggestions" : "Suggestions")
                                 .font(.headline)
                             Spacer()
                             if isLoadingSuggestions {

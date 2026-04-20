@@ -101,7 +101,7 @@ struct SettingsView: View {
                     AISettingsView()
                 } label: {
                     HStack {
-                        Label("GagGrabber AI Keys", systemImage: "key.fill")
+                        Label("GagGrabber Fuel", systemImage: "fork.knife")
                         Spacer()
                         aiKeysStatusBadge
                     }
@@ -212,7 +212,7 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundColor(.green)
         } else {
-            Text("Not set")
+            Text("Hungry")
                 .font(.caption)
                 .foregroundColor(.orange)
         }

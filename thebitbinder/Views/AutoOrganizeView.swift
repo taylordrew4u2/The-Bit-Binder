@@ -269,7 +269,7 @@ struct AutoOrganizeView: View {
                             Text("Smart Auto-Organize")
                                 .font(.headline)
                             Text(customFolders.isEmpty
-                                ? (AutoOrganizeService.isAIAvailable ? "AI-powered categorization" : "Will create folders automatically")
+                                ? (AutoOrganizeService.isAIAvailable ? "GagGrabber-powered categorization" : "Will create folders automatically")
                                 : "Using \(customFolders.count) custom folders")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.8))
