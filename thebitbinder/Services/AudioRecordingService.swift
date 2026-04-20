@@ -38,8 +38,11 @@ class AudioRecordingService: NSObject, ObservableObject {
     
     override init() {
         super.init()
-        setupAudioSession()
         setupMemoryWarningObserver()
+        // Audio session setup may retry with delays; run off the main thread.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.setupAudioSession()
+        }
     }
     
     deinit {
@@ -86,17 +89,18 @@ class AudioRecordingService: NSObject, ObservableObject {
                 )
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
                 print(" [Audio] Audio session configured + activated for recording (attempt \(attempt))")
-                audioSessionError = nil
+                DispatchQueue.main.async { [weak self] in self?.audioSessionError = nil }
                 return // success
             } catch {
                 lastError = error
                 print(" [Audio] Audio session setup attempt \(attempt)/\(maxAudioSessionRetries) failed: \(error.localizedDescription)")
                 if attempt < maxAudioSessionRetries {
+                    // Safe: this method is dispatched off the main thread by callers.
                     Thread.sleep(forTimeInterval: retryDelay)
                 }
             }
         }
-        
+
         // All retries exhausted
         let errorMsg: String
         if audioSession.isOtherAudioPlaying {
@@ -105,13 +109,15 @@ class AudioRecordingService: NSObject, ObservableObject {
             errorMsg = "Could not configure audio for recording: \(lastError?.localizedDescription ?? "unknown error"). Please restart the app."
         }
         print(" [Audio] Audio session setup failed after \(maxAudioSessionRetries) attempts: \(errorMsg)")
-        audioSessionError = errorMsg
+        DispatchQueue.main.async { [weak self] in self?.audioSessionError = errorMsg }
     }
-    
+
     /// Re-attempts audio session setup. Call from UI when user taps "Try Again".
     func retryAudioSessionSetup() {
         audioSessionError = nil
-        setupAudioSession()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.setupAudioSession()
+        }
     }
     
     func startRecording(fileName: String) -> Bool {
