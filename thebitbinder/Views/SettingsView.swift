@@ -98,16 +98,6 @@ struct SettingsView: View {
             // MARK: - Data Section
             Section {
                 NavigationLink {
-                    AISettingsView()
-                } label: {
-                    HStack {
-                        Label("GagGrabber Fuel", systemImage: "fork.knife")
-                        Spacer()
-                        aiKeysStatusBadge
-                    }
-                }
-
-                NavigationLink {
                     iCloudSyncSettingsView()
                 } label: {
                     HStack {
@@ -202,20 +192,6 @@ struct SettingsView: View {
         }
         isEditingName = false
         nameFieldFocused = false
-    }
-
-    @ViewBuilder
-    private var aiKeysStatusBadge: some View {
-        let configured = AIKeyLoader.loadKey(for: .openRouter) != nil
-        if configured {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.caption)
-                .foregroundColor(.green)
-        } else {
-            Text("Hungry")
-                .font(.caption)
-                .foregroundColor(.orange)
-        }
     }
 
     @ViewBuilder

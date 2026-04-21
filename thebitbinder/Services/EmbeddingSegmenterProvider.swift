@@ -34,9 +34,6 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
 
     let providerType: AIProviderType = .embeddingLocal
 
-    /// Pure on-device — no network, no key.
-    var requiresNetwork: Bool { false }
-
     /// Available whenever an English sentence-embedding model is present —
     /// shipped with iOS since the framework was introduced.
     func isConfigured() -> Bool {

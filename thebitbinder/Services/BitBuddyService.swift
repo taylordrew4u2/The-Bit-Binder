@@ -9,9 +9,9 @@ import Foundation
 import AVFoundation
 
 /// BitBuddy — Your on-device comedy writing assistant.
-/// 100% local and rule-based. NEVER uses AI providers.
-/// Extraction providers (OpenAI, Arcee, OpenRouter) are reserved exclusively for file-import
-/// joke extraction and are token-gated via `AIExtractionToken`.
+/// 100% local and rule-based. NEVER uses the GagGrabber extraction providers.
+/// GagGrabber's on-device extraction providers are reserved exclusively for
+/// file imports and are token-gated via `AIExtractionToken`.
 /// Powered by a 93-intent router that covers all 11 app sections.
 @MainActor
 final class BitBuddyService: NSObject, ObservableObject {

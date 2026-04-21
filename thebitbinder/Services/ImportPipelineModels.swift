@@ -186,7 +186,7 @@ struct ImportPipelineResult: Identifiable {
     let rejectedBlocks: [LayoutBlock]
     let pipelineStats: PipelineStats
     let debugInfo: PipelineDebugInfo?
-    /// Which AI provider was used (e.g., "OpenAI", "Arcee", "OpenRouter")
+    /// Which on-device provider handled the extraction (e.g. "On-Device (Apple)").
     let providerUsed: String
 }
 

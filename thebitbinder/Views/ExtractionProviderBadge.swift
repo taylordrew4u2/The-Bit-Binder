@@ -67,7 +67,6 @@ struct ExtractionProviderBadge: View {
         switch type {
         case .appleOnDevice:  return .blue
         case .embeddingLocal: return .teal
-        case .openAI, .arceeAI, .openRouter: return .purple
         }
     }
 
@@ -89,8 +88,6 @@ struct ExtractionProviderBadge: View {
             return "On-device • private • no network used"
         case .embeddingLocal:
             return "Offline segmenter • everything went to review"
-        case .openAI, .arceeAI, .openRouter:
-            return "Cloud AI • your file was sent to \(type.displayName)"
         }
     }
 }
@@ -102,11 +99,6 @@ struct ExtractionProviderBadge: View {
 
 #Preview("Embedding segmenter") {
     ExtractionProviderBadge(providerUsed: "On-Device (Offline Segmenter)")
-        .padding()
-}
-
-#Preview("Cloud") {
-    ExtractionProviderBadge(providerUsed: "OpenRouter")
         .padding()
 }
 

@@ -23,54 +23,10 @@ final class AppStartupCoordinator: ObservableObject {
     func start() async {
         guard !isReady else { return }
 
-        // Seed any API keys that weren't entered via Settings UI
-        seedAPIKeysIfNeeded()
-
         await performDataProtectionSequence()
 
         statusText = "Ready"
         isReady = true
-    }
-
-    // MARK: - API Key Seeding
-
-    /// Seeds API keys from the bundled plists into UserDefaults on first launch
-    /// (or whenever Keychain doesn't already have a key for a provider).
-    /// Keychain is always checked first by AIKeyLoader, so this is the
-    /// most reliable way to ensure keys are available without Xcode target setup.
-    private func seedAPIKeysIfNeeded() {
-        let providers: [AIProviderType] = AIProviderType.allCases
-        for provider in providers {
-            // On-device providers don't use keys at all — nothing to seed.
-            guard !provider.isOnDevice else { continue }
-
-            // Only seed if there's no user-entered key already
-            let existing = KeychainHelper.load(forKey: provider.keychainKey)
-            guard existing == nil || (existing?.isEmpty ?? true) else { continue }
-
-            // Try to read from the bundled plist
-            if let url = Bundle.main.url(forResource: provider.secretsPlistName, withExtension: "plist"),
-               let dict = NSDictionary(contentsOf: url),
-               let key = dict[provider.plistKey] as? String,
-               !key.isEmpty,
-               !key.hasPrefix("YOUR_") {
-                KeychainHelper.save(key, forKey: provider.keychainKey)
-                print(" [AppStartup] Seeded \(provider.displayName) key to Keychain from plist")
-            }
-        }
-
-        // Log provider readiness
-        print(" [AppStartup] Extraction providers loaded:")
-        for provider in AIProviderType.allCases {
-            if provider.isOnDevice {
-                // On-device readiness is reported by the manager's availability check.
-                print("   \(provider.displayName): (on-device; availability checked at runtime)")
-                continue
-            }
-            let key = AIKeyLoader.loadKey(for: provider)
-            let status = key != nil ? " ready" : "  no key"
-            print("   \(provider.displayName): \(status)")
-        }
     }
 
     private func performDataProtectionSequence() async {

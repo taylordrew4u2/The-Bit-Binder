@@ -29,9 +29,6 @@ final class AppleOnDeviceJokeExtractionProvider: AIJokeExtractionProvider {
 
     let providerType: AIProviderType = .appleOnDevice
 
-    /// On-device model needs no network, no API key, no rate-limit budget.
-    var requiresNetwork: Bool { false }
-
     // MARK: - Configuration
 
     func isConfigured() -> Bool {
@@ -64,7 +61,7 @@ final class AppleOnDeviceJokeExtractionProvider: AIJokeExtractionProvider {
         // Older OS or Foundation Models framework not present — this provider
         // shouldn't have been selected in the first place, but surface a
         // clear error so the manager can skip to the next provider.
-        throw AIProviderError.keyNotConfigured(.appleOnDevice)
+        throw AIProviderError.notAvailable(.appleOnDevice)
     }
 
     // MARK: - FoundationModels implementation (iOS 26+)
@@ -96,8 +93,8 @@ final class AppleOnDeviceJokeExtractionProvider: AIJokeExtractionProvider {
             return response.content.map { $0.asAIExtractedJoke() }
         } catch {
             // Wrap in the shared provider-error type so the manager can
-            // treat it uniformly with cloud failures.
-            throw AIProviderError.apiError(.appleOnDevice, error.localizedDescription)
+            // treat it uniformly with other provider failures.
+            throw AIProviderError.runFailed(.appleOnDevice, error.localizedDescription)
         }
     }
 
