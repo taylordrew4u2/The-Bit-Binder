@@ -288,6 +288,8 @@ struct JokesView: View {
                 action: { showingAddRoastTarget = true },
                 roastMode: true
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(FirePalette.ambient.ignoresSafeArea())
         } else {
             if roastViewMode == .grid {
                 ScrollView {
@@ -308,6 +310,7 @@ struct JokesView: View {
                     }
                     .animation(.easeOut(duration: 0.2), value: effectiveRoastScale)
                 }
+                .background(FirePalette.ambient.ignoresSafeArea())
                 .simultaneousGesture(roastPinchGesture)
             } else {
                 List {
@@ -326,6 +329,8 @@ struct JokesView: View {
                     }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(FirePalette.ambient.ignoresSafeArea())
             }
         }
     }
@@ -1674,6 +1679,10 @@ struct RoastTargetGridCard: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+
+            HeatMeter(value: min(1.0, Double(safeJokeCount) / 10.0), segments: 5, segmentHeight: 6, glowWhenHot: false)
+                .frame(maxWidth: max(60, 80 * scale))
+                .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, max(6, 10 * scale))
@@ -1714,6 +1723,10 @@ struct RoastTargetListRow: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
+                HeatMeter(value: min(1.0, Double(safeJokeCount) / 10.0), segments: 5, segmentHeight: 6, glowWhenHot: false)
+                    .frame(width: 60)
+                    .padding(.top, 2)
             }
             
             Spacer()

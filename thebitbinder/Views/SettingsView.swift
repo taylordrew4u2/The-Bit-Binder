@@ -87,10 +87,31 @@ struct SettingsView: View {
             
             // MARK: - Mode Section
             Section {
-                Toggle(isOn: $roastMode) {
-                    Label("Roast Mode", systemImage: roastMode ? "flame.fill" : "flame")
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle(isOn: $roastMode) {
+                        HStack(spacing: 8) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(roastMode ? AnyShapeStyle(FirePalette.flame) : AnyShapeStyle(Color.accentColor.opacity(0.15)))
+                                    .frame(width: 32, height: 32)
+                                Image(systemName: "flame.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(roastMode ? .white : .accentColor)
+                            }
+                            Text("Roast Mode")
+                                .font(.body.weight(.medium))
+                        }
+                    }
+                    .tint(FirePalette.core)
+
+                    if roastMode {
+                        Text("Organize material by roast target. Ember palette active.")
+                            .font(.caption)
+                            .foregroundColor(FirePalette.ember)
+                    }
                 }
-                .tint(Color.bitbinderAccent)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 2)
             } footer: {
                 Text("Organize material by roast target instead of folder.")
             }
