@@ -2,12 +2,12 @@
   "images" : [
     {
       "idiom" : "universal",
-      "filename" : "BotAvatar.pdf",
+      "filename" : "BotAvatar.png",
       "scale" : "1x"
     }
   ],
   "properties" : {
-    "preserves-vector-representation" : true,
+    "preserves-vector-representation" : false,
     "template-rendering-intent" : "template"
   },
   "info" : {
