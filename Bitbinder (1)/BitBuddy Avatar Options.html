@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>BitBuddy — avatar & icon options</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html, body { margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; color: #1a1a1a; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+// ─── Design canvas primitives (inlined from starter) ──────────
+const DC = {
+  bg: '#f0eee9',
+  grid: 'rgba(0,0,0,0.06)',
+  label: 'rgba(60,50,40,0.7)',
+  title: 'rgba(40,30,20,0.85)',
+  subtitle: 'rgba(60,50,40,0.6)',
+  postitBg: '#fef4a8',
+  postitText: '#5a4a2a',
+};
+
+function DesignCanvas({ children }) {
+  const vpRef = React.useRef(null);
+  const worldRef = React.useRef(null);
+  const tf = React.useRef({ x: 0, y: 0, scale: 1 });
+  const apply = React.useCallback(() => {
+    const { x, y, scale } = tf.current;
+    const el = worldRef.current;
+    if (el) el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+  }, []);
+  React.useEffect(() => {
+    const vp = vpRef.current; if (!vp) return;
+    const zoomAt = (cx, cy, factor) => {
+      const r = vp.getBoundingClientRect();
+      const px = cx - r.left, py = cy - r.top;
+      const t = tf.current;
+      const next = Math.min(8, Math.max(0.1, t.scale * factor));
+      const k = next / t.scale;
+      t.x = px - (px - t.x) * k; t.y = py - (py - t.y) * k; t.scale = next;
+      apply();
+    };
+    const onWheel = (e) => {
+      e.preventDefault();
+      if (e.ctrlKey) zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
+      else { tf.current.x -= e.deltaX; tf.current.y -= e.deltaY; apply(); }
+    };
+    let drag = null;
+    const onDown = (e) => {
+      const onBg = e.target === vp || e.target === worldRef.current;
+      if (!(e.button === 1 || (e.button === 0 && onBg))) return;
+      e.preventDefault();
+      vp.setPointerCapture(e.pointerId);
+      drag = { id: e.pointerId, lx: e.clientX, ly: e.clientY };
+    };
+    const onMove = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      tf.current.x += e.clientX - drag.lx;
+      tf.current.y += e.clientY - drag.ly;
+      drag.lx = e.clientX; drag.ly = e.clientY;
+      apply();
+    };
+    const onUp = (e) => { if (!drag) return; vp.releasePointerCapture(e.pointerId); drag = null; };
+    vp.addEventListener('wheel', onWheel, { passive: false });
+    vp.addEventListener('pointerdown', onDown);
+    vp.addEventListener('pointermove', onMove);
+    vp.addEventListener('pointerup', onUp);
+    return () => {
+      vp.removeEventListener('wheel', onWheel);
+      vp.removeEventListener('pointerdown', onDown);
+      vp.removeEventListener('pointermove', onMove);
+      vp.removeEventListener('pointerup', onUp);
+    };
+  }, [apply]);
+  const gridSvg = `url("data:image/svg+xml,%3Csvg width='120' height='120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M120 0H0v120' fill='none' stroke='${encodeURIComponent(DC.grid)}' stroke-width='1'/%3E%3C/svg%3E")`;
+  return (
+    <div ref={vpRef} style={{
+      height: '100vh', width: '100vw', background: DC.bg,
+      overflow: 'hidden', touchAction: 'none', position: 'relative', boxSizing: 'border-box',
+    }}>
+      <div ref={worldRef} style={{
+        position: 'absolute', top: 0, left: 0, transformOrigin: '0 0',
+        willChange: 'transform', width: 'max-content', minWidth: '100%', minHeight: '100%',
+        padding: '60px 0 80px', backgroundImage: gridSvg, backgroundSize: '120px 120px',
+      }}>{children}</div>
+    </div>
+  );
+}
+
+function DCSection({ title, subtitle, children, gap = 48 }) {
+  return (
+    <div style={{ marginBottom: 80, position: 'relative' }}>
+      <div style={{ padding: '0 60px 36px' }}>
+        <div style={{ fontSize: 22, fontWeight: 600, color: DC.title, letterSpacing: -0.3, marginBottom: 4 }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 14, color: DC.subtitle }}>{subtitle}</div>}
+      </div>
+      <div style={{ display: 'flex', gap, padding: '0 60px', alignItems: 'flex-start', width: 'max-content' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function DCArtboard({ label, children, width, height }) {
+  return (
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      {label && <div style={{
+        position: 'absolute', bottom: '100%', left: 0, paddingBottom: 8,
+        fontSize: 12, fontWeight: 500, color: DC.label, whiteSpace: 'nowrap',
+      }}>{label}</div>}
+      <div style={{
+        borderRadius: 2,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06)',
+        overflow: 'hidden', width, height, background: '#fff',
+      }}>{children}</div>
+    </div>
+  );
+}
+
+// ─── BitBuddy colors ──────────────────────────────────────────
+const BB_BLUE = '#1E90FF';
+const BB_WHITE = '#FFFFFF';
+
+function IconTile({ size = 220, bg = BB_BLUE, radius = 0.224, children, style = {} }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size * radius, background: bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.08), 0 6px 18px rgba(0,0,0,0.08)', ...style,
+    }}>{children}</div>
+  );
+}
+
+function AvatarChip({ size = 88, bg = '#E5F1FD', children, style = {} }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', background: bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...style,
+    }}>{children}</div>
+  );
+}
+
+function Glyph({ children, stroke = BB_WHITE, sw = 70 }) {
+  return (
+    <svg viewBox="0 0 1024 1024" width="100%" height="100%" style={{ display: 'block' }}>
+      <g fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">{children}</g>
+    </svg>
+  );
+}
+
+// ─── Eight original SF-style glyphs ───────────────────────────
+
+// 01 — Book + sparkle
+function M01({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      <path d="M 260 230 h 460 a 40 40 0 0 1 40 40 v 500 a 40 40 0 0 1 -40 40 h -420 a 40 40 0 0 0 -40 40 v -580 a 40 40 0 0 1 0 -40 Z" />
+      <path d="M 260 230 v 620" />
+      <path d="M 512 420 L 542 510 L 632 540 L 542 570 L 512 660 L 482 570 L 392 540 L 482 510 Z" fill={stroke} stroke="none" />
+    </Glyph>
+  );
+}
+
+// 02 — Chat buddy
+function M02({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      <path d="M 200 260 a 80 80 0 0 1 80 -80 h 464 a 80 80 0 0 1 80 80 v 344 a 80 80 0 0 1 -80 80 h -176 l -108 108 a 20 20 0 0 1 -34 -14 v -94 h -146 a 80 80 0 0 1 -80 -80 Z" />
+      <path d="M 404 420 l 18 -52 l 18 52 l 52 18 l -52 18 l -18 52 l -18 -52 l -52 -18 Z" fill={stroke} stroke="none" />
+      <path d="M 620 420 l 18 -52 l 18 52 l 52 18 l -52 18 l -18 52 l -18 -52 l -52 -18 Z" fill={stroke} stroke="none" />
+    </Glyph>
+  );
+}
+
+// 03 — Sparkle buddy
+function M03({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke} sw={60}>
+      <path d="M 460 220 C 480 380 500 400 660 460 C 500 520 480 540 460 780 C 440 540 420 520 260 460 C 420 400 440 380 460 220 Z"
+            fill={stroke} stroke="none" />
+      <path d="M 780 180 C 787 220 794 228 844 246 C 794 264 787 272 780 360 C 773 272 766 264 716 246 C 766 228 773 220 780 180 Z"
+            fill={stroke} stroke="none" />
+    </Glyph>
+  );
+}
+
+// 04 — Notebook mascot
+function M04({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      <path d="M 220 220 h 540 a 40 40 0 0 1 40 40 v 560 a 40 40 0 0 1 -40 40 h -500 a 40 40 0 0 0 -40 40 v -640 a 40 40 0 0 1 0 -40 Z" />
+      <path d="M 220 220 v 680" />
+      <circle cx="420" cy="520" r="28" fill={stroke} stroke="none" />
+      <circle cx="620" cy="520" r="28" fill={stroke} stroke="none" />
+      <path d="M 410 640 q 110 80 220 0" />
+    </Glyph>
+  );
+}
+
+// 05 — Waveform spark
+function M05({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke} sw={60}>
+      <path d="M 220 560 v 80" />
+      <path d="M 340 500 v 200" />
+      <path d="M 460 420 v 360" />
+      <path d="M 580 340 v 520" />
+      <path d="M 700 460 v 280" />
+      <path d="M 820 190 C 830 250 838 260 900 282 C 838 304 830 314 820 410 C 810 314 802 304 740 282 C 802 260 810 250 820 190 Z"
+            fill={stroke} stroke="none" />
+    </Glyph>
+  );
+}
+
+// 06 — Page + sparkle
+function M06({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      <path d="M 240 220 h 400 l 160 160 v 440 a 40 40 0 0 1 -40 40 h -520 a 40 40 0 0 1 -40 -40 v -560 a 40 40 0 0 1 40 -40 Z" />
+      <path d="M 640 220 v 120 a 40 40 0 0 0 40 40 h 120" />
+      <path d="M 340 520 h 260" />
+      <path d="M 340 620 h 340" />
+      <path d="M 340 720 h 180" />
+    </Glyph>
+  );
+}
+
+// 07 — Buddy head
+function M07({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      <rect x="232" y="320" width="560" height="440" rx="100" ry="100" />
+      <path d="M 380 760 l -40 80 a 16 16 0 0 0 22 20 l 128 -60" />
+      <path d="M 412 464 l 12 -36 l 12 36 l 36 12 l -36 12 l -12 36 l -12 -36 l -36 -12 Z" fill={stroke} stroke="none" />
+      <path d="M 612 464 l 12 -36 l 12 36 l 36 12 l -36 12 l -12 36 l -12 -36 l -36 -12 Z" fill={stroke} stroke="none" />
+      <path d="M 450 600 q 62 50 124 0" />
+      <path d="M 512 320 v -80" />
+      <circle cx="512" cy="200" r="28" fill={stroke} stroke="none" />
+    </Glyph>
+  );
+}
+
+// 08 — Monogram
+function M08({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke} sw={64}>
+      <path d="M 300 260 h 240 a 110 110 0 0 1 0 220 h -240 Z" />
+      <path d="M 300 480 h 280 a 110 110 0 0 1 0 220 h -280 Z" />
+      <path d="M 300 260 v 440" />
+      <path d="M 800 710 C 807 750 814 758 864 776 C 814 794 807 802 800 860 C 793 802 786 794 736 776 C 786 758 793 750 800 710 Z"
+            fill={stroke} stroke="none" />
+    </Glyph>
+  );
+}
+
+// ─── Clown-flavored set (monoline, SF-consistent) ─────────────
+// Clown-essence via circus collar, round nose, curly side tufts,
+// tiny pointed hat. Kept geometric so it doesn't become a cartoon.
+
+// C1 — Clown collar buddy: speech-bubble head with ruffled circus collar
+function C1({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      {/* ruffle collar — 5 arcs */}
+      <path d="M 220 780 q 40 -70 100 -70 q 30 0 50 30 q 20 -60 80 -60 q 30 0 54 40 q 24 -40 54 -40 q 60 0 80 60 q 20 -30 50 -30 q 60 0 100 70" />
+      {/* head (bubble) */}
+      <path d="M 270 300 a 80 80 0 0 1 80 -80 h 324 a 80 80 0 0 1 80 80 v 300 a 80 80 0 0 1 -80 80 h -324 a 80 80 0 0 1 -80 -80 Z" />
+      {/* sparkle eyes */}
+      <path d="M 432 410 l 14 -42 l 14 42 l 42 14 l -42 14 l -14 42 l -14 -42 l -42 -14 Z" fill={stroke} stroke="none" />
+      <path d="M 576 410 l 14 -42 l 14 42 l 42 14 l -42 14 l -14 42 l -14 -42 l -42 -14 Z" fill={stroke} stroke="none" />
+      {/* red-nose dot (kept mono — shown as filled circle) */}
+      <circle cx="512" cy="540" r="28" fill={stroke} stroke="none" />
+      {/* tiny smile */}
+      <path d="M 470 610 q 42 30 84 0" />
+    </Glyph>
+  );
+}
+
+// C2 — Tuft buddy: rounded head w/ curly side tufts + sparkle hat
+function C2({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      {/* head */}
+      <rect x="272" y="340" width="480" height="420" rx="110" ry="110" />
+      {/* left tuft — two curls */}
+      <path d="M 272 500 q -80 -30 -80 30 q 0 40 50 40" />
+      <path d="M 272 580 q -90 20 -70 80 q 14 40 60 20" />
+      {/* right tuft */}
+      <path d="M 752 500 q 80 -30 80 30 q 0 40 -50 40" />
+      <path d="M 752 580 q 90 20 70 80 q -14 40 -60 20" />
+      {/* pointed hat on top with pompom */}
+      <path d="M 420 340 L 512 210 L 604 340" />
+      <circle cx="512" cy="188" r="24" fill={stroke} stroke="none" />
+      {/* sparkle eyes */}
+      <path d="M 420 500 l 12 -36 l 12 36 l 36 12 l -36 12 l -12 36 l -12 -36 l -36 -12 Z" fill={stroke} stroke="none" />
+      <path d="M 580 500 l 12 -36 l 12 36 l 36 12 l -36 12 l -12 36 l -12 -36 l -36 -12 Z" fill={stroke} stroke="none" />
+      {/* nose */}
+      <circle cx="512" cy="600" r="24" fill={stroke} stroke="none" />
+      {/* smile */}
+      <path d="M 456 670 q 56 44 112 0" />
+    </Glyph>
+  );
+}
+
+// C3 — Jester hat + sparkle: little jester silhouette, cap with two points
+function C3({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      {/* jester two-point cap */}
+      <path d="M 300 420 L 380 240 L 440 380" />
+      <path d="M 584 380 L 644 240 L 724 420" />
+      <path d="M 300 420 q 212 -120 424 0" />
+      {/* bell tips */}
+      <circle cx="380" cy="230" r="22" fill={stroke} stroke="none" />
+      <circle cx="644" cy="230" r="22" fill={stroke} stroke="none" />
+      {/* face beneath */}
+      <path d="M 330 420 a 182 182 0 0 0 364 0" fill="none" />
+      <path d="M 330 420 a 182 182 0 0 0 364 0 v 180 a 80 80 0 0 1 -80 80 h -204 a 80 80 0 0 1 -80 -80 Z" />
+      {/* sparkle eyes */}
+      <path d="M 424 500 l 12 -36 l 12 36 l 36 12 l -36 12 l -12 36 l -12 -36 l -36 -12 Z" fill={stroke} stroke="none" />
+      <path d="M 576 500 l 12 -36 l 12 36 l 36 12 l -36 12 l -12 36 l -12 -36 l -36 -12 Z" fill={stroke} stroke="none" />
+      {/* nose */}
+      <circle cx="512" cy="600" r="22" fill={stroke} stroke="none" />
+      {/* smile */}
+      <path d="M 460 670 q 52 36 104 0" />
+    </Glyph>
+  );
+}
+
+// C4 — Book + clown nose: BitBinder book with a single dot nose and tiny curls
+// (most restrained — reads "book" first, "clown" on second glance)
+function C4({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      {/* book */}
+      <path d="M 240 220 h 520 a 40 40 0 0 1 40 40 v 540 a 40 40 0 0 1 -40 40 h -480 a 40 40 0 0 0 -40 40 v -620 a 40 40 0 0 1 0 -40 Z" />
+      <path d="M 240 220 v 660" />
+      {/* dot eyes */}
+      <circle cx="420" cy="490" r="22" fill={stroke} stroke="none" />
+      <circle cx="620" cy="490" r="22" fill={stroke} stroke="none" />
+      {/* round nose */}
+      <circle cx="520" cy="580" r="30" fill={stroke} stroke="none" />
+      {/* curly side tufts on the book spine side */}
+      <path d="M 320 430 q -40 -40 -8 -70" />
+      <path d="M 720 430 q 40 -40 8 -70" />
+      {/* smile */}
+      <path d="M 450 670 q 70 44 140 0" />
+    </Glyph>
+  );
+}
+
+// C5 — Mic + nose: stand mic head dotted with a clown nose — buddy at the show
+function C5({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke} sw={64}>
+      {/* mic capsule */}
+      <rect x="384" y="180" width="256" height="360" rx="128" ry="128" />
+      {/* grille lines */}
+      <path d="M 420 300 h 184" />
+      <path d="M 420 360 h 184" />
+      <path d="M 420 420 h 184" />
+      {/* yoke + stand */}
+      <path d="M 300 440 a 212 212 0 0 0 424 0" />
+      <path d="M 512 652 v 160" />
+      <path d="M 380 840 h 264" />
+      {/* clown nose on the capsule */}
+      <circle cx="512" cy="250" r="34" fill={stroke} stroke="none" />
+    </Glyph>
+  );
+}
+
+// C6 — Pointed hat sparkle: just a cone hat with pompom + sparkle burst
+function C6({ stroke = BB_WHITE }) {
+  return (
+    <Glyph stroke={stroke}>
+      {/* cone */}
+      <path d="M 300 760 L 512 240 L 724 760 Z" />
+      {/* brim */}
+      <path d="M 240 760 h 568" />
+      {/* pompom */}
+      <circle cx="512" cy="210" r="36" fill={stroke} stroke="none" />
+      {/* two dots on cone */}
+      <circle cx="460" cy="560" r="22" fill={stroke} stroke="none" />
+      <circle cx="564" cy="460" r="22" fill={stroke} stroke="none" />
+      {/* satellite sparkle */}
+      <path d="M 830 320 C 836 356 843 363 880 378 C 843 393 836 400 830 460 C 824 400 817 393 780 378 C 817 363 824 356 830 320 Z"
+            fill={stroke} stroke="none" />
+    </Glyph>
+  );
+}
+
+const MARKS = [
+  { id: '01', name: 'Book + Sparkle',   sub: 'Binder glyph with AI sparkle', C: M01 },
+  { id: '02', name: 'Chat Buddy',       sub: 'Speech bubble, sparkle eyes',  C: M02 },
+  { id: '03', name: 'Sparkle Buddy',    sub: 'Pure AI sparkle duet',         C: M03 },
+  { id: '04', name: 'Notebook Mascot',  sub: 'Book with a face',             C: M04 },
+  { id: '05', name: 'Waveform Spark',   sub: 'Listens to your set',          C: M05 },
+  { id: '06', name: 'Page + Sparkle',   sub: 'Buddy as editor',              C: M06 },
+  { id: '07', name: 'Buddy Head',       sub: 'Character mascot',             C: M07 },
+  { id: '08', name: 'BB Monogram',      sub: 'Typographic, neutral',         C: M08 },
+];
+
+const CLOWN_MARKS = [
+  { id: 'C1', name: 'Collar Buddy',    sub: 'Ruffled circus collar + sparkle eyes',  C: C1 },
+  { id: 'C2', name: 'Tuft Buddy',      sub: 'Side curls, pompom hat',                C: C2 },
+  { id: 'C3', name: 'Jester',          sub: 'Two-point jester cap',                  C: C3 },
+  { id: 'C4', name: 'Book Clown',      sub: 'Binder book with nose & curls',         C: C4 },
+  { id: 'C5', name: 'Mic + Nose',      sub: 'Stand mic, dotted nose',                C: C5 },
+  { id: 'C6', name: 'Party Cone',      sub: 'Pointed hat + sparkle',                 C: C6 },
+];
+
+// ─── Preview pieces ───────────────────────────────────────────
+function IconPreview({ mark }) {
+  const C = mark.C;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      <IconTile size={180}><div style={{ width: '100%', height: '100%' }}><C /></div></IconTile>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>{mark.id} · {mark.name}</div>
+        <div style={{ fontSize: 11, color: '#7a7a7a', marginTop: 2 }}>{mark.sub}</div>
+      </div>
+    </div>
+  );
+}
+
+function ChatRow({ mark }) {
+  const C = mark.C;
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px 16px', background: '#fff' }}>
+      <AvatarChip size={36} bg="#E5F1FD">
+        <div style={{ width: 22, height: 22 }}><C stroke={BB_BLUE} /></div>
+      </AvatarChip>
+      <div style={{ background: '#F2F2F4', borderRadius: 18, padding: '8px 14px', fontSize: 13, maxWidth: 200 }}>
+        Hey Comedian! Here's what I found in your set.
+      </div>
+    </div>
+  );
+}
+
+function SizeStudy({ mark }) {
+  const C = mark.C;
+  const sizes = [240, 120, 64, 40, 24];
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 18, padding: '28px 32px', background: '#fff' }}>
+      {sizes.map(s => (
+        <div key={s} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <IconTile size={s}><div style={{ width: '100%', height: '100%' }}><C /></div></IconTile>
+          <div style={{ fontSize: 10, color: '#9a9a9a' }}>{s}px</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InversionStudy({ mark }) {
+  const C = mark.C;
+  return (
+    <div style={{ display: 'flex', gap: 16, padding: '20px 24px', background: '#fff' }}>
+      <IconTile size={120} bg={BB_BLUE}><div style={{width:'100%',height:'100%'}}><C stroke="#fff" /></div></IconTile>
+      <IconTile size={120} bg="#0B1F3A"><div style={{width:'100%',height:'100%'}}><C stroke="#fff" /></div></IconTile>
+      <IconTile size={120} bg="#F2F2F4"><div style={{width:'100%',height:'100%'}}><C stroke={BB_BLUE} /></div></IconTile>
+      <IconTile size={120} bg="#fff" style={{ boxShadow: '0 0 0 1px #E5E5E8 inset' }}>
+        <div style={{width:'100%',height:'100%'}}><C stroke={BB_BLUE} /></div>
+      </IconTile>
+      <IconTile size={120} bg="#1a1a1a"><div style={{width:'100%',height:'100%'}}><C stroke="#fff" /></div></IconTile>
+    </div>
+  );
+}
+
+// ─── App ──────────────────────────────────────────────────────
+function App() {
+  const rec = CLOWN_MARKS[0]; // Collar Buddy
+  const RecC = rec.C;
+  return (
+    <DesignCanvas>
+      <div style={{ padding: '20px 60px 40px', maxWidth: 900 }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: '#9a8a70', fontWeight: 600 }}>BitBinder · BitBuddy</div>
+        <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: -0.8, color: '#2a2015', marginTop: 8 }}>Avatar & icon options</div>
+        <div style={{ fontSize: 15, color: '#5a4a30', marginTop: 10, lineHeight: 1.5, maxWidth: 680 }}>
+          Original SF-style glyphs for BitBuddy — monoline strokes, rounded caps,
+          the same vocabulary the rest of the app uses. Two families: a
+          <b> clowny set</b> (circus collar, pompom, jester cap, round nose) and
+          a neutral <b>utility set</b>. Each mark is tested as an iOS app icon,
+          across sizes, on dark and light surfaces, and in the chat avatar slot.
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, padding: '4px 10px', background: '#fff', borderRadius: 999, border: '1px solid #e0dccc' }}>
+            <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: BB_BLUE, marginRight: 6, verticalAlign: -1 }} />#1E90FF tile
+          </span>
+          <span style={{ fontSize: 12, padding: '4px 10px', background: '#fff', borderRadius: 999, border: '1px solid #e0dccc' }}>White glyph · 70pt</span>
+          <span style={{ fontSize: 12, padding: '4px 10px', background: '#fff', borderRadius: 999, border: '1px solid #e0dccc' }}>22% squircle</span>
+          <span style={{ fontSize: 12, padding: '4px 10px', background: '#fff', borderRadius: 999, border: '1px solid #e0dccc' }}>Round caps / joins</span>
+        </div>
+      </div>
+
+      <DCSection title="Clown-flavored set" subtitle="Clown essence — collar, pompom, round nose, jester cap — kept monoline so it still belongs to the app.">
+        <DCArtboard label="C1 – C6 · clown set" width={1480} height={480}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 24, padding: 40, background: '#fafaf7', width: '100%', height: '100%', boxSizing: 'border-box' }}>
+            {CLOWN_MARKS.map(m => <IconPreview key={m.id} mark={m} />)}
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection title="Recommended" subtitle="Most &quot;clown buddy&quot; feeling — the ruffled collar instantly reads circus, the sparkle eyes keep the AI personality.">
+        <DCArtboard label="hero" width={720} height={380}>
+          <div style={{ display: 'flex', gap: 40, alignItems: 'center', padding: 40, background: '#fff', width: '100%', height: '100%', boxSizing: 'border-box' }}>
+            <IconTile size={280}><div style={{ width: '100%', height: '100%' }}><RecC /></div></IconTile>
+            <div>
+              <div style={{ fontSize: 11, letterSpacing: 1.4, textTransform: 'uppercase', color: '#9a9a9a', marginBottom: 8 }}>Recommended</div>
+              <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: -0.8 }}>{rec.name}</div>
+              <div style={{ fontSize: 14, color: '#5a5a5a', marginTop: 8, maxWidth: 300, lineHeight: 1.5 }}>
+                Speech-bubble head (buddy), ruffled clown collar (circus),
+                sparkle eyes + round nose (personality). Reads as "buddy the clown"
+                without leaning on a face that would feel off at 40px.
+              </div>
+              <div style={{ marginTop: 18, display: 'flex', gap: 10, alignItems: 'center' }}>
+                <AvatarChip size={44} bg="#E5F1FD"><div style={{width:30,height:30}}><RecC stroke={BB_BLUE} /></div></AvatarChip>
+                <AvatarChip size={36} bg="#E5F1FD"><div style={{width:24,height:24}}><RecC stroke={BB_BLUE} /></div></AvatarChip>
+                <AvatarChip size={28} bg="#E5F1FD"><div style={{width:20,height:20}}><RecC stroke={BB_BLUE} /></div></AvatarChip>
+              </div>
+            </div>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard label="in-app avatar use" width={360} height={380}>
+          <div style={{ display: 'flex', flexDirection: 'column', padding: 20, gap: 2, background: '#fff', height: '100%', boxSizing: 'border-box' }}>
+            <div style={{ fontSize: 11, color: '#9a9a9a', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, padding: '0 16px 8px' }}>Chat thread</div>
+            <ChatRow mark={rec} />
+            <ChatRow mark={rec} />
+            <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <AvatarChip size={24} bg="#E5F1FD"><div style={{width:16,height:16}}><RecC stroke={BB_BLUE} /></div></AvatarChip>
+              <div style={{ fontSize: 12, color: '#7a7a7a' }}>BitBuddy is typing…</div>
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection title="Clown set · per-option tests" subtitle="Each clown mark across sizes and backgrounds.">
+        {CLOWN_MARKS.map(m => (
+          <DCArtboard key={m.id} label={m.name.toLowerCase()} width={720} height={420}>
+            <div style={{ padding: 0, background: '#fff', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '20px 32px 8px', borderBottom: '1px solid #f0f0ec' }}>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{m.id} · {m.name}</div>
+                <div style={{ fontSize: 13, color: '#7a7a7a', marginTop: 2 }}>{m.sub}</div>
+              </div>
+              <SizeStudy mark={m} />
+              <div style={{ height: 1, background: '#f0f0ec' }} />
+              <InversionStudy mark={m} />
+            </div>
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <DCSection title="Utility set (no clown)" subtitle="Kept for comparison — reference the original eight directions.">
+        <DCArtboard label="01 – 08 · utility set" width={1480} height={480}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 30, padding: 40, background: '#fafaf7', width: '100%', height: '100%', boxSizing: 'border-box' }}>
+            {MARKS.map(m => <IconPreview key={m.id} mark={m} />)}
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection title="Utility set · per-option tests" subtitle="Same treatment, utility marks.">
+        {MARKS.map(m => (
+          <DCArtboard key={m.id} label={m.name.toLowerCase()} width={720} height={420}>
+            <div style={{ padding: 0, background: '#fff', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '20px 32px 8px', borderBottom: '1px solid #f0f0ec' }}>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{m.id} · {m.name}</div>
+                <div style={{ fontSize: 13, color: '#7a7a7a', marginTop: 2 }}>{m.sub}</div>
+              </div>
+              <SizeStudy mark={m} />
+              <div style={{ height: 1, background: '#f0f0ec' }} />
+              <InversionStudy mark={m} />
+            </div>
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <div style={{ padding: '40px 60px 80px', maxWidth: 900 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: '#2a2015' }}>Next</div>
+        <ul style={{ fontSize: 14, color: '#5a4a30', lineHeight: 1.7, paddingLeft: 20 }}>
+          <li>Tell me which of the 8 to take forward (or mix — e.g. #04 body with #03 sparkle eyes)</li>
+          <li>I'll export 1024×1024 PNG + SVG and the inverted blue-on-white variant</li>
+          <li>Optional: full iOS @1x/@2x/@3x ladder for Xcode</li>
+        </ul>
+      </div>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
