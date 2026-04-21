@@ -162,6 +162,14 @@ final class AIJokeExtractionManager {
         }
     }
 
+    /// Whether a provider's underlying implementation reports itself
+    /// configured right now (cloud provider has a key / on-device model is
+    /// present on this device). Ignores the enabled flag and rate-limit
+    /// state — use `providerStatuses()` for the full picture.
+    func isProviderReady(_ type: AIProviderType) -> Bool {
+        providers[type]?.isConfigured() ?? false
+    }
+
     /// Returns all providers with their current status.
     func providerStatuses() -> [(type: AIProviderType, configured: Bool, enabled: Bool, rateLimited: Bool)] {
         providerOrder.map { type in

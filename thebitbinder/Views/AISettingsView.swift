@@ -23,6 +23,12 @@ struct AISettingsView: View {
     @State private var savedProvider: AIProviderType? = nil
     @State private var showTutorial = false
 
+    // Provider-order controls. Mirrors `AIJokeExtractionManager` UserDefaults
+    // state; refreshed on appear and after every edit.
+    @State private var providerOrder: [AIProviderType] = []
+    @State private var disabledProviders: Set<AIProviderType> = []
+    @State private var showAdvancedOrder: Bool = false
+
     var body: some View {
         List {
             // MARK: - Tutorial banner
@@ -161,6 +167,9 @@ struct AISettingsView: View {
                 }
                 .padding(.vertical, 4)
             }
+
+            // MARK: - Advanced: Extraction order
+            providerOrderSection
         }
         .navigationTitle("GagGrabber Fuel")
         .navigationBarTitleDisplayMode(.inline)
@@ -260,11 +269,142 @@ struct AISettingsView: View {
         .animation(EffortlessAnimation.smooth, value: savedProvider != nil)
     }
 
+    // MARK: - Provider Order Section
+
+    @ViewBuilder
+    private var providerOrderSection: some View {
+        Section {
+            DisclosureGroup(isExpanded: $showAdvancedOrder) {
+                Text("GagGrabber tries providers from top to bottom. Use the arrows to reorder and the toggle to disable any you never want to use.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+
+                ForEach(Array(providerOrder.enumerated()), id: \.element) { index, type in
+                    providerRow(type: type, index: index)
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Extraction Order")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Advanced — control which providers GagGrabber tries and in what order.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } footer: {
+            Text("On-device providers are free, private, and work offline but are typically less accurate than cloud AI. Move them up if you prefer offline-first — down if you want cloud quality first.")
+                .font(.caption)
+        }
+    }
+
+    private func providerRow(type: AIProviderType, index: Int) -> some View {
+        let isConfigured = AIJokeExtractionManager.shared.isProviderReady(type)
+        let isEnabled = !disabledProviders.contains(type)
+        let isFirst = index == 0
+        let isLast  = index == providerOrder.count - 1
+
+        return HStack(spacing: 10) {
+            Image(systemName: type.icon)
+                .font(.subheadline)
+                .foregroundStyle(tint(for: type))
+                .frame(width: 22)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(type.displayName)
+                    .font(.subheadline.weight(.medium))
+                Text(statusText(type: type, configured: isConfigured, enabled: isEnabled))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            HStack(spacing: 0) {
+                Button {
+                    moveProvider(type, direction: -1)
+                } label: {
+                    Image(systemName: "chevron.up")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 30, height: 28)
+                }
+                .buttonStyle(.borderless)
+                .disabled(isFirst)
+                .opacity(isFirst ? 0.3 : 1)
+
+                Button {
+                    moveProvider(type, direction: 1)
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 30, height: 28)
+                }
+                .buttonStyle(.borderless)
+                .disabled(isLast)
+                .opacity(isLast ? 0.3 : 1)
+            }
+
+            Toggle("", isOn: Binding(
+                get: { isEnabled },
+                set: { setEnabled($0, for: type) }
+            ))
+            .labelsHidden()
+            .tint(Color.bitbinderAccent)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func tint(for type: AIProviderType) -> Color {
+        switch type {
+        case .appleOnDevice:  return .blue
+        case .embeddingLocal: return .teal
+        case .openAI, .arceeAI, .openRouter: return .purple
+        }
+    }
+
+    private func statusText(type: AIProviderType, configured: Bool, enabled: Bool) -> String {
+        if !enabled { return "Disabled" }
+        if configured { return "Ready" }
+        switch type {
+        case .appleOnDevice:  return "Unavailable on this device"
+        case .embeddingLocal: return "Unavailable"
+        case .openAI:         return "No Premium voucher"
+        case .arceeAI, .openRouter: return "No House Blend voucher"
+        }
+    }
+
+    private func moveProvider(_ type: AIProviderType, direction: Int) {
+        guard let currentIndex = providerOrder.firstIndex(of: type) else { return }
+        let targetIndex = currentIndex + direction
+        guard providerOrder.indices.contains(targetIndex) else { return }
+
+        var order = providerOrder
+        order.swapAt(currentIndex, targetIndex)
+        providerOrder = order
+        AIJokeExtractionManager.shared.providerOrder = order
+        haptic(.light)
+    }
+
+    private func setEnabled(_ enabled: Bool, for type: AIProviderType) {
+        AIJokeExtractionManager.shared.setProvider(type, enabled: enabled)
+        if enabled {
+            disabledProviders.remove(type)
+        } else {
+            disabledProviders.insert(type)
+        }
+    }
+
     // MARK: - Helpers
 
     private func refreshStatus() {
         houseBlendConfigured = AIKeyLoader.loadKey(for: .openRouter) != nil
         premiumConfigured    = AIKeyLoader.loadKey(for: .openAI) != nil
+        providerOrder        = AIJokeExtractionManager.shared.providerOrder
+        disabledProviders    = AIJokeExtractionManager.shared.disabledProviders
     }
 }
 
