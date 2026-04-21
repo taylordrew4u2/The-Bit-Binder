@@ -8,7 +8,12 @@
 import UIKit
 import Foundation
 
-/// Centralized memory management for the app
+/// Centralized memory management for the app.
+///
+/// `@MainActor`-isolated so its mutable state (`isClearing`, observer tokens)
+/// and the @MainActor services it touches (`BitBuddyService`) are accessed
+/// without implicit sync hops from notification-observer callbacks.
+@MainActor
 final class MemoryManager {
     static let shared = MemoryManager()
 
@@ -25,103 +30,95 @@ final class MemoryManager {
 
     /// Track if we're currently clearing caches to avoid duplicate work
     private var isClearing = false
-    private let clearingLock = NSLock()
-    
+
     /// Observers for cleanup
     private var memoryWarningObserver: NSObjectProtocol?
     private var backgroundObserver: NSObjectProtocol?
     private var foregroundObserver: NSObjectProtocol?
-    
+
     private init() {
         setupObservers()
     }
-    
-    deinit {
-        removeObservers()
-    }
-    
+
+    // No deinit: this is a process-lifetime singleton, so the observers
+    // live as long as the app. Removing `deinit` avoids the Swift-6 isolation
+    // conflict that arises when a `@MainActor` class has a nonisolated deinit
+    // that touches instance state.
+
     private func setupObservers() {
-        // Memory warning - highest priority
+        // Memory warning - highest priority.
+        // `queue: .main` guarantees the closure body runs on the main thread,
+        // so `MainActor.assumeIsolated` is sound and avoids the async hop
+        // (and accompanying `unsafeForcedSync` runtime warning) that an
+        // unannotated closure would otherwise trigger when calling into
+        // `@MainActor` instance methods.
         memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleMemoryWarning()
+            MainActor.assumeIsolated {
+                self?.handleMemoryWarning()
+            }
         }
-        
+
         // Background transition - clear caches to reduce footprint
         backgroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleBackgroundTransition()
+            MainActor.assumeIsolated {
+                self?.handleBackgroundTransition()
+            }
         }
-        
+
         // Foreground transition - good time to report memory state
         foregroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.handleForegroundTransition()
+            MainActor.assumeIsolated {
+                self?.handleForegroundTransition()
+            }
         }
     }
     
-    private func removeObservers() {
-        if let observer = memoryWarningObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        if let observer = backgroundObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        if let observer = foregroundObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-    }
-    
-    /// Called when system sends memory warning
+    /// Called when system sends memory warning.
+    ///
+    /// Returns quickly — iOS expects memory-warning handlers to yield control
+    /// back fast, so the actual cleanup is deferred to the next runloop via
+    /// a `Task { @MainActor }`. MainActor isolation serialises access to
+    /// `isClearing`, so no explicit lock is needed.
     func handleMemoryWarning() {
-        // Prevent duplicate clearing
-        clearingLock.lock()
-        guard !isClearing else {
-            clearingLock.unlock()
-            return
-        }
+        guard !isClearing else { return }
         isClearing = true
-        clearingLock.unlock()
-        
+
         print(" [MemoryManager] Memory warning received - clearing caches")
         reportMemoryUsage()
-        
-        // Clear caches on main thread
-        DispatchQueue.main.async { [weak self] in
+
+        Task { @MainActor [weak self] in
             // 1. Clear URL caches
             URLCache.shared.removeAllCachedResponses()
             URLCache.shared.memoryCapacity = 0
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                URLCache.shared.memoryCapacity = MemoryManager.postFlushURLCacheBytes
-            }
-            
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s breather
+            URLCache.shared.memoryCapacity = MemoryManager.postFlushURLCacheBytes
+
             // 2. Clear BitBuddy conversation history — can be substantial after
             //    many turns, and is not user-critical data.
-            Task { @MainActor in
-                BitBuddyService.shared.startNewConversation()
-            }
-            
+            BitBuddyService.shared.startNewConversation()
+
             // 3. Clear temp files (scratch recordings, import artifacts, etc.)
             self?.clearTempFiles()
-            
+
             // 4. Notify listeners (SpeechRecognizer, import pipeline, etc.)
             NotificationCenter.default.post(name: .appMemoryWarning, object: nil)
-            
+
             self?.reportMemoryUsage()
             print(" [MemoryManager] Caches cleared")
-            
-            self?.clearingLock.lock()
+
             self?.isClearing = false
-            self?.clearingLock.unlock()
         }
     }
     

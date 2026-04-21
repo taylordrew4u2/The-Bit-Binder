@@ -157,10 +157,22 @@ final class iCloudKeyValueStore {
     
     // MARK: - Auto-push on UserDefaults change
     
-    /// Called whenever ANY UserDefaults key changes (including @AppStorage)
+    /// Called whenever ANY UserDefaults key changes (including @AppStorage).
+    ///
+    /// UserDefaults posts `didChangeNotification` synchronously on whatever
+    /// thread performed the write. Hop to main before touching instance
+    /// state (`isSyncing`, `syncDebounceWorkItem`) so Swift concurrency
+    /// doesn't insert an `unsafeForcedSync` hazard hop at runtime.
     @objc private func defaultsDidChange() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.defaultsDidChange()
+            }
+            return
+        }
+
         guard !isSyncing else { return }  // Don't push back what we just pulled
-        
+
         // Performance: Debounce sync operations to prevent excessive iCloud calls
         syncDebounceWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
