@@ -1799,3 +1799,343 @@ struct EditRoastTargetView: View {
         }
     }
 }
+
+// MARK: - Export Sheet
+
+struct RoastExportSheet: View {
+    let target: RoastTarget
+    @Binding var exportedURL: URL?
+    @Environment(\.dismiss) private var dismiss
+    @State private var exportFormat: ExportFormat = .text
+    @State private var includeStructure = true
+    @State private var includeNotes = true
+    @State private var isExporting = false
+    @State private var showShareSheet = false
+    
+    enum ExportFormat: String, CaseIterable {
+        case text = "Plain Text"
+        case pdf = "PDF"
+        case markdown = "Markdown"
+        
+        var icon: String {
+            switch self {
+            case .text: return "doc.text"
+            case .pdf: return "doc.richtext"
+            case .markdown: return "text.badge.checkmark"
+            }
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Format") {
+                    Picker("Export Format", selection: $exportFormat) {
+                        ForEach(ExportFormat.allCases, id: \.self) { format in
+                            Label(format.rawValue, systemImage: format.icon)
+                                .tag(format)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                }
+                
+                Section("Include") {
+                    Toggle("Joke Structure (Setup/Punchline)", isOn: $includeStructure)
+                    Toggle("Performance Notes", isOn: $includeNotes)
+                }
+                
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Preview")
+                            .font(.headline)
+                        Text("\(target.jokeCount) roast\(target.jokeCount == 1 ? "" : "s") for \(target.name)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        if target.killerCount > 0 {
+                            Text("Including \(target.killerCount) killer\(target.killerCount == 1 ? "" : "s") ⭐️")
+                                .font(.caption)
+                                .foregroundColor(Color.bitbinderAccent)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Export Roasts")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Export") {
+                        exportRoasts()
+                    }
+                    .disabled(isExporting)
+                }
+            }
+            .sheet(isPresented: $showShareSheet) {
+                if let url = exportedURL {
+                    ShareSheet(activityItems: [url])
+                }
+            }
+        }
+    }
+    
+    private func exportRoasts() {
+        isExporting = true
+        
+        Task {
+            let url: URL?
+            
+            switch exportFormat {
+            case .text:
+                url = exportAsText()
+            case .pdf:
+                url = PDFExportService.exportRoastsToPDF(targets: [target], fileName: "Roasts_\(target.name)")
+            case .markdown:
+                url = exportAsMarkdown()
+            }
+            
+            await MainActor.run {
+                isExporting = false
+                if let url = url {
+                    exportedURL = url
+                    showShareSheet = true
+                }
+            }
+        }
+    }
+    
+    private func exportAsText() -> URL? {
+        var text = "ROASTS FOR \(target.name.uppercased())\n"
+        text += String(repeating: "=", count: 40) + "\n\n"
+        
+        if !target.notes.isEmpty {
+            text += "About: \(target.notes)\n\n"
+        }
+        
+        if !target.traits.isEmpty {
+            text += "Traits:\n"
+            for trait in target.traits {
+                text += "• \(trait)\n"
+            }
+            text += "\n"
+        }
+        
+        text += String(repeating: "-", count: 40) + "\n\n"
+        
+        let allJokes = target.sortedJokes
+        let openingRoasts = allJokes.filter { $0.isOpeningRoast }.sorted { $0.displayOrder < $1.displayOrder }
+        let backupRoasts = allJokes.filter { !$0.isOpeningRoast && $0.parentOpeningRoastID != nil }
+        let unassignedRoasts = allJokes.filter { !$0.isOpeningRoast && $0.parentOpeningRoastID == nil }
+        
+        var jokeIndex = 1
+        
+        // Opening roasts section
+        if !openingRoasts.isEmpty {
+            text += "⭐ OPENING ROASTS (\(openingRoasts.count))\n"
+            text += String(repeating: "-", count: 25) + "\n"
+            
+            for (i, joke) in openingRoasts.enumerated() {
+                text += "\(i + 1). "
+                if joke.isKiller { text += "🔥 " }
+                text += "\(joke.content)\n"
+                
+                if includeStructure && joke.hasStructure {
+                    if !joke.setup.isEmpty {
+                        text += "   SETUP: \(joke.setup)\n"
+                    }
+                    if !joke.punchline.isEmpty {
+                        text += "   PUNCHLINE: \(joke.punchline)\n"
+                    }
+                }
+                
+                if includeNotes && !joke.performanceNotes.isEmpty {
+                    text += "   NOTES: \(joke.performanceNotes)\n"
+                }
+                
+                if joke.isTested {
+                    text += "   (Performed \(joke.performanceCount)x)\n"
+                }
+                
+                // Show backups for this opener
+                let backupsForOpener = backupRoasts.filter { $0.parentOpeningRoastID == joke.id }
+                if !backupsForOpener.isEmpty {
+                    text += "   BACKUPS:\n"
+                    for backup in backupsForOpener {
+                        text += "   ↳ \(backup.content)\n"
+                        if includeNotes && !backup.performanceNotes.isEmpty {
+                            text += "      NOTES: \(backup.performanceNotes)\n"
+                        }
+                    }
+                }
+                
+                text += "\n"
+                jokeIndex += 1
+            }
+        }
+        
+        // Unassigned roasts section
+        if !unassignedRoasts.isEmpty {
+            text += "\nOTHER ROASTS (\(unassignedRoasts.count))\n"
+            text += String(repeating: "-", count: 25) + "\n"
+            
+            for joke in unassignedRoasts {
+                text += "\(jokeIndex). "
+                if joke.isKiller { text += "⭐️ " }
+                text += "\(joke.content)\n"
+                
+                if includeStructure && joke.hasStructure {
+                    if !joke.setup.isEmpty {
+                        text += "   SETUP: \(joke.setup)\n"
+                    }
+                    if !joke.punchline.isEmpty {
+                        text += "   PUNCHLINE: \(joke.punchline)\n"
+                    }
+                }
+                
+                if includeNotes && !joke.performanceNotes.isEmpty {
+                    text += "   NOTES: \(joke.performanceNotes)\n"
+                }
+                
+                if joke.isTested {
+                    text += "   (Performed \(joke.performanceCount)x)\n"
+                }
+                
+                text += "\n"
+                jokeIndex += 1
+            }
+        }
+        
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileName = "Roasts_\(target.name.replacingOccurrences(of: " ", with: "_")).txt"
+        let fileURL = documentsURL.appendingPathComponent(fileName)
+        
+        do {
+            try text.write(to: fileURL, atomically: true, encoding: .utf8)
+            return fileURL
+        } catch {
+            print("⚠️ Failed to write text export: \(error)")
+            return nil
+        }
+    }
+    
+    private func exportAsMarkdown() -> URL? {
+        var md = "# Roasts for \(target.name)\n\n"
+        
+        if !target.notes.isEmpty {
+            md += "> \(target.notes)\n\n"
+        }
+        
+        if !target.traits.isEmpty {
+            md += "## Traits\n"
+            for trait in target.traits {
+                md += "- \(trait)\n"
+            }
+            md += "\n"
+        }
+        
+        let allJokes = target.sortedJokes
+        let openingRoasts = allJokes.filter { $0.isOpeningRoast }.sorted { $0.displayOrder < $1.displayOrder }
+        let backupRoasts = allJokes.filter { !$0.isOpeningRoast && $0.parentOpeningRoastID != nil }
+        let unassignedRoasts = allJokes.filter { !$0.isOpeningRoast && $0.parentOpeningRoastID == nil }
+        
+        var jokeIndex = 1
+        
+        // Opening roasts section
+        if !openingRoasts.isEmpty {
+            md += "## ⭐ Opening Roasts (\(openingRoasts.count))\n\n"
+            
+            for (i, joke) in openingRoasts.enumerated() {
+                md += "### \(i + 1). "
+                if joke.isKiller { md += "🔥 " }
+                md += "\(joke.title.isEmpty ? "Opening Roast" : joke.title)\n\n"
+                md += "\(joke.content)\n\n"
+                
+                if includeStructure && joke.hasStructure {
+                    if !joke.setup.isEmpty {
+                        md += "**Setup:** \(joke.setup)\n\n"
+                    }
+                    if !joke.punchline.isEmpty {
+                        md += "**Punchline:** \(joke.punchline)\n\n"
+                    }
+                }
+                
+                if includeNotes && !joke.performanceNotes.isEmpty {
+                    md += "*Notes: \(joke.performanceNotes)*\n\n"
+                }
+                
+                var meta: [String] = []
+                if joke.isTested { meta.append("Performed \(joke.performanceCount)x") }
+                if joke.relatabilityScore > 0 { meta.append("Relatability: \(joke.relatabilityScore)/5") }
+                if !meta.isEmpty {
+                    md += "`\(meta.joined(separator: " | "))`\n\n"
+                }
+                
+                // Show backups for this opener
+                let backupsForOpener = backupRoasts.filter { $0.parentOpeningRoastID == joke.id }
+                if !backupsForOpener.isEmpty {
+                    md += "#### Backups\n\n"
+                    for backup in backupsForOpener {
+                        md += "- ↳ \(backup.content)\n"
+                        if includeNotes && !backup.performanceNotes.isEmpty {
+                            md += "  - *Notes: \(backup.performanceNotes)*\n"
+                        }
+                    }
+                    md += "\n"
+                }
+                
+                md += "---\n\n"
+                jokeIndex += 1
+            }
+        }
+        
+        // Unassigned roasts section
+        if !unassignedRoasts.isEmpty {
+            md += "## Other Roasts (\(unassignedRoasts.count))\n\n"
+            
+            for joke in unassignedRoasts {
+                md += "### \(jokeIndex). "
+                if joke.isKiller { md += "⭐️ " }
+                md += "\(joke.title.isEmpty ? "Roast" : joke.title)\n\n"
+                md += "\(joke.content)\n\n"
+                
+                if includeStructure && joke.hasStructure {
+                    if !joke.setup.isEmpty {
+                        md += "**Setup:** \(joke.setup)\n\n"
+                    }
+                    if !joke.punchline.isEmpty {
+                        md += "**Punchline:** \(joke.punchline)\n\n"
+                    }
+                }
+                
+                if includeNotes && !joke.performanceNotes.isEmpty {
+                    md += "*Notes: \(joke.performanceNotes)*\n\n"
+                }
+                
+                var meta: [String] = []
+                if joke.isTested { meta.append("Performed \(joke.performanceCount)x") }
+                if joke.relatabilityScore > 0 { meta.append("Relatability: \(joke.relatabilityScore)/5") }
+                if !meta.isEmpty {
+                    md += "`\(meta.joined(separator: " | "))`\n\n"
+                }
+                
+                md += "---\n\n"
+                jokeIndex += 1
+            }
+        }
+        
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileName = "Roasts_\(target.name.replacingOccurrences(of: " ", with: "_")).md"
+        let fileURL = documentsURL.appendingPathComponent(fileName)
+        
+        do {
+            try md.write(to: fileURL, atomically: true, encoding: .utf8)
+            return fileURL
+        } catch {
+            print("⚠️ Failed to write markdown export: \(error)")
+            return nil
+        }
+    }
+}
+
