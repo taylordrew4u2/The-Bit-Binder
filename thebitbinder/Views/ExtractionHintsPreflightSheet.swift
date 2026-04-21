@@ -16,7 +16,10 @@ struct ExtractionHintsPreflightSheet: View {
     let onSkip: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var hints: ExtractionHints = .unspecified
+
+    /// Pre-populated from the last set of hints the user confirmed via this
+    /// sheet. Default `.unspecified` on first launch.
+    @State private var hints: ExtractionHints = .loadLastUsed()
 
     var body: some View {
         NavigationStack {
@@ -60,6 +63,7 @@ struct ExtractionHintsPreflightSheet: View {
     private var actionButtons: some View {
         VStack(spacing: 10) {
             Button {
+                hints.saveAsLastUsed()
                 onContinue(hints)
                 dismiss()
             } label: {

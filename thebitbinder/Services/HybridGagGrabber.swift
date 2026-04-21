@@ -47,9 +47,10 @@ final class HybridGagGrabber: ObservableObject {
 
     /// Structured hints the user supplies before extraction. Drives both
     /// preprocessing (stripping stage directions / timestamps / etc.) and the
-    /// AI-prompt prefix sent with the document text. Defaults to `.unspecified`
-    /// so users who never touch the form get today's behavior unchanged.
-    @Published var hints: ExtractionHints = .unspecified
+    /// AI-prompt prefix sent with the document text. Seeded from the last
+    /// set of hints the user confirmed via the preflight sheet, so users who
+    /// always paste the same kind of material only set it once.
+    @Published var hints: ExtractionHints = .loadLastUsed()
 
     /// Human-readable status message shown during extraction so the user
     /// knows GagGrabber is working and not frozen.
@@ -148,6 +149,11 @@ final class HybridGagGrabber: ObservableObject {
             let deduped = Self.deduplicateJokes(jokes)
             if deduped.isEmpty {
                 lastError = "GagGrabber read the whole file but couldn't spot any jokes. Try adjusting the hints above and give it another go!"
+            } else {
+                // Only persist after a successful run so the next sheet open
+                // — in GagGrabber or the document-picker preflight — starts
+                // from hints that actually produced results.
+                hints.saveAsLastUsed()
             }
             extractedJokes = deduped
         } catch {

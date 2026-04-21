@@ -282,6 +282,42 @@ struct ExtractionHints: Codable, Equatable {
         return "\(prefix)\n\n\(rawText)"
     }
 
+    // MARK: - Per-user persistence
+
+    /// UserDefaults key for the most recently used hints. Single-user slot;
+    /// we don't try to remember per-filename answers yet — most users import
+    /// material of a consistent shape, and the cost of a wrong initial
+    /// value is a few taps, not data loss.
+    private static let lastUsedKey = "extraction_hints_last_used_v1"
+
+    /// Returns the hints the user last deliberately confirmed via the
+    /// preflight sheet, or `.unspecified` if they've never used it (or if
+    /// the saved blob is corrupted). Decoding failures fall back to
+    /// `.unspecified` silently so a schema bump never breaks first launch.
+    static func loadLastUsed() -> ExtractionHints {
+        guard let data = UserDefaults.standard.data(forKey: lastUsedKey),
+              let decoded = try? JSONDecoder().decode(ExtractionHints.self, from: data)
+        else { return .unspecified }
+        return decoded
+    }
+
+    /// Persists `self` as the user's most recent answer set. No-op when
+    /// `isUnspecified` — we don't want "Just figure it out" to overwrite
+    /// deliberate prior answers with defaults.
+    func saveAsLastUsed() {
+        guard !isUnspecified else { return }
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        UserDefaults.standard.set(data, forKey: Self.lastUsedKey)
+    }
+
+    /// Removes any saved last-used hints. Used by the tear-down path or
+    /// when the user explicitly resets the preflight.
+    static func clearLastUsed() {
+        UserDefaults.standard.removeObject(forKey: lastUsedKey)
+    }
+
+    // MARK: - Prefix stripping
+
     /// Removes any `[EXTRACTION HINTS FROM USER] … [END HINTS]` block (plus
     /// the legacy `[USER FORMAT HINT: …]` form) that a caller prepended to
     /// the text. Useful for providers that want to consume hints in a
