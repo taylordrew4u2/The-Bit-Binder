@@ -70,10 +70,11 @@ final class AIJokeExtractionManager {
     // MARK: - Providers
 
     private let providers: [AIProviderType: AIJokeExtractionProvider] = [
-        .appleOnDevice: AppleOnDeviceJokeExtractionProvider(),
-        .openAI:        OpenAIProvider(),
-        .arceeAI:       ArceeAIProvider(),
-        .openRouter:    OpenRouterProvider()
+        .appleOnDevice:  AppleOnDeviceJokeExtractionProvider(),
+        .embeddingLocal: EmbeddingSegmenterProvider(),
+        .openAI:         OpenAIProvider(),
+        .arceeAI:        ArceeAIProvider(),
+        .openRouter:     OpenRouterProvider()
     ]
 
     /// UserDefaults key for the user's preferred provider order.
@@ -99,9 +100,12 @@ final class AIJokeExtractionManager {
                 let missing = AIProviderType.allCases.filter { !decoded.contains($0) }
                 return decoded + missing
             }
-            // On-device first (free, offline, private); free cloud providers
-            // next; OpenAI last (requires paid credits, disabled by default).
-            return [.appleOnDevice, .arceeAI, .openRouter, .openAI]
+            // Apple Intelligence first (free, offline, private, smart);
+            // free cloud providers next (most accurate for "is this a joke?");
+            // OpenAI before the local segmenter because it's still more
+            // accurate; the embedding segmenter is the last-resort offline
+            // fallback when everything else is unavailable.
+            return [.appleOnDevice, .arceeAI, .openRouter, .openAI, .embeddingLocal]
         }
         set {
             if let data = try? JSONEncoder().encode(newValue) {

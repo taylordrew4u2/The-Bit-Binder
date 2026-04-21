@@ -13,26 +13,28 @@ import UIKit
 
 /// Every extraction provider available for joke extraction.
 enum AIProviderType: String, CaseIterable, Identifiable, Codable {
-    case appleOnDevice = "AppleOnDevice"
-    case openAI        = "OpenAI"
-    case arceeAI       = "ArceeAI"
-    case openRouter    = "OpenRouter"
+    case appleOnDevice  = "AppleOnDevice"
+    case embeddingLocal = "EmbeddingLocal"
+    case openAI         = "OpenAI"
+    case arceeAI        = "ArceeAI"
+    case openRouter     = "OpenRouter"
 
     var id: String { rawValue }
 
     /// True for providers that run entirely on-device and need no API key,
     /// no network, and no user setup. Cloud providers return `false`.
     var isOnDevice: Bool {
-        self == .appleOnDevice
+        self == .appleOnDevice || self == .embeddingLocal
     }
 
     /// Human-readable display name
     var displayName: String {
         switch self {
-        case .appleOnDevice: return "On-Device (Apple)"
-        case .openAI:        return "OpenAI"
-        case .arceeAI:       return "Arcee"
-        case .openRouter:    return "OpenRouter"
+        case .appleOnDevice:  return "On-Device (Apple)"
+        case .embeddingLocal: return "On-Device (Offline Segmenter)"
+        case .openAI:         return "OpenAI"
+        case .arceeAI:        return "Arcee"
+        case .openRouter:     return "OpenRouter"
         }
     }
 
@@ -41,10 +43,11 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     /// update it here. `openrouter/free` auto-routes to whatever is live.
     var defaultModel: String {
         switch self {
-        case .appleOnDevice: return "Apple Foundation Model"
-        case .openAI:        return "gpt-4o-mini"
-        case .arceeAI:       return "mistralai/mistral-small-3.1-24b-instruct:free"
-        case .openRouter:    return "meta-llama/llama-4-scout:free"
+        case .appleOnDevice:  return "Apple Foundation Model"
+        case .embeddingLocal: return "NLEmbedding.sentenceEmbedding"
+        case .openAI:         return "gpt-4o-mini"
+        case .arceeAI:        return "mistralai/mistral-small-3.1-24b-instruct:free"
+        case .openRouter:     return "meta-llama/llama-4-scout:free"
         }
     }
 
@@ -52,22 +55,24 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     /// Each slot tries its own list before the manager moves to the next provider.
     var fallbackModels: [String] {
         switch self {
-        case .appleOnDevice: return []
-        case .openAI:        return []
-        case .arceeAI:       return ["google/gemma-3-27b-it:free", "openrouter/free"]
-        case .openRouter:    return ["google/gemma-3-12b-it:free", "openrouter/free"]
+        case .appleOnDevice:  return []
+        case .embeddingLocal: return []
+        case .openAI:         return []
+        case .arceeAI:        return ["google/gemma-3-27b-it:free", "openrouter/free"]
+        case .openRouter:     return ["google/gemma-3-12b-it:free", "openrouter/free"]
         }
     }
 
     /// Where users can get a free API key. `nil` for providers that don't
-    /// need one (the on-device model runs locally).
+    /// need one (on-device models run locally).
     var keySignupURL: URL? {
         let raw: String
         switch self {
-        case .appleOnDevice: return nil
-        case .openAI:        raw = "https://platform.openai.com/api-keys"
-        case .arceeAI:       raw = "https://openrouter.ai/keys"
-        case .openRouter:    raw = "https://openrouter.ai/keys"
+        case .appleOnDevice:  return nil
+        case .embeddingLocal: return nil
+        case .openAI:         raw = "https://platform.openai.com/api-keys"
+        case .arceeAI:        raw = "https://openrouter.ai/keys"
+        case .openRouter:     raw = "https://openrouter.ai/keys"
         }
         guard let url = URL(string: raw) else {
             assertionFailure("keySignupURL has an invalid hardcoded URL: \(raw)")
@@ -79,10 +84,11 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     /// SF Symbol for the provider
     var icon: String {
         switch self {
-        case .appleOnDevice: return "cpu"
-        case .openAI:        return "brain.head.profile"
-        case .arceeAI:       return "triangle.fill"
-        case .openRouter:    return "arrow.triangle.branch"
+        case .appleOnDevice:  return "cpu"
+        case .embeddingLocal: return "waveform.path.ecg"
+        case .openAI:         return "brain.head.profile"
+        case .arceeAI:        return "triangle.fill"
+        case .openRouter:     return "arrow.triangle.branch"
         }
     }
 
@@ -90,10 +96,11 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     /// on-device providers that don't use a key.
     var plistKey: String {
         switch self {
-        case .appleOnDevice: return ""
-        case .openAI:        return "OPENAI_API_KEY"
-        case .arceeAI:       return "ARCEEAI_API_KEY"
-        case .openRouter:    return "OPENROUTER_API_KEY"
+        case .appleOnDevice:  return ""
+        case .embeddingLocal: return ""
+        case .openAI:         return "OPENAI_API_KEY"
+        case .arceeAI:        return "ARCEEAI_API_KEY"
+        case .openRouter:     return "OPENROUTER_API_KEY"
         }
     }
 
@@ -101,10 +108,11 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     /// for on-device providers.
     var secretsPlistName: String {
         switch self {
-        case .appleOnDevice: return ""
-        case .openAI:        return "OpenAI-Secrets"
-        case .arceeAI:       return "ArceeAI-Secrets"
-        case .openRouter:    return "OpenRouter-Secrets"
+        case .appleOnDevice:  return ""
+        case .embeddingLocal: return ""
+        case .openAI:         return "OpenAI-Secrets"
+        case .arceeAI:        return "ArceeAI-Secrets"
+        case .openRouter:     return "OpenRouter-Secrets"
         }
     }
 
@@ -112,10 +120,11 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     /// for on-device providers.
     var keychainKey: String {
         switch self {
-        case .appleOnDevice: return ""
-        case .openAI:        return "ai_key_openai"
-        case .arceeAI:       return "ai_key_arceeai"
-        case .openRouter:    return "ai_key_openrouter"
+        case .appleOnDevice:  return ""
+        case .embeddingLocal: return ""
+        case .openAI:         return "ai_key_openai"
+        case .arceeAI:        return "ai_key_arceeai"
+        case .openRouter:     return "ai_key_openrouter"
         }
     }
 

@@ -167,7 +167,7 @@ class AutoOrganizeService {
             endpoint = "https://openrouter.ai/api/v1/chat/completions"
             headers["HTTP-Referer"] = "https://openrouter.ai"
             headers["X-Title"] = "thebitbinder"
-        case .appleOnDevice:
+        case .appleOnDevice, .embeddingLocal:
             // Guarded above — unreachable. Throw for exhaustiveness.
             throw AIProviderError.keyNotConfigured(provider)
         }
