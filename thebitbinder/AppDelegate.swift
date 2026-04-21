@@ -30,6 +30,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         UNUserNotificationCenter.current().delegate = NotificationManager.shared
         NotificationManager.shared.scheduleIfNeeded()
+        JournalReminderManager.shared.scheduleIfNeeded()
         
         // Required for CloudKit silent push notifications between devices
         application.registerForRemoteNotifications()

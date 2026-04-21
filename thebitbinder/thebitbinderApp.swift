@@ -29,6 +29,7 @@ struct thebitbinderApp: App {
             ImportedJokeMetadata.self,
             UnresolvedImportFragment.self,
             ChatMessage.self,
+            DailyJournalEntry.self,
         ])
 
         // One store file. All fallbacks use this same URL — never switch to a
@@ -298,6 +299,7 @@ struct thebitbinderApp: App {
                 
                 // Ensure notifications are scheduled
                 NotificationManager.shared.scheduleIfNeeded()
+                JournalReminderManager.shared.scheduleIfNeeded()
                 
             case .inactive:
                 print(" [AppLifecycle] App became inactive")

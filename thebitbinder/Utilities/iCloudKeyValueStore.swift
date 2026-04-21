@@ -27,11 +27,15 @@ enum SyncedKeys {
     static let dailyNotificationsEnabled = "dailyNotificationsEnabled"
     static let dailyNotifStartMinute = "dailyNotifStartMinute"
     static let dailyNotifEndMinute = "dailyNotifEndMinute"
-    
+
+    // Daily Journal reminder
+    static let journalReminderEnabled = "journalReminderEnabled"
+    static let journalReminderMinute = "journalReminderMinute"
+
     // Auth
     static let userId = "userId"
     static let lastSyncDate = "lastSyncDate"
-    
+
     /// All keys that should be mirrored between UserDefaults and iCloud KV store
     static let all: [String] = [
         notepadText,
@@ -47,6 +51,8 @@ enum SyncedKeys {
         dailyNotificationsEnabled,
         dailyNotifStartMinute,
         dailyNotifEndMinute,
+        journalReminderEnabled,
+        journalReminderMinute,
         userId,
         lastSyncDate,
     ]

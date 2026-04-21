@@ -17,10 +17,14 @@ struct HomeView: View {
     @Query(filter: #Predicate<SetList> { !$0.isTrashed }) private var allSets: [SetList]
     @Query(filter: #Predicate<BrainstormIdea> { !$0.isTrashed }) private var allIdeas: [BrainstormIdea]
     @Query(filter: #Predicate<Recording> { !$0.isTrashed }) private var allRecordings: [Recording]
+    @Query(sort: \DailyJournalEntry.date, order: .reverse) private var journalEntries: [DailyJournalEntry]
+
+    @Environment(\.modelContext) private var modelContext
 
     @State private var showAddJoke = false
     @State private var showTalkToText = false
     @State private var showQuickRecord = false
+    @State private var showJournalEditor = false
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("userName") private var userName = ""
     
@@ -54,6 +58,13 @@ struct HomeView: View {
     
     private var recentJokes: [Joke] { Array(allJokes.prefix(3)) }
 
+    private var todayJournalEntry: DailyJournalEntry? {
+        let key = DailyJournalEntry.todayKey
+        return journalEntries.first { $0.dateKey == key }
+    }
+
+    private var todayJournalComplete: Bool { todayJournalEntry?.isComplete ?? false }
+
     var body: some View {
         List {
             // MARK: - Greeting Header
@@ -77,6 +88,35 @@ struct HomeView: View {
                 .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
             }
             
+            // MARK: - Daily Journal
+            Section {
+                Button {
+                    haptic(.light)
+                    showJournalEditor = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: todayJournalComplete ? "checkmark.circle.fill" : "book.closed")
+                            .foregroundColor(todayJournalComplete ? .accentColor : Color.bitbinderAccent)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Daily Journal")
+                                .foregroundColor(.primary)
+                            Text(todayJournalComplete ? "Today is complete" : "Today is incomplete")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                    }
+                }
+            } footer: {
+                if !todayJournalComplete {
+                    Text("A quick end-of-day note. One entry per day.")
+                }
+            }
+
             // MARK: - Quick Actions
             Section {
                 Button {
@@ -243,6 +283,14 @@ struct HomeView: View {
         .sheet(isPresented: $showQuickRecord) {
             StandaloneRecordingView()
         }
+        .sheet(isPresented: $showJournalEditor) {
+            NavigationStack {
+                JournalEntryEditorView(
+                    entry: DailyJournalStore.entryForToday(in: modelContext),
+                    isBackfill: false
+                )
+            }
+        }
     }
     
     private var motivationalSubtitle: String {
@@ -326,6 +374,6 @@ extension Date {
     }
     .modelContainer(for: [
         Joke.self, SetList.self, BrainstormIdea.self,
-        Recording.self, ImportBatch.self
+        Recording.self, ImportBatch.self, DailyJournalEntry.self
     ], inMemory: true)
 }

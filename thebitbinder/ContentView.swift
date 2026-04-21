@@ -27,12 +27,13 @@ enum AppScreen: String, CaseIterable {
     case sets = "Sets"
     case recordings = "Recordings"
     case notebookSaver = "Photo Notebook"
+    case journal = "Journal"
     case settings = "Settings"
 
     static var roastScreens: [AppScreen] {
         [.jokes, .settings]
     }
-    
+
     // Default screens for the tab bar when no custom selection exists
     static var defaultTabBarScreens: [AppScreen] {
         [.home, .jokes, .sets, .notebookSaver]
@@ -45,7 +46,7 @@ enum AppScreen: String, CaseIterable {
     /// Ordered list of all screens that can appear in the tab bar.
     /// Used to maintain a stable ordering regardless of selection order.
     static var tabBarOrder: [AppScreen] {
-        [.home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver]
+        [.home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver, .journal]
     }
 
     /// Returns the user's custom tab selection (plus Settings, always appended).
@@ -67,10 +68,11 @@ enum AppScreen: String, CaseIterable {
         case .sets:          return "list.bullet.rectangle.portrait"
         case .recordings:    return "waveform"
         case .notebookSaver: return "photo.on.rectangle"
+        case .journal:       return "book.closed"
         case .settings:      return "gearshape"
         }
     }
-    
+
     var selectedIcon: String {
         switch self {
         case .home:          return "house.fill"
@@ -79,6 +81,7 @@ enum AppScreen: String, CaseIterable {
         case .sets:          return "list.bullet.rectangle.portrait.fill"
         case .recordings:    return "waveform"
         case .notebookSaver: return "photo.on.rectangle.fill"
+        case .journal:       return "book.closed.fill"
         case .settings:      return "gearshape.fill"
         }
     }
@@ -91,6 +94,7 @@ enum AppScreen: String, CaseIterable {
         case .sets:          return "Roast Sets"
         case .recordings:    return "Recordings"
         case .notebookSaver: return "Photo Notebook"
+        case .journal:       return "Journal"
         case .settings:      return "Settings"
         }
     }
@@ -314,6 +318,8 @@ struct MainTabView: View {
             RecordingsView()
         case .notebookSaver:
             NotebookView()
+        case .journal:
+            JournalHomeView()
         case .settings:
             SettingsView()
         }

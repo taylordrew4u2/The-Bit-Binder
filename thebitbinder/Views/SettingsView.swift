@@ -154,6 +154,22 @@ struct SettingsView: View {
             
             // MARK: - Notifications Section
             DailyNotificationSection()
+
+            // MARK: - Journal Section
+            Section {
+                NavigationLink {
+                    JournalHomeView()
+                } label: {
+                    Label("Daily Journal", systemImage: "book.closed")
+                }
+                NavigationLink {
+                    JournalReminderSettingsView()
+                } label: {
+                    Label("Journal Reminder", systemImage: "bell.badge")
+                }
+            } header: {
+                Text("Journal")
+            }
             
             // MARK: - Customize Section
             Section {
