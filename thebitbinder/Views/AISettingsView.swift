@@ -89,9 +89,11 @@ struct AISettingsView: View {
                     )
                 }
 
-                Link(destination: AIProviderType.openRouter.keySignupURL) {
-                    Label("Grab a free House Blend voucher", systemImage: "leaf.fill")
-                        .font(.subheadline)
+                if let signupURL = AIProviderType.openRouter.keySignupURL {
+                    Link(destination: signupURL) {
+                        Label("Grab a free House Blend voucher", systemImage: "leaf.fill")
+                            .font(.subheadline)
+                    }
                 }
             } header: {
                 Text("House Blend (Free)")

@@ -121,6 +121,13 @@ class AutoOrganizeService {
 
     /// Sends a categorization request to an AI provider and parses the response.
     private static func callAIForCategorization(content: String, provider: AIProviderType, existingFolders: [String]) async throws -> [CategoryMatch] {
+        // On-device providers don't use a REST endpoint, and this categorizer
+        // is cloud-only for now — the caller filters by `loadKey != nil` so
+        // on-device never reaches here, but throw defensively if it ever does.
+        if provider.isOnDevice {
+            throw AIProviderError.keyNotConfigured(provider)
+        }
+
         guard let apiKey = AIKeyLoader.loadKey(for: provider) else {
             throw AIProviderError.keyNotConfigured(provider)
         }
@@ -160,6 +167,9 @@ class AutoOrganizeService {
             endpoint = "https://openrouter.ai/api/v1/chat/completions"
             headers["HTTP-Referer"] = "https://openrouter.ai"
             headers["X-Title"] = "thebitbinder"
+        case .appleOnDevice:
+            // Guarded above — unreachable. Throw for exhaustiveness.
+            throw AIProviderError.keyNotConfigured(provider)
         }
 
         let model = provider.defaultModel

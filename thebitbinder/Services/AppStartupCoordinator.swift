@@ -41,6 +41,9 @@ final class AppStartupCoordinator: ObservableObject {
     private func seedAPIKeysIfNeeded() {
         let providers: [AIProviderType] = AIProviderType.allCases
         for provider in providers {
+            // On-device providers don't use keys at all — nothing to seed.
+            guard !provider.isOnDevice else { continue }
+
             // Only seed if there's no user-entered key already
             let existing = KeychainHelper.load(forKey: provider.keychainKey)
             guard existing == nil || (existing?.isEmpty ?? true) else { continue }
@@ -59,6 +62,11 @@ final class AppStartupCoordinator: ObservableObject {
         // Log provider readiness
         print(" [AppStartup] Extraction providers loaded:")
         for provider in AIProviderType.allCases {
+            if provider.isOnDevice {
+                // On-device readiness is reported by the manager's availability check.
+                print("   \(provider.displayName): (on-device; availability checked at runtime)")
+                continue
+            }
             let key = AIKeyLoader.loadKey(for: provider)
             let status = key != nil ? " ready" : "  no key"
             print("   \(provider.displayName): \(status)")

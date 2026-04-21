@@ -13,18 +13,26 @@ import UIKit
 
 /// Every extraction provider available for joke extraction.
 enum AIProviderType: String, CaseIterable, Identifiable, Codable {
-    case openAI      = "OpenAI"
-    case arceeAI     = "ArceeAI"
-    case openRouter  = "OpenRouter"
+    case appleOnDevice = "AppleOnDevice"
+    case openAI        = "OpenAI"
+    case arceeAI       = "ArceeAI"
+    case openRouter    = "OpenRouter"
 
     var id: String { rawValue }
+
+    /// True for providers that run entirely on-device and need no API key,
+    /// no network, and no user setup. Cloud providers return `false`.
+    var isOnDevice: Bool {
+        self == .appleOnDevice
+    }
 
     /// Human-readable display name
     var displayName: String {
         switch self {
-        case .openAI:      return "OpenAI"
-        case .arceeAI:     return "Arcee"
-        case .openRouter:  return "OpenRouter"
+        case .appleOnDevice: return "On-Device (Apple)"
+        case .openAI:        return "OpenAI"
+        case .arceeAI:       return "Arcee"
+        case .openRouter:    return "OpenRouter"
         }
     }
 
@@ -33,9 +41,10 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     /// update it here. `openrouter/free` auto-routes to whatever is live.
     var defaultModel: String {
         switch self {
-        case .openAI:      return "gpt-4o-mini"
-        case .arceeAI:     return "mistralai/mistral-small-3.1-24b-instruct:free"
-        case .openRouter:  return "meta-llama/llama-4-scout:free"
+        case .appleOnDevice: return "Apple Foundation Model"
+        case .openAI:        return "gpt-4o-mini"
+        case .arceeAI:       return "mistralai/mistral-small-3.1-24b-instruct:free"
+        case .openRouter:    return "meta-llama/llama-4-scout:free"
         }
     }
 
@@ -43,24 +52,26 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     /// Each slot tries its own list before the manager moves to the next provider.
     var fallbackModels: [String] {
         switch self {
-        case .openAI:      return []
-        case .arceeAI:     return ["google/gemma-3-27b-it:free", "openrouter/free"]
-        case .openRouter:  return ["google/gemma-3-12b-it:free", "openrouter/free"]
+        case .appleOnDevice: return []
+        case .openAI:        return []
+        case .arceeAI:       return ["google/gemma-3-27b-it:free", "openrouter/free"]
+        case .openRouter:    return ["google/gemma-3-12b-it:free", "openrouter/free"]
         }
     }
 
-    /// Where users can get a free API key
-    var keySignupURL: URL {
+    /// Where users can get a free API key. `nil` for providers that don't
+    /// need one (the on-device model runs locally).
+    var keySignupURL: URL? {
         let raw: String
         switch self {
-        case .openAI:      raw = "https://platform.openai.com/api-keys"
-        case .arceeAI:     raw = "https://openrouter.ai/keys"
-        case .openRouter:  raw = "https://openrouter.ai/keys"
+        case .appleOnDevice: return nil
+        case .openAI:        raw = "https://platform.openai.com/api-keys"
+        case .arceeAI:       raw = "https://openrouter.ai/keys"
+        case .openRouter:    raw = "https://openrouter.ai/keys"
         }
-        // These are compile-time constants; guard lets us fail safe instead of crash.
         guard let url = URL(string: raw) else {
             assertionFailure("keySignupURL has an invalid hardcoded URL: \(raw)")
-            return URL(string: "https://openrouter.ai/keys") ?? URL(fileURLWithPath: "/")
+            return URL(string: "https://openrouter.ai/keys")
         }
         return url
     }
@@ -68,39 +79,46 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     /// SF Symbol for the provider
     var icon: String {
         switch self {
-        case .openAI:      return "brain.head.profile"
-        case .arceeAI:     return "triangle.fill"
-        case .openRouter:  return "arrow.triangle.branch"
+        case .appleOnDevice: return "cpu"
+        case .openAI:        return "brain.head.profile"
+        case .arceeAI:       return "triangle.fill"
+        case .openRouter:    return "arrow.triangle.branch"
         }
     }
 
-    /// The plist key name for this provider's API key
+    /// The plist key name for this provider's API key. Empty string for
+    /// on-device providers that don't use a key.
     var plistKey: String {
         switch self {
-        case .openAI:      return "OPENAI_API_KEY"
-        case .arceeAI:     return "ARCEEAI_API_KEY"
-        case .openRouter:  return "OPENROUTER_API_KEY"
+        case .appleOnDevice: return ""
+        case .openAI:        return "OPENAI_API_KEY"
+        case .arceeAI:       return "ARCEEAI_API_KEY"
+        case .openRouter:    return "OPENROUTER_API_KEY"
         }
     }
 
-    /// The per-provider plist file name (without extension)
+    /// The per-provider plist file name (without extension). Empty string
+    /// for on-device providers.
     var secretsPlistName: String {
         switch self {
-        case .openAI:      return "OpenAI-Secrets"
-        case .arceeAI:     return "ArceeAI-Secrets"
-        case .openRouter:  return "OpenRouter-Secrets"
+        case .appleOnDevice: return ""
+        case .openAI:        return "OpenAI-Secrets"
+        case .arceeAI:       return "ArceeAI-Secrets"
+        case .openRouter:    return "OpenRouter-Secrets"
         }
     }
 
-    /// Keychain account key for storing user-entered API keys.
+    /// Keychain account key for storing user-entered API keys. Empty string
+    /// for on-device providers.
     var keychainKey: String {
         switch self {
-        case .openAI:      return "ai_key_openai"
-        case .arceeAI:     return "ai_key_arceeai"
-        case .openRouter:  return "ai_key_openrouter"
+        case .appleOnDevice: return ""
+        case .openAI:        return "ai_key_openai"
+        case .arceeAI:       return "ai_key_arceeai"
+        case .openRouter:    return "ai_key_openrouter"
         }
     }
-    
+
     /// Legacy UserDefaults key (for migration only).
     var userDefaultsKey: String { keychainKey }
 }
@@ -137,11 +155,21 @@ enum AIProviderError: LocalizedError {
 protocol AIJokeExtractionProvider {
     var providerType: AIProviderType { get }
 
-    /// Check if this provider is configured (has a valid API key).
+    /// Whether this provider needs network access to run. Cloud providers are
+    /// `true`; on-device providers (Apple Foundation Models) are `false`.
+    /// Default: `true` so existing cloud providers don't need to override.
+    var requiresNetwork: Bool { get }
+
+    /// Check if this provider is configured (has a valid API key, or the
+    /// on-device model is available on this device).
     func isConfigured() -> Bool
 
     /// Extract jokes from raw text. Throws `AIProviderError` on failure.
     func extractJokes(from text: String) async throws -> [AIExtractedJoke]
+}
+
+extension AIJokeExtractionProvider {
+    var requiresNetwork: Bool { true }
 }
 
 // MARK: - Shared Prompt
@@ -304,6 +332,10 @@ enum AIKeyLoader {
     /// Checks: 1) Keychain (user-entered), 2) Per-provider plist, 3) Secrets.plist, 4) environment variable.
     /// Automatically migrates legacy keys from UserDefaults to Keychain on first access.
     static func loadKey(for provider: AIProviderType) -> String? {
+        // On-device providers don't have keys — short-circuit so we don't
+        // read/write empty-string Keychain accounts.
+        if provider.isOnDevice { return nil }
+
         // 1a. Migrate from UserDefaults to Keychain if needed
         if let legacyKey = UserDefaults.standard.string(forKey: provider.userDefaultsKey),
            !legacyKey.isEmpty {

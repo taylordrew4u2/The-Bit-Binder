@@ -70,9 +70,10 @@ final class AIJokeExtractionManager {
     // MARK: - Providers
 
     private let providers: [AIProviderType: AIJokeExtractionProvider] = [
-        .openAI:      OpenAIProvider(),
-        .arceeAI:     ArceeAIProvider(),
-        .openRouter:  OpenRouterProvider()
+        .appleOnDevice: AppleOnDeviceJokeExtractionProvider(),
+        .openAI:        OpenAIProvider(),
+        .arceeAI:       ArceeAIProvider(),
+        .openRouter:    OpenRouterProvider()
     ]
 
     /// UserDefaults key for the user's preferred provider order.
@@ -98,8 +99,9 @@ final class AIJokeExtractionManager {
                 let missing = AIProviderType.allCases.filter { !decoded.contains($0) }
                 return decoded + missing
             }
-            // Free providers first — OpenAI requires paid credits and is disabled by default
-            return [.arceeAI, .openRouter, .openAI]
+            // On-device first (free, offline, private); free cloud providers
+            // next; OpenAI last (requires paid credits, disabled by default).
+            return [.appleOnDevice, .arceeAI, .openRouter, .openAI]
         }
         set {
             if let data = try? JSONEncoder().encode(newValue) {
@@ -203,9 +205,15 @@ final class AIJokeExtractionManager {
         print(" [Extraction] Starting with \(text.count) chars")
         print(" [Extraction] Providers in use order: \(providerOrder.map(\.displayName).joined(separator: " → "))")
 
-        // If no connectivity, skip straight to throwing — don't silently degrade.
-        if await !Self.hasNetworkConnectivity() {
-            print(" [Extraction] No network — all AI providers unreachable")
+        // If no connectivity, we can still run on-device providers that don't
+        // need the network. Only bail upfront when every available provider
+        // requires a network we don't have.
+        let onDeviceAvailable = availableProviders.contains { type in
+            guard let provider = providers[type] else { return false }
+            return !provider.requiresNetwork
+        }
+        if !onDeviceAvailable, await !Self.hasNetworkConnectivity() {
+            print(" [Extraction] No network and no on-device provider available")
             throw AIExtractionFailedError(
                 reason: "No internet — GagGrabber can't do its thing offline!",
                 underlyingErrors: [:]
@@ -216,13 +224,6 @@ final class AIJokeExtractionManager {
         var hitNetworkError = false
 
         for providerType in providerOrder {
-            // If a previous provider hit a network error, skip the rest —
-            // they will all fail the same way.
-            if hitNetworkError {
-                print(" [Extraction] Skipping \(providerType.displayName) (network down)")
-                continue
-            }
-
             guard !disabledProviders.contains(providerType) else {
                 print(" [Extraction] Skipping \(providerType.displayName) (disabled)")
                 continue
@@ -230,6 +231,14 @@ final class AIJokeExtractionManager {
 
             guard let provider = providers[providerType], provider.isConfigured() else {
                 print(" [Extraction] Skipping \(providerType.displayName) (no API key)")
+                continue
+            }
+
+            // If a previous cloud provider hit a network error, skip the rest
+            // of the cloud providers — they will all fail the same way. But
+            // still try any on-device providers that don't need the network.
+            if hitNetworkError, provider.requiresNetwork {
+                print(" [Extraction] Skipping \(providerType.displayName) (network down)")
                 continue
             }
 
