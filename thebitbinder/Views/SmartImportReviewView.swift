@@ -47,6 +47,13 @@ struct SmartImportReviewView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
+                    // Which provider actually ran — transparent about
+                    // on-device vs. cloud so the user can see that their
+                    // document didn't leave the device when it didn't have to.
+                    ExtractionProviderBadge(providerUsed: importResult.providerUsed)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+
                     // Progress bar
                     progressSection
                     
