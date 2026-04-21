@@ -45,9 +45,11 @@ final class HybridGagGrabber: ObservableObject {
     /// When AI is unavailable, the earliest time the user can retry.
     @Published var retryAfterDate: Date?
 
-    /// The user's description of how their document is formatted.
-    /// Sent to the AI to improve extraction accuracy.
-    @Published var documentFormatHint: String = ""
+    /// Structured hints the user supplies before extraction. Drives both
+    /// preprocessing (stripping stage directions / timestamps / etc.) and the
+    /// AI-prompt prefix sent with the document text. Defaults to `.unspecified`
+    /// so users who never touch the form get today's behavior unchanged.
+    @Published var hints: ExtractionHints = .unspecified
 
     /// Human-readable status message shown during extraction so the user
     /// knows GagGrabber is working and not frozen.
@@ -104,18 +106,19 @@ final class HybridGagGrabber: ObservableObject {
 
         print(" [GagGrabber] Text length: \(rawText.count) chars")
 
-        // Build the text to send — prepend the user's format hint if provided
-        let hint = documentFormatHint.trimmingCharacters(in: .whitespacesAndNewlines)
-        let textToSend: String
-        if hint.isEmpty {
-            textToSend = rawText
-        } else {
-            textToSend = """
-            [USER FORMAT HINT: \(hint)]
-
-            \(rawText)
-            """
+        // Apply any user-selected ignore filters (stage directions, crowd
+        // reactions, timestamps, notes-to-self) *before* the text reaches the
+        // AI. Safe to call unconditionally — it's a no-op when no toggles
+        // are on.
+        let preprocessed = hints.preprocess(rawText)
+        if preprocessed.count != rawText.count {
+            print(" [GagGrabber] Preprocessing trimmed \(rawText.count - preprocessed.count) chars")
         }
+
+        // Prepend a natural-language summary of the user's hints so the AI
+        // knows how the document is structured. `applyingPromptPrefix` is a
+        // no-op when hints are unspecified.
+        let textToSend = hints.applyingPromptPrefix(to: preprocessed)
 
         // ------------------------------------------------------------------
         // Try all configured AI providers via AIJokeExtractionManager
@@ -144,7 +147,7 @@ final class HybridGagGrabber: ObservableObject {
             statusMessage = "Cleaning up results…"
             let deduped = Self.deduplicateJokes(jokes)
             if deduped.isEmpty {
-                lastError = "GagGrabber read the whole file but couldn't spot any jokes. Try describing your document format above and give it another go!"
+                lastError = "GagGrabber read the whole file but couldn't spot any jokes. Try adjusting the hints above and give it another go!"
             }
             extractedJokes = deduped
         } catch {
@@ -531,23 +534,15 @@ struct HybridGagGrabberSheet: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
                 }
 
-                // MARK: Document Format Hint
+                // MARK: Document Format Hints
                 Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("How is your document set up?")
-                            .font(.subheadline.weight(.semibold))
-                        Text("This helps GagGrabber find every joke accurately.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextField("e.g. \"Each joke is numbered 1-50\" or \"One joke per line\"",
-                                  text: $grabber.documentFormatHint, axis: .vertical)
-                            .textFieldStyle(.roundedBorder)
-                            .lineLimit(2...4)
-                            .font(.subheadline)
-                    }
-                    .padding(.vertical, 4)
+                    ExtractionHintsForm(hints: $grabber.hints, compact: true)
+                        .padding(.vertical, 4)
                 } header: {
-                    Label("Format Hint (optional)", systemImage: "text.magnifyingglass")
+                    Label("Tell GagGrabber about your document (optional)", systemImage: "text.magnifyingglass")
+                } footer: {
+                    Text("Skip this and tap Extract — GagGrabber will try to figure it out on its own.")
+                        .font(.caption)
                 }
 
                 // MARK: Source

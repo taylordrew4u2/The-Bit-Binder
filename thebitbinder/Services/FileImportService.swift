@@ -10,12 +10,14 @@ final class FileImportService {
     
     private init() {}
     
-    /// Modern import method that returns the full pipeline result
-    func importWithPipeline(from url: URL) async throws -> ImportPipelineResult {
+    /// Modern import method that returns the full pipeline result. Optional
+    /// `hints` from the user tell the pipeline how the document is structured.
+    /// Defaults to `.unspecified` so existing callers keep working unchanged.
+    func importWithPipeline(from url: URL, hints: ExtractionHints = .unspecified) async throws -> ImportPipelineResult {
         dataLogger.logInfo("Starting pipeline import for \(url.lastPathComponent)")
-        
+
         do {
-            let result = try await pipelineCoordinator.processFile(url: url)
+            let result = try await pipelineCoordinator.processFile(url: url, hints: hints)
             
             dataLogger.logInfo("Pipeline import completed successfully")
             dataLogger.logInfo("Auto-saved: \(result.autoSavedJokes.count)")

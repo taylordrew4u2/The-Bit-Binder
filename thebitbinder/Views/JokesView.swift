@@ -9,6 +9,20 @@ import SwiftUI
 import SwiftData
 import PhotosUI
 
+/// Identifiable wrapper for the URLs the user just picked in the document
+/// picker, so `.sheet(item:)` can present the extraction-hints preflight.
+struct PendingDocumentImport: Identifiable {
+    let id = UUID()
+    let urls: [URL]
+
+    var summary: String {
+        if urls.count == 1 {
+            return urls[0].lastPathComponent
+        }
+        return "\(urls.count) files"
+    }
+}
+
 struct ImportErrorMessage: LocalizedError {
     let message: String
     var errorDescription: String? { message }
@@ -116,6 +130,11 @@ struct JokesView: View {
     @State private var smartImportResult: ImportPipelineResult?
     @State private var importError: Error? = nil
     @State private var showingImportError = false
+
+    // Pre-flight extraction-hints sheet. `pendingDocumentImport` is set when
+    // the user picks files via the document picker; presenting the sheet
+    // gathers structured hints before the pipeline runs.
+    @State private var pendingDocumentImport: PendingDocumentImport?
     
     // Batch select/delete mode
     @State private var isSelectMode = false
@@ -401,6 +420,17 @@ struct JokesView: View {
                         selectedFolder: selectedFolder,
                         onComplete: {
                             smartImportResult = nil
+                        }
+                    )
+                }
+                .sheet(item: $pendingDocumentImport) { pending in
+                    ExtractionHintsPreflightSheet(
+                        fileNameSummary: pending.summary,
+                        onContinue: { hints in
+                            runDocumentImport(urls: pending.urls, hints: hints)
+                        },
+                        onSkip: {
+                            runDocumentImport(urls: pending.urls, hints: .unspecified)
                         }
                     )
                 }
@@ -1245,14 +1275,22 @@ struct JokesView: View {
         }
     }
     
+    /// Entry point used by the document picker. Presents the extraction-hints
+    /// preflight sheet first — `runDocumentImport(urls:hints:)` does the
+    /// actual work once the user continues or skips.
     private func processDocuments(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        pendingDocumentImport = PendingDocumentImport(urls: urls)
+    }
+
+    private func runDocumentImport(urls: [URL], hints: ExtractionHints) {
         print(" SMART IMPORT START: \(urls.count) files selected")
         isProcessingImages = true
         importedJokeNames = []
         importStatusMessage = "Analyzing \(urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files")..."
         importFileCount = urls.count
         importFileIndex = 0
-        
+
         Task {
             // For multi-file imports, we combine results from all files
             var combinedAutoSaved: [ImportedJoke] = []
@@ -1269,7 +1307,7 @@ struct JokesView: View {
                 }
                 
                 do {
-                    let result = try await FileImportService.shared.importWithPipeline(from: url)
+                    let result = try await FileImportService.shared.importWithPipeline(from: url, hints: hints)
                     combinedAutoSaved.append(contentsOf: result.autoSavedJokes)
                     combinedReview.append(contentsOf: result.reviewQueueJokes)
                     combinedRejected.append(contentsOf: result.rejectedBlocks)

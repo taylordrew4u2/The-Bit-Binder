@@ -46,8 +46,13 @@ final class ImportPipelineCoordinator {
 
     // MARK: - Main Pipeline Entry Point
 
-    /// Processes a file and returns an `ImportPipelineResult`.
-    func processFile(url: URL) async throws -> ImportPipelineResult {
+    /// Processes a file and returns an `ImportPipelineResult`. Optional
+    /// `hints` from the user tell us how the document is structured so we can
+    /// strip ignored content (stage directions, timestamps, …) before
+    /// extraction and prepend a natural-language hint prefix to the AI prompt.
+    /// Defaults to `.unspecified`, preserving the zero-friction path for
+    /// callers that don't collect hints.
+    func processFile(url: URL, hints: ExtractionHints = .unspecified) async throws -> ImportPipelineResult {
         let startTime = Date()
         var debugInfo: [String] = []
 
@@ -100,13 +105,21 @@ final class ImportPipelineCoordinator {
         }
         debugInfo.append("Clean lines: \(cleanedPages.flatMap(\.lines).count)")
 
-        //  Stage 4: Reassemble plain text for extraction 
+        //  Stage 4: Reassemble plain text for extraction
         // We merge all clean pages back into one text string so extraction providers
         // can see the full document context rather than fragmented chunks.
-        let fullText = cleanedPages
+        let reassembled = cleanedPages
             .flatMap(\.lines)
             .map(\.normalizedText)
             .joined(separator: "\n")
+
+        // Apply user-selected ignore filters (stage directions, crowd
+        // reactions, timestamps, notes-to-self). No-op when hints are
+        // unspecified or every toggle is off.
+        let fullText = hints.preprocess(reassembled)
+        if fullText.count != reassembled.count {
+            debugInfo.append("Hint preprocessing trimmed \(reassembled.count - fullText.count) chars")
+        }
 
         debugInfo.append("\n=== Stage 4: Joke Extraction (AI — no local fallback) ===")
         let availableAI = AIJokeExtractionManager.shared.availableProviders
@@ -125,9 +138,16 @@ final class ImportPipelineCoordinator {
         var extractedJokes: [AIExtractedJoke]
         var providerUsed: String
         let textChunks = splitIntoExtractionChunks(fullText)
+        // Build the hint prefix once so each chunk gets the same system-level
+        // context. Nil when hints are unspecified — no extra tokens spent.
+        let hintPrefix = hints.aiPromptPrefix()
+        func prepare(_ chunk: String) -> String {
+            guard let hintPrefix else { return chunk }
+            return "\(hintPrefix)\n\n\(chunk)"
+        }
         if textChunks.count == 1 {
             // Single chunk — let errors propagate so the caller can surface them.
-            let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: textChunks[0], token: importToken)
+            let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: prepare(textChunks[0]), token: importToken)
             extractedJokes = result.jokes
             providerUsed = result.providerUsed
         } else {
@@ -142,7 +162,7 @@ final class ImportPipelineCoordinator {
             for (chunkIndex, chunk) in textChunks.enumerated() {
                 do {
                     debugInfo.append("  Chunk \(chunkIndex + 1)/\(textChunks.count): \(chunk.count) chars")
-                    let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: chunk, token: importToken)
+                    let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: prepare(chunk), token: importToken)
                     allJokes.append(contentsOf: result.jokes)
                     lastProvider = result.providerUsed
                 } catch {
