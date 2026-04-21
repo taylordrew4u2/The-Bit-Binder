@@ -19,10 +19,6 @@ final class ImportReviewViewModel: ObservableObject {
     /// Set when extraction hits a rate-limit or all providers fail during import.
     @Published var rateLimitError: AIExtractionFailedError? = nil
 
-    // Legacy quota stats placeholder. Multi-provider extraction no longer tracks per-provider usage here.
-    var aiRequestsRemaining: Int { Int.max }
-    var aiRequestsUsed: Int      { 0 }
-
     /// Indices of items that were auto-accepted (from the high-confidence autoSavedJokes bucket)
     private(set) var autoAcceptedIndices: Set<Int> = []
     

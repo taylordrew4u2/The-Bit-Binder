@@ -13,30 +13,13 @@ import Combine
 final class AuthService: ObservableObject {
     static let shared = AuthService()
     
-    @Published var hasAcceptedTerms = false
-    @Published var isLoading = false
     @Published var isAuthenticated = true
-    @Published var authError: AuthServiceError?
     
     private let kvStore = iCloudKeyValueStore.shared
     
-    private init() {
-        hasAcceptedTerms = UserDefaults.standard.bool(forKey: SyncedKeys.termsAccepted)
-    }
-    
-    // MARK: - Terms Acceptance
-    
-    func acceptTerms() {
-        hasAcceptedTerms = true
-        kvStore.set(true, forKey: SyncedKeys.termsAccepted)
-    }
+    private init() {}
     
     // MARK: - Auth Stubs (no external auth needed)
-    
-    /// Always succeeds — no external auth provider required
-    func signInAnonymously() async throws {
-        isAuthenticated = true
-    }
     
     /// Always succeeds — no external auth provider required
     func ensureAuthenticated() async throws {
@@ -52,19 +35,6 @@ final class AuthService: ObservableObject {
             let newId = UUID().uuidString
             kvStore.set(newId, forKey: SyncedKeys.userId)
             return newId
-        }
-    }
-}
-
-// MARK: - Error Type
-
-enum AuthServiceError: LocalizedError {
-    case unknown
-    
-    var errorDescription: String? {
-        switch self {
-        case .unknown:
-            return "An unknown error occurred"
         }
     }
 }

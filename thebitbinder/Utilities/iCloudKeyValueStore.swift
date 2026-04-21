@@ -29,7 +29,6 @@ enum SyncedKeys {
     static let dailyNotifEndMinute = "dailyNotifEndMinute"
     
     // Auth
-    static let termsAccepted = "hasAcceptedTerms"
     static let userId = "userId"
     static let lastSyncDate = "lastSyncDate"
     
@@ -48,7 +47,6 @@ enum SyncedKeys {
         dailyNotificationsEnabled,
         dailyNotifStartMinute,
         dailyNotifEndMinute,
-        termsAccepted,
         userId,
         lastSyncDate,
     ]

@@ -106,15 +106,6 @@ final class OCRTextExtractor {
     
     // MARK: - Vision Results Processing
 
-    /// Legacy overload kept for any callers that still pass a UIImage.
-    private func processVisionResults(
-        _ observations: [VNRecognizedTextObservation],
-        image: UIImage,
-        pageNumber: Int
-    ) -> [ExtractedLine] {
-        processVisionResultsFromCGImage(observations, cgImageSize: image.size, pageNumber: pageNumber)
-    }
-
     /// Primary overload — takes only the size so the UIImage is not retained.
     private func processVisionResultsFromCGImage(
         _ observations: [VNRecognizedTextObservation],
