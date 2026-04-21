@@ -1113,7 +1113,11 @@ struct JokesView: View {
 
                     await MainActor.run { importStatusMessage = "GagGrabber extracting jokes from scan \(importFileIndex) of \(images.count)..." }
 
-                    let result = try await FileImportService.shared.importWithPipeline(from: tmpURL)
+                    // Scanner path doesn't present the preflight (the user is
+                    // scanning arbitrary pages, not a file they already know
+                    // the shape of) but they still benefit from whatever
+                    // hints they've confirmed in previous imports.
+                    let result = try await FileImportService.shared.importWithPipeline(from: tmpURL, hints: .loadLastUsed())
                     combinedAutoSaved.append(contentsOf: result.autoSavedJokes)
                     combinedReview.append(contentsOf: result.reviewQueueJokes)
                     combinedRejected.append(contentsOf: result.rejectedBlocks)
@@ -1211,7 +1215,10 @@ struct JokesView: View {
 
                 await MainActor.run { importStatusMessage = "GagGrabber extracting jokes from photo \(importFileIndex) of \(importFileCount)..." }
 
-                let result = try await FileImportService.shared.importWithPipeline(from: tmpURL)
+                // Photo-library path mirrors the scanner — no preflight
+                // (arbitrary photos, unpredictable content) but still
+                // benefits from the user's last-confirmed hints.
+                let result = try await FileImportService.shared.importWithPipeline(from: tmpURL, hints: .loadLastUsed())
                 combinedAutoSaved.append(contentsOf: result.autoSavedJokes)
                 combinedReview.append(contentsOf: result.reviewQueueJokes)
                 combinedRejected.append(contentsOf: result.rejectedBlocks)
