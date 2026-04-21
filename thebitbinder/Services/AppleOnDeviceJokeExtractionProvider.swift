@@ -46,9 +46,18 @@ final class AppleOnDeviceJokeExtractionProvider: AIJokeExtractionProvider {
     // MARK: - Extraction
 
     func extractJokes(from text: String) async throws -> [AIExtractedJoke] {
+        try await extractJokes(from: text, hints: .unspecified)
+    }
+
+    /// Hints-aware entry point. Structured hints go into `LanguageModelSession`
+    /// instructions (the system-prompt slot) rather than being prefixed to
+    /// the user message — that's the cleaner place for them and frees the
+    /// user message for pure document content, respecting the on-device
+    /// context window.
+    func extractJokes(from text: String, hints: ExtractionHints) async throws -> [AIExtractedJoke] {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, macOS 26.0, *) {
-            return try await runOnDevice(text: text)
+            return try await runOnDevice(text: text, hints: hints)
         }
         #endif
 
@@ -62,14 +71,26 @@ final class AppleOnDeviceJokeExtractionProvider: AIJokeExtractionProvider {
 
     #if canImport(FoundationModels)
     @available(iOS 26.0, macOS 26.0, *)
-    private func runOnDevice(text: String) async throws -> [AIExtractedJoke] {
-        let instructions = Self.instructions
+    private func runOnDevice(text: String, hints: ExtractionHints) async throws -> [AIExtractedJoke] {
+        // Build instructions: base prompt + the user's hint summary (if any).
+        // The instructions slot is the right place for "how to interpret the
+        // input" — equivalent to a system prompt. The user message stays
+        // pure document content.
+        var instructionsText = Self.baseInstructions
+        if let prefix = hints.aiPromptPrefix() {
+            instructionsText += "\n\n" + prefix
+        }
 
-        let session = LanguageModelSession(instructions: instructions)
+        // Cloud providers receive the hint prefix prepended to `text`; the
+        // on-device provider pulls hints from the instructions block
+        // instead, so strip any prefix the caller added to `text`.
+        let documentText = ExtractionHints.stripPromptPrefix(from: text)
+
+        let session = LanguageModelSession(instructions: instructionsText)
 
         do {
             let response = try await session.respond(
-                to: text,
+                to: documentText,
                 generating: [OnDeviceJoke].self
             )
             return response.content.map { $0.asAIExtractedJoke() }
@@ -80,10 +101,11 @@ final class AppleOnDeviceJokeExtractionProvider: AIJokeExtractionProvider {
         }
     }
 
-    /// Instruction block for the on-device model. Kept close to the shared
-    /// cloud prompt's spirit but trimmed for the smaller context window and
-    /// relying on guided generation for the output shape.
-    private static let instructions: String = """
+    /// Base instruction block for the on-device model. Kept close to the
+    /// shared cloud prompt's spirit but trimmed for the smaller context
+    /// window and relying on guided generation for the output shape.
+    /// User hint summary (when present) is appended at call time.
+    private static let baseInstructions: String = """
     You are a comedy-writing assistant reviewing a stand-up comedian's file.
     Return EVERY piece of text from the file as a separate entry — do not skip,
     summarise, merge, or paraphrase.

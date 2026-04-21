@@ -281,4 +281,29 @@ struct ExtractionHints: Codable, Equatable {
         guard let prefix = aiPromptPrefix() else { return rawText }
         return "\(prefix)\n\n\(rawText)"
     }
+
+    /// Removes any `[EXTRACTION HINTS FROM USER] … [END HINTS]` block (plus
+    /// the legacy `[USER FORMAT HINT: …]` form) that a caller prepended to
+    /// the text. Useful for providers that want to consume hints in a
+    /// different slot — e.g. the on-device `LanguageModelSession` places
+    /// hints in `instructions` rather than the user message, so the text
+    /// itself shouldn't carry the prefix.
+    static func stripPromptPrefix(from text: String) -> String {
+        var out = text
+
+        if let range = out.range(
+            of: #"(?is)^\s*\[EXTRACTION HINTS FROM USER\].*?\[END HINTS\]\s*"#,
+            options: .regularExpression
+        ) {
+            out.removeSubrange(range)
+        }
+
+        out = out.replacingOccurrences(
+            of: #"^\s*\[USER FORMAT HINT:[^\]]*\]\s*"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        return out
+    }
 }

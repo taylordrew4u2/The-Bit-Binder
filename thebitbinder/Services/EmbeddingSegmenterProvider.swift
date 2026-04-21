@@ -60,7 +60,7 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
         // … [END HINTS]` block. We strip it so the hint prose doesn't wind up
         // as a joke entry — the semantic equivalent of what guided-generation
         // providers get for free.
-        let stripped = Self.stripHintPrefix(text)
+        let stripped = ExtractionHints.stripPromptPrefix(from: text)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !stripped.isEmpty else { return [] }
 
@@ -83,30 +83,6 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
                 tags: []
             )
         }
-    }
-
-    // MARK: - Hint-prefix stripping
-
-    /// Remove the `[EXTRACTION HINTS FROM USER] … [END HINTS]` block that
-    /// `ExtractionHints.aiPromptPrefix()` produces, plus the legacy
-    /// `[USER FORMAT HINT: …]` form. Case-insensitive, single-line match.
-    static func stripHintPrefix(_ text: String) -> String {
-        var out = text
-
-        // New structured prefix (always ends with `[END HINTS]`).
-        if let range = out.range(of: #"(?is)^\s*\[EXTRACTION HINTS FROM USER\].*?\[END HINTS\]\s*"#,
-                                 options: .regularExpression) {
-            out.removeSubrange(range)
-        }
-
-        // Legacy single-line prefix.
-        out = out.replacingOccurrences(
-            of: #"^\s*\[USER FORMAT HINT:[^\]]*\]\s*"#,
-            with: "",
-            options: .regularExpression
-        )
-
-        return out
     }
 
     // MARK: - Segmentation
