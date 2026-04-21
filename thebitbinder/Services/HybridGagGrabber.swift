@@ -140,7 +140,7 @@ final class HybridGagGrabber: ObservableObject {
         statusMessage = "GagGrabber is scanning for jokes…"
 
         do {
-            let result = try await manager.extractJokes(from: textToSend, token: token)
+            let result = try await manager.extractJokes(from: textToSend, hints: hints, token: token)
             let jokes = result.jokes.map(\.jokeText)
             print(" [GagGrabber] \(result.provider.displayName) returned \(jokes.count) joke(s)")
 

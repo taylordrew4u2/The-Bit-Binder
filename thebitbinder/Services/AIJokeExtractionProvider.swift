@@ -165,8 +165,9 @@ protocol AIJokeExtractionProvider {
     var providerType: AIProviderType { get }
 
     /// Whether this provider needs network access to run. Cloud providers are
-    /// `true`; on-device providers (Apple Foundation Models) are `false`.
-    /// Default: `true` so existing cloud providers don't need to override.
+    /// `true`; on-device providers (Apple Foundation Models, embedding
+    /// segmenter) are `false`. Default: `true` so existing cloud providers
+    /// don't need to override.
     var requiresNetwork: Bool { get }
 
     /// Check if this provider is configured (has a valid API key, or the
@@ -174,11 +175,23 @@ protocol AIJokeExtractionProvider {
     func isConfigured() -> Bool
 
     /// Extract jokes from raw text. Throws `AIProviderError` on failure.
+    /// Providers that want structured access to the user's pre-flight hints
+    /// should override `extractJokes(from:hints:)` instead of this method.
     func extractJokes(from text: String) async throws -> [AIExtractedJoke]
 }
 
 extension AIJokeExtractionProvider {
     var requiresNetwork: Bool { true }
+
+    /// Hints-aware entry point the manager calls. Cloud providers don't
+    /// need structured access (callers already prepend a natural-language
+    /// `[EXTRACTION HINTS …]` block to the text); they use the default
+    /// implementation and ignore the parameter. Providers that benefit from
+    /// structured hints — e.g. the embedding segmenter tuning its split
+    /// threshold — override this method directly.
+    func extractJokes(from text: String, hints: ExtractionHints) async throws -> [AIExtractedJoke] {
+        try await extractJokes(from: text)
+    }
 }
 
 // MARK: - Shared Prompt

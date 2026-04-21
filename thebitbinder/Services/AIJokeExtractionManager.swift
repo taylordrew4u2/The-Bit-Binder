@@ -202,8 +202,13 @@ final class AIJokeExtractionManager {
     /// If NO provider succeeds, this throws `AIExtractionFailedError` —
     /// there is NO local/rule-based fallback. The caller must surface the failure.
     ///
+    /// `hints` is passed through to each provider for structured consumption.
+    /// Callers also typically prepend the natural-language form of the hints
+    /// to `text` for cloud / Apple providers. `.unspecified` is the default so
+    /// callers that don't collect hints keep working unchanged.
+    ///
     ///   Requires an `AIExtractionToken`. Only the file-import pipeline may call this.
-    func extractJokes(from text: String, token: AIExtractionToken) async throws -> (jokes: [AIExtractedJoke], provider: AIProviderType) {
+    func extractJokes(from text: String, hints: ExtractionHints = .unspecified, token: AIExtractionToken) async throws -> (jokes: [AIExtractedJoke], provider: AIProviderType) {
         assertAuthorised(token)
 
         print(" [Extraction] Starting with \(text.count) chars")
@@ -253,7 +258,7 @@ final class AIJokeExtractionManager {
 
             do {
                 print(" [Extraction] Trying \(providerType.displayName)…")
-                let jokes = try await provider.extractJokes(from: text)
+                let jokes = try await provider.extractJokes(from: text, hints: hints)
                 print(" [Extraction] \(providerType.displayName) returned \(jokes.count) fragment(s)")
                 return (jokes, providerType)
             } catch let error as AIProviderError {
@@ -299,8 +304,8 @@ final class AIJokeExtractionManager {
     /// Returns the jokes and the provider name, or throws `AIExtractionFailedError`.
     ///
     ///   Requires an `AIExtractionToken`. Only file-import callers may use this.
-    func extractJokesForPipeline(from text: String, token: AIExtractionToken) async throws -> (jokes: [AIExtractedJoke], providerUsed: String) {
-        let result = try await extractJokes(from: text, token: token)
+    func extractJokesForPipeline(from text: String, hints: ExtractionHints = .unspecified, token: AIExtractionToken) async throws -> (jokes: [AIExtractedJoke], providerUsed: String) {
+        let result = try await extractJokes(from: text, hints: hints, token: token)
         return (result.jokes, result.provider.displayName)
     }
 

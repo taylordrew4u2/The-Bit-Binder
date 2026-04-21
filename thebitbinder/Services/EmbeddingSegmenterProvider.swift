@@ -44,6 +44,18 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
     }
 
     func extractJokes(from text: String) async throws -> [AIExtractedJoke] {
+        try await extractJokes(from: text, hints: .unspecified)
+    }
+
+    /// Hints-aware path the manager prefers. Structured hints lets us:
+    ///   - skip auto-detection when the user already told us the separator
+    ///     style (`separator != .mixed`);
+    ///   - pick `.noneOrFlowing` to bypass structural splitting entirely and
+    ///     rely purely on embedding troughs;
+    ///   - tune the similarity-trough sigma threshold based on the user's
+    ///     declared bit length so one-liner decks get more splits and
+    ///     long-paragraph docs get fewer.
+    func extractJokes(from text: String, hints: ExtractionHints) async throws -> [AIExtractedJoke] {
         // The coordinator sometimes prepends a `[EXTRACTION HINTS FROM USER]
         // … [END HINTS]` block. We strip it so the hint prose doesn't wind up
         // as a joke entry — the semantic equivalent of what guided-generation
@@ -54,7 +66,7 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
 
         // Heavy NL work off the main actor.
         let chunks = await Task.detached(priority: .userInitiated) {
-            EmbeddingSegmenterProvider.segment(text: stripped)
+            EmbeddingSegmenterProvider.segment(text: stripped, hints: hints)
         }.value
 
         return chunks.map { body in
@@ -100,19 +112,21 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
     // MARK: - Segmentation
 
     /// Split `text` into joke-sized chunks. See file header for the algorithm.
-    static func segment(text: String) -> [String] {
+    static func segment(text: String, hints: ExtractionHints = .unspecified) -> [String] {
         // Normalise line endings so regex splits behave consistently.
         let normalised = text
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
 
-        // Stage 1: strong structural splits. If the document clearly uses
-        // numbered items or bullets, that wins over anything else.
-        let blocks = structuralSplit(normalised)
+        // Stage 1: strong structural splits. When the user pre-declared a
+        // separator style we use it directly; otherwise we auto-detect based
+        // on marker frequency.
+        let blocks = structuralSplit(normalised, hints: hints)
 
         // Stage 2: inside each block, use embedding troughs to separate
         // topics where the block is long enough to have internal structure.
         // Short blocks pass through unchanged.
+        let sigma = sigmaThreshold(for: hints.length)
         var chunks: [String] = []
         let embedding = NLEmbedding.sentenceEmbedding(for: .english)
 
@@ -139,7 +153,8 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
 
             let subChunks = segmentByEmbeddings(
                 sentences: sentences,
-                embedding: embedding
+                embedding: embedding,
+                sigma: sigma
             )
             chunks.append(contentsOf: subChunks)
         }
@@ -149,14 +164,23 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
             .filter { !$0.isEmpty }
     }
 
+    /// Picks the similarity-trough threshold based on the user's declared
+    /// bit length. Lower σ = more splits (expect many short bits); higher σ
+    /// = fewer splits (expect long paragraph-sized bits).
+    private static func sigmaThreshold(for length: ExtractionHints.BitLength) -> Double {
+        switch length {
+        case .oneLiner:          return 0.5
+        case .shortFewSentences: return 1.0
+        case .longParagraph:     return 1.5
+        case .varies:            return 1.0
+        }
+    }
+
     // MARK: - Stage 1: structural splits
 
-    private static func structuralSplit(_ text: String) -> [String] {
+    private static func structuralSplit(_ text: String, hints: ExtractionHints) -> [String] {
         let lines = text.components(separatedBy: "\n")
 
-        // Count strong structural signals over the whole document. When one
-        // signal dominates we commit to it; otherwise fall back to splitting
-        // on blank lines (the most common separator).
         let numberedPattern = try? NSRegularExpression(
             pattern: #"^\s*(?:(?:joke|bit|gag|#)\s*)?\d+\s*[.):\-–—]\s+"#,
             options: [.caseInsensitive]
@@ -178,6 +202,37 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
             ) != nil
         }
 
+        // User-declared separator style wins. `.mixed` (default) falls
+        // through to auto-detection. `.headers` has no regex yet — treat as
+        // auto-detect too.
+        switch hints.separator {
+        case .numbered:
+            return splitOn(lines) { line in
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                return matches(numberedPattern, trimmed) || matches(separatorPattern, trimmed)
+            }
+        case .bullets:
+            return splitOn(lines) { line in
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                return matches(bulletPattern, trimmed) || matches(separatorPattern, trimmed)
+            }
+        case .blankLine:
+            return splitByBlankLines(lines) { line in
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                return matches(separatorPattern, trimmed)
+            }
+        case .noneOrFlowing:
+            // User says there are no structural markers — skip Stage 1
+            // entirely and let Stage 2 embedding troughs do the work on the
+            // whole document as a single block.
+            return [text]
+        case .headers, .mixed:
+            break
+        }
+
+        // Auto-detect: count structural signals across the whole document.
+        // When one signal dominates (≥ ~30% of non-empty lines) we commit to
+        // it; otherwise fall back to splitting on blank lines.
         var numberedCount = 0
         var bulletCount = 0
         var nonEmpty = 0
@@ -189,9 +244,6 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
             if matches(bulletPattern, trimmed)   { bulletCount += 1 }
         }
 
-        // Threshold: structural marker drives the split only if it's present
-        // on at least ~30% of non-empty lines — below that it's probably
-        // incidental prose.
         let structuralThreshold = max(3, nonEmpty / 3)
         let useNumbered = numberedCount >= structuralThreshold
         let useBullets  = !useNumbered && bulletCount >= structuralThreshold
@@ -210,11 +262,10 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
             }
         }
 
-        // Default: blank-line split, also honouring explicit separator lines.
-        return splitByBlankLines(lines, separatorMatcher: { line in
+        return splitByBlankLines(lines) { line in
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             return matches(separatorPattern, trimmed)
-        })
+        }
     }
 
     /// Split `lines` into blocks where each block starts with a line for
@@ -275,10 +326,6 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
     /// shorter and the block is smaller than a typical bit anyway.
     private static let minSentencesToAnalyse = 4
 
-    /// How many standard deviations below the mean similarity a gap must be
-    /// to count as a topic boundary. Higher = fewer, larger chunks.
-    private static let troughSigmaThreshold: Double = 1.0
-
     private static func tokenizeSentences(_ text: String) -> [String] {
         let tokenizer = NLTokenizer(unit: .sentence)
         tokenizer.string = text
@@ -295,7 +342,8 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
 
     private static func segmentByEmbeddings(
         sentences: [String],
-        embedding: NLEmbedding
+        embedding: NLEmbedding,
+        sigma: Double
     ) -> [String] {
         // Compute per-sentence vectors. Unknown sentences (punctuation-only,
         // etc.) come back nil — we reuse the previous vector so they don't
@@ -327,7 +375,7 @@ final class EmbeddingSegmenterProvider: AIJokeExtractionProvider {
         let mean = sims.reduce(0, +) / Double(sims.count)
         let variance = sims.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(sims.count)
         let stddev = variance.squareRoot()
-        let threshold = mean - troughSigmaThreshold * stddev
+        let threshold = mean - sigma * stddev
 
         // Find boundaries. `sims[i]` is the similarity between sentence `i`
         // and sentence `i+1`, so a low value there means the split happens

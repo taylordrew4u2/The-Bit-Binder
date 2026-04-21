@@ -147,7 +147,7 @@ final class ImportPipelineCoordinator {
         }
         if textChunks.count == 1 {
             // Single chunk — let errors propagate so the caller can surface them.
-            let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: prepare(textChunks[0]), token: importToken)
+            let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: prepare(textChunks[0]), hints: hints, token: importToken)
             extractedJokes = result.jokes
             providerUsed = result.providerUsed
         } else {
@@ -162,7 +162,7 @@ final class ImportPipelineCoordinator {
             for (chunkIndex, chunk) in textChunks.enumerated() {
                 do {
                     debugInfo.append("  Chunk \(chunkIndex + 1)/\(textChunks.count): \(chunk.count) chars")
-                    let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: prepare(chunk), token: importToken)
+                    let result = try await AIJokeExtractionManager.shared.extractJokesForPipeline(from: prepare(chunk), hints: hints, token: importToken)
                     allJokes.append(contentsOf: result.jokes)
                     lastProvider = result.providerUsed
                 } catch {
