@@ -36,9 +36,6 @@ struct RoastTargetDetailView: View {
     // Filter state
     @State private var filterMode: RoastFilterMode = .all
     
-    // Edit mode for drag-to-reorder
-    @State private var isEditMode = false
-
     private let accentColor: Color = .accentColor
     
     enum RoastFilterMode: String, CaseIterable {
@@ -521,12 +518,6 @@ struct RoastTargetDetailView: View {
                     Button(action: { showFullContent.toggle() }) {
                         Label(showFullContent ? "Compact View" : "Full Content", systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
                     }
-                    
-                    if sortOption == .custom {
-                        Button(action: { isEditMode.toggle() }) {
-                            Label(isEditMode ? "Done Reordering" : "Reorder Roasts", systemImage: isEditMode ? "checkmark" : "line.3.horizontal")
-                        }
-                    }
                 }
                 
                 Divider()
@@ -575,25 +566,6 @@ struct RoastTargetDetailView: View {
         }
     }
 
-    private func deleteRoasts(at offsets: IndexSet) {
-        let jokes = displayedJokes
-        for index in offsets {
-            guard index < jokes.count else { continue }
-            jokes[index].moveToTrash()
-        }
-        saveContext("roast soft-delete")
-    }
-    
-    private func moveJokes(from source: IndexSet, to destination: Int) {
-        var jokes = displayedJokes
-        jokes.move(fromOffsets: source, toOffset: destination)
-        // Update display order for all jokes
-        for (index, joke) in jokes.enumerated() {
-            joke.displayOrder = index
-        }
-        saveContext("reorder")
-    }
-    
     private func toggleKiller(_ joke: RoastJoke) {
         joke.isKiller.toggle()
         joke.dateModified = Date()
@@ -1168,6 +1140,217 @@ extension Double {
     }
 }
 
+// MARK: - Roast Joke Row (Legacy)
+
+struct RoastJokeRow: View {
+    let joke: RoastJoke
+    var showFullContent: Bool = true
+    let accentColor: Color
+    var onToggleKiller: (() -> Void)? = nil
+    var onToggleTested: (() -> Void)? = nil
+    var onUndoPerformance: (() -> Void)? = nil
+    var onQuickEdit: (() -> Void)? = nil
+    var onAddStructure: (() -> Void)? = nil
+    var onTrash: (() -> Void)? = nil
+    var onToggleOpening: (() -> Void)? = nil
+    var onAssignAsBackup: ((UUID?) -> Void)? = nil
+    var openingRoastsForTarget: [RoastJoke] = []
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            // Icon with badges - tappable for killer toggle
+            Button {
+                onToggleKiller?()
+            } label: {
+                ZStack(alignment: .bottomTrailing) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(joke.isKiller ? Color.bitbinderAccent.opacity(0.2) : accentColor.opacity(0.12))
+                            .frame(width: 42, height: 42)
+                        Image(systemName: joke.isKiller ? "star.fill" : "flame.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(accentColor)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 4) {
+                // Main content
+                if showFullContent {
+                    Text(joke.content)
+                        .font(.system(size: 15))
+                        .foregroundColor(.primary)
+                } else {
+                    Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+                
+                // Metadata row
+                HStack(spacing: 8) {
+                    Text(joke.dateCreated, format: .dateTime.month(.abbreviated).day())
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    
+                    // Opening roast badge
+                    if joke.isOpeningRoast {
+                        HStack(spacing: 2) {
+                            Image(systemName: "star.circle.fill")
+                                .font(.system(size: 9))
+                                .foregroundColor(Color.bitbinderAccent)
+                            Text("OPENER")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(Color.bitbinderAccent)
+                        }
+                    } else if joke.parentOpeningRoastID != nil {
+                        HStack(spacing: 2) {
+                            Image(systemName: "arrow.turn.down.right")
+                                .font(.system(size: 8))
+                                .foregroundColor(Color.bitbinderAccent)
+                            Text("BACKUP")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(Color.bitbinderAccent)
+                        }
+                    }
+                    
+                    // Tappable tested badge
+                    if joke.isTested {
+                        Button {
+                            onToggleTested?()
+                        } label: {
+                            HStack(spacing: 2) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(Color.bitbinderAccent)
+                                Text("\(joke.performanceCount)x")
+                                    .font(.caption2)
+                                    .foregroundColor(Color.bitbinderAccent)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    if joke.relatabilityScore > 0 {
+                        HStack(spacing: 1) {
+                            ForEach(0..<5, id: \.self) { i in
+                                Image(systemName: i < joke.relatabilityScore ? "person.fill" : "person")
+                                    .font(.system(size: 7))
+                                    .foregroundColor(i < joke.relatabilityScore ? Color.accentColor : .gray.opacity(0.3))
+                            }
+                        }
+                    }
+                    
+                    if joke.hasStructure {
+                        Image(systemName: "text.alignleft")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color.bitbinderAccent)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Quick action chevron
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .contextMenu {
+            // Quick actions context menu
+            Button {
+                onToggleKiller?()
+            } label: {
+                Label(joke.isKiller ? "Remove Killer" : "Mark as Killer", systemImage: joke.isKiller ? "star.slash" : "star.fill")
+            }
+            
+            Button {
+                onToggleTested?()
+            } label: {
+                Label("Add Performance +1", systemImage: "checkmark.circle")
+            }
+            
+            if joke.performanceCount > 0 {
+                Button {
+                    onUndoPerformance?()
+                } label: {
+                    Label("Undo Performance -1 (\(joke.performanceCount))", systemImage: "arrow.uturn.backward.circle")
+                }
+            }
+            
+            Divider()
+            
+            // Opening roast / Backup section
+            Button {
+                onToggleOpening?()
+            } label: {
+                Label(joke.isOpeningRoast ? "Remove as Opener" : "Mark as Opening Roast", systemImage: joke.isOpeningRoast ? "star.circle" : "star.circle.fill")
+            }
+            
+            // Backup assignment submenu (only if not an opening roast)
+            if !joke.isOpeningRoast && !openingRoastsForTarget.isEmpty {
+                Menu {
+                    // None option
+                    Button {
+                        onAssignAsBackup?(nil)
+                    } label: {
+                        HStack {
+                            Text("None (Unassigned)")
+                            if joke.parentOpeningRoastID == nil {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Opening roast options
+                    ForEach(Array(openingRoastsForTarget.enumerated()), id: \.element.id) { index, opening in
+                        Button {
+                            onAssignAsBackup?(opening.id)
+                        } label: {
+                            HStack {
+                                Text("Opener \(index + 1): \(opening.content.prefix(30))...")
+                                if joke.parentOpeningRoastID == opening.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label(joke.parentOpeningRoastID != nil ? "Change Backup Assignment" : "Assign as Backup For...", systemImage: "arrow.turn.down.right")
+                }
+            }
+            
+            Divider()
+            
+            if !joke.hasStructure {
+                Button {
+                    onAddStructure?()
+                } label: {
+                    Label("Add Setup/Punchline", systemImage: "text.alignleft")
+                }
+            }
+            
+            Button {
+                onQuickEdit?()
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            
+            Divider()
+            
+            Button(role: .destructive) {
+                onTrash?()
+            } label: {
+                Label("Move to Trash", systemImage: "trash")
+            }
+        }
+    }
+}
 
 // MARK: - Export Sheet
 
