@@ -81,11 +81,12 @@ final class AppStartupCoordinator: ObservableObject {
             UserDefaults.standard.removeObject(forKey: "DataValidation_Counts")
         }
         
-        // ── Corruption cleanup detection ────────────────────────────────
-        // If the ModelContainer initializer had to wipe the store and create
-        // a fresh one, inform the user so they can restore from a backup.
+        // ── Store recovery detection ────────────────────────────────────
+        // If startup had to fall back because the persistent store could not
+        // be opened, inform the user so they can restore from a backup.
         if UserDefaults.standard.bool(forKey: "ModelContainer_CorruptionCleanupPerformed") {
             let isInMemory = UserDefaults.standard.bool(forKey: "ModelContainer_InMemoryFallback")
+            let storePreserved = UserDefaults.standard.bool(forKey: "ModelContainer_StorePreservedForRecovery")
             let cleanupTimestamp = UserDefaults.standard.double(forKey: "ModelContainer_CorruptionCleanupTimestamp")
             let cleanupDate = Date(timeIntervalSince1970: cleanupTimestamp)
             let formatter = DateFormatter()
@@ -93,11 +94,15 @@ final class AppStartupCoordinator: ObservableObject {
             formatter.timeStyle = .short
             let dateStr = formatter.string(from: cleanupDate)
             
-            print(" [AppStartup] CRITICAL: Store corruption cleanup was performed at \(dateStr)")
-            DataOperationLogger.shared.logCritical("Post-corruption startup detected — alerting user")
+            print(" [AppStartup] CRITICAL: Persistent store recovery mode detected at \(dateStr)")
+            DataOperationLogger.shared.logCritical("Persistent store recovery mode detected - alerting user")
             
             if isInMemory {
-                dataLossDetails = "Your data store was corrupted and could not be recovered. The app is running in temporary mode — any changes will be lost when the app closes. Please restore from a backup immediately in Settings → Data Safety."
+                if storePreserved {
+                    dataLossDetails = "Your data store could not be opened on \(dateStr). The original store files were preserved on disk and the app is running in temporary mode so nothing is deleted automatically. Any new changes will be lost when the app closes until you restore from Data Safety."
+                } else {
+                    dataLossDetails = "Your data store was corrupted and could not be recovered. The app is running in temporary mode — any changes will be lost when the app closes. Please restore from a backup immediately in Settings → Data Safety."
+                }
             } else {
                 dataLossDetails = "Your data store was corrupted on \(dateStr) and had to be rebuilt. A backup of the corrupted store was saved automatically. You can restore from a recent backup in Settings → Data Safety."
             }
@@ -106,6 +111,7 @@ final class AppStartupCoordinator: ObservableObject {
             // Clear the one-shot flag so the alert only shows once
             UserDefaults.standard.removeObject(forKey: "ModelContainer_CorruptionCleanupPerformed")
             UserDefaults.standard.removeObject(forKey: "ModelContainer_InMemoryFallback")
+            UserDefaults.standard.removeObject(forKey: "ModelContainer_StorePreservedForRecovery")
             // Keep the timestamp for audit trail
             
             // Reset validation counts — the fresh store is empty so comparing

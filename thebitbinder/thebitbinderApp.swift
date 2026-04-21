@@ -136,77 +136,29 @@ struct thebitbinderApp: App {
             }
         }
 
-        // 3⃣ Last resort: wipe corrupted files at same URL (backup already saved above)
-        print(" [ModelContainer] Cleaning corrupted store files...")
-        DataOperationLogger.shared.logCritical("Cleaning corrupted store files as last resort")
+        // 3⃣ Final fallback: preserve the on-disk store and run in-memory only.
+        // Never delete the user's store automatically. If recovery is needed,
+        // the user can restore from Data Safety after inspecting the backups.
+        print(" [ModelContainer] Persistent store could not be opened. Preserving files and switching to temporary in-memory mode.")
+        DataOperationLogger.shared.logCritical("Persistent store unavailable - preserving files and using in-memory fallback")
         
-        for ext in ["", "-shm", "-wal"] {
-            let fileURL = URL.applicationSupportDirectory.appending(path: "default.store\(ext)")
-            do {
-                if FileManager.default.fileExists(atPath: fileURL.path) {
-                    try FileManager.default.removeItem(at: fileURL)
-                    print("   Removed: default.store\(ext)")
-                }
-            } catch {
-                print("   Failed to remove default.store\(ext): \(error)")
-            }
-        }
-        
-        // Also clean up the external storage directory — a fresh store
-        // cannot reference blobs from the corrupted store, so leaving them
-        // creates orphaned files. They were already backed up above.
-        let externalStorageURL = URL(fileURLWithPath: storeURL.path + "_Files")
-        if FileManager.default.fileExists(atPath: externalStorageURL.path) {
-            do {
-                try FileManager.default.removeItem(at: externalStorageURL)
-                print("   Removed: default.store_Files (external storage)")
-            } catch {
-                print("   Failed to remove default.store_Files: \(error)")
-            }
-        }
+        UserDefaults.standard.set(true, forKey: "ModelContainer_CorruptionCleanupPerformed")
+        UserDefaults.standard.set(true, forKey: "ModelContainer_InMemoryFallback")
+        UserDefaults.standard.set(true, forKey: "ModelContainer_StorePreservedForRecovery")
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "ModelContainer_CorruptionCleanupTimestamp")
         
         do {
             let config = ModelConfiguration(
                 schema: schema,
-                url: storeURL,
-                allowsSave: true,
-                cloudKitDatabase: .none
+                isStoredInMemoryOnly: true
             )
             let container = try ModelContainer(for: schema, configurations: [config])
-            print(" [ModelContainer] Fresh store at same URL (corrupted store was backed up)")
-            
-            DataOperationLogger.shared.logCritical("Fresh store created after corruption cleanup - data may be lost but backups available")
-            
-            // Set flag so the startup coordinator can inform the user on next launch
-            UserDefaults.standard.set(true, forKey: "ModelContainer_CorruptionCleanupPerformed")
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "ModelContainer_CorruptionCleanupTimestamp")
-            
+            print(" [ModelContainer] EMERGENCY: Created in-memory container - original store preserved on disk")
+            DataOperationLogger.shared.logCritical("EMERGENCY: In-memory container created - original store preserved")
             return container
         } catch {
-            //  CATASTROPHIC FAILURE - Log everything possible
-            print(" [ModelContainer] CATASTROPHIC FAILURE: Cannot create any persistent store: \(error)")
-            DataOperationLogger.shared.logCritical("CATASTROPHIC FAILURE: Cannot create ModelContainer - \(error.localizedDescription)")
-            
-            // Try to create in-memory as absolute last resort to prevent app crash
-            do {
-                let config = ModelConfiguration(
-                    schema: schema,
-                    isStoredInMemoryOnly: true
-                )
-                let container = try ModelContainer(for: schema, configurations: [config])
-                print(" [ModelContainer] EMERGENCY: Created in-memory container - DATA WILL BE LOST ON APP CLOSE")
-                DataOperationLogger.shared.logCritical("EMERGENCY: Created in-memory container - all data will be lost")
-                
-                // Flag so user sees a warning even in the in-memory scenario
-                UserDefaults.standard.set(true, forKey: "ModelContainer_CorruptionCleanupPerformed")
-                UserDefaults.standard.set(true, forKey: "ModelContainer_InMemoryFallback")
-                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "ModelContainer_CorruptionCleanupTimestamp")
-                
-                return container
-            } catch {
-                DataOperationLogger.shared.logCritical("TOTAL FAILURE: Cannot create any ModelContainer - app will crash")
-                fatalError(" [ModelContainer] TOTAL FAILURE: Cannot create any ModelContainer: \(error)")
-            }
+            DataOperationLogger.shared.logCritical("TOTAL FAILURE: Cannot create any ModelContainer - app will crash")
+            fatalError(" [ModelContainer] TOTAL FAILURE: Cannot create any ModelContainer: \(error)")
         }
     }()
 

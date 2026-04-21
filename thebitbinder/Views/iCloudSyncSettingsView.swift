@@ -88,6 +88,17 @@ struct iCloudSyncSettingsView: View {
                         }
                         .padding(12)
                         .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.1)))
+                    } else if let errorMessage = syncService.errorMessage, !errorMessage.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundColor(.red)
+                            Text(errorMessage)
+                                .font(.system(size: 13))
+                                .foregroundColor(.red)
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.1)))
                     }
                     
                     // Issues Found
@@ -386,6 +397,112 @@ struct SyncItemRow: View {
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color(UIColor.systemBackground)))
+    }
+}
+
+private struct DiagnosticsDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var diagnostics = iCloudSyncDiagnostics.shared
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Summary") {
+                    LabeledContent("Status", value: statusText)
+                    LabeledContent("Issues", value: "\(diagnostics.syncIssuesFound.count)")
+                    LabeledContent("Checks Logged", value: "\(diagnostics.diagnosticResults.count)")
+                }
+
+                if diagnostics.syncIssuesFound.isEmpty {
+                    Section("Issues") {
+                        Text("No sync issues are currently flagged.")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Section("Issues") {
+                        ForEach(Array(diagnostics.syncIssuesFound.enumerated()), id: \.offset) { _, issue in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label(issue.description, systemImage: iconName(for: issue.severity))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(color(for: issue.severity))
+
+                                Text(issue.suggestedFix)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+
+                Section("Diagnostic Log") {
+                    if diagnostics.diagnosticResults.isEmpty {
+                        Text("No diagnostics have been run yet.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(Array(diagnostics.diagnosticResults.enumerated()), id: \.offset) { _, result in
+                            Text(result)
+                                .font(.footnote.monospaced())
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Diagnostics")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        Task {
+                            await diagnostics.runComprehensiveDiagnostics()
+                        }
+                    } label: {
+                        if diagnostics.isRunningDiagnostics {
+                            ProgressView()
+                        } else {
+                            Text("Run Again")
+                        }
+                    }
+                    .disabled(diagnostics.isRunningDiagnostics)
+                }
+            }
+        }
+    }
+
+    private var statusText: String {
+        if diagnostics.isRunningDiagnostics {
+            return "Running"
+        }
+
+        return diagnostics.syncIssuesFound.isEmpty ? "Healthy" : "Needs Attention"
+    }
+
+    private func color(for severity: iCloudSyncDiagnostics.SyncIssue.Severity) -> Color {
+        switch severity {
+        case .critical:
+            return .red
+        case .warning:
+            return .orange
+        case .info:
+            return .blue
+        }
+    }
+
+    private func iconName(for severity: iCloudSyncDiagnostics.SyncIssue.Severity) -> String {
+        switch severity {
+        case .critical:
+            return "xmark.octagon.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .info:
+            return "info.circle.fill"
+        }
     }
 }
 

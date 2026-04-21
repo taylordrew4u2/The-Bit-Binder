@@ -60,13 +60,6 @@
 			);
 			target = BAD6B2C52F6F753E00A09B53 /* bit */;
 		};
-		BAB3D05F2EDF80F6007295C1 /* Exceptions for "thebitbinder" folder in "thebitbinder" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = BAB3D0512EDF80F5007295C1 /* thebitbinder */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -81,9 +74,6 @@
 		};
 		BAB3D0542EDF80F5007295C1 /* thebitbinder */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				BAB3D05F2EDF80F6007295C1 /* Exceptions for "thebitbinder" folder in "thebitbinder" target */,
-			);
 			path = thebitbinder;
 			sourceTree = "<group>";
 		};

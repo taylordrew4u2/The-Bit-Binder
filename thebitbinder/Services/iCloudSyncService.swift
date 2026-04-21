@@ -241,14 +241,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
         print(" [iCloud] Starting full sync...")
         syncStatus = .syncing
         errorMessage = nil
-        
-        defer {
-            let now = Date()
-            lastSyncDate = now
-            lastSyncCompletionDate = now
-            UserDefaults.standard.set(now.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
-        }
-        
+
         do {
             // 1. Verify iCloud availability first
             let accountStatus = try await container.accountStatus()
@@ -320,6 +313,10 @@ final class iCloudSyncService: NSObject, ObservableObject {
             // Notify UI to refresh
             NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
             
+            let now = Date()
+            lastSyncDate = now
+            lastSyncCompletionDate = now
+            UserDefaults.standard.set(now.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
             syncStatus = .success
             errorMessage = nil
             print(" [iCloud] Full sync completed successfully")
@@ -328,6 +325,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
         } catch {
             let message = "Sync failed: \(error.localizedDescription)"
             print(" [iCloud] \(message)")
+            lastSyncCompletionDate = Date()
             syncStatus = .error(message)
             errorMessage = message
         }
@@ -530,6 +528,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
             switch status {
             case .available:
                 print(" [iCloud] Account available")
+                errorMessage = nil
                 return true
             case .noAccount:
                 print(" [iCloud] No account — user not signed into iCloud")

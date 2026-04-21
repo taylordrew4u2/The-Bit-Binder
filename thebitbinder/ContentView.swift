@@ -220,7 +220,7 @@ struct MainTabView: View {
             }
         }
         .fullScreenCover(isPresented: $showSetup) {
-            AppSetupView(isFirstLaunch: !hasCompletedSetup)
+            AppSetupView(isFirstLaunch: !hasLaunchedBefore)
         }
         .onChange(of: roastMode) { _, isRoast in
             haptic(.medium)
