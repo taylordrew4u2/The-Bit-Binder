@@ -49,8 +49,9 @@ struct DataSafetyView: View {
                 Section("Data Protection Status") {
                     StatusRow(
                         title: "Data Validation",
-                        status: validationResult?.isHealthy == true ? "Healthy" : "Needs Check",
-                        isHealthy: validationResult?.isHealthy == true
+                        status: validationStatusText,
+                        isHealthy: validationResult?.isHealthy ?? true,
+                        hasRunValidation: validationResult != nil
                     )
                     
                     StatusRow(
@@ -215,19 +216,13 @@ struct DataSafetyView: View {
                 if let result = validationResult {
                     Section("Last Validation Results") {
                         VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Total Entities:")
-                                Spacer()
-                                Text("\(result.totalEntities)")
-                                    .fontWeight(.semibold)
-                            }
-                            
-                            HStack {
-                                Text("Validation Date:")
-                                Spacer()
-                                Text(result.validationDate, style: .relative)
-                                    .fontWeight(.semibold)
-                            }
+                            Text(result.isHealthy ? "No issues detected." : "Action needed")
+                                .font(.headline)
+                                .foregroundColor(result.isHealthy ? .green : .red)
+
+                            Text("Checked \(result.totalEntities) items on \(result.validationDate.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                             
                             if !result.issues.isEmpty {
                                 Text("Issues Found:")
@@ -235,14 +230,12 @@ struct DataSafetyView: View {
                                     .foregroundColor(.red)
                                 
                                 ForEach(result.issues.indices, id: \.self) { index in
-                                    Text("• \(result.issues[index])")
-                                        .font(.caption)
-                                        .foregroundColor(.red)
+                                    ValidationIssueRow(issue: result.issues[index])
                                 }
                             }
                             
                             if result.significantDataLoss {
-                                Text(" SIGNIFICANT DATA LOSS DETECTED")
+                                Text("Significant data loss detected")
                                     .fontWeight(.bold)
                                     .foregroundColor(.red)
                             }
@@ -352,6 +345,14 @@ struct DataSafetyView: View {
     }
     
     // MARK: - Disk Space
+
+    private var validationStatusText: String {
+        guard let result = validationResult else {
+            return "Not run yet"
+        }
+
+        return result.isHealthy ? "Healthy" : "Needs Check"
+    }
     
     /// Returns the available free disk space in bytes.
     static func freeDiskSpaceBytes() -> Int64 {
@@ -568,11 +569,12 @@ struct StatusRow: View {
     let title: String
     let status: String
     let isHealthy: Bool
+    var hasRunValidation = true
     
     var body: some View {
         HStack {
-            Image(systemName: isHealthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundColor(isHealthy ? Color.accentColor : .red)
+            Image(systemName: iconName)
+                .foregroundColor(iconColor)
             
             VStack(alignment: .leading) {
                 Text(title)
@@ -585,8 +587,73 @@ struct StatusRow: View {
             Spacer()
         }
     }
+
+    private var iconName: String {
+        if !hasRunValidation {
+            return "clock.badge.questionmark"
+        }
+
+        return isHealthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+    }
+
+    private var iconColor: Color {
+        if !hasRunValidation {
+            return .orange
+        }
+
+        return isHealthy ? Color.accentColor : .red
+    }
 }
 #endif
+
+private struct ValidationIssueRow: View {
+    let issue: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("• \(issue)")
+                .font(.caption)
+                .foregroundColor(.red)
+
+            Text(remediationText)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.top, 2)
+    }
+
+    private var remediationText: String {
+        if issue.contains("empty content") {
+            return "Fix: open the blank joke entry and add text, or delete it if it was created by mistake."
+        }
+
+        if issue.contains("invalid dates") {
+            return "Fix: run the built-in repair flow or edit the affected entry so it gets a fresh saved date."
+        }
+
+        if issue.contains("invalid folder references") || issue.contains("broken joke-folder relationships") {
+            return "Fix: move the affected joke into a valid folder, or remove the broken folder assignment."
+        }
+
+        if issue.contains("broken roast joke-target relationships") {
+            return "Fix: reassign the affected roast joke to an existing target."
+        }
+
+        if issue.contains("invalid file URLs") {
+            return "Fix: remove the broken recording entry and re-import the audio file from disk."
+        }
+
+        if issue.contains("recordings with missing files") {
+            return "Fix: restore the audio file to this device or delete the orphaned recording entry."
+        }
+
+        if issue.contains("Failed to validate") {
+            return "Fix: retry validation. If it keeps failing, inspect the underlying store or recent import that introduced the error."
+        }
+
+        return "Fix: review the affected record and correct or remove the invalid data."
+    }
+}
 
 struct BackupsView: View {
     @State var backups: [BackupInfo]

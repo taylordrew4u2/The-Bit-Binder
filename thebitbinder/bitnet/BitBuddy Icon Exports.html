@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>BitBuddy — icon exports</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root { --bg: #f5f4ef; --card: #fff; --ink: #1a1a1a; --muted: #7a7a7a; --line: #e8e6df; --blue: #1E90FF; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px 120px; }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.6px; margin: 0 0 8px; }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: #9a8a70; }
+  .lede { font-size: 15px; color: #5a4a30; line-height: 1.5; margin: 10px 0 0; max-width: 640px; }
+  code.tag { font-size: 13px; background:#efeee8; padding:2px 6px; border-radius:4px; }
+  section { margin-top: 48px; }
+  section h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.4px; color: var(--muted); margin: 0 0 18px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .card .img { width: 100%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; border-radius: 10px; overflow: hidden; }
+  .card .img.tile-blue { background: var(--blue); }
+  .card .img.tile-white { background: #fafaf7; }
+  .card .img.tile-dark { background: #0B1F3A; }
+  .card .img.tile-chip { background: #E5F1FD; }
+  .card .img svg { width: 100%; height: 100%; display: block; }
+  .card .img.tile-chip svg { width: 60%; height: 60%; }
+  .card .meta { text-align: center; }
+  .card .name { font-size: 13px; font-weight: 600; }
+  .card .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .card a { font-size: 11px; color: var(--blue); text-decoration: none; font-weight: 500; }
+  .card a:hover { text-decoration: underline; }
+  .sizeladder { display: flex; align-items: flex-end; gap: 22px; padding: 22px 24px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; flex-wrap: wrap; }
+  .sizeladder .s { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .sizeladder .s .tile { background: var(--blue); border-radius: 22.4%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .sizeladder .s .tile svg { width:100%; height:100%; display:block; }
+  .sizeladder .s .lbl { font-size: 10px; color: var(--muted); }
+  .chatframe { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .chatrow { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: #E5F1FD; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+  .avatar svg { width: 22px; height: 22px; }
+  .bubble { background: #F2F2F4; border-radius: 18px; padding: 8px 14px; font-size: 13px; max-width: 260px; }
+  .files { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; line-height:1.9; color:#444; }
+  .dl { display:inline-block; margin-top: 12px; background: var(--blue); color:#fff; padding: 10px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">BitBinder · BitBuddy</div>
+  <h1>Icon exports — C2 Tuft Buddy</h1>
+  <p class="lede">
+    Ready-to-drop assets for App Store Connect, Xcode, and in-app avatar usage.
+    All files are in the <code class="tag">export/</code> folder — use the download card in chat, or grab individual files from the project.
+  </p>
+
+  <!-- Reusable glyph symbol. Sized by parent via viewBox. -->
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <symbol id="bb-glyph" viewBox="0 0 1024 1024">
+      <g fill="none" stroke="currentColor" stroke-width="70" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="286" y="340" width="452" height="420" rx="110" ry="110" />
+        <path d="M 286 500 c -90 -20 -120 60 -60 100 c 40 26 80 -10 60 -50" />
+        <path d="M 738 500 c 90 -20 120 60 60 100 c -40 26 -80 -10 -60 -50" />
+        <path d="M 430 340 L 512 210 L 594 340" />
+        <circle cx="512" cy="188" r="28" fill="currentColor" stroke="none" />
+        <path d="M 420 480 l 14 -42 l 14 42 l 42 14 l -42 14 l -14 42 l -14 -42 l -42 -14 Z" fill="currentColor" stroke="none" />
+        <path d="M 576 480 l 14 -42 l 14 42 l 42 14 l -42 14 l -14 42 l -14 -42 l -42 -14 Z" fill="currentColor" stroke="none" />
+        <circle cx="512" cy="588" r="28" fill="currentColor" stroke="none" />
+        <path d="M 430 668 Q 512 740 594 668" />
+      </g>
+    </symbol>
+  </svg>
+
+  <section>
+    <h2>Primary — 1024×1024</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="img tile-blue" style="border-radius:22.4%;"><svg style="color:#fff"><use href="#bb-glyph"/></svg></div>
+        <div class="meta">
+          <div class="name">App icon</div>
+          <div class="sub">1024 · white on blue</div>
+          <a href="export/bitbuddy-icon-1024.png" download>PNG</a> · <a href="export/bitbuddy-icon.svg" download>SVG</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="img tile-white" style="border-radius:22.4%; box-shadow: 0 0 0 1px #e8e6df inset;"><svg style="color:#1E90FF"><use href="#bb-glyph"/></svg></div>
+        <div class="meta">
+          <div class="name">Inverted</div>
+          <div class="sub">Blue on white</div>
+          <a href="export/bitbuddy-icon-inverted-1024.png" download>PNG</a> · <a href="export/bitbuddy-icon-inverted.svg" download>SVG</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="img tile-dark" style="border-radius:22.4%;"><svg style="color:#fff"><use href="#bb-glyph"/></svg></div>
+        <div class="meta">
+          <div class="name">Dark mode</div>
+          <div class="sub">White glyph, navy tile</div>
+          <a href="export/bitbuddy-icon-dark.svg" download>SVG</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="img tile-chip" style="border-radius:50%;"><svg style="color:#1E90FF"><use href="#bb-glyph"/></svg></div>
+        <div class="meta">
+          <div class="name">Avatar glyph</div>
+          <div class="sub">Transparent · blue</div>
+          <a href="export/bitbuddy-glyph-blue-256.png" download>PNG</a> · <a href="export/bitbuddy-glyph-blue.svg" download>SVG</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>iOS ladder</h2>
+    <div class="sizeladder">
+      <div class="s"><div class="tile" style="width:180px;height:180px;"><svg style="color:#fff"><use href="#bb-glyph"/></svg></div><div class="lbl">1024 · App Store</div></div>
+      <div class="s"><div class="tile" style="width:120px;height:120px;"><svg style="color:#fff"><use href="#bb-glyph"/></svg></div><div class="lbl">512</div></div>
+      <div class="s"><div class="tile" style="width:90px;height:90px;"><svg style="color:#fff"><use href="#bb-glyph"/></svg></div><div class="lbl">180 · iPhone @3x</div></div>
+      <div class="s"><div class="tile" style="width:60px;height:60px;"><svg style="color:#fff"><use href="#bb-glyph"/></svg></div><div class="lbl">120 · iPhone @2x</div></div>
+      <div class="s"><div class="tile" style="width:40px;height:40px;"><svg style="color:#fff"><use href="#bb-glyph"/></svg></div><div class="lbl">40</div></div>
+      <div class="s"><div class="tile" style="width:24px;height:24px;"><svg style="color:#fff"><use href="#bb-glyph"/></svg></div><div class="lbl">24</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>In-app avatar (chat)</h2>
+    <div class="chatframe">
+      <div class="chatrow">
+        <div class="avatar"><svg style="color:#1E90FF"><use href="#bb-glyph"/></svg></div>
+        <div class="bubble">Hey Comedian! I did a pass on your notebook — three new jokes saved.</div>
+      </div>
+      <div class="chatrow">
+        <div class="avatar"><svg style="color:#1E90FF"><use href="#bb-glyph"/></svg></div>
+        <div class="bubble">Want me to polish the cat bit?</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Files delivered</h2>
+    <div class="card" style="align-items:flex-start; max-width:640px;">
+      <div class="files">
+        export/<br/>
+        ├── bitbuddy-icon.svg &nbsp;&nbsp;← primary, use in-app<br/>
+        ├── bitbuddy-icon-1024.png &nbsp;&nbsp;← App Store Connect<br/>
+        ├── bitbuddy-icon-512.png<br/>
+        ├── bitbuddy-icon-180.png &nbsp;&nbsp;← iPhone @3x<br/>
+        ├── bitbuddy-icon-120.png &nbsp;&nbsp;← iPhone @2x<br/>
+        ├── bitbuddy-icon-inverted.svg<br/>
+        ├── bitbuddy-icon-inverted-1024.png<br/>
+        ├── bitbuddy-icon-dark.svg<br/>
+        ├── bitbuddy-glyph-blue.svg &nbsp;&nbsp;← chat avatar<br/>
+        ├── bitbuddy-glyph-blue-256.png<br/>
+        └── bitbuddy-glyph-white.svg
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
