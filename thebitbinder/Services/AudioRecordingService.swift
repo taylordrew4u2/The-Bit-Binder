@@ -112,14 +112,6 @@ class AudioRecordingService: NSObject, ObservableObject {
         DispatchQueue.main.async { [weak self] in self?.audioSessionError = errorMsg }
     }
 
-    /// Re-attempts audio session setup. Call from UI when user taps "Try Again".
-    func retryAudioSessionSetup() {
-        audioSessionError = nil
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.setupAudioSession()
-        }
-    }
-    
     func startRecording(fileName: String) -> Bool {
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let audioFileName = documentsPath.appendingPathComponent("\(fileName).m4a")

@@ -147,31 +147,4 @@ enum FAQData {
         ]),
     ]
 
-    static func matchingAnswer(for query: String) -> FAQItem? {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-
-        let lower = trimmed.lowercased()
-        let tokens = Set(lower.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
-        if tokens.isEmpty { return nil }
-
-        var bestMatch: FAQItem?
-        var bestScore = 0
-
-        for section in sections {
-            for item in section.items {
-                let questionTokens = Set(item.question.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
-                let answerTokens = Set(item.answer.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
-                let questionOverlap = tokens.intersection(questionTokens).count
-                let answerOverlap = tokens.intersection(answerTokens).count
-                let score = questionOverlap * 3 + answerOverlap
-                if score > bestScore {
-                    bestScore = score
-                    bestMatch = item
-                }
-            }
-        }
-
-        return bestScore >= 2 ? bestMatch : nil
-    }
 }

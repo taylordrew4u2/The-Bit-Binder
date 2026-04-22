@@ -183,9 +183,13 @@ struct AIExtractedJoke: Codable, Identifiable, Equatable {
             }
         }()
 
+        // Strip leading numbered-list markers (e.g. "1.", "2)") that the
+        // model may carry over from the source document.
+        let cleanedText = HybridGagGrabber.stripLeadingNumber(jokeText)
+
         return ImportedJoke(
             title:            title,
-            body:             jokeText,
+            body:             cleanedText,
             rawSourceText:    jokeText,
             tags:             tags,
             confidence:       importConfidence,

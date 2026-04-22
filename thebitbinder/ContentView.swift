@@ -188,8 +188,10 @@ struct MainTabView: View {
                                     Button {
                                         showGagGrabber = true
                                     } label: {
-                                        Image(systemName: "doc.text.magnifyingglass")
-                                            .font(.system(size: 14))
+                                        Image("GagGrabberGlyph")
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(width: 20, height: 20)
                                     }
                                 }
                             }

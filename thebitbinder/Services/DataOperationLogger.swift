@@ -44,71 +44,11 @@ final class DataOperationLogger {
         logger.info(" \(message)")
     }
     
-    func logDataUpdate<T: PersistentModel>(_ entity: T, context: ModelContext, changes: [String] = []) {
-        let entityName = String(describing: type(of: entity))
-        let changesStr = changes.isEmpty ? "" : " (changes: \(changes.joined(separator: ", ")))"
-        let message = "UPDATED \(entityName)\(changesStr)"
-        logOperation(.info, message)
-        
-        logger.info(" \(message)")
-    }
-    
-    func logDataDeletion<T: PersistentModel>(_ entity: T, context: ModelContext, soft: Bool = false) {
-        let entityName = String(describing: type(of: entity))
-        let deleteType = soft ? "SOFT_DELETED" : "HARD_DELETED"
-        let message = "\(deleteType) \(entityName)"
-        logOperation(.warning, message)
-        
-        logger.notice(" \(message)")
-    }
-    
     func logBulkOperation(_ operation: String, entityType: String, count: Int, context: ModelContext) {
         let message = "BULK_\(operation.uppercased()) \(count) \(entityType) entities"
         logOperation(.notice, message)
         
         logger.notice(" \(message)")
-    }
-    
-    func logMigration(_ fromVersion: Int?, _ toVersion: Int, result: String) {
-        let message = "MIGRATION from v\(fromVersion ?? 0) to v\(toVersion): \(result)"
-        logOperation(.critical, message)
-        
-        logger.critical(" \(message)")
-    }
-    
-    func logBackup(_ backupName: String, reason: String, success: Bool) {
-        let status = success ? "SUCCESS" : "FAILED"
-        let message = "BACKUP \(status): \(backupName) (reason: \(reason))"
-        logOperation(success ? .notice : .error, message)
-        
-        if success {
-            logger.notice(" \(message)")
-        } else {
-            logger.error(" \(message)")
-        }
-    }
-    
-    func logDataValidation(_ result: DataValidationResult) {
-        let message = "VALIDATION: \(result.totalEntities) entities, \(result.issues.count) issues, healthy: \(result.isHealthy)"
-        logOperation(result.isHealthy ? .info : .error, message)
-        
-        if result.isHealthy {
-            logger.info(" \(message)")
-        } else {
-            logger.error(" \(message)")
-            
-            // Log individual issues
-            for issue in result.issues {
-                logOperation(.error, "VALIDATION_ISSUE: \(issue)")
-                logger.error("   - \(issue)")
-            }
-        }
-        
-        if result.significantDataLoss {
-            let lossMessage = "SIGNIFICANT_DATA_LOSS_DETECTED"
-            logOperation(.critical, lossMessage)
-            logger.critical(" \(lossMessage)")
-        }
     }
     
     func logError(_ error: Error, operation: String, context: String? = nil) {
@@ -202,47 +142,6 @@ final class DataOperationLogger {
         }
     }
     
-    // MARK: - Log Retrieval
-    
-    /// Gets the current log content for debugging or support
-    func getCurrentLog() -> String? {
-        return try? String(contentsOf: logFileURL)
-    }
-    
-    /// Gets all log files for comprehensive debugging
-    func getAllLogs() -> [String] {
-        var logs: [String] = []
-        
-        // Add main log
-        if let mainLog = getCurrentLog() {
-            logs.append(mainLog)
-        }
-        
-        // Add rotated logs
-        for i in 1...maxLogFiles {
-            let rotatedURL = logFileURL.appendingPathExtension("\(i)")
-            if let rotatedLog = try? String(contentsOf: rotatedURL) {
-                logs.append(rotatedLog)
-            }
-        }
-        
-        return logs
-    }
-    
-    /// Exports all logs to a single file for support/debugging
-    func exportLogs() -> URL? {
-        let exportURL = URL.temporaryDirectory
-            .appending(path: "BitBinder_DataLogs_\(ISO8601DateFormatter().string(from: Date())).txt")
-        
-        do {
-            let allLogs = getAllLogs().joined(separator: "\n--- LOG ROTATION ---\n")
-            try allLogs.write(to: exportURL, atomically: true, encoding: .utf8)
-            return exportURL
-        } catch {
-            print("Failed to export logs: \(error)")
-            return nil
-        }
-    }
 }
 
 // MARK: - Supporting Types
@@ -253,27 +152,6 @@ enum LogLevel: String, CaseIterable {
     case warning = "WARNING"
     case error = "ERROR"
     case critical = "CRITICAL"
-}
-
-// MARK: - SwiftData Extensions for Automatic Logging
-
-extension ModelContext {
-    
-    /// Enhanced save with automatic logging
-    func saveWithLogging() throws {
-        let logger = DataOperationLogger.shared
-        
-        // Log the save operation
-        logger.logInfo("CONTEXT_SAVE initiated")
-        
-        do {
-            try self.save()
-            logger.logInfo("CONTEXT_SAVE completed successfully")
-        } catch {
-            logger.logError(error, operation: "CONTEXT_SAVE")
-            throw error
-        }
-    }
 }
 
 // Extension for public access to logging methods

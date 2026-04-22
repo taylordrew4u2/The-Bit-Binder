@@ -198,8 +198,10 @@ struct ImportBatchDetailView: View {
                                 Circle()
                                     .fill(Color.accentColor.opacity(0.1))
                                     .frame(width: 48, height: 48)
-                                Image(systemName: "doc.text.magnifyingglass")
-                                    .font(.system(size: 20))
+                                Image("GagGrabberGlyph")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 24, height: 24)
                                     .foregroundColor(.accentColor)
                             }
                             

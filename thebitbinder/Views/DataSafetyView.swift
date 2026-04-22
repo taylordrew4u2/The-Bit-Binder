@@ -663,7 +663,6 @@ struct BackupsView: View {
     @State private var selectedBackup: BackupInfo?
     @State private var showRestoreConfirmation = false
     @State private var isRestoring = false
-    @State private var restoreComplete = false
     @State private var restoreError: String?
     @State private var showRestoreError = false
     @State private var showDeleteConfirmation = false
@@ -812,16 +811,6 @@ struct BackupsView: View {
                     Text("This will replace ALL current data with the backup from \(backup.createdAt.formatted(date: .abbreviated, time: .shortened)).\n\nYour current data will be backed up first.\n\nThe app will need to restart after restoring.")
                 }
             }
-            .alert("Restore Complete", isPresented: $restoreComplete) {
-                Button("Restart App") {
-                    // Force terminate so SwiftData reloads from restored store
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        exit(0)
-                    }
-                }
-            } message: {
-                Text("Your data has been restored successfully. The app needs to restart to load the restored data.\n\nTap 'Restart App' and then reopen BitBinder.")
-            }
             .alert("Restore Failed", isPresented: $showRestoreError) {
                 Button("OK", role: .cancel) { }
             } message: {
@@ -866,9 +855,12 @@ struct BackupsView: View {
         Task {
             do {
                 try await dataProtection.recoverFromBackup(backup)
-                await MainActor.run {
-                    isRestoring = false
-                    restoreComplete = true
+                // Exit immediately so the active SwiftData connection cannot
+                // write stale WAL journal entries over the restored store files.
+                // The pendingRestoreRestart flag (set inside recoverFromBackup)
+                // tells AppStartupCoordinator to confirm success on next launch.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    exit(0)
                 }
             } catch {
                 await MainActor.run {

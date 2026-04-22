@@ -7,9 +7,6 @@ extension Notification.Name {
     /// Published by BitBuddyService when an add_joke action is dispatched.
     /// userInfo keys: "jokeText" (String), "folder" (String?, optional).
     static let bitBuddyAddJoke = Notification.Name("BitBuddyAddJoke")
-    /// userInfo: "jokeText" (String), "folder" (String?, optional)
-    static let bitBuddyDuplicateJoke = Notification.Name("BitBuddyDuplicateJoke")
-
     // MARK: - Brainstorm Actions
     /// userInfo: "text" (String)
     static let bitBuddyAddBrainstormNote = Notification.Name("BitBuddyAddBrainstormNote")
@@ -42,9 +39,4 @@ extension Notification.Name {
     /// userInfo: "section" (BitBuddySection.rawValue as String)
     static let bitBuddyNavigateToSection = Notification.Name("BitBuddyNavigateToSection")
 
-    // MARK: - Recording Actions
-    /// Published to start a recording from BitBuddy chat.
-    static let bitBuddyStartRecording = Notification.Name("BitBuddyStartRecording")
-    /// Published to stop an active recording from BitBuddy chat.
-    static let bitBuddyStopRecording = Notification.Name("BitBuddyStopRecording")
 }

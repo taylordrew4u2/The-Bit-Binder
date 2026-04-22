@@ -784,8 +784,10 @@ struct SmartImportReviewView: View {
                         )
                         .frame(width: 110, height: 110)
                     
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 44, weight: .medium))
+                    Image("GagGrabberGlyph")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 48, height: 48)
                         .foregroundColor(Color.bitbinderAccent)
                 }
                 

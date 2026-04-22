@@ -547,6 +547,13 @@ final class DataProtectionService: ObservableObject {
         }
         
         UserDefaults.standard.set(true, forKey: pendingRestoreRestartKey)
+        
+        // Force CloudKit zone deletion on next launch so the restored local
+        // data becomes the source of truth. Without this, CloudKit sync would
+        // overwrite the restored data with the (pre-restore) cloud state.
+        UserDefaults.standard.removeObject(forKey: CloudKitResetUtility.cleanupVersionKey)
+        
+        UserDefaults.standard.synchronize()
         print(" [DataProtection] Recovery completed from backup \(backupInfo.name)")
     }
 

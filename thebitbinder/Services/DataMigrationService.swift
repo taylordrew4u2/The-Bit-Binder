@@ -213,45 +213,6 @@ final class DataMigrationService: ObservableObject {
         return fingerprint.data(using: .utf8)?.base64EncodedString() ?? ""
     }
     
-    // MARK: - Recovery Functions
-    
-    /// Attempts to recover from catastrophic data loss
-    func emergencyDataRecovery() async -> MigrationResult {
-        print(" [DataMigration] EMERGENCY DATA RECOVERY INITIATED")
-        
-        // Try to find any available backup
-        let backups = dataProtection.getAvailableBackups().sorted { $0.createdAt > $1.createdAt }
-        
-        guard let mostRecentBackup = backups.first else {
-            return .failure("No backups available for emergency recovery")
-        }
-        
-        do {
-            print(" [DataMigration] Attempting emergency recovery from backup: \(mostRecentBackup.name)")
-            try await dataProtection.recoverFromBackup(mostRecentBackup)
-            
-            return .success("Emergency recovery completed from backup: \(mostRecentBackup.name)")
-            
-        } catch {
-            print(" [DataMigration] Emergency recovery failed: \(error)")
-            return .failure("Emergency recovery failed: \(error.localizedDescription)")
-        }
-    }
-    
-    // MARK: - Status and Reporting
-    
-    func getMigrationStatus() -> MigrationStatus {
-        let lastMigrationVersion = UserDefaults.standard.integer(forKey: migrationVersionKey)
-        let availableBackups = dataProtection.getAvailableBackups()
-        
-        return MigrationStatus(
-            currentVersion: currentMigrationVersion,
-            lastMigrationVersion: lastMigrationVersion,
-            migrationNeeded: lastMigrationVersion < currentMigrationVersion,
-            availableBackups: availableBackups.count,
-            lastBackupDate: availableBackups.first?.createdAt
-        )
-    }
 }
 
 // MARK: - Supporting Types
@@ -276,10 +237,4 @@ enum MigrationResult {
     }
 }
 
-struct MigrationStatus {
-    let currentVersion: Int
-    let lastMigrationVersion: Int
-    let migrationNeeded: Bool
-    let availableBackups: Int
-    let lastBackupDate: Date?
-}
+

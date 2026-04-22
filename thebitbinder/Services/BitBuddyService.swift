@@ -248,53 +248,6 @@ final class BitBuddyService: NSObject, ObservableObject {
         )
     }
     
-    /// Extract jokes from raw text using local structural heuristics.
-    func extractJokes(from text: String) async throws -> [String] {
-        try await authService.ensureAuthenticated()
-        
-        let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
-        let rawParts = normalized
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        
-        var jokes: [String] = []
-        var currentBlock: [String] = []
-        
-        for line in rawParts {
-            if line.isEmpty {
-                if !currentBlock.isEmpty {
-                    jokes.append(currentBlock.joined(separator: "\n"))
-                    currentBlock.removeAll()
-                }
-                continue
-            }
-            
-            let isBullet = line.hasPrefix("-") || line.hasPrefix("•") || line.hasPrefix("*")
-            let isNumbered = line.range(of: #"^\d+[\.)]\s"#, options: .regularExpression) != nil
-            
-            if (isBullet || isNumbered), !currentBlock.isEmpty {
-                jokes.append(currentBlock.joined(separator: "\n"))
-                currentBlock = [stripListMarker(from: line)]
-            } else {
-                currentBlock.append(isBullet || isNumbered ? stripListMarker(from: line) : line)
-            }
-        }
-        
-        if !currentBlock.isEmpty {
-            jokes.append(currentBlock.joined(separator: "\n"))
-        }
-        
-        let filtered = jokes
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        
-        if filtered.isEmpty, !normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return [normalized.trimmingCharacters(in: .whitespacesAndNewlines)]
-        }
-        
-        return filtered
-    }
-    
     /// Analyze multiple jokes and group them by category.
     /// Updates the original `Joke` objects in-place so changes are visible
     /// to SwiftData without creating detached copies.
@@ -598,12 +551,10 @@ final class BitBuddyService: NSObject, ObservableObject {
         // MARK: Recordings — Direct + Navigate
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         case "start_recording":
-            print(" [BitBuddy] start_recording → posting notification + navigating to Recordings")
-            NotificationCenter.default.post(name: .bitBuddyStartRecording, object: nil)
+            print(" [BitBuddy] start_recording → navigating to Recordings")
             pendingNavigation = .recordings
         case "stop_recording":
-            print(" [BitBuddy] stop_recording → posting notification")
-            NotificationCenter.default.post(name: .bitBuddyStopRecording, object: nil)
+            print(" [BitBuddy] stop_recording")
 
         // MARK: Recordings — Context-dependent → Navigate
         case "rename_recording", "delete_recording", "play_recording",
@@ -934,12 +885,6 @@ final class BitBuddyService: NSObject, ObservableObject {
             turns = Array(turns.suffix(maxConversationTurns))
         }
         turnsByConversation[conversationId] = turns
-    }
-    
-    private func stripListMarker(from line: String) -> String {
-        line
-            .replacingOccurrences(of: #"^[-•*]\s*"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"^\d+[\.)]\s*"#, with: "", options: .regularExpression)
     }
     
     private func inferCategory(from lower: String) -> String {

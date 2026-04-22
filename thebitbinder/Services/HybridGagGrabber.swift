@@ -83,7 +83,7 @@ final class HybridGagGrabber: ObservableObject {
 
         do {
             let result = try await manager.extractJokes(from: textToSend, hints: hints, token: token)
-            let jokes = result.jokes.map(\.jokeText)
+            let jokes = result.jokes.map { Self.stripLeadingNumber($0.jokeText) }
             print(" [GagGrabber] \(result.provider.displayName) returned \(jokes.count) joke(s)")
 
             statusMessage = "Cleaning up results…"
@@ -133,6 +133,14 @@ final class HybridGagGrabber: ObservableObject {
     private func stopElapsedTimer() {
         timerTask?.cancel()
         timerTask = nil
+    }
+
+    // MARK: - Cleaning Helpers
+
+    /// Strips leading numbered-list markers like "1.", "2)", "10." etc.
+    nonisolated static func stripLeadingNumber(_ text: String) -> String {
+        text.replacingOccurrences(of: #"^\s*\d+[.\)]\s*"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
     }
 
     // MARK: - Dedup Helper
@@ -193,7 +201,14 @@ struct HybridGagGrabberToolbarButton: View {
         Button {
             showSheet = true
         } label: {
-            Label("Extract Jokes", systemImage: "doc.text.magnifyingglass")
+            Label {
+                Text("Extract Jokes")
+            } icon: {
+                Image("GagGrabberGlyph")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
+            }
         }
         .sheet(isPresented: $showSheet) {
             HybridGagGrabberSheet()

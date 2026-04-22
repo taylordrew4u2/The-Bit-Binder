@@ -182,6 +182,15 @@ struct thebitbinderApp: App {
             .tint(roastMode ? FirePalette.core : .blue)
             .animation(.easeOut(duration: 0.35), value: startup.isReady)
             .task {
+                // If we just restored from a backup, delete the CloudKit zone
+                // IMMEDIATELY — before wiring up sync or registering for pushes.
+                // This prevents CloudKit from overwriting the restored local data
+                // with the (pre-restore) cloud state. After zone deletion, SwiftData
+                // will re-export every local record on its next sync cycle.
+                if DataProtectionService.shared.hasPendingRestoreRestart() {
+                    await performAggressiveCloudKitCleanup()
+                }
+                
                 // Wire the main context into the sync service so remote change
                 // notifications can call refreshAllObjects() on the right context
                 iCloudSyncService.shared.modelContext = sharedModelContainer.mainContext

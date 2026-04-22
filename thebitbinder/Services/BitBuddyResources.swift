@@ -247,8 +247,4 @@ struct BitBuddyResources {
         return matching.randomElement()?.example ?? roastExamples.randomElement()?.example
     }
     
-    /// Get a random joke technique example.
-    static func randomJokeExample() -> (technique: String, example: String)? {
-        jokeExamples.randomElement()
-    }
 }

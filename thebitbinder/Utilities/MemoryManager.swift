@@ -112,9 +112,6 @@ final class MemoryManager {
             // 3. Clear temp files (scratch recordings, import artifacts, etc.)
             self?.clearTempFiles()
 
-            // 4. Notify listeners (SpeechRecognizer, import pipeline, etc.)
-            NotificationCenter.default.post(name: .appMemoryWarning, object: nil)
-
             self?.reportMemoryUsage()
             print(" [MemoryManager] Caches cleared")
 
@@ -216,8 +213,4 @@ final class MemoryManager {
     }
 }
 
-// MARK: - Notification Names
 
-extension Notification.Name {
-    static let appMemoryWarning = Notification.Name("appMemoryWarning")
-}

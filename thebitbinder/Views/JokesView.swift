@@ -893,7 +893,14 @@ struct JokesView: View {
                     }
                     Section("Import") {
                         Button(action: { showingGagGrabber = true }) {
-                            Label("GagGrabber (Extract Jokes)", systemImage: "doc.text.magnifyingglass")
+                            Label {
+                                Text("GagGrabber (Extract Jokes)")
+                            } icon: {
+                                Image("GagGrabberGlyph")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 20, height: 20)
+                            }
                         }
                         Button(action: { showingFilePicker = true }) {
                             Label("Import from Files", systemImage: "doc.text")

@@ -41,6 +41,15 @@ struct AutoOrganizeView: View {
     // Track if we've populated categorization results
     @State private var hasPopulatedCategorizationResults = false
     
+    // Live progress tracking
+    @State private var currentJokeTitle = ""
+    @State private var recentAssignments: [(id: UUID, title: String, category: String)] = []
+    
+    // Mode picker
+    @State private var showOrganizeModeSheet = false
+    @State private var organizeMode: OrganizeMode = .topic
+    @State private var pendingReorganize = false
+    
     var unorganizedJokes: [Joke] {
         jokes.filter { ($0.folders ?? []).isEmpty && !$0.isTrashed }
     }
@@ -178,16 +187,22 @@ struct AutoOrganizeView: View {
             ) {
                 Button("Reorganize & Keep Old Folders") {
                     deleteOldFoldersOnReorganize = false
-                    performReorganizeAll()
+                    pendingReorganize = true
+                    showOrganizeModeSheet = true
                 }
                 Button("Reorganize & Delete Empty Folders", role: .destructive) {
                     deleteOldFoldersOnReorganize = true
-                    performReorganizeAll()
+                    pendingReorganize = true
+                    showOrganizeModeSheet = true
                 }
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("This will remove all jokes from their current folders and reorganize them into new categories.\n\n No jokes will be deleted — only folder assignments will change.")
             }
+            .sheet(isPresented: $showOrganizeModeSheet) {
+                organizeModePicker
+            }
+            .overlay { organizingOverlay }
             .onAppear {
                 // Pre-populate categorization results for all unorganized jokes
                 // using AI when available, local heuristics as fallback
@@ -247,7 +262,7 @@ struct AutoOrganizeView: View {
             .cornerRadius(10)
             
             // Auto-Organize Button
-            Button(action: performAutoOrganize) {
+            Button(action: { pendingReorganize = false; showOrganizeModeSheet = true }) {
                 if isAnalyzing {
                     HStack(spacing: 12) {
                         ProgressView()
@@ -269,7 +284,7 @@ struct AutoOrganizeView: View {
                             Text("Smart Auto-Organize")
                                 .font(.headline)
                             Text(customFolders.isEmpty
-                                ? (AutoOrganizeService.isAIAvailable ? "GagGrabber-powered categorization" : "Will create folders automatically")
+                                ? (AutoOrganizeService.isAIAvailable ? "Apple Intelligence categorization" : "Will create folders automatically")
                                 : "Using \(customFolders.count) custom folders")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.8))
@@ -410,6 +425,145 @@ struct AutoOrganizeView: View {
         .cornerRadius(8)
     }
     
+    // MARK: - Mode Picker
+
+    @ViewBuilder
+    private var organizeModePicker: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("How should we organize?")
+                    .font(.title3.bold())
+                    .padding(.top, 8)
+
+                Text("Choose what kind of folders to create")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                VStack(spacing: 12) {
+                    ForEach(OrganizeMode.allCases) { mode in
+                        Button {
+                            organizeMode = mode
+                            showOrganizeModeSheet = false
+                            if pendingReorganize {
+                                performReorganizeAll()
+                            } else {
+                                performAutoOrganize()
+                            }
+                        } label: {
+                            HStack(spacing: 14) {
+                                Image(systemName: mode.iconName)
+                                    .font(.system(size: 22))
+                                    .frame(width: 36)
+                                    .foregroundStyle(Color.accentColor)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("By \(mode.displayName)")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    Text(mode.subtitle)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(Color(.secondarySystemGroupedBackground))
+                            .cornerRadius(12)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+
+                Spacer()
+            }
+            .padding(.top)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showOrganizeModeSheet = false }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    // MARK: - Organizing Progress Overlay
+    
+    @ViewBuilder
+    private var organizingOverlay: some View {
+        if isAnalyzing {
+            ZStack {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    Image(systemName: "wand.and.stars")
+                        .font(.system(size: 36))
+                        .foregroundStyle(Color.accentColor)
+                    
+                    Text("Organizing by \(organizeMode.displayName)")
+                        .font(.title3.bold())
+                    
+                    VStack(spacing: 6) {
+                        ProgressView(value: Double(analysisProgress), total: Double(max(1, analysisTotal)))
+                            .tint(Color.accentColor)
+                        
+                        Text("\(analysisProgress) of \(analysisTotal) jokes")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    if !currentJokeTitle.isEmpty {
+                        VStack(spacing: 2) {
+                            Text("Analyzing")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(currentJokeTitle)
+                                .font(.caption.bold())
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    if !recentAssignments.isEmpty {
+                        let recent = Array(recentAssignments.suffix(5))
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(recent, id: \.id) { item in
+                                HStack(spacing: 6) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundColor(.green)
+                                    Text(item.title)
+                                        .font(.caption2)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text(item.category)
+                                        .font(.caption2.bold())
+                                        .foregroundStyle(Color.accentColor)
+                                }
+                            }
+                        }
+                        .padding(12)
+                        .background(Color(.tertiarySystemBackground))
+                        .cornerRadius(8)
+                    }
+                }
+                .padding(28)
+                .frame(maxWidth: 320)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+                .shadow(color: .black.opacity(0.2), radius: 20)
+            }
+            .animation(.easeInOut(duration: 0.3), value: analysisProgress)
+        }
+    }
+    
     private func performAutoOrganize() {
         isAnalyzing = true
         // Capture a snapshot of unorganized jokes BEFORE we start modifying them
@@ -417,6 +571,8 @@ struct AutoOrganizeView: View {
         analysisTotal = jokesToOrganize.count
         analysisProgress = 0
         errorMessage = nil
+        currentJokeTitle = ""
+        recentAssignments = []
         
         guard !jokesToOrganize.isEmpty else {
             isAnalyzing = false
@@ -434,6 +590,7 @@ struct AutoOrganizeView: View {
                 
                 for joke in jokesToOrganize {
                     analysisProgress += 1
+                    currentJokeTitle = String(joke.title.prefix(50))
                     
                     // Get ALL matching categories for this joke (not just the top one)
                     let allMatches: [CategoryMatch]
@@ -445,7 +602,8 @@ struct AutoOrganizeView: View {
                         let existingFolderNames = folders.map { $0.name }
                         allMatches = await AutoOrganizeService.aiCategorize(
                             content: joke.content,
-                            existingFolders: existingFolderNames + (availableFolders ?? [])
+                            existingFolders: existingFolderNames + (availableFolders ?? []),
+                            mode: organizeMode
                         )
                     }
                     
@@ -495,6 +653,9 @@ struct AutoOrganizeView: View {
                     
                     if !assignedFolderNames.isEmpty {
                         organizedCount += 1
+                        if let topCategory = allMatches.first?.category {
+                            recentAssignments.append((id: UUID(), title: String(joke.title.prefix(30)), category: topCategory))
+                        }
                     }
                 }
                 
@@ -638,6 +799,8 @@ struct AutoOrganizeView: View {
         analysisTotal = allActiveJokes.count
         analysisProgress = 0
         errorMessage = nil
+        currentJokeTitle = ""
+        recentAssignments = []
         
         guard !allActiveJokes.isEmpty else {
             isAnalyzing = false
@@ -706,6 +869,7 @@ struct AutoOrganizeView: View {
                 
                 for joke in allActiveJokes {
                     analysisProgress += 1
+                    currentJokeTitle = String(joke.title.prefix(50))
                     
                     // Get ALL matching categories for this joke
                     let allMatches: [CategoryMatch]
@@ -716,7 +880,8 @@ struct AutoOrganizeView: View {
                         let existingFolderNames = folders.map { $0.name }
                         allMatches = await AutoOrganizeService.aiCategorize(
                             content: joke.content,
-                            existingFolders: existingFolderNames + (availableFolders ?? [])
+                            existingFolders: existingFolderNames + (availableFolders ?? []),
+                            mode: organizeMode
                         )
                     }
                     
@@ -755,6 +920,9 @@ struct AutoOrganizeView: View {
                     
                     if !assignedFolderNames.isEmpty {
                         organizedCount += 1
+                        if let topCategory = allMatches.first?.category {
+                            recentAssignments.append((id: UUID(), title: String(joke.title.prefix(30)), category: topCategory))
+                        }
                     }
                 }
                 
