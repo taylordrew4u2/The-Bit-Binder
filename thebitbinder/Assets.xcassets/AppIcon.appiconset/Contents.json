@@ -1,9 +1,11 @@
 {
   "images" : [
     {
-      "filename" : "Appicon.png",
-      "idiom" : "universal",
+      "filename" : "AppIcon.png",
+      "idiom" : "ios-marketing",
       "platform" : "ios",
+      "role" : "marketing",
+      "scale" : "1x",
       "size" : "1024x1024"
     }
   ],
