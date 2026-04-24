@@ -38,10 +38,22 @@ struct thebitbinderApp: App {
         // Changing this to anything else creates a NEW empty store and makes
         // all existing user data invisible. Always use "default.store".
         let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
-        
+
         //  NOTE: Emergency backups are now performed AFTER launch in
         // performDeferredBackup() to avoid watchdog timeout (code 9).
         // The ModelContainer closure must be fast.
+
+        // After a backup restore, disable CloudKit on this launch to prevent
+        // the cloud from overwriting the restored local data. The zone will be
+        // deleted in the .task block, and CloudKit re-enables on next launch.
+        let pendingRestore = UserDefaults.standard.bool(forKey: "DataProtection_PendingRestoreRestart")
+        let cloudKitDB: ModelConfiguration.CloudKitDatabase = pendingRestore
+            ? .none
+            : .private("iCloud.The-BitBinder.thebitbinder")
+
+        if pendingRestore {
+            print(" [ModelContainer] Post-restore launch — CloudKit disabled to protect restored data")
+        }
 
         // 1⃣ Persistent + CloudKit (single container, full schema)
         do {
@@ -55,18 +67,21 @@ struct thebitbinderApp: App {
                 schema: schema,
                 url: storeURL,
                 allowsSave: true,
-                cloudKitDatabase: .private("iCloud.The-BitBinder.thebitbinder")
+                cloudKitDatabase: cloudKitDB
             )
             let container = try ModelContainer(for: schema, configurations: [config])
-            print(" [ModelContainer] Persistent + CloudKit ready with history tracking")
-            
-            // Log successful container creation
-            DataOperationLogger.shared.logSuccess("ModelContainer created with CloudKit")
-            
-            // Verify CloudKit container identifier matches entitlements
+
+            if pendingRestore {
+                print(" [ModelContainer] Persistent store opened (CloudKit paused for restore)")
+                DataOperationLogger.shared.logSuccess("ModelContainer created without CloudKit (post-restore)")
+            } else {
+                print(" [ModelContainer] Persistent + CloudKit ready with history tracking")
+                DataOperationLogger.shared.logSuccess("ModelContainer created with CloudKit")
+            }
+
             let cloudKitContainerID = "iCloud.The-BitBinder.thebitbinder"
             print(" [CloudKit] Using container ID: \(cloudKitContainerID)")
-            
+
             return container
         } catch {
             print(" [ModelContainer] CloudKit failed (\(error)) — local-only fallback (same file, data preserved)")

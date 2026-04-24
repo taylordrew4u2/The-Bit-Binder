@@ -80,15 +80,17 @@ final class DataProtectionService: ObservableObject {
         await createBackup(named: backupName, reason: .appUpdate)
     }
     
-    /// Creates a complete backup of all user data
-    func createBackup(named name: String? = nil, reason: BackupReason = .manual) async {
+    /// Creates a complete backup of all user data.
+    /// Pass `bypassCooldown: true` for safety-critical backups (e.g. pre-recovery)
+    /// that must run regardless of how recently the last backup completed.
+    func createBackup(named name: String? = nil, reason: BackupReason = .manual, bypassCooldown: Bool = false) async {
         // Guard: prevent concurrent backups
         guard !isBackupInProgress else {
             print(" [DataProtection] Backup already in progress — skipping duplicate request")
             return
         }
         // Guard: prevent rapid back-to-back backups (e.g. two triggers within seconds)
-        guard Date().timeIntervalSince(lastBackupCompletionDate) >= backupCooldown else {
+        guard bypassCooldown || Date().timeIntervalSince(lastBackupCompletionDate) >= backupCooldown else {
             print(" [DataProtection] Backup ran recently (\(String(format: "%.0f", Date().timeIntervalSince(lastBackupCompletionDate)))s ago) — skipping")
             return
         }
@@ -168,7 +170,16 @@ final class DataProtectionService: ObservableObject {
                 print(" [DataProtection] External storage directory backed up")
             }
             
-            print(" [DataProtection] SwiftData store backed up")
+            // Verify the backed-up store file is a valid SQLite database
+            if copiedStoreComponent {
+                let destStoreURL = storeDirectory.appending(path: "default.store")
+                if !isValidSQLiteFile(at: destStoreURL) {
+                    print(" [DataProtection] Backup verification failed — store file has invalid SQLite header")
+                    return false
+                }
+            }
+
+            print(" [DataProtection] SwiftData store backed up and verified")
             return copiedStoreComponent
         } catch {
             print(" [DataProtection] Failed to backup SwiftData store: \(error)")
@@ -517,10 +528,22 @@ final class DataProtectionService: ObservableObject {
         guard isBackupRestorable(backupInfo.url) else {
             throw DataProtectionError.invalidBackup("This backup is incomplete and cannot be restored.")
         }
-        
-        // Create a backup of current state before recovery
-        await createBackup(named: "PreRecovery_\(ISO8601DateFormatter().string(from: Date()))", reason: .preRecovery)
-        
+
+        // Validate the backup's SQLite store before any destructive operations
+        guard let storeFileURL = backupStoreFileURL(for: backupInfo.url),
+              isValidSQLiteFile(at: storeFileURL) else {
+            throw DataProtectionError.corruptBackup("Backup store file is corrupted (invalid SQLite header) and cannot be restored.")
+        }
+
+        // Create a backup of current state before recovery (bypass cooldown
+        // so a recent manual backup doesn't block the safety net)
+        await createBackup(named: "PreRecovery_\(ISO8601DateFormatter().string(from: Date()))", reason: .preRecovery, bypassCooldown: true)
+
+        // Set restore flags BEFORE destructive operations so that even if
+        // restore partially fails, the next launch will suppress CloudKit
+        // sync and attempt zone cleanup instead of overwriting restored data.
+        setRestoreFlags()
+
         if isEmergencyOrCorruptionBackup(backupInfo.url) {
             // ── Flat-format restore ─────────────────────────────────────
             try await restoreFromFlatBackup(backupInfo)
@@ -529,32 +552,44 @@ final class DataProtectionService: ObservableObject {
             let swiftDataSource = backupInfo.url.appending(path: "SwiftData")
             let userDefaultsSource = backupInfo.url.appending(path: "UserDefaults.plist")
             let appFilesSource = backupInfo.url.appending(path: "AppFiles")
-            
-            // Restore SwiftData
+
+            // Restore SwiftData (critical — failure aborts the restore)
             if fileManager.fileExists(atPath: swiftDataSource.path) {
                 try await restoreSwiftDataStore(from: swiftDataSource)
             }
-            
-            // Restore UserDefaults
+
+            // Restore UserDefaults (non-critical — log and continue)
             if fileManager.fileExists(atPath: userDefaultsSource.path) {
-                try restoreUserDefaults(from: userDefaultsSource)
+                do {
+                    try restoreUserDefaults(from: userDefaultsSource)
+                } catch {
+                    print(" [DataProtection] UserDefaults restore failed (non-fatal): \(error)")
+                }
             }
-            
-            // Restore app files
+
+            // Restore app files (non-critical — log and continue)
             if fileManager.fileExists(atPath: appFilesSource.path) {
-                try restoreAppFiles(from: appFilesSource)
+                do {
+                    try restoreAppFiles(from: appFilesSource)
+                } catch {
+                    print(" [DataProtection] App files restore failed (non-fatal): \(error)")
+                }
             }
         }
-        
-        UserDefaults.standard.set(true, forKey: pendingRestoreRestartKey)
-        
-        // Force CloudKit zone deletion on next launch so the restored local
-        // data becomes the source of truth. Without this, CloudKit sync would
-        // overwrite the restored data with the (pre-restore) cloud state.
-        UserDefaults.standard.removeObject(forKey: CloudKitResetUtility.cleanupVersionKey)
-        
-        UserDefaults.standard.synchronize()
+
+        // Re-set flags in case UserDefaults restore overwrote them with
+        // values from the backup (which may have had the cleanup key = true)
+        setRestoreFlags()
+
         print(" [DataProtection] Recovery completed from backup \(backupInfo.name)")
+    }
+
+    /// Sets the UserDefaults flags that control post-restore behavior:
+    /// pending restart flag + CloudKit zone cleanup trigger.
+    private func setRestoreFlags() {
+        UserDefaults.standard.set(true, forKey: pendingRestoreRestartKey)
+        UserDefaults.standard.removeObject(forKey: CloudKitResetUtility.cleanupVersionKey)
+        UserDefaults.standard.synchronize()
     }
 
     func hasPendingRestoreRestart() -> Bool {
@@ -566,30 +601,46 @@ final class DataProtectionService: ObservableObject {
     }
 
     private func isBackupRestorable(_ backupURL: URL) -> Bool {
-        // Structured backup: has manifest + SwiftData/default.store
+        guard let storeURL = backupStoreFileURL(for: backupURL) else { return false }
+        return fileManager.fileExists(atPath: storeURL.path)
+    }
+
+    /// Returns the path to the SQLite store file inside a backup, or nil if
+    /// the backup layout is unrecognized.
+    private func backupStoreFileURL(for backupURL: URL) -> URL? {
+        // Structured backup: SwiftData/default.store
         let manifestURL = backupURL.appending(path: "backup_manifest.json")
         let swiftDataStoreURL = backupURL
             .appending(path: "SwiftData", directoryHint: .isDirectory)
             .appending(path: "default.store")
-        
         if fileManager.fileExists(atPath: manifestURL.path) &&
             fileManager.fileExists(atPath: swiftDataStoreURL.path) {
-            return true
+            return swiftDataStoreURL
         }
-        
+
         // Flat-format: emergency backup file (the URL IS the .store file)
         let name = backupURL.lastPathComponent
         if name.hasPrefix("emergency_backup_") && name.hasSuffix(".store") {
-            return fileManager.fileExists(atPath: backupURL.path)
+            return backupURL
         }
-        
+
         // Flat-format: corrupted store backup directory (default.store at root)
         if name.hasPrefix("corrupted_store_backup_") {
-            let storeFile = backupURL.appending(path: "default.store")
-            return fileManager.fileExists(atPath: storeFile.path)
+            return backupURL.appending(path: "default.store")
         }
-        
-        return false
+
+        return nil
+    }
+
+    /// Validates that a file starts with the SQLite magic header bytes.
+    private func isValidSQLiteFile(at url: URL) -> Bool {
+        guard fileManager.fileExists(atPath: url.path),
+              let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 16),
+              header.count >= 16 else { return false }
+        let magic = Data("SQLite format 3\0".utf8)
+        return header.starts(with: magic)
     }
     
     /// Restores from a flat-format emergency or corrupted-store backup.
@@ -758,10 +809,13 @@ struct BackupInfo: Identifiable {
 
 enum DataProtectionError: LocalizedError {
     case invalidBackup(String)
+    case corruptBackup(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidBackup(let message):
+            return message
+        case .corruptBackup(let message):
             return message
         }
     }

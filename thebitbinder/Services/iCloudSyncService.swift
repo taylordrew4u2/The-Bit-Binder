@@ -112,6 +112,10 @@ final class iCloudSyncService: NSObject, ObservableObject {
     }
     
     private func processRemoteChangeAsync() async {
+        guard !UserDefaults.standard.bool(forKey: "DataProtection_PendingRestoreRestart") else {
+            print(" [iCloud] Sync suppressed — pending restore restart")
+            return
+        }
         guard Date().timeIntervalSince(lastSyncCompletionDate) >= syncCooldown else {
             print(" [iCloud] Sync request ignored due to cooldown.")
             return
@@ -233,9 +237,13 @@ final class iCloudSyncService: NSObject, ObservableObject {
     // MARK: - Full Sync
     
     func performFullSync() async {
-        guard isSyncEnabled else { 
+        guard isSyncEnabled else {
             print(" [iCloud] Sync requested but disabled")
-            return 
+            return
+        }
+        guard !UserDefaults.standard.bool(forKey: "DataProtection_PendingRestoreRestart") else {
+            print(" [iCloud] Full sync suppressed — pending restore restart")
+            return
         }
         
         print(" [iCloud] Starting full sync...")
@@ -440,6 +448,10 @@ final class iCloudSyncService: NSObject, ObservableObject {
     // MARK: - Manual Sync Trigger
     
     func syncNow() async {
+        guard !UserDefaults.standard.bool(forKey: "DataProtection_PendingRestoreRestart") else {
+            print(" [iCloud] syncNow() suppressed — pending restore restart")
+            return
+        }
         // Guard against cascading calls — if a sync just completed, skip.
         guard Date().timeIntervalSince(lastSyncCompletionDate) >= syncCooldown else {
             print(" [iCloud] syncNow() skipped — cooldown active")
