@@ -162,14 +162,14 @@ struct StandaloneRecordingView: View {
                 VStack(spacing: 12) {
                     HStack {
                         Circle()
-                            .fill(Color.red)
+                            .fill(Color.recording)
                             .frame(width: 12, height: 12)
                             .opacity(0.8)
                             .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
-                        
+
                         Text("Recording")
                             .font(.headline)
-                            .foregroundColor(.red)
+                            .foregroundColor(.recording)
                         
                         Spacer()
                         
@@ -179,20 +179,20 @@ struct StandaloneRecordingView: View {
                     }
                     .padding()
                     .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                    .cornerRadius(DS.Corner.md)
                 }
                 .padding()
             }
-            
+
             // Recording Visualization
             ZStack {
                 Circle()
-                    .stroke(audioService.isRecording ? Color.red : Color.accentColor, lineWidth: 4)
+                    .stroke(audioService.isRecording ? Color.recording : Color.accentColor, lineWidth: 4)
                     .frame(width: 200, height: 200)
-                
+
                 if audioService.isRecording {
                     Circle()
-                        .fill(Color.red.opacity(0.2))
+                        .fill(Color.recording.opacity(DS.Opacity.medium))
                         .frame(width: 180, height: 180)
                         .scaleEffect(audioService.isPaused ? 1.0 : 1.1)
                         .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: audioService.isPaused)
@@ -200,7 +200,7 @@ struct StandaloneRecordingView: View {
                 
                 Image(systemName: audioService.isRecording ? "waveform" : "mic.fill")
                     .font(.system(size: 60))
-                    .foregroundColor(audioService.isRecording ? .red : .accentColor)
+                    .foregroundColor(audioService.isRecording ? .recording : .accentColor)
             }
             .padding(.vertical, 40)
             
@@ -211,11 +211,11 @@ struct StandaloneRecordingView: View {
                         VStack(spacing: 8) {
                             ZStack {
                                 Circle()
-                                    .fill(Color.red.opacity(0.1))
+                                    .fill(Color.recording.opacity(0.1))
                                     .frame(width: 80, height: 80)
                                 Image(systemName: "record.circle.fill")
                                     .font(.system(size: 50))
-                                    .foregroundColor(.red)
+                                    .foregroundColor(.recording)
                             }
                             Text("Start")
                                 .font(.subheadline)
@@ -244,11 +244,11 @@ struct StandaloneRecordingView: View {
                         VStack(spacing: 8) {
                             ZStack {
                                 Circle()
-                                    .fill(Color.red.opacity(0.1))
+                                    .fill(Color.recording.opacity(0.1))
                                     .frame(width: 70, height: 70)
                                 Image(systemName: "stop.circle.fill")
                                     .font(.system(size: 40))
-                                    .foregroundColor(.red)
+                                    .foregroundColor(.recording)
                             }
                             Text("Stop")
                                 .font(.caption)
@@ -274,7 +274,7 @@ struct StandaloneRecordingView: View {
                     }
                     .padding()
                     .background(Color(.systemGray6))
-                    .cornerRadius(12)
+                    .cornerRadius(DS.Corner.md)
                 }
                 .padding()
             }

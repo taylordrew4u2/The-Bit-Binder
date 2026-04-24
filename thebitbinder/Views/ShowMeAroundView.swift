@@ -138,13 +138,13 @@ struct ShowMeAroundView: View {
                                 if roastMode {
                                     FirePalette.flameHorizontal
                                 } else {
-                                    Color.green
+                                    Color.accentColor
                                 }
                             }
                         )
                         .foregroundColor(.white)
                         .clipShape(Capsule())
-                        .shadow(color: (roastMode ? FirePalette.core : Color.green).opacity(0.35),
+                        .shadow(color: (roastMode ? FirePalette.core : .accentColor).opacity(0.35),
                                 radius: 8, x: 0, y: 3)
                     }
                 }
@@ -312,7 +312,7 @@ private struct ProTipCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: roastMode ? "flame.fill" : "lightbulb.fill")
-                .foregroundColor(roastMode ? FirePalette.core : .yellow)
+                .foregroundColor(roastMode ? FirePalette.core : .accentColor)
                 .font(.body)
             Text(.init("**\(roastMode ? "Hot Tip:" : "Pro Tip:")** \(text)"))
                 .font(.caption)
@@ -322,11 +322,11 @@ private struct ProTipCard: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill((roastMode ? FirePalette.core : Color.yellow).opacity(roastMode ? 0.10 : 0.08))
+                .fill((roastMode ? FirePalette.core : Color.accentColor).opacity(DS.Opacity.subtle))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder((roastMode ? FirePalette.core : Color.yellow).opacity(0.25), lineWidth: 0.5)
+                .strokeBorder((roastMode ? FirePalette.core : Color.accentColor).opacity(0.25), lineWidth: 0.5)
         )
     }
 }

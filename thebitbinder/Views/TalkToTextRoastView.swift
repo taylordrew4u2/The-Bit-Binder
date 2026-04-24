@@ -52,14 +52,14 @@ struct TalkToTextRoastView: View {
                 VStack(spacing: 12) {
                     ZStack {
                          Circle()
-                             .fill(isRecording ? Color.red.opacity(0.15) : accentColor.opacity(0.1))
+                             .fill(isRecording ? Color.recording.opacity(DS.Opacity.light) : accentColor.opacity(0.1))
                              .frame(width: 100, height: 100)
                              .scaleEffect(isRecording ? 1.1 : 1.0)
                              .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isRecording)
                          
                          Image(systemName: isRecording ? "waveform" : "mic.fill")
                              .font(.largeTitle)
-                             .foregroundColor(isRecording ? .red : accentColor)
+                             .foregroundColor(isRecording ? .recording : accentColor)
                              .symbolEffect(.variableColor, isActive: isRecording)
                      }
                      
@@ -133,7 +133,7 @@ struct TalkToTextRoastView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(isRecording ? .red : accentColor)
+                    .tint(isRecording ? .recording : accentColor)
                     .controlSize(.large)
                     .disabled(permissionStatus == .denied)
                     

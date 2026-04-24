@@ -177,7 +177,7 @@ struct FolderChip: View {
                 .padding(.vertical, 8)
                 .background(
                     isSelected
-                        ? (roastMode ? AnyShapeStyle(Color.orange) : AnyShapeStyle(Color.accentColor))
+                        ? (roastMode ? AnyShapeStyle(FirePalette.core) : AnyShapeStyle(Color.accentColor))
                         : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
                 )
                 .clipShape(Capsule())

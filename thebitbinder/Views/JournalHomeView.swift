@@ -246,7 +246,7 @@ private struct JournalCalendarView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(isFuture ? Color.clear : bgColor)
             )
-            .foregroundStyle(isFuture ? Color.secondary.opacity(0.4) : (status != nil ? Color.white : Color.primary))
+            .foregroundStyle(isFuture ? Color.secondary.opacity(0.4) : (status == true ? Color.white : Color.primary))
             .overlay(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(Color.bitbinderAccent, lineWidth: isToday ? 1.5 : 0)

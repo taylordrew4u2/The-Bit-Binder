@@ -261,7 +261,7 @@ struct NotebookView: View {
         .overlay {
             if isImportingPDF {
                 ZStack {
-                    Color.black.opacity(0.4)
+                    Color.scrim
                         .ignoresSafeArea()
                     VStack(spacing: 16) {
                         ProgressView()
@@ -1082,7 +1082,7 @@ private struct NotebookThumbnailCell: View {
                         .resizable()
                         .scaledToFill()
                 } else {
-                    Color.gray.opacity(0.2)
+                    Color.gray.opacity(DS.Opacity.medium)
                         .overlay(ProgressView().tint(.secondary))
                 }
             }

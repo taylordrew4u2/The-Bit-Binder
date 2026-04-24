@@ -16,7 +16,7 @@ extension Color {
     /// Reads the same `@AppStorage` key as the global tint in
     /// `thebitbinderApp`, so it stays in sync automatically.
     static var bitbinderAccent: Color {
-        UserDefaults.standard.bool(forKey: "roastModeEnabled") ? FirePalette.core : .blue
+        UserDefaults.standard.bool(forKey: "roastModeEnabled") ? FirePalette.core : .accentColor
     }
 }
 
@@ -27,7 +27,7 @@ struct RoastModeTint: ViewModifier {
     @AppStorage("roastModeEnabled") private var roastMode: Bool = false
 
     func body(content: Content) -> some View {
-        content.tint(roastMode ? FirePalette.core : .blue)
+        content.tint(roastMode ? FirePalette.core : .accentColor)
     }
 }
 

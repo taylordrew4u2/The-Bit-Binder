@@ -51,7 +51,7 @@ struct GagGrabberFace: View {
         case .confused:
             Image(systemName: "exclamationmark.circle.fill")
                 .font(.system(size: size * 0.26, weight: .bold))
-                .foregroundStyle(.white, Color.red)
+                .foregroundStyle(.white, Color.recording)
                 .offset(x: size * 0.32, y: size * 0.32)
         }
     }

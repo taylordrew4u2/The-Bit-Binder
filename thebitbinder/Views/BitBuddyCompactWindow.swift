@@ -150,13 +150,13 @@ struct BitBuddyCompactWindow: View {
         .frame(width: windowWidth, height: windowHeight)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(UIColor.systemBackground))
+                .fill(roastMode ? Color(FirePalette.bg) : Color(UIColor.systemBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                .stroke(roastMode ? FirePalette.core.opacity(0.27) : Color.primary.opacity(0.08), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.22), radius: 22, x: 0, y: 12)
+        .shadow(color: roastMode ? FirePalette.core.opacity(0.2) : .black.opacity(0.22), radius: 22, x: 0, y: 12)
         .environment(\.dismissBitBuddyDrawer) {
             presenter.close()
         }
@@ -167,9 +167,9 @@ struct BitBuddyCompactWindow: View {
     private var header: some View {
         HStack(spacing: 8) {
             BitBuddyAvatar(roastMode: roastMode, size: 24, symbolSize: 14)
-            Text("BitBuddy")
+            Text(roastMode ? "Roast Buddy" : "BitBuddy")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(roastMode ? FirePalette.text : .primary)
             Spacer(minLength: 4)
 
             // Expand → full drawer

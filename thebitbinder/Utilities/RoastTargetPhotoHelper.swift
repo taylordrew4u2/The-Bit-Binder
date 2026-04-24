@@ -116,7 +116,7 @@ struct AsyncThumbnailView: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                Color.gray.opacity(0.2)
+                Color.gray.opacity(DS.Opacity.medium)
                     .overlay(
                         Group {
                             if imageData != nil {

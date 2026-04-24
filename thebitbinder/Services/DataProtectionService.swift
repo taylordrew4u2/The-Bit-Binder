@@ -36,20 +36,73 @@ final class DataProtectionService: ObservableObject {
     private let previousVersionKey = "DataProtection_PreviousAppVersion"
     private let pendingRestoreRestartKey = "DataProtection_PendingRestoreRestart"
     
+    /// Directory where backup files are staged for the next launch.
+    /// The actual file swap happens in `applyPendingRestoreIfNeeded()`
+    /// before the ModelContainer is created, avoiding SQLite file-handle conflicts.
+    nonisolated static let pendingRestoreDir = URL.applicationSupportDirectory
+        .appending(path: "pending_restore", directoryHint: .isDirectory)
+
     init() {
         // Create backup directory in Application Support
         self.backupDirectory = URL.applicationSupportDirectory
             .appending(path: "DataBackups", directoryHint: .isDirectory)
-        
+
         // Ensure backup directory exists
         try? fileManager.createDirectory(
             at: backupDirectory,
             withIntermediateDirectories: true
         )
-        
+
         // Log initialization
         print(" [DataProtection] Service initialized")
         print(" [DataProtection] Backup directory: \(backupDirectory.path)")
+    }
+
+    /// Applies a staged restore if one is pending. Call this BEFORE
+    /// creating the ModelContainer so no SQLite connections exist yet.
+    nonisolated static func applyPendingRestoreIfNeeded() {
+        let fm = FileManager.default
+        let stagingDir = pendingRestoreDir
+
+        guard fm.fileExists(atPath: stagingDir.path) else { return }
+
+        let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
+        let extensions = ["", "-shm", "-wal"]
+
+        print(" [DataProtection] Applying staged restore from previous session...")
+
+        do {
+            for ext in extensions {
+                let destFile = URL(fileURLWithPath: storeURL.path + ext)
+                if fm.fileExists(atPath: destFile.path) {
+                    try fm.removeItem(at: destFile)
+                }
+            }
+            let externalStorageURL = URL(fileURLWithPath: storeURL.path + "_Files")
+            if fm.fileExists(atPath: externalStorageURL.path) {
+                try fm.removeItem(at: externalStorageURL)
+            }
+
+            for ext in extensions {
+                let src = stagingDir.appending(path: "default.store\(ext)")
+                let dst = URL(fileURLWithPath: storeURL.path + ext)
+                if fm.fileExists(atPath: src.path) {
+                    try fm.moveItem(at: src, to: dst)
+                    print(" [DataProtection] Restored staged: default.store\(ext)")
+                }
+            }
+            let stagedExternal = stagingDir.appending(path: "default.store_Files")
+            if fm.fileExists(atPath: stagedExternal.path) {
+                try fm.moveItem(at: stagedExternal, to: externalStorageURL)
+                print(" [DataProtection] Restored staged external storage directory")
+            }
+
+            try fm.removeItem(at: stagingDir)
+            print(" [DataProtection] Staged restore applied successfully")
+        } catch {
+            print(" [DataProtection] Failed to apply staged restore: \(error)")
+            try? fm.removeItem(at: stagingDir)
+        }
     }
     
     // MARK: - Version Tracking
@@ -232,6 +285,7 @@ final class DataProtectionService: ObservableObject {
                 let name = fileURL.lastPathComponent
                 if name.contains("default.store") ||
                    name == "DataBackups" ||
+                   name == "pending_restore" ||
                    name.hasPrefix("emergency_backup_") ||
                    name.hasPrefix("corrupted_store_backup_") {
                     continue
@@ -649,106 +703,75 @@ final class DataProtectionService: ObservableObject {
     /// Corrupted backups: the URL is a directory containing `default.store`
     /// plus optional companions.
     private func restoreFromFlatBackup(_ backupInfo: BackupInfo) async throws {
-        let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
+        let stagingDir = Self.pendingRestoreDir
         let extensions = ["", "-shm", "-wal"]
-        
-        // Step 1: Remove existing store files & external storage
-        for ext in extensions {
-            let destFile = URL(fileURLWithPath: storeURL.path + ext)
-            if fileManager.fileExists(atPath: destFile.path) {
-                try fileManager.removeItem(at: destFile)
-                print(" [DataProtection] Removed existing: default.store\(ext)")
-            }
-        }
-        let externalStorageURL = URL(fileURLWithPath: storeURL.path + "_Files")
-        if fileManager.fileExists(atPath: externalStorageURL.path) {
-            try fileManager.removeItem(at: externalStorageURL)
-            print(" [DataProtection] Removed existing external storage directory")
-        }
-        
-        // Step 2: Determine source layout and copy files
+
+        try? fileManager.removeItem(at: stagingDir)
+        try fileManager.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+
         let name = backupInfo.url.lastPathComponent
-        
+
         if name.hasPrefix("emergency_backup_") && name.hasSuffix(".store") {
-            // Emergency backup: URL is the .store file, companions are siblings
             let basePath = backupInfo.url.path
             for ext in extensions {
                 let src = URL(fileURLWithPath: basePath + ext)
-                let dst = URL(fileURLWithPath: storeURL.path + ext)
+                let dst = stagingDir.appending(path: "default.store\(ext)")
                 if fileManager.fileExists(atPath: src.path) {
                     try fileManager.copyItem(at: src, to: dst)
-                    print(" [DataProtection] Restored: default.store\(ext) (from emergency backup)")
+                    print(" [DataProtection] Staged: default.store\(ext) (from emergency backup)")
                 }
             }
-            // External storage companion
             let srcExternal = URL(fileURLWithPath: basePath + "_Files")
             if fileManager.fileExists(atPath: srcExternal.path) {
-                try fileManager.copyItem(at: srcExternal, to: externalStorageURL)
-                print(" [DataProtection] Restored external storage directory (from emergency backup)")
+                let dstExternal = stagingDir.appending(path: "default.store_Files")
+                try fileManager.copyItem(at: srcExternal, to: dstExternal)
+                print(" [DataProtection] Staged external storage (from emergency backup)")
             }
         } else if name.hasPrefix("corrupted_store_backup_") {
-            // Corrupted backup: URL is a directory containing default.store + companions
             for ext in extensions {
                 let src = backupInfo.url.appending(path: "default.store\(ext)")
-                let dst = URL(fileURLWithPath: storeURL.path + ext)
+                let dst = stagingDir.appending(path: "default.store\(ext)")
                 if fileManager.fileExists(atPath: src.path) {
                     try fileManager.copyItem(at: src, to: dst)
-                    print(" [DataProtection] Restored: default.store\(ext) (from corrupted backup)")
+                    print(" [DataProtection] Staged: default.store\(ext) (from corrupted backup)")
                 }
             }
             let srcExternal = backupInfo.url.appending(path: "default.store_Files")
             if fileManager.fileExists(atPath: srcExternal.path) {
-                try fileManager.copyItem(at: srcExternal, to: externalStorageURL)
-                print(" [DataProtection] Restored external storage directory (from corrupted backup)")
+                let dstExternal = stagingDir.appending(path: "default.store_Files")
+                try fileManager.copyItem(at: srcExternal, to: dstExternal)
+                print(" [DataProtection] Staged external storage (from corrupted backup)")
             }
         }
-        
-        print(" [DataProtection] Flat-format store restored — app must restart to load")
+
+        print(" [DataProtection] Restore staged — files will be applied on next launch")
     }
     
     private func restoreSwiftDataStore(from sourceURL: URL) async throws {
-        let storeURL = URL.applicationSupportDirectory.appending(path: "default.store")
-        
-        // All possible SQLite/SwiftData companion files
+        let stagingDir = Self.pendingRestoreDir
         let extensions = ["", "-shm", "-wal"]
-        
-        // Step 1: Remove ALL existing store files (including journal)
-        // This prevents SQLite from replaying old WAL entries over restored data
-        for ext in extensions {
-            let destFile = URL(fileURLWithPath: storeURL.path + ext)
-            if fileManager.fileExists(atPath: destFile.path) {
-                try fileManager.removeItem(at: destFile)
-                print(" [DataProtection] Removed existing: default.store\(ext)")
-            }
-        }
-        
-        // Also remove the SwiftData external storage directory
-        // (this is where @Attribute(.externalStorage) blobs like photoData live)
-        let externalStorageURL = URL(fileURLWithPath: storeURL.path + "_Files")
-        if fileManager.fileExists(atPath: externalStorageURL.path) {
-            try fileManager.removeItem(at: externalStorageURL)
-            print(" [DataProtection] Removed existing external storage directory")
-        }
-        
-        // Step 2: Copy backup files into place
+
+        try? fileManager.removeItem(at: stagingDir)
+        try fileManager.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+
         for ext in extensions {
             let sourceFile = sourceURL.appending(path: "default.store\(ext)")
-            let destFile = URL(fileURLWithPath: storeURL.path + ext)
-            
+            let destFile = stagingDir.appending(path: "default.store\(ext)")
+
             if fileManager.fileExists(atPath: sourceFile.path) {
                 try fileManager.copyItem(at: sourceFile, to: destFile)
-                print(" [DataProtection] Restored: default.store\(ext)")
+                print(" [DataProtection] Staged: default.store\(ext)")
             }
         }
-        
-        // Step 3: Restore external storage directory if it was backed up
+
         let sourceExternalStorage = sourceURL.appending(path: "default.store_Files")
         if fileManager.fileExists(atPath: sourceExternalStorage.path) {
-            try fileManager.copyItem(at: sourceExternalStorage, to: externalStorageURL)
-            print(" [DataProtection] Restored external storage directory")
+            let destExternal = stagingDir.appending(path: "default.store_Files")
+            try fileManager.copyItem(at: sourceExternalStorage, to: destExternal)
+            print(" [DataProtection] Staged external storage directory")
         }
-        
-        print(" [DataProtection] SwiftData store fully restored — app must restart to load")
+
+        print(" [DataProtection] Restore staged — files will be applied on next launch")
     }
     
     private func restoreUserDefaults(from sourceURL: URL) throws {

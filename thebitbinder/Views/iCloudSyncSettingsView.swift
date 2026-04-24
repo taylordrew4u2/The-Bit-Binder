@@ -87,7 +87,7 @@ struct iCloudSyncSettingsView: View {
                             Spacer()
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.destructive.opacity(DS.Opacity.light)))
                     } else if let errorMessage = syncService.errorMessage, !errorMessage.isEmpty {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.circle.fill")
@@ -98,7 +98,7 @@ struct iCloudSyncSettingsView: View {
                             Spacer()
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.destructive.opacity(DS.Opacity.light)))
                     }
                     
                     // Issues Found

@@ -746,7 +746,7 @@ struct BackupsView: View {
                                                 .padding(7)
                                                 .background(
                                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                        .fill(Color.red.opacity(0.1))
+                                                        .fill(Color.destructive.opacity(DS.Opacity.light))
                                                 )
                                         }
                                         .buttonStyle(.plain)
@@ -775,7 +775,7 @@ struct BackupsView: View {
             .overlay {
                 if isRestoring {
                     ZStack {
-                        Color.black.opacity(0.4)
+                        Color.scrim
                             .ignoresSafeArea()
                         
                         VStack(spacing: 16) {

@@ -62,10 +62,10 @@ struct SetListDetailView: View {
              VStack(spacing: 12) {
                  HStack {
                      if audioService.isRecording {
-                         Circle().fill(Color.red).frame(width: 12, height: 12)
+                         Circle().fill(Color.recording).frame(width: 12, height: 12)
                              .opacity(0.8)
                              .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
-                         Text("Recording").font(.headline).foregroundColor(.red)
+                         Text("Recording").font(.headline).foregroundColor(.recording)
                          Spacer()
                          Text(timeString(from: recordingDuration))
                              .font(.system(.title3, design: .monospaced))
@@ -82,7 +82,7 @@ struct SetListDetailView: View {
                              Label("Start Recording", systemImage: "record.circle.fill")
                                  .labelStyle(.iconOnly)
                                  .font(.system(size: 44))
-                                 .foregroundColor(.red)
+                                 .foregroundColor(.recording)
                          }
                          .accessibilityLabel("Start Recording")
                      } else {
@@ -96,7 +96,7 @@ struct SetListDetailView: View {
                          Button(action: stopRecording) {
                              Image(systemName: "stop.circle.fill")
                                  .font(.system(size: 40))
-                                 .foregroundColor(.red)
+                                 .foregroundColor(.recording)
                          }
                          .accessibilityLabel("Stop Recording")
                      }
@@ -474,7 +474,7 @@ struct SetListDetailView: View {
                     .foregroundColor(Color.accentColor)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color.white)
+                    .background(Color(UIColor.systemBackground))
                     .clipShape(Capsule())
             }
         }
@@ -511,7 +511,7 @@ struct SetListDetailView: View {
                         .foregroundColor(Color.accentColor)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color.white)
+                        .background(Color(UIColor.systemBackground))
                         .clipShape(Capsule())
                 }
 

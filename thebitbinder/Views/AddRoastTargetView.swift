@@ -25,7 +25,7 @@ struct AddRoastTargetView: View {
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
 
-    private let accentColor: Color = .accentColor
+    private var accentColor: Color { FirePalette.core }
 
     var body: some View {
         NavigationStack {
@@ -258,7 +258,7 @@ struct GuidedRoastTargetSheet: View {
     @State private var promptIndex = 0
     @State private var displayedPrompt = ""
     
-    private let accentColor: Color = .accentColor
+    private var accentColor: Color { FirePalette.core }
     
     private let traitPrompts = [
         "What's their job or what do they do?",

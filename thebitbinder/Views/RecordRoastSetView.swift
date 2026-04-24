@@ -25,7 +25,7 @@ struct RecordRoastSetView: View {
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
     
-    private let accentColor: Color = .accentColor
+    private var accentColor: Color { FirePalette.core }
     
     /// Safe access to target name
     private var safeTargetName: String {
@@ -45,14 +45,14 @@ struct RecordRoastSetView: View {
                 VStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(isRecording ? Color.red.opacity(0.15) : accentColor.opacity(0.1))
+                            .fill(isRecording ? Color.recording.opacity(DS.Opacity.light) : accentColor.opacity(0.1))
                             .frame(width: 100, height: 100)
                             .scaleEffect(isRecording ? 1.1 : 1.0)
                             .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isRecording)
                         
                         Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
                             .font(.system(size: 40))
-                            .foregroundColor(isRecording ? .red : accentColor)
+                            .foregroundColor(isRecording ? .recording : accentColor)
                             .symbolEffect(.variableColor, isActive: isRecording)
                     }
                     
@@ -63,7 +63,7 @@ struct RecordRoastSetView: View {
                     // Time display
                      Text(formattedTime)
                          .font(.system(size: 36, weight: .bold, design: .monospaced))
-                         .foregroundColor(isRecording ? .red : accentColor)
+                         .foregroundColor(isRecording ? .recording : accentColor)
                          .padding()
                          .background(Color(UIColor.secondarySystemBackground))
                          .cornerRadius(12)
@@ -110,7 +110,7 @@ struct RecordRoastSetView: View {
                         }
                         .frame(maxWidth: .infinity)
                          .padding(.vertical, 16)
-                         .background(isRecording ? .red : accentColor)
+                         .background(isRecording ? Color.recording : accentColor)
                          .foregroundColor(.white)
                          .clipShape(RoundedRectangle(cornerRadius: 14))
                     }

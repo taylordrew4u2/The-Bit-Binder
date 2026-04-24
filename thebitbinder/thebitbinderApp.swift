@@ -43,6 +43,10 @@ struct thebitbinderApp: App {
         // performDeferredBackup() to avoid watchdog timeout (code 9).
         // The ModelContainer closure must be fast.
 
+        // Apply any staged restore BEFORE opening the store — no SQLite
+        // connections exist yet, so file deletion is safe.
+        DataProtectionService.applyPendingRestoreIfNeeded()
+
         // After a backup restore, disable CloudKit on this launch to prevent
         // the cloud from overwriting the restored local data. The zone will be
         // deleted in the .task block, and CloudKit re-enables on next launch.

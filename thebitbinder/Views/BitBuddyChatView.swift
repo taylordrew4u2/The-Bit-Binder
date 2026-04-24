@@ -88,7 +88,7 @@ struct BitBuddyChatView: View {
             // Input Area
             inputArea
         }
-        .background(Color(UIColor.systemBackground))
+        .background(roastMode ? Color(FirePalette.bg) : Color(UIColor.systemBackground))
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .bitBinderToolbar(roastMode: roastMode)
@@ -283,13 +283,15 @@ struct BitBuddyChatView: View {
             }
             
             VStack(spacing: 8) {
-                Text(roastMode ? "Ready to Roast?" : "Hey, \(userPreferences.userName)!")
+                Text(roastMode ? "Roast Buddy" : "Hey, \(userPreferences.userName)!")
                     .font(.title2.bold())
                     .foregroundColor(.primary)
                 
-                Text("I can help with your jokes, set lists, brainstorms, recordings, imports, and more.")
+                Text(roastMode
+                     ? "Sharp. Merciless. Affectionate. Give me a target."
+                     : "I can help with your jokes, set lists, brainstorms, recordings, imports, and more.")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(roastMode ? FirePalette.sub : .secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
@@ -323,19 +325,19 @@ struct BitBuddyChatView: View {
         } label: {
             Text(text)
                 .font(.subheadline)
-                .foregroundColor(.primary)
+                .foregroundColor(roastMode ? FirePalette.text : .primary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .frame(maxWidth: 280, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(UIColor.secondarySystemBackground))
+                        .fill(roastMode ? Color.white.opacity(0.05) : Color(UIColor.secondarySystemBackground))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(
-                            roastMode ? FirePalette.core.opacity(0.22) : Color.accentColor.opacity(0.15),
-                            lineWidth: 1
+                            roastMode ? FirePalette.edge : Color.accentColor.opacity(0.15),
+                            lineWidth: roastMode ? 0.5 : 1
                         )
                 )
         }
@@ -351,7 +353,7 @@ struct BitBuddyChatView: View {
             HStack(spacing: 12) {
                 // Text field
                 HStack {
-                    TextField("Ask BitBuddy...", text: $inputText)
+                    TextField(roastMode ? "Sharpen this bit…" : "Ask BitBuddy...", text: $inputText)
                         .font(.body)
                         .foregroundColor(.primary)
                         .focused($isInputFocused)
@@ -362,27 +364,27 @@ struct BitBuddyChatView: View {
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(Color(UIColor.secondarySystemBackground))
+                        .fill(roastMode ? Color.white.opacity(0.05) : Color(UIColor.secondarySystemBackground))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .strokeBorder(roastMode ? FirePalette.core.opacity(0.3) : Color.clear, lineWidth: 1)
                 )
-                
+
                 // Send button
                 Button(action: sendMessage) {
                     ZStack {
                         Circle()
                             .fill(
                                 inputText.trimmingCharacters(in: .whitespaces).isEmpty || bitBuddy.isLoading
-                                ? Color(UIColor.systemGray5)
+                                ? (roastMode ? Color.white.opacity(0.08) : Color(UIColor.systemGray5))
                                 : accentColor
                             )
                             .frame(width: 44, height: 44)
-                        
+
                         if bitBuddy.isLoading {
                             ProgressView()
-                                .tint(.primary)
+                                .tint(roastMode ? FirePalette.text : .primary)
                         } else {
                             Image(systemName: "arrow.up")
                                 .font(.system(size: 18, weight: .semibold))
@@ -399,7 +401,7 @@ struct BitBuddyChatView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color(UIColor.systemBackground))
+            .background(roastMode ? Color(FirePalette.bg2) : Color(UIColor.systemBackground))
         }
     }
     
@@ -407,7 +409,7 @@ struct BitBuddyChatView: View {
         // Greet the user on every fresh conversation
         if messages.isEmpty {
             let greeting = roastMode
-                ? "BitBuddy here — Roast Mode is ON. Give me a target and I'll load the burns."
+                ? "Roast Buddy here. Give me a target and I'll sharpen the burns."
                 : "Hey! I'm BitBuddy, your comedy writing partner. Ask me to analyze a joke, build a set list, brainstorm premises, or anything else — I'm ready when you are."
             let intro = ChatBubbleMessage(text: greeting, isUser: false, conversationId: conversationId)
             messages.append(intro)
@@ -559,13 +561,19 @@ struct ChatBubble: View {
                 .padding(12)
                 .background(
                     message.isUser
-                    ? (roastMode ? FirePalette.core : Color.accentColor)
-                    : Color(UIColor.secondarySystemBackground)
+                    ? (roastMode ? AnyShapeStyle(FirePalette.emberCTA) : AnyShapeStyle(Color.accentColor))
+                    : (roastMode ? AnyShapeStyle(Color.white.opacity(0.05)) : AnyShapeStyle(Color(UIColor.secondarySystemBackground)))
                 )
                 .foregroundColor(
                     message.isUser
                     ? .white
-                    : .primary
+                    : (roastMode ? FirePalette.text : .primary)
+                )
+                .overlay(
+                    !message.isUser && roastMode
+                    ? RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(FirePalette.edge, lineWidth: 0.5)
+                    : nil
                 )
                 .cornerRadius(16)
                 .cornerRadius(message.isUser ? 16 : 4, corners: message.isUser ? [.topLeft, .bottomLeft, .bottomRight] : [.topRight, .bottomLeft, .bottomRight])
@@ -637,10 +645,16 @@ struct TypingIndicator: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .background(
-                Color(UIColor.secondarySystemBackground)
+                roastMode ? Color.white.opacity(0.05) : Color(UIColor.secondarySystemBackground)
             )
             .cornerRadius(16)
             .cornerRadius(4, corners: [.topRight, .bottomLeft, .bottomRight])
+            .overlay(
+                roastMode
+                ? RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(FirePalette.edge, lineWidth: 0.5)
+                : nil
+            )
             .animation(.easeInOut(duration: 0.3), value: statusMessage)
             .onAppear {
                 for i in 0..<3 {
@@ -665,45 +679,153 @@ struct BitBuddyAvatar: View {
     let symbolSize: CGFloat
 
     var body: some View {
-        ZStack {
-            // Use the full-color BitBuddy icon (blue rounded-rect with white glyph)
-            Image("BitBuddyIcon")
-                .resizable()
-                .scaledToFill()
-                .clipShape(Circle())
-
-            // Tint overlay for roast mode — matches FirePalette.core used elsewhere
-            if roastMode {
-                Circle()
-                    .fill(FirePalette.core.opacity(0.7))
-                    .blendMode(.sourceAtop)
-
-                // Devil horns in roast mode
-                HStack(spacing: size * 0.22) {
-                    DevilHorn(size: size * 0.22)
-                    DevilHorn(size: size * 0.22)
-                }
-                .offset(y: -size * 0.44)
+        if roastMode {
+            RoastBuddyAvatar(size: size)
+        } else {
+            ZStack {
+                Image("BitBuddyIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(Circle())
             }
+            .frame(width: size, height: size)
         }
-        .frame(width: size, height: size)
-        .compositingGroup()
     }
 }
 
-/// A simple triangular devil horn drawn with a Path — stays native iOS styling.
-private struct DevilHorn: View {
-    let size: CGFloat
+/// Roast Buddy — BitBuddy's alter-ego. Charred background, ember glow,
+/// speech-bubble glyph with sparkle eyes and a crooked smirk.
+struct RoastBuddyAvatar: View {
+    var size: CGFloat = 40
+    var color: Color = FirePalette.bright
 
     var body: some View {
-        Path { path in
-            path.move(to: CGPoint(x: size * 0.5, y: 0))           // tip
-            path.addLine(to: CGPoint(x: 0, y: size))              // bottom-left
-            path.addLine(to: CGPoint(x: size, y: size))           // bottom-right
-            path.closeSubpath()
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.23, green: 0.094, blue: 0.063),
+                            Color(red: 0.102, green: 0.051, blue: 0.031)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            Circle()
+                .strokeBorder(FirePalette.core.opacity(0.27), lineWidth: 0.5)
+
+            // Ember glow in top-right
+            Circle()
+                .fill(RadialGradient(
+                    colors: [FirePalette.core.opacity(0.5), .clear],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: size * 0.35
+                ))
+                .frame(width: size * 0.55, height: size * 0.55)
+                .blur(radius: size * 0.08)
+                .offset(x: size * 0.15, y: -size * 0.15)
+
+            // Roast Buddy glyph — speech bubble + sparkle eyes + smirk + ember
+            RoastBuddyGlyph(size: size * 0.56, color: color)
         }
-        .fill(FirePalette.core)
         .frame(width: size, height: size)
+        .shadow(color: FirePalette.core.opacity(0.2), radius: 8, y: 2)
+    }
+}
+
+/// SVG-equivalent glyph for Roast Buddy: speech bubble head, sparkle eyes, smirk, ember top.
+struct RoastBuddyGlyph: View {
+    var size: CGFloat = 22
+    var color: Color = FirePalette.bright
+
+    var body: some View {
+        Canvas { context, canvasSize in
+            let s = min(canvasSize.width, canvasSize.height)
+            let scale = s / 1024.0
+
+            // Speech bubble
+            var bubble = Path()
+            bubble.move(to: CGPoint(x: 200 * scale, y: 320 * scale))
+            bubble.addQuadCurve(
+                to: CGPoint(x: 280 * scale, y: 240 * scale),
+                control: CGPoint(x: 200 * scale, y: 240 * scale)
+            )
+            bubble.addLine(to: CGPoint(x: 744 * scale, y: 240 * scale))
+            bubble.addQuadCurve(
+                to: CGPoint(x: 824 * scale, y: 320 * scale),
+                control: CGPoint(x: 824 * scale, y: 240 * scale)
+            )
+            bubble.addLine(to: CGPoint(x: 824 * scale, y: 664 * scale))
+            bubble.addQuadCurve(
+                to: CGPoint(x: 744 * scale, y: 744 * scale),
+                control: CGPoint(x: 824 * scale, y: 744 * scale)
+            )
+            bubble.addLine(to: CGPoint(x: 568 * scale, y: 744 * scale))
+            bubble.addLine(to: CGPoint(x: 460 * scale, y: 852 * scale))
+            bubble.addLine(to: CGPoint(x: 460 * scale, y: 744 * scale))
+            bubble.addLine(to: CGPoint(x: 280 * scale, y: 744 * scale))
+            bubble.addQuadCurve(
+                to: CGPoint(x: 200 * scale, y: 664 * scale),
+                control: CGPoint(x: 200 * scale, y: 744 * scale)
+            )
+            bubble.closeSubpath()
+
+            context.stroke(bubble, with: .color(color), style: StrokeStyle(lineWidth: 3.5 * scale, lineCap: .round, lineJoin: .round))
+
+            // Sparkle eyes (4-point stars)
+            drawSparkle(in: &context, center: CGPoint(x: 420 * scale, y: 478 * scale), size: 36 * scale, color: color)
+            drawSparkle(in: &context, center: CGPoint(x: 636 * scale, y: 478 * scale), size: 36 * scale, color: color)
+
+            // Crooked smirk
+            var smirk = Path()
+            smirk.move(to: CGPoint(x: 450 * scale, y: 620 * scale))
+            smirk.addQuadCurve(
+                to: CGPoint(x: 560 * scale, y: 630 * scale),
+                control: CGPoint(x: 500 * scale, y: 660 * scale)
+            )
+            context.stroke(smirk, with: .color(color), style: StrokeStyle(lineWidth: 3.5 * scale, lineCap: .round))
+
+            // Ember flame on top
+            var flame = Path()
+            flame.move(to: CGPoint(x: 512 * scale, y: 240 * scale))
+            flame.addCurve(
+                to: CGPoint(x: 504 * scale, y: 144 * scale),
+                control1: CGPoint(x: 520 * scale, y: 192 * scale),
+                control2: CGPoint(x: 496 * scale, y: 176 * scale)
+            )
+            flame.addCurve(
+                to: CGPoint(x: 536 * scale, y: 232 * scale),
+                control1: CGPoint(x: 540 * scale, y: 168 * scale),
+                control2: CGPoint(x: 548 * scale, y: 200 * scale)
+            )
+            context.stroke(flame, with: .color(color), style: StrokeStyle(lineWidth: 2.5 * scale, lineCap: .round))
+
+            // Ember dot
+            let dotRect = CGRect(x: 516 * scale, y: 118 * scale, width: 14 * scale, height: 14 * scale)
+            context.fill(Path(ellipseIn: dotRect), with: .color(color))
+        }
+        .frame(width: size, height: size)
+    }
+
+    private func drawSparkle(in context: inout GraphicsContext, center: CGPoint, size: CGFloat, color: Color) {
+        var path = Path()
+        let r = size / 2
+        let inner = r * 0.35
+        for i in 0..<4 {
+            let outerAngle = Angle.degrees(Double(i) * 90 - 90)
+            let innerAngle = Angle.degrees(Double(i) * 90 - 45)
+            let ox = center.x + cos(outerAngle.radians) * r
+            let oy = center.y + sin(outerAngle.radians) * r
+            let ix = center.x + cos(innerAngle.radians) * inner
+            let iy = center.y + sin(innerAngle.radians) * inner
+            if i == 0 { path.move(to: CGPoint(x: ox, y: oy)) }
+            else { path.addLine(to: CGPoint(x: ox, y: oy)) }
+            path.addLine(to: CGPoint(x: ix, y: iy))
+        }
+        path.closeSubpath()
+        context.fill(path, with: .color(color))
     }
 }
 

@@ -500,7 +500,7 @@ struct AutoOrganizeView: View {
     private var organizingOverlay: some View {
         if isAnalyzing {
             ZStack {
-                Color.black.opacity(0.4)
+                Color.scrim
                     .ignoresSafeArea()
                 
                 VStack(spacing: 20) {

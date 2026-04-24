@@ -2,36 +2,19 @@
 //  HeatMeter.swift
 //  thebitbinder
 //
-//  A horizontal heat meter for Roast Mode surfaces. Visualizes how
-//  "hot" a roast target is based on a 0…1 value (recency × frequency).
-//  Segments light up from left to right using FirePalette.heat() so the
-//  hottest targets glow with the `spark` tone and cool targets stay at
-//  a dim ember.
-//
-//  Use it on RoastTargetDetailView hero cards and in the target list
-//  row to replace generic progress bars. Pair with `.flame.fill` badges
-//  when the heat exceeds 0.85 to call out the hottest target.
+//  Continuous heat bar for Roast Mode. Color scales with heat value:
+//  0-30 ashy grey, 30-60 amber, 60-85 orange, 85-100 ember+glow.
+//  Matches the Roast Mode v2 design spec.
 //
 
 import SwiftUI
 
 struct HeatMeter: View {
-    /// 0…1 heat value. Values above 1 are clamped and trigger the
-    /// "boiling" glow overlay.
     let value: Double
 
-    /// Number of segmented notches. 8 is a good default at card width;
-    /// drop to 5 for compact rows.
     var segments: Int = 8
-
-    /// Height of a single segment. Meter height = segmentHeight.
     var segmentHeight: CGFloat = 10
-
-    /// Gap between segments.
     var gap: CGFloat = 3
-
-    /// If true, emit a soft halo below the meter when heat >= 0.85.
-    /// Use on hero cards; turn off in dense list rows.
     var glowWhenHot: Bool = true
 
     var body: some View {
@@ -41,8 +24,6 @@ struct HeatMeter: View {
 
         ZStack {
             if isHot && glowWhenHot {
-                // Soft under-glow — pulls from the same warm tone as the
-                // last filled segment so the meter "breathes heat".
                 Capsule()
                     .fill(FirePalette.spark.opacity(0.35))
                     .blur(radius: 14)
@@ -71,21 +52,87 @@ struct HeatMeter: View {
     }
 }
 
+/// Continuous heat bar matching the v2 design — a single track with a
+/// filled portion whose gradient shifts based on the heat value.
+struct HeatBar: View {
+    let heat: Int
+
+    var body: some View {
+        let clamped = min(max(heat, 0), 100)
+        let pct = CGFloat(clamped) / 100.0
+
+        let fill: LinearGradient = {
+            if clamped < 30 {
+                return LinearGradient(colors: [
+                    Color(red: 0.35, green: 0.29, blue: 0.25),
+                    Color(red: 0.48, green: 0.42, blue: 0.35)
+                ], startPoint: .leading, endPoint: .trailing)
+            } else if clamped < 60 {
+                return LinearGradient(colors: [
+                    Color(red: 0.54, green: 0.42, blue: 0.23),
+                    FirePalette.bright
+                ], startPoint: .leading, endPoint: .trailing)
+            } else if clamped < 85 {
+                return LinearGradient(colors: [
+                    FirePalette.bright,
+                    FirePalette.core
+                ], startPoint: .leading, endPoint: .trailing)
+            } else {
+                return LinearGradient(colors: [
+                    FirePalette.core,
+                    Color(red: 1.0, green: 0.18, blue: 0.0)
+                ], startPoint: .leading, endPoint: .trailing)
+            }
+        }()
+
+        let glowShadow: Color = {
+            if clamped < 60 { return .clear }
+            if clamped < 85 { return FirePalette.core.opacity(0.33) }
+            return FirePalette.core.opacity(0.67)
+        }()
+
+        let numColor: Color = {
+            if clamped < 30 { return ColdPalette.grey }
+            if clamped < 60 { return FirePalette.bright }
+            return FirePalette.core
+        }()
+
+        HStack(spacing: 8) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(FirePalette.text.opacity(0.06))
+
+                    Capsule()
+                        .fill(fill)
+                        .frame(width: geo.size.width * pct)
+                        .shadow(color: glowShadow, radius: clamped >= 60 ? 6 : 0)
+                }
+            }
+            .frame(height: 4)
+
+            Text("\(clamped)°")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(numColor)
+                .monospacedDigit()
+                .frame(minWidth: 32, alignment: .trailing)
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Heat")
+        .accessibilityValue("\(clamped) degrees")
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
     VStack(alignment: .leading, spacing: 24) {
-        ForEach([0.0, 0.2, 0.5, 0.75, 0.92, 1.0], id: \.self) { v in
-            VStack(alignment: .leading, spacing: 6) {
-                Text(String(format: "%.0f%%", v * 100))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                HeatMeter(value: v)
-                    .frame(width: 220)
-            }
+        ForEach([0, 18, 34, 58, 76, 92], id: \.self) { h in
+            HeatBar(heat: h)
+                .frame(width: 260)
         }
     }
     .padding(32)
-    .background(FirePalette.ambient.ignoresSafeArea())
+    .background(FirePalette.bg.ignoresSafeArea())
     .preferredColorScheme(.dark)
 }

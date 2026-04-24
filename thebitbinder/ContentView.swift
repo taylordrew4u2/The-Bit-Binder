@@ -11,10 +11,101 @@ import UIKit
 
 struct ContentView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
-    
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var takeoverProgress: CGFloat = 0
+    @State private var showTakeover = false
+    @State private var previousRoastMode = false
+
     var body: some View {
-        MainTabView()
-            .preferredColorScheme(roastMode ? .dark : nil)
+        ZStack {
+            MainTabView()
+                .preferredColorScheme(roastMode ? .dark : nil)
+
+            if showTakeover {
+                RoastTakeoverOverlay(progress: takeoverProgress, entering: roastMode)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+        }
+        .onChange(of: roastMode) { _, entering in
+            guard previousRoastMode != entering else { return }
+            previousRoastMode = entering
+            runTakeover()
+        }
+        .onAppear {
+            previousRoastMode = roastMode
+        }
+    }
+
+    private func runTakeover() {
+        if reduceMotion {
+            return
+        }
+        showTakeover = true
+        takeoverProgress = 0
+        haptic(.medium)
+        withAnimation(.easeIn(duration: 0.45)) {
+            takeoverProgress = 1
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            showTakeover = false
+            takeoverProgress = 0
+        }
+    }
+}
+
+/// Flame-wipe overlay that sweeps upward during roast mode transitions.
+struct RoastTakeoverOverlay: View {
+    let progress: CGFloat
+    let entering: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            let h = geo.size.height
+            let charredHeight = progress * h
+
+            ZStack {
+                // Charred region
+                VStack(spacing: 0) {
+                    Spacer()
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.clear, entering ? FirePalette.bg2 : Color(UIColor.systemBackground).opacity(0.9), entering ? FirePalette.bg : Color(UIColor.systemBackground)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(height: charredHeight)
+                }
+
+                // Flame front
+                if progress > 0 && progress < 1 {
+                    VStack(spacing: 0) {
+                        Spacer()
+                            .frame(height: max(0, h - charredHeight - 60))
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.clear, FirePalette.bright.opacity(0.4), FirePalette.core, Color(red: 0.91, green: 0.27, blue: 0.12)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .frame(height: 120)
+                            .blur(radius: 6)
+                        Spacer()
+                    }
+                }
+
+                // Badge bloom at center
+                if progress >= 0.35 && progress < 0.95 {
+                    RoastModeBadge(lit: entering)
+                        .scaleEffect(0.6 + (progress - 0.35) * 1.2)
+                        .opacity(Double(min(1, (progress - 0.3) * 3)))
+                }
+            }
+        }
     }
 }
 

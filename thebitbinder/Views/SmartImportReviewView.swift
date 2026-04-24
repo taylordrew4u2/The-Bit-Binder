@@ -110,7 +110,7 @@ struct SmartImportReviewView: View {
                         .padding(10)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(Color.orange.opacity(0.12))
+                                .fill(Color.warning.opacity(DS.Opacity.light))
                         )
                         .padding(.horizontal, 12)
                         .padding(.top, 4)
@@ -415,7 +415,7 @@ struct SmartImportReviewView: View {
                 .padding(8)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.orange.opacity(0.12))
+                        .fill(Color.warning.opacity(DS.Opacity.light))
                 )
             }
 
@@ -1048,7 +1048,7 @@ struct SmartImportReviewView: View {
     
     private var swipeTutorialOverlay: some View {
         ZStack {
-            Color.black.opacity(0.65)
+            Color.black.opacity(DS.Opacity.heavy)
                 .ignoresSafeArea()
                 .onTapGesture {
                     dismissTutorial()

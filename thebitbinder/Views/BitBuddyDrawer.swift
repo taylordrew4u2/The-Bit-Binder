@@ -64,7 +64,7 @@ struct BitBuddyDrawerOverlay: View {
             ZStack(alignment: .trailing) {
                 // Scrim — catches taps outside the drawer to close it.
                 if controller.isOpen {
-                    Color.black.opacity(0.28)
+                    Color.scrim
                         .ignoresSafeArea()
                         .transition(.opacity)
                         .onTapGesture {
@@ -80,12 +80,12 @@ struct BitBuddyDrawerOverlay: View {
                         .frame(width: drawerWidth)
                         .frame(maxHeight: .infinity)
                         .background(
-                            Color(UIColor.systemBackground)
+                            (roastMode ? Color(FirePalette.bg) : Color(UIColor.systemBackground))
                                 .ignoresSafeArea(edges: .vertical)
                         )
                         .overlay(alignment: .leading) {
                             Rectangle()
-                                .fill(Color.black.opacity(0.08))
+                                .fill(Color.black.opacity(DS.Opacity.subtle))
                                 .frame(width: 0.5)
                                 .ignoresSafeArea(edges: .vertical)
                         }
