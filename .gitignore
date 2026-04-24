@@ -38,3 +38,12 @@ thebitbinder-eckpwvqsvkpfeseqgsmnxnbnrulh/
 # Secrets – never commit real API keys
 Secrets.plist
 *-Secrets.plist
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+*.ipa
+*.dSYM.zip
+*.mobileprovision
