@@ -25,8 +25,8 @@ struct SetListDetailView: View {
     @State private var showingLivePerformance = false
     @State private var showingUnfinalizeAlert = false
     @State private var showingDeleteSetAlert = false
-    @State private var deleteError: String?
-    @State private var showingDeleteError = false
+    @State private var operationError: String?
+    @State private var showingOperationError = false
     
     // Recording inline
     @StateObject private var audioService = AudioRecordingService()
@@ -35,6 +35,8 @@ struct SetListDetailView: View {
     @State private var lastRecordingURL: URL?
     @State private var timer: Timer?
     @State private var showingSaveAlert = false
+    @State private var showRecordingSaveError = false
+    @State private var recordingSaveErrorMessage = ""
     
     var setListJokes: [Joke] {
         setList.jokeIDs.compactMap { jokeID in
@@ -256,10 +258,10 @@ struct SetListDetailView: View {
         } message: {
             Text("\"\(setList.name)\" will be moved to trash. You can restore it later from the trash.")
         }
-        .alert("Error", isPresented: $showingDeleteError) {
+        .alert("Error", isPresented: $showingOperationError) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(deleteError ?? "An unknown error occurred")
+            Text(operationError ?? "An unknown error occurred")
         }
         .alert("Save Recording", isPresented: $showingSaveAlert) {
             TextField("Recording name", text: $recordingName)
@@ -268,8 +270,14 @@ struct SetListDetailView: View {
         } message: {
             Text("Enter a name for your recording")
         }
+        .alert("Recording Error", isPresented: $showRecordingSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(recordingSaveErrorMessage)
+        }
         .onAppear {
             recordingName = "\(setList.name) - \(Date().formatted(date: .abbreviated, time: .shortened))"
+            cleanDanglingIDs()
         }
         .onDisappear {
             timer?.invalidate()
@@ -309,9 +317,8 @@ struct SetListDetailView: View {
     
     private func saveRecording() {
         guard let fileURL = lastRecordingURL else {
-            #if DEBUG
-            print("Error: No recording URL available")
-            #endif
+            recordingSaveErrorMessage = "No recording file found."
+            showRecordingSaveError = true
             return
         }
         let recording = Recording(
@@ -320,22 +327,21 @@ struct SetListDetailView: View {
             duration: recordingDuration
         )
         modelContext.insert(recording)
-        
-        // Try to save the context
+
         do {
             try modelContext.save()
             #if DEBUG
             print("Recording saved successfully: \(recording.title)")
             #endif
+            lastRecordingURL = nil
+            recordingDuration = 0
         } catch {
             #if DEBUG
             print(" Failed to save recording: \(error)")
             #endif
+            recordingSaveErrorMessage = "Could not save recording: \(error.localizedDescription)"
+            showRecordingSaveError = true
         }
-        
-        // Reset state
-        lastRecordingURL = nil
-        recordingDuration = 0
     }
     
     private func moveJokes(from source: IndexSet, to destination: Int) {
@@ -344,12 +350,11 @@ struct SetListDetailView: View {
         do {
             try modelContext.save()
         } catch {
-            #if DEBUG
-            print("⚠️ [SetListDetailView] Failed to save joke move: \(error)")
-            #endif
+            operationError = "Could not save reorder: \(error.localizedDescription)"
+            showingOperationError = true
         }
     }
-    
+
     private func deleteJokes(at offsets: IndexSet) {
         for index in offsets.sorted(by: >) {
             if index < setList.jokeIDs.count {
@@ -360,9 +365,8 @@ struct SetListDetailView: View {
         do {
             try modelContext.save()
         } catch {
-            #if DEBUG
-            print("⚠️ [SetListDetailView] Failed to save joke deletion: \(error)")
-            #endif
+            operationError = "Could not remove joke: \(error.localizedDescription)"
+            showingOperationError = true
         }
     }
     
@@ -404,12 +408,11 @@ struct SetListDetailView: View {
         do {
             try modelContext.save()
         } catch {
-            #if DEBUG
-            print("⚠️ [SetListDetailView] Failed to save roast joke move: \(error)")
-            #endif
+            operationError = "Could not save reorder: \(error.localizedDescription)"
+            showingOperationError = true
         }
     }
-    
+
     private func deleteRoastJokes(at offsets: IndexSet) {
         for index in offsets.sorted(by: >) {
             if index < setList.roastJokeIDs.count {
@@ -420,9 +423,8 @@ struct SetListDetailView: View {
         do {
             try modelContext.save()
         } catch {
-            #if DEBUG
-            print("⚠️ [SetListDetailView] Failed to save roast joke deletion: \(error)")
-            #endif
+            operationError = "Could not remove roast: \(error.localizedDescription)"
+            showingOperationError = true
         }
     }
     
@@ -533,9 +535,8 @@ struct SetListDetailView: View {
         do {
             try modelContext.save()
         } catch {
-            #if DEBUG
-            print("⚠️ [SetListDetailView] Failed to unfinalize: \(error)")
-            #endif
+            operationError = "Could not unfinalize set: \(error.localizedDescription)"
+            showingOperationError = true
         }
     }
     
@@ -545,15 +546,20 @@ struct SetListDetailView: View {
             try modelContext.save()
             dismiss()
         } catch {
-            // IMPORTANT: Do NOT restore on save failure - this causes deleted items
-            // to reappear unexpectedly. The delete stays in memory and will persist
-            // on next successful save. User is notified of the issue.
             #if DEBUG
             print("⚠️ [SetListDetailView] Failed to delete set: \(error)")
             #endif
-            deleteError = "Delete may not have saved. The set will stay deleted but please check later."
-            showingDeleteError = true
-            dismiss()  // Still dismiss - the item is deleted in memory
+            operationError = "Delete may not have saved. The set will stay deleted but please check later."
+            showingOperationError = true
+            dismiss()
+        }
+    }
+
+    private func cleanDanglingIDs() {
+        let jokeIDSet = Set(jokes.map(\.id))
+        let roastIDSet = Set(roastJokes.map(\.id))
+        if setList.cleanDanglingIDs(existingJokeIDs: jokeIDSet, existingRoastJokeIDs: roastIDSet) {
+            try? modelContext.save()
         }
     }
 }

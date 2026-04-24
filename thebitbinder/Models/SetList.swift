@@ -120,4 +120,21 @@ final class SetList: Identifiable {
     var isValid: Bool {
         self.modelContext != nil
     }
+
+    // MARK: - Dangling ID Cleanup
+
+    /// Removes joke/roast IDs that no longer reference existing records.
+    /// Returns true if any IDs were removed.
+    @discardableResult
+    func cleanDanglingIDs(existingJokeIDs: Set<UUID>, existingRoastJokeIDs: Set<UUID>) -> Bool {
+        let cleanedJokes = jokeIDs.filter { existingJokeIDs.contains($0) }
+        let cleanedRoasts = roastJokeIDs.filter { existingRoastJokeIDs.contains($0) }
+        let changed = cleanedJokes.count != jokeIDs.count || cleanedRoasts.count != roastJokeIDs.count
+        if changed {
+            jokeIDs = cleanedJokes
+            roastJokeIDs = cleanedRoasts
+            dateModified = Date()
+        }
+        return changed
+    }
 }

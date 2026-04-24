@@ -318,7 +318,6 @@ struct LivePerformanceView: View {
                     .padding(.vertical, 24)
                 }
             } else {
-                // Empty state
                 VStack(spacing: 20) {
                     Image(systemName: "text.bubble")
                         .font(.system(size: 70))
@@ -326,6 +325,13 @@ struct LivePerformanceView: View {
                     Text("Empty Set")
                         .font(.system(size: 28, weight: .medium))
                         .foregroundColor(.white.opacity(0.4))
+                    if isSetListValid && setList.totalItemCount > 0 {
+                        Text("The jokes in this set may have been deleted.")
+                            .font(.system(size: 15))
+                            .foregroundColor(.white.opacity(0.3))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
                 }
             }
         }

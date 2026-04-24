@@ -11,6 +11,8 @@ import SwiftData
 struct SetListsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<SetList> { !$0.isTrashed }) private var setLists: [SetList]
+    @Query private var allJokes: [Joke]
+    @Query private var allRoastJokes: [RoastJoke]
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     @State private var showingCreateSetList = false
@@ -105,6 +107,9 @@ struct SetListsView: View {
         } message: {
             Text(persistenceError ?? "An unknown error occurred")
         }
+        .task {
+            cleanAllDanglingIDs()
+        }
     }
     
     private func deleteSetLists(at offsets: IndexSet) {
@@ -122,6 +127,20 @@ struct SetListsView: View {
         }
     }
     
+    private func cleanAllDanglingIDs() {
+        let jokeIDSet = Set(allJokes.map(\.id))
+        let roastIDSet = Set(allRoastJokes.map(\.id))
+        var changed = false
+        for setList in setLists {
+            if setList.cleanDanglingIDs(existingJokeIDs: jokeIDSet, existingRoastJokeIDs: roastIDSet) {
+                changed = true
+            }
+        }
+        if changed {
+            try? modelContext.save()
+        }
+    }
+
     private func softDeleteSetList(_ setList: SetList) {
         setList.moveToTrash()
         do {

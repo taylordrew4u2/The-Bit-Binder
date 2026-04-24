@@ -21,6 +21,8 @@ struct AddRoastJokesToSetListView: View {
     @State private var selectedIDs: Set<UUID> = []
     @State private var expandedTargets: Set<UUID> = []
     @State private var searchText = ""
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
 
     private let accent = Color.bitbinderAccent
 
@@ -76,6 +78,11 @@ struct AddRoastJokesToSetListView: View {
                     .fontWeight(.semibold)
                     .disabled(selectedIDs.isEmpty)
                 }
+            }
+            .alert("Save Failed", isPresented: $showSaveError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(saveErrorMessage)
             }
         }
     }
@@ -216,11 +223,13 @@ struct AddRoastJokesToSetListView: View {
         setList.dateModified = Date()
         do {
             try modelContext.save()
+            dismiss()
         } catch {
             #if DEBUG
             print("⚠️ [AddRoastJokesToSetListView] Failed to save added roast jokes: \(error)")
             #endif
+            saveErrorMessage = "Could not save roast jokes to set list: \(error.localizedDescription)"
+            showSaveError = true
         }
-        dismiss()
     }
 }

@@ -22,6 +22,8 @@ struct AddJokesToSetListView: View {
     @State private var selectedJokeIDs: Set<UUID> = []
     @State private var searchText = ""
     @State private var selectedFolder: JokeFolder? = nil
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
     
     var availableJokes: [Joke] {
         // Start with jokes not already in the set list
@@ -136,6 +138,11 @@ struct AddJokesToSetListView: View {
             }
         }
         .tint(Color.bitbinderAccent)
+        .alert("Save Failed", isPresented: $showSaveError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(saveErrorMessage)
+        }
     }
     
     private func addJokes() {
@@ -143,11 +150,13 @@ struct AddJokesToSetListView: View {
         setList.dateModified = Date()
         do {
             try modelContext.save()
+            dismiss()
         } catch {
             #if DEBUG
             print("⚠️ [AddJokesToSetListView] Failed to save added jokes: \(error)")
             #endif
+            saveErrorMessage = "Could not save jokes to set list: \(error.localizedDescription)"
+            showSaveError = true
         }
-        dismiss()
     }
 }

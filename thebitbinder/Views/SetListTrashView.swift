@@ -38,7 +38,7 @@ struct SetListTrashView: View {
                 BitBinderEmptyState(
                     icon: "trash",
                     title: "Set List Trash is Empty",
-                    subtitle: "Deleted set lists appear here for 30 days before being permanently removed.",
+                    subtitle: "Deleted set lists appear here until you permanently remove them.",
                     roastMode: roastMode
                 )
             } else {
