@@ -201,11 +201,12 @@ struct thebitbinderApp: App {
             .tint(roastMode ? FirePalette.core : .blue)
             .animation(.easeOut(duration: 0.35), value: startup.isReady)
             .task {
-                // If we just restored from a backup, delete the CloudKit zone
-                // IMMEDIATELY — before wiring up sync or registering for pushes.
-                // This prevents CloudKit from overwriting the restored local data
-                // with the (pre-restore) cloud state. After zone deletion, SwiftData
-                // will re-export every local record on its next sync cycle.
+                // RESTORE-PATH ONLY: delete the CloudKit zone BEFORE wiring
+                // up sync or registering for pushes. This prevents CloudKit
+                // from overwriting the restored local data with the (pre-restore)
+                // cloud state. The unconditional call later in this .task is
+                // the general-case cleanup; the guard inside the function
+                // prevents it from running twice.
                 if DataProtectionService.shared.hasPendingRestoreRestart() {
                     await performAggressiveCloudKitCleanup()
                 }
@@ -231,7 +232,9 @@ struct thebitbinderApp: App {
                 //  Deferred heavy work — runs AFTER UI is visible
                 await performDeferredBackup()
                 
-                // CloudKit cleanup runs after backup so UI is already showing
+                // General-case CloudKit schema cleanup (runs after backup so
+                // UI is already showing). If the restore-path call above already
+                // ran, the guard inside the function no-ops here.
                 await performAggressiveCloudKitCleanup()
             }
             .environmentObject(userPreferences)

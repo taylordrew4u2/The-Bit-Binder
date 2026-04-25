@@ -34,16 +34,16 @@ enum SpeechReliability {
     /// Max consecutive auto-restarts that happen without any new text being
     /// recognised. After this many empty restarts in a row we stop so we
     /// don't burn battery on a broken session.
-    static let maxConsecutiveEmptyRestarts: Int = 5
+    static let maxConsecutiveEmptyRestarts: Int = 10
 
     /// Delay before the next auto-restart kicks off after iOS's ~60s
     /// recognition window or an `isFinal` result. Short enough to feel
     /// continuous, long enough to avoid hammering the speech service.
-    static let restartDelay: TimeInterval = 0.3
+    static let restartDelay: TimeInterval = 0.1
 
     /// Additional backoff added per consecutive empty restart so repeated
     /// failures don't thrash the audio stack.
-    static let restartBackoffStep: TimeInterval = 0.25
+    static let restartBackoffStep: TimeInterval = 0.15
 
     /// Delay before retrying audio-session activation after a transient
     /// failure (e.g. another app briefly held the category).

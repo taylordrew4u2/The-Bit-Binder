@@ -103,6 +103,10 @@ struct JokesView: View {
     @State private var searchText = ""
     @State private var exportedPDFURL: URL?
     @State private var selectedPhotos: [PhotosPickerItem] = []
+    // TODO: Consider grouping the 16+ import-related @State vars below into a
+    // single `ImportState` struct to reduce view-body invalidation surface.
+    // Deferred because the binding plumbing through JokesSheetsModifier and
+    // JokesAlertsModifier makes the refactor non-trivial.
     @State private var isProcessingImages = false
     @State private var processingCurrent: Int = 0
     @State private var processingTotal: Int = 0
@@ -353,16 +357,17 @@ struct JokesView: View {
     }
 
     
-    // A stable key that changes whenever any filter input changes.
-    // Used by .task(id:) to re-run filtering only when something actually changed.
+    // A stable key that changes whenever any *filter input* changes.
+    // Used by .task(id:) to re-run filtering only when the user changes a
+    // filter — NOT on every joke count change. Data-count changes are
+    // handled separately via .onChange(of: jokes.count).
     private var filterKey: String {
         let folder = selectedFolder?.id.uuidString ?? "nil"
         let hits   = showingHitsFilter ? "1" : "0"
         let openMic = showingOpenMicFilter ? "1" : "0"
         let recent = showRecentlyAdded  ? "1" : "0"
         let search = debouncedSearchText
-        let count  = jokes.count
-        return "\(folder)|\(hits)|\(openMic)|\(recent)|\(search)|\(count)"
+        return "\(folder)|\(hits)|\(openMic)|\(recent)|\(search)"
     }
 
     var filteredJokes: [Joke] { cachedFilteredJokes }
@@ -493,6 +498,10 @@ struct JokesView: View {
                 .overlay { importOverlay }
                 // Rebuild filtered list whenever filter inputs change
                 .task(id: filterKey) {
+                    rebuildFilteredJokes()
+                }
+                // Also rebuild when the underlying data count changes (adds/deletes)
+                .onChange(of: jokes.count) { _, _ in
                     rebuildFilteredJokes()
                 }
                 // Performance: Debounce search text updates
@@ -870,6 +879,7 @@ struct JokesView: View {
                     showingAddRoastTarget = true
                 } label: {
                     Image(systemName: "person.badge.plus")
+                        .accessibilityLabel("Add roast target")
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -884,7 +894,7 @@ struct JokesView: View {
                                   systemImage: roastViewMode.icon)
                         }
                     }
-                    
+
                     Section("Export") {
                         Button(action: exportAllRoastsToPDF) {
                             Label("Export All Roasts to PDF", systemImage: "doc.richtext")
@@ -895,6 +905,7 @@ struct JokesView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
+                        .accessibilityLabel("More Actions")
                 }
             }
         } else {

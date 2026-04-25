@@ -69,7 +69,8 @@ final class RoastJoke: Identifiable {
             return tagsString.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
         }
         set {
-            tagsString = newValue.joined(separator: ",")
+            // Strip commas from individual tags to prevent corruption of the serialized format
+            tagsString = newValue.map { $0.replacingOccurrences(of: ",", with: "") }.joined(separator: ",")
         }
     }
     

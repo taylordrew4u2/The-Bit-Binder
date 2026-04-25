@@ -70,6 +70,11 @@ final class BitBuddyService: NSObject, ObservableObject {
     // MARK: - Public API
     
     /// Optional hook so BitBuddy can ground responses in current app joke data.
+    ///
+    /// - Important: Callers **must** use `[weak self]` (or `[weak viewModel]`)
+    ///   capture semantics in the closure to avoid retain cycles.
+    ///   `BitBuddyService` holds a strong reference to the closure for
+    ///   the lifetime of the service.
     func registerJokeDataProvider(_ provider: @escaping () -> [BitBuddyJokeSummary]) {
         recentJokeProvider = provider
     }
@@ -885,6 +890,22 @@ final class BitBuddyService: NSObject, ObservableObject {
             turns = Array(turns.suffix(maxConversationTurns))
         }
         turnsByConversation[conversationId] = turns
+
+        // Periodic eviction: trim stale conversations even between explicit
+        // startNewConversation() calls so the dictionary can't grow unbounded.
+        if turnsByConversation.count > maxRetainedConversations + 1 {
+            let activeKey = conversationId
+            while turnsByConversation.count > maxRetainedConversations + 1 {
+                // Evict the conversation with the fewest turns, skipping the active one
+                if let leastActiveKey = turnsByConversation
+                    .filter({ $0.key != activeKey })
+                    .min(by: { $0.value.count < $1.value.count })?.key {
+                    turnsByConversation.removeValue(forKey: leastActiveKey)
+                } else {
+                    break
+                }
+            }
+        }
     }
     
     private func inferCategory(from lower: String) -> String {

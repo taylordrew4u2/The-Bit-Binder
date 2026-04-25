@@ -116,22 +116,52 @@ final class DataValidationService: ObservableObject {
     // These prevent false data-loss alerts when trash purge removes old items.
     
     private func countActiveJokes(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<Joke>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
+        do {
+            return try context.fetchCount(FetchDescriptor<Joke>(predicate: #Predicate { $0.isTrashed == false }))
+        } catch {
+            DataOperationLogger.shared.logError(error, operation: "countActiveJokes", context: "Failed to fetch active joke count")
+            return 0
+        }
     }
     private func countActiveRecordings(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<Recording>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
+        do {
+            return try context.fetchCount(FetchDescriptor<Recording>(predicate: #Predicate { $0.isTrashed == false }))
+        } catch {
+            DataOperationLogger.shared.logError(error, operation: "countActiveRecordings", context: "Failed to fetch active recording count")
+            return 0
+        }
     }
     private func countActiveSetLists(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<SetList>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
+        do {
+            return try context.fetchCount(FetchDescriptor<SetList>(predicate: #Predicate { $0.isTrashed == false }))
+        } catch {
+            DataOperationLogger.shared.logError(error, operation: "countActiveSetLists", context: "Failed to fetch active set list count")
+            return 0
+        }
     }
     private func countActiveRoastJokes(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<RoastJoke>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
+        do {
+            return try context.fetchCount(FetchDescriptor<RoastJoke>(predicate: #Predicate { $0.isTrashed == false }))
+        } catch {
+            DataOperationLogger.shared.logError(error, operation: "countActiveRoastJokes", context: "Failed to fetch active roast joke count")
+            return 0
+        }
     }
     private func countActiveBrainstormIdeas(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<BrainstormIdea>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
+        do {
+            return try context.fetchCount(FetchDescriptor<BrainstormIdea>(predicate: #Predicate { $0.isTrashed == false }))
+        } catch {
+            DataOperationLogger.shared.logError(error, operation: "countActiveBrainstormIdeas", context: "Failed to fetch active brainstorm idea count")
+            return 0
+        }
     }
     private func countActiveNotebookPhotos(context: ModelContext) async -> Int {
-        (try? context.fetchCount(FetchDescriptor<NotebookPhotoRecord>(predicate: #Predicate { $0.isTrashed == false }))) ?? 0
+        do {
+            return try context.fetchCount(FetchDescriptor<NotebookPhotoRecord>(predicate: #Predicate { $0.isTrashed == false }))
+        } catch {
+            DataOperationLogger.shared.logError(error, operation: "countActiveNotebookPhotos", context: "Failed to fetch active notebook photo count")
+            return 0
+        }
     }
     
     // MARK: - Entity-Specific Validation

@@ -131,7 +131,11 @@ struct LivePerformanceView: View {
                                         goToPrevious()
                                     }
                                 }
-                            
+                                .accessibilityElement()
+                                .accessibilityLabel("Previous joke")
+                                .accessibilityHint(canGoPrevious ? "Double-tap to go to the previous joke" : "No previous joke")
+                                .accessibilityAddTraits(.isButton)
+
                             // TAP CENTER = Toggle controls
                             Color.clear
                                 .contentShape(Rectangle())
@@ -142,7 +146,11 @@ struct LivePerformanceView: View {
                                         showHint = false
                                     }
                                 }
-                            
+                                .accessibilityElement()
+                                .accessibilityLabel("Show controls")
+                                .accessibilityHint("Double-tap to toggle performance controls")
+                                .accessibilityAddTraits(.isButton)
+
                             // TAP RIGHT = Next
                             Color.clear
                                 .contentShape(Rectangle())
@@ -152,6 +160,10 @@ struct LivePerformanceView: View {
                                         goToNext()
                                     }
                                 }
+                                .accessibilityElement()
+                                .accessibilityLabel("Next joke")
+                                .accessibilityHint(canGoNext ? "Double-tap to go to the next joke" : "No next joke")
+                                .accessibilityAddTraits(.isButton)
                         }
                     }
                     
@@ -222,6 +234,7 @@ struct LivePerformanceView: View {
                     .foregroundColor(.white.opacity(0.5))
                     .frame(width: 44, height: 44)
             }
+            .accessibilityLabel("Exit performance")
             
             Spacer()
             
@@ -230,11 +243,13 @@ struct LivePerformanceView: View {
                 Text("\(safeCurrentIndex + 1)/\(max(1, safeItemCount))")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                
+
                 Text(timeString(from: elapsedTime))
                     .font(.system(size: 13, design: .monospaced))
                     .foregroundColor(.white.opacity(0.5))
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Joke \(safeCurrentIndex + 1) of \(max(1, safeItemCount)), elapsed time \(timeString(from: elapsedTime))")
             
             Spacer()
             
@@ -445,12 +460,13 @@ struct LivePerformanceView: View {
                                 .font(.system(size: 32))
                                 .foregroundColor(.white)
                         }
-                        
+                        .accessibilityLabel("Decrease text size")
+
                         Text("\(Int(fontSize))")
                             .font(.system(size: 18, weight: .bold, design: .monospaced))
                             .foregroundColor(.white)
                             .frame(width: 40)
-                        
+
                         Button {
                             fontSize = min(48, fontSize + 4)
                         } label: {
@@ -458,6 +474,7 @@ struct LivePerformanceView: View {
                                 .font(.system(size: 32))
                                 .foregroundColor(.white)
                         }
+                        .accessibilityLabel("Increase text size")
                     }
                 }
                 

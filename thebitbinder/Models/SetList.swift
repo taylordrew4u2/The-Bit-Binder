@@ -49,18 +49,34 @@ final class SetList: Identifiable {
     var jokeIDs: [UUID] {
         get {
             guard !jokeIDsString.isEmpty else { return [] }
-            return jokeIDsString.split(separator: ",").compactMap { UUID(uuidString: String($0)) }
+            return jokeIDsString.split(separator: ",").compactMap { segment in
+                let raw = String(segment)
+                guard let uuid = UUID(uuidString: raw) else {
+                    DataOperationLogger.shared.logOperation(.warning,
+                        "SetList[\(name)]: failed to parse jokeID segment '\(raw)' — skipping")
+                    return nil
+                }
+                return uuid
+            }
         }
         set {
             jokeIDsString = newValue.map { $0.uuidString }.joined(separator: ",")
         }
     }
-    
+
     // Roast joke IDs stored the same way
     var roastJokeIDs: [UUID] {
         get {
             guard !roastJokeIDsString.isEmpty else { return [] }
-            return roastJokeIDsString.split(separator: ",").compactMap { UUID(uuidString: String($0)) }
+            return roastJokeIDsString.split(separator: ",").compactMap { segment in
+                let raw = String(segment)
+                guard let uuid = UUID(uuidString: raw) else {
+                    DataOperationLogger.shared.logOperation(.warning,
+                        "SetList[\(name)]: failed to parse roastJokeID segment '\(raw)' — skipping")
+                    return nil
+                }
+                return uuid
+            }
         }
         set {
             roastJokeIDsString = newValue.map { $0.uuidString }.joined(separator: ",")

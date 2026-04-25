@@ -90,7 +90,8 @@ final class Joke: Identifiable {
             return tagsString.split(separator: ",").map { String($0) }
         }
         set {
-            tagsString = newValue.joined(separator: ",")
+            // Strip commas from individual tags to prevent corruption of the serialized format
+            tagsString = newValue.map { $0.replacingOccurrences(of: ",", with: "") }.joined(separator: ",")
         }
     }
     
@@ -101,7 +102,8 @@ final class Joke: Identifiable {
             return allCategoriesString.split(separator: ",").map { String($0) }
         }
         set {
-            allCategoriesString = newValue.joined(separator: ",")
+            // Strip commas from individual categories to prevent corruption of the serialized format
+            allCategoriesString = newValue.map { $0.replacingOccurrences(of: ",", with: "") }.joined(separator: ",")
         }
     }
     
@@ -114,12 +116,21 @@ final class Joke: Identifiable {
                 let parts = pair.split(separator: ":")
                 if parts.count == 2, let score = Double(parts[1]) {
                     result[String(parts[0])] = score
+                } else {
+                    DataOperationLogger.shared.logOperation(.warning,
+                        "Joke[\(title)]: failed to parse categoryScore segment '\(pair)' — expected 'category:score' format, skipping")
                 }
             }
             return result
         }
         set {
-            categoryScoresString = newValue.map { "\($0.key):\($0.value)" }.joined(separator: "|")
+            // Strip pipes and colons from keys to prevent corruption of the serialized format
+            categoryScoresString = newValue.map { entry in
+                let safeKey = entry.key
+                    .replacingOccurrences(of: "|", with: "")
+                    .replacingOccurrences(of: ":", with: "")
+                return "\(safeKey):\(entry.value)"
+            }.joined(separator: "|")
         }
     }
     
@@ -130,7 +141,8 @@ final class Joke: Identifiable {
             return styleTagsString.split(separator: "|").map { String($0) }
         }
         set {
-            styleTagsString = newValue.joined(separator: "|")
+            // Strip pipes from individual tags to prevent corruption of the serialized format
+            styleTagsString = newValue.map { $0.replacingOccurrences(of: "|", with: "") }.joined(separator: "|")
         }
     }
     
@@ -141,7 +153,8 @@ final class Joke: Identifiable {
             return craftNotesString.split(separator: "|").map { String($0) }
         }
         set {
-            craftNotesString = newValue.joined(separator: "|")
+            // Strip pipes from individual notes to prevent corruption of the serialized format
+            craftNotesString = newValue.map { $0.replacingOccurrences(of: "|", with: "") }.joined(separator: "|")
         }
     }
     
@@ -150,7 +163,9 @@ final class Joke: Identifiable {
         do {
             categorizationResults = try JSONDecoder().decode([CategoryMatch].self, from: data)
         } catch {
-            print("Failed to decode categorization results: \(error)")
+            DataOperationLogger.shared.logError(error,
+                operation: "loadCategorizationResults",
+                context: "Joke[\(title)] — \(data.count) bytes of stored JSON failed to decode as [CategoryMatch]")
         }
     }
 
@@ -158,7 +173,9 @@ final class Joke: Identifiable {
         do {
             categorizationResultsData = try JSONEncoder().encode(categorizationResults)
         } catch {
-            print("Failed to encode categorization results: \(error)")
+            DataOperationLogger.shared.logError(error,
+                operation: "saveCategorizationResults",
+                context: "Joke[\(title)] — \(categorizationResults.count) CategoryMatch entries failed to encode")
         }
     }
 

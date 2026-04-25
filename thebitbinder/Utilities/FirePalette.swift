@@ -31,7 +31,7 @@ enum FirePalette {
 
     static let text    = Color(red: 0.961, green: 0.933, blue: 0.906) // #F5EEE7
     static let sub     = Color(red: 0.961, green: 0.933, blue: 0.906).opacity(0.55)
-    static let edge    = Color(red: 1.0, green: 0.47, blue: 0.196).opacity(0.14)
+    static let edge    = Color(red: 1.0, green: 0.47, blue: 0.196).opacity(DS.Opacity.light)
 
     // MARK: - Gradients
 
@@ -83,7 +83,7 @@ enum FirePalette {
     static func heatGlow(_ value: Double) -> Color {
         if value < 0.60 { return .clear }
         if value < 0.85 { return core.opacity(0.33) }
-        return core.opacity(0.67)
+        return core.opacity(DS.Opacity.heavy)
     }
 }
 
@@ -92,7 +92,7 @@ enum FirePalette {
 enum ColdPalette {
     static let bg   = Color(red: 0.086, green: 0.071, blue: 0.063) // #161210
     static let card = Color(red: 0.122, green: 0.102, blue: 0.094) // #1F1A18
-    static let edge = Color.white.opacity(0.06)
+    static let edge = Color.white.opacity(DS.Opacity.subtle)
     static let text = Color(red: 0.788, green: 0.765, blue: 0.749) // #C9C3BF
     static let sub  = Color(red: 0.788, green: 0.765, blue: 0.749).opacity(0.5)
     static let grey = Color(red: 0.416, green: 0.392, blue: 0.376) // #6A6460

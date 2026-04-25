@@ -40,26 +40,41 @@ actor MLXSharedRuntime {
     /// files aren't on disk and we'd be waiting for a HuggingFace download.
     private static let loadTimeout: TimeInterval = 8
 
+    /// Maximum number of load attempts before permanently disabling MLX for
+    /// this session. The first attempt uses `loadTimeout`; retries double it.
+    private static let maxLoadAttempts = 2
+
     @discardableResult
     func prepareModelIfNeeded() async throws -> ModelContainer {
         if let container { return container }
         if loadFailed { throw MLXRuntimeError.modelLoadPreviouslyFailed }
-        do {
-            let loaded = try await withThrowingTimeout(seconds: Self.loadTimeout) {
-                try await LLMModelFactory.shared.loadContainer(
-                    configuration: Self.modelConfig
-                )
+
+        var lastError: Error?
+        for attempt in 1...Self.maxLoadAttempts {
+            let timeout = Self.loadTimeout * Double(attempt) // 8s, then 16s
+            do {
+                let loaded = try await withThrowingTimeout(seconds: timeout) {
+                    try await LLMModelFactory.shared.loadContainer(
+                        configuration: Self.modelConfig
+                    )
+                }
+                container = loaded
+                isModelLoaded = true
+                return loaded
+            } catch {
+                lastError = error
+                #if DEBUG
+                print("[MLXSharedRuntime] Load attempt \(attempt)/\(Self.maxLoadAttempts) failed (timeout \(Int(timeout))s): \(error.localizedDescription)")
+                #endif
             }
-            container = loaded
-            isModelLoaded = true
-            return loaded
-        } catch {
-            loadFailed = true
-            #if DEBUG
-            print("[MLXSharedRuntime] Model load failed — disabling MLX for this session: \(error.localizedDescription)")
-            #endif
-            throw error
         }
+
+        // All attempts exhausted — mark permanently failed for this session
+        loadFailed = true
+        #if DEBUG
+        print("[MLXSharedRuntime] Model load failed after \(Self.maxLoadAttempts) attempts — disabling MLX for this session")
+        #endif
+        throw lastError ?? MLXRuntimeError.modelLoadTimedOut
     }
 
     /// Runs `operation` with a wall-clock deadline. If the operation doesn't

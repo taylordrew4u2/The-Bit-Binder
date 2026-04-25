@@ -21,12 +21,20 @@ struct HomeView: View {
 
     @Environment(\.modelContext) private var modelContext
 
-    @State private var showAddJoke = false
-    @State private var showTalkToText = false
-    @State private var showQuickRecord = false
-    @State private var showJournalEditor = false
+    /// Unified sheet state — only one sheet can present at a time in SwiftUI,
+    /// so an optional enum prevents conflicting `isPresented` booleans.
+    private enum ActiveSheet: Identifiable {
+        case addJoke, talkToText, quickRecord, journalEditor
+        var id: Int { hashValue }
+    }
+    @State private var activeSheet: ActiveSheet?
+
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("userName") private var userName = ""
+
+    // Cached stats — rebuilt via .task(id:) when allJokes changes
+    @State private var cachedHitsCount: Int = 0
+    @State private var cachedThisWeekCount: Int = 0
     
     // Time-aware greeting
     private var greeting: String {
@@ -46,15 +54,12 @@ struct HomeView: View {
         return "\(greeting), \(name)"
     }
     
-    // Stats
-    private var hitsCount: Int {
-        allJokes.filter { $0.isHit }.count
-    }
-    
-    private var thisWeekCount: Int {
-        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        return allJokes.filter { $0.dateCreated >= weekAgo }.count
-    }
+    // Stats — use cached values; rebuilt by .task(id:) below
+    private var hitsCount: Int { cachedHitsCount }
+    private var thisWeekCount: Int { cachedThisWeekCount }
+
+    /// Invalidation key for stats — changes when joke count changes.
+    private var statsKey: Int { allJokes.count }
     
     private var recentJokes: [Joke] { Array(allJokes.prefix(3)) }
 
@@ -92,12 +97,13 @@ struct HomeView: View {
             Section {
                 Button {
                     haptic(.light)
-                    showJournalEditor = true
+                    activeSheet = .journalEditor
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: todayJournalComplete ? "checkmark.circle.fill" : "book.closed")
                             .foregroundColor(todayJournalComplete ? .accentColor : Color.bitbinderAccent)
                             .frame(width: 22)
+                            .accessibilityLabel(todayJournalComplete ? "Journal complete" : "Journal incomplete")
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Daily Journal")
                                 .foregroundColor(.primary)
@@ -109,6 +115,7 @@ struct HomeView: View {
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
                             .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .accessibilityHidden(true)
                     }
                 }
             } footer: {
@@ -121,7 +128,7 @@ struct HomeView: View {
             Section {
                 Button {
                     haptic(.medium)
-                    showAddJoke = true
+                    activeSheet = .addJoke
                 } label: {
                     Label {
                         Text("New Joke")
@@ -133,7 +140,7 @@ struct HomeView: View {
 
                 Button {
                     haptic(.light)
-                    showTalkToText = true
+                    activeSheet = .talkToText
                 } label: {
                     Label {
                         Text("Capture Idea")
@@ -145,7 +152,7 @@ struct HomeView: View {
 
                 Button {
                     haptic(.light)
-                    showQuickRecord = true
+                    activeSheet = .quickRecord
                 } label: {
                     Label {
                         Text("Record Set")
@@ -274,22 +281,27 @@ struct HomeView: View {
         .navigationDestination(for: Joke.self) { joke in
             JokeDetailView(joke: joke)
         }
-        .sheet(isPresented: $showAddJoke) {
-            AddJokeView()
-        }
-        .sheet(isPresented: $showTalkToText) {
-            TalkToTextView(selectedFolder: nil as JokeFolder?, saveToBrainstorm: true)
-        }
-        .sheet(isPresented: $showQuickRecord) {
-            StandaloneRecordingView()
-        }
-        .sheet(isPresented: $showJournalEditor) {
-            NavigationStack {
-                JournalEntryEditorView(
-                    entry: DailyJournalStore.entryForToday(in: modelContext),
-                    isBackfill: false
-                )
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .addJoke:
+                AddJokeView()
+            case .talkToText:
+                TalkToTextView(selectedFolder: nil as JokeFolder?, saveToBrainstorm: true)
+            case .quickRecord:
+                StandaloneRecordingView()
+            case .journalEditor:
+                NavigationStack {
+                    JournalEntryEditorView(
+                        entry: DailyJournalStore.entryForToday(in: modelContext),
+                        isBackfill: false
+                    )
+                }
             }
+        }
+        .task(id: statsKey) {
+            cachedHitsCount = allJokes.filter { $0.isHit }.count
+            let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+            cachedThisWeekCount = allJokes.filter { $0.dateCreated >= weekAgo }.count
         }
     }
     
@@ -318,15 +330,16 @@ private struct StatCard: View {
                 Image(systemName: icon)
                     .font(.caption.weight(.semibold))
                     .foregroundColor(tint)
+                    .accessibilityHidden(true)
                 Spacer()
             }
-            
+
             Text("\(value)")
                 .font(.title2.weight(.bold))
                 .foregroundColor(.primary)
                 .monospacedDigit()
                 .contentTransition(.numericText())
-            
+
             Text(label)
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -334,6 +347,8 @@ private struct StatCard: View {
         .padding(12)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 }
 

@@ -184,6 +184,10 @@ final class NotificationManager: NSObject, ObservableObject, UNUserNotificationC
         )
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self, name: .NSSystemTimeZoneDidChange, object: nil)
+    }
+
     // MARK: - Public API
 
     /// Call once on app launch / didBecomeActive

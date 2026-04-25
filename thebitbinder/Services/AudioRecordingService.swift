@@ -10,8 +10,9 @@ import UIKit
 import Foundation
 import Combine
 
-/// Audio recording service - thread-safe via SwiftUI's @Published property dispatch.
-/// All mutating methods should be called from the main thread (SwiftUI handles this).
+/// Audio recording service - @MainActor isolated so @Published properties
+/// are always mutated on the main thread.
+@MainActor
 class AudioRecordingService: NSObject, ObservableObject {
     
     @Published var isRecording = false
@@ -40,13 +41,15 @@ class AudioRecordingService: NSObject, ObservableObject {
         super.init()
         setupMemoryWarningObserver()
         // Audio session setup may retry with delays; run off the main thread.
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.setupAudioSession()
+        Task.detached { [weak self] in
+            await self?.setupAudioSession()
         }
     }
     
     deinit {
-        cleanup()
+        // Cannot call @MainActor-isolated cleanup() from nonisolated deinit.
+        // Invalidate the timer directly — it is safe to call from any thread.
+        recordingTimer?.invalidate()
         NotificationCenter.default.removeObserver(self)
     }
     
@@ -66,13 +69,13 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
     }
     
-    private func setupAudioSession() {
+    nonisolated private func setupAudioSession() async {
         // Check if another app is playing audio and warn
         let audioSession = AVAudioSession.sharedInstance()
         if audioSession.isOtherAudioPlaying {
             print(" [Audio] Another app is currently playing audio — session may conflict")
         }
-        
+
         // Retry loop: attempt up to maxAudioSessionRetries times with retryDelay between attempts
         var lastError: Error?
         for attempt in 1...maxAudioSessionRetries {
@@ -89,14 +92,13 @@ class AudioRecordingService: NSObject, ObservableObject {
                 )
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
                 print(" [Audio] Audio session configured + activated for recording (attempt \(attempt))")
-                DispatchQueue.main.async { [weak self] in self?.audioSessionError = nil }
+                await MainActor.run { [weak self] in self?.audioSessionError = nil }
                 return // success
             } catch {
                 lastError = error
                 print(" [Audio] Audio session setup attempt \(attempt)/\(maxAudioSessionRetries) failed: \(error.localizedDescription)")
                 if attempt < maxAudioSessionRetries {
-                    // Safe: this method is dispatched off the main thread by callers.
-                    Thread.sleep(forTimeInterval: retryDelay)
+                    try? await Task.sleep(nanoseconds: UInt64(retryDelay * 1_000_000_000))
                 }
             }
         }
@@ -109,7 +111,7 @@ class AudioRecordingService: NSObject, ObservableObject {
             errorMsg = "Could not configure audio for recording: \(lastError?.localizedDescription ?? "unknown error"). Please restart the app."
         }
         print(" [Audio] Audio session setup failed after \(maxAudioSessionRetries) attempts: \(errorMsg)")
-        DispatchQueue.main.async { [weak self] in self?.audioSessionError = errorMsg }
+        await MainActor.run { [weak self] in self?.audioSessionError = errorMsg }
     }
 
     func startRecording(fileName: String) -> Bool {
@@ -134,9 +136,13 @@ class AudioRecordingService: NSObject, ObservableObject {
             recordingTime = 0
             pausedDuration = 0
             
+            // Invalidate any leftover timer before creating a new one to prevent
+            // a leaked repeating timer if startRecording is called twice.
+            recordingTimer?.invalidate()
+
             // Start timer to update recording time
             recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     guard let self = self, let startTime = self.recordingStartTime else { return }
                     self.recordingTime = Date().timeIntervalSince(startTime) - self.pausedDuration
                 }
@@ -172,7 +178,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         // Restart timer
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 guard let self = self, let startTime = self.recordingStartTime else { return }
                 self.recordingTime = Date().timeIntervalSince(startTime) - self.pausedDuration
             }
@@ -232,7 +238,7 @@ class AudioRecordingService: NSObject, ObservableObject {
 }
 
 extension AudioRecordingService: AVAudioRecorderDelegate {
-    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+    nonisolated func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
         if !flag {
             print(" Recording failed")
         }

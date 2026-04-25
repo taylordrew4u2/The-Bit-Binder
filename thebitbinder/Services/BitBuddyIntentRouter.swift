@@ -116,7 +116,8 @@ struct BitBuddyRouteResult: Sendable {
 // MARK: - Intent Router
 
 /// Central router that classifies freeform text into structured intents.
-final class BitBuddyIntentRouter: @unchecked Sendable {
+/// Thread-safe: all stored state is immutable after init.
+final class BitBuddyIntentRouter: Sendable {
     static let shared = BitBuddyIntentRouter()
 
     let allIntents: [BitBuddyIntent]

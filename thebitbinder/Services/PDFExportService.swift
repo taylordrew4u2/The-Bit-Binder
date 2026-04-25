@@ -107,6 +107,7 @@ class PDFExportService {
             return pdfURL
         } catch {
             print("Error creating PDF: \(error)")
+            DataOperationLogger.shared.logError(error, operation: "exportJokesToPDF", context: "Failed to write jokes PDF to \(pdfURL.lastPathComponent)")
             return nil
         }
     }
@@ -367,6 +368,7 @@ class PDFExportService {
             return pdfURL
         } catch {
             print("Error creating roast PDF: \(error)")
+            DataOperationLogger.shared.logError(error, operation: "exportRoastsToPDF", context: "Failed to write roasts PDF to \(pdfURL.lastPathComponent)")
             return nil
         }
     }
@@ -452,6 +454,7 @@ class PDFExportService {
             return pdfURL
         } catch {
             print("Error creating brainstorm PDF: \(error)")
+            DataOperationLogger.shared.logError(error, operation: "exportBrainstormToPDF", context: "Failed to write brainstorm PDF to \(pdfURL.lastPathComponent)")
             return nil
         }
     }
@@ -563,6 +566,7 @@ class PDFExportService {
             return pdfURL
         } catch {
             print("Error creating full export PDF: \(error)")
+            DataOperationLogger.shared.logError(error, operation: "exportEverythingToPDF", context: "Failed to write full export PDF to \(pdfURL.lastPathComponent)")
             return nil
         }
     }

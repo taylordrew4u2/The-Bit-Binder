@@ -733,11 +733,7 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
         segmentStartText = transcribedText
 
         // 4. Create the recognition request.
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        if #available(iOS 16.0, *) {
-            request.addsPunctuation = true
-        }
+        let request = makeRecognitionRequest()
         recognitionRequest = request
 
         // 5. Create a fresh AVAudioEngine for this session.
@@ -784,52 +780,94 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
 
         // 7. Kick off the recognition task.
         recognitionTask = speechRecognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self = self else { return }
-
-            var isFinal = false
-
-            if let result = result {
-                isFinal = result.isFinal
-                let spoken = result.bestTranscription.formattedString
-                DispatchQueue.main.async {
-                    if self.accumulatedText.isEmpty {
-                        self.transcribedText = spoken
-                    } else {
-                        self.transcribedText = self.accumulatedText + " " + spoken
-                    }
-                }
-            }
-
-            if let error = error {
-                let nsError = error as NSError
-
-                if SpeechErrorCode.isCancelled(nsError) {
-                    self.isStarting = false
-                    return
-                }
-
-                if SpeechErrorCode.isNoSpeechTimeout(nsError) || isFinal {
-                    self.scheduleAutoRestart()
-                    return
-                }
-
-                #if DEBUG
-                print(" [SpeechRecognizer] Recognition error: \(nsError.domain) code \(nsError.code) — \(error.localizedDescription)")
-                #endif
-                DispatchQueue.main.async {
-                    self.error = SpeechErrorMapper.userMessage(for: error)
-                    self.isTranscribing = false
-                    self.isStarting = false
-                }
-                return
-            }
-
-            if isFinal {
-                self.scheduleAutoRestart()
-            }
+            self?.handleRecognitionResult(result, error: error)
         }
 
         isStarting = false
+    }
+
+    private func makeRecognitionRequest() -> SFSpeechAudioBufferRecognitionRequest {
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        if #available(iOS 16.0, *) {
+            request.addsPunctuation = true
+        }
+        request.taskHint = .dictation
+        if speechRecognizer?.supportsOnDeviceRecognition == true {
+            request.requiresOnDeviceRecognition = true
+        }
+        return request
+    }
+
+    private func handleRecognitionResult(_ result: SFSpeechRecognitionResult?, error: Error?) {
+        var isFinal = false
+
+        if let result = result {
+            isFinal = result.isFinal
+            let spoken = result.bestTranscription.formattedString
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                if self.accumulatedText.isEmpty {
+                    self.transcribedText = spoken
+                } else {
+                    self.transcribedText = self.accumulatedText + " " + spoken
+                }
+            }
+        }
+
+        if let error = error {
+            let nsError = error as NSError
+
+            if SpeechErrorCode.isCancelled(nsError) {
+                isStarting = false
+                return
+            }
+
+            if SpeechErrorCode.isNoSpeechTimeout(nsError) || isFinal {
+                scheduleAutoRestart()
+                return
+            }
+
+            #if DEBUG
+            print(" [SpeechRecognizer] Recognition error: \(nsError.domain) code \(nsError.code) — \(error.localizedDescription)")
+            #endif
+            DispatchQueue.main.async { [weak self] in
+                self?.error = SpeechErrorMapper.userMessage(for: error)
+                self?.isTranscribing = false
+                self?.isStarting = false
+            }
+            return
+        }
+
+        if isFinal {
+            scheduleAutoRestart()
+        }
+    }
+
+    /// Lightweight restart that keeps the audio engine running — swaps the
+    /// recognition request in place so there is no gap in captured audio.
+    private func restartRecognitionInPlace() {
+        recognitionTask?.cancel()
+        recognitionTask = nil
+
+        let oldRequest = recognitionRequest
+        let newRequest = makeRecognitionRequest()
+        recognitionRequest = newRequest
+        oldRequest?.endAudio()
+
+        segmentStartText = transcribedText
+
+        guard let sr = speechRecognizer, sr.isAvailable else {
+            isStarting = false
+            tearDown(deactivateSession: false)
+            startRecognitionSession()
+            return
+        }
+
+        isStarting = false
+        recognitionTask = sr.recognitionTask(with: newRequest) { [weak self] result, error in
+            self?.handleRecognitionResult(result, error: error)
+        }
     }
 
     /// Common auto-restart path used by both the timeout/no-speech error and
@@ -876,7 +914,12 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
             let extra = Double(self.consecutiveEmptyRestarts) * SpeechReliability.restartBackoffStep
             let delay = SpeechReliability.restartDelay + extra
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                self?.startRecognitionSession()
+                guard let self = self, self.shouldBeRunning else { return }
+                if let engine = self.audioEngine, engine.isRunning {
+                    self.restartRecognitionInPlace()
+                } else {
+                    self.startRecognitionSession()
+                }
             }
         }
     }

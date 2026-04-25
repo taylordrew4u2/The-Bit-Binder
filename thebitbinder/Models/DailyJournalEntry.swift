@@ -55,10 +55,24 @@ final class DailyJournalEntry: Identifiable {
 
     var answers: [String: String] {
         get {
-            guard let data = answersJSON.data(using: .utf8),
-                  let dict = try? JSONDecoder().decode([String: String].self, from: data)
-            else { return [:] }
-            return dict
+            guard let data = answersJSON.data(using: .utf8) else {
+                DataOperationLogger.shared.logError(
+                    NSError(domain: "DailyJournalEntry", code: 1, userInfo: [NSLocalizedDescriptionKey: "answersJSON is not valid UTF-8"]),
+                    operation: "DailyJournalEntry.answers.get",
+                    context: "dateKey=\(dateKey)"
+                )
+                return [:]
+            }
+            do {
+                return try JSONDecoder().decode([String: String].self, from: data)
+            } catch {
+                DataOperationLogger.shared.logError(
+                    error,
+                    operation: "DailyJournalEntry.answers.get",
+                    context: "Failed to decode answersJSON for dateKey=\(dateKey)"
+                )
+                return [:]
+            }
         }
         set {
             let data = (try? JSONEncoder().encode(newValue)) ?? Data("{}".utf8)

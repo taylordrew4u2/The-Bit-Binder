@@ -17,8 +17,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     
     private let container: CKContainer
     private let schemaVersion = "2.5.0"  // Increment when schema changes - Added SetList finalization & RoastJoke structure fields
-    private let signatureService: CloudKitSignatureService
-    
+
     /// All CloudKit record types managed by this schema
     private let recordTypes: [String] = [
         "CD_Joke",
@@ -37,7 +36,6 @@ final class SchemaDeploymentService: @unchecked Sendable {
     
     private init() {
         self.container = CKContainer(identifier: "iCloud.The-BitBinder.thebitbinder")
-        self.signatureService = CloudKitSignatureService.shared
     }
     
     // MARK: - Schema Verification

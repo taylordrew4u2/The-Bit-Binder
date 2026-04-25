@@ -101,7 +101,13 @@ final class DataProtectionService: ObservableObject {
             print(" [DataProtection] Staged restore applied successfully")
         } catch {
             print(" [DataProtection] Failed to apply staged restore: \(error)")
-            try? fm.removeItem(at: stagingDir)
+            DataOperationLogger.shared.logError(error, operation: "applyPendingRestore", context: "Staged restore failed — cleaning up staging directory")
+            do {
+                try fm.removeItem(at: stagingDir)
+            } catch {
+                print(" [DataProtection] Failed to clean up staging directory after failed restore: \(error)")
+                DataOperationLogger.shared.logError(error, operation: "applyPendingRestore", context: "Staging directory cleanup failed")
+            }
         }
     }
     
@@ -790,8 +796,15 @@ final class DataProtectionService: ObservableObject {
             let destURL = URL.applicationSupportDirectory.appending(path: fileURL.lastPathComponent)
             
             // Remove existing file/directory
-            try? fileManager.removeItem(at: destURL)
-            
+            do {
+                try fileManager.removeItem(at: destURL)
+            } catch let removeError as NSError where removeError.domain == NSCocoaErrorDomain && removeError.code == NSFileNoSuchFileError {
+                // File didn't exist — fine, nothing to remove
+            } catch {
+                print(" [DataProtection] Failed to remove existing file before restore: \(destURL.lastPathComponent) — \(error)")
+                DataOperationLogger.shared.logError(error, operation: "restoreAppFiles", context: "Could not remove \(destURL.lastPathComponent) before overwriting")
+            }
+
             // Copy from backup
             try fileManager.copyItem(at: fileURL, to: destURL)
         }

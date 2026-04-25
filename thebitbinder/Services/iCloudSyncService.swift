@@ -11,6 +11,10 @@ import CloudKit
 import UIKit
 import CoreData
 
+extension NSNotification.Name {
+    static let iCloudDataDidChange = NSNotification.Name("iCloudDataDidChange")
+}
+
 @MainActor
 final class iCloudSyncService: NSObject, ObservableObject {
     @Published var isSyncEnabled = false
@@ -141,7 +145,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
                 // Step 3: Post notification so SwiftUI views using @Query will refresh
                 // @Query automatically observes the model context and should update,
                 // but posting this notification allows custom observers to react too.
-                NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
+                NotificationCenter.default.post(name: .iCloudDataDidChange, object: nil)
                 
                 print(" [iCloud] Context successfully refreshed with remote changes")
             } catch {
@@ -319,7 +323,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
             }
             
             // Notify UI to refresh
-            NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
+            NotificationCenter.default.post(name: .iCloudDataDidChange, object: nil)
             
             let now = Date()
             lastSyncDate = now
@@ -333,6 +337,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
         } catch {
             let message = "Sync failed: \(error.localizedDescription)"
             print(" [iCloud] \(message)")
+            DataOperationLogger.shared.logError(error, operation: "performFullSync", context: "Full iCloud sync failed")
             lastSyncCompletionDate = Date()
             syncStatus = .error(message)
             errorMessage = message
@@ -417,6 +422,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
             print(" Thoughts synced to iCloud")
         } catch {
             print(" Failed to sync thoughts: \(error)")
+            DataOperationLogger.shared.logError(error, operation: "syncThoughts", context: "Failed to save thoughts record to CloudKit")
         }
     }
     
@@ -441,6 +447,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
             return nil
         } catch {
             print(" Failed to fetch thoughts: \(error)")
+            DataOperationLogger.shared.logError(error, operation: "fetchThoughtsFromCloud", context: "Failed to fetch thoughts record from CloudKit")
             return nil
         }
     }
@@ -511,7 +518,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
             }
             
             // Notify UI to refresh
-            NotificationCenter.default.post(name: .init("iCloudDataDidChange"), object: nil)
+            NotificationCenter.default.post(name: .iCloudDataDidChange, object: nil)
             
             hapticFeedback()
             
