@@ -367,7 +367,9 @@ final class DataValidationService: ObservableObject {
         
         for issue in issues {
             if issue.contains("empty content") {
-                // Could implement repair for empty jokes
+                if await repairEmptyJokes(context: context) {
+                    repairedIssues.append(issue)
+                }
             } else if issue.contains("invalid dates") {
                 if await repairInvalidDates(context: context) {
                     repairedIssues.append(issue)
@@ -386,6 +388,31 @@ final class DataValidationService: ObservableObject {
         return repairedIssues
     }
     
+    private func repairEmptyJokes(context: ModelContext) async -> Bool {
+        do {
+            let jokes = try context.fetch(FetchDescriptor<Joke>())
+            var trashedCount = 0
+
+            for joke in jokes {
+                guard !joke.isTrashed else { continue }
+                if joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    joke.moveToTrash()
+                    trashedCount += 1
+                }
+            }
+
+            if trashedCount > 0 {
+                try context.save()
+                print(" [DataValidation] Trashed \(trashedCount) joke(s) with empty content (recoverable for 30 days)")
+            }
+
+            return trashedCount > 0
+        } catch {
+            print(" [DataValidation] Failed to repair empty jokes: \(error)")
+            return false
+        }
+    }
+
     private func repairInvalidDates(context: ModelContext) async -> Bool {
         do {
             let jokes = try context.fetch(FetchDescriptor<Joke>())

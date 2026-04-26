@@ -71,6 +71,10 @@ protocol AIJokeExtractionProvider {
 
     /// Extract jokes from raw text.
     func extractJokes(from text: String) async throws -> [AIExtractedJoke]
+
+    /// Extract jokes with user-supplied hints that configure preprocessing,
+    /// split thresholds, and AI instructions.
+    func extractJokes(from text: String, hints: ExtractionHints) async throws -> [AIExtractedJoke]
 }
 
 extension AIJokeExtractionProvider {

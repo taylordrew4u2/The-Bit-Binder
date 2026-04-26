@@ -100,17 +100,15 @@ final class HuggingFaceTransformersBitBuddyService: BitBuddyBackend {
             return "\(role): \(turn.text)"
         }.joined(separator: "\n")
 
+        let contextPrompt = BitBuddyResources.buildLLMPrompt(message: message, dataContext: dataContext)
+
         return """
-        You are BitBuddy, an on-device assistant for comedians.
-        Be practical, funny when useful, and concise.
-        Never claim you saved, edited, deleted, imported, exported, synced, or migrated data.
-        UserName: \(dataContext.userName)
-        ActiveSection: \(dataContext.activeSection?.displayName ?? "None")
+        \(BitBuddyResources.llmSystemInstructions)
 
         Conversation:
         \(history)
 
-        User: \(message)
+        \(contextPrompt)
         Assistant:
         """
     }

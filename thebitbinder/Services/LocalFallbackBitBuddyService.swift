@@ -1047,22 +1047,46 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
     private func improve(_ text: String) -> String {
         guard !text.isEmpty else { return "Please provide a joke to improve." }
         let suggestions = JokeAnalyzer.suggestEdits(text)
-        
+        let structure = JokeAnalyzer.structure(text)
+        let words = text.split(separator: " ")
+        let wordCount = words.count
+
         var response = " **Improvement Mode**\n\n"
-        
-        // Core structural suggestions
-        if suggestions.isEmpty {
-            response += "**Structure:**\n"
-            response += "• Tighten setup: Remove context not needed for the punchline.\n"
-            response += "• Swap punchline: Try ending on a harder consonant sound (K, T, P hit harder).\n"
-            response += "• Cut filler words — if the audience can infer it, don't say it.\n"
-        } else {
-            response += "**Structure Edits:**\n"
+
+        // Quote the original so they see it analyzed
+        response += "**Your joke:** \(text.prefix(200))\(text.count > 200 ? "…" : "")\n\n"
+
+        // Structural diagnosis
+        response += "**Structure:** \(structure.rawValue)\n\n"
+
+        // Concrete tightening suggestions
+        response += "**Tighten It Up:**\n"
+        if wordCount > 30 {
+            response += "• Your setup is \(wordCount) words — try cutting it to \(max(10, wordCount * 2 / 3)). Ask: what's the minimum context the punchline needs?\n"
+        }
+
+        // Find and flag specific filler words in their text
+        let lower = text.lowercased()
+        let foundFillers = BitBuddyResources.fillerWords.filter { lower.contains($0) }
+        if !foundFillers.isEmpty {
+            response += "• Cut these filler words: \(foundFillers.prefix(4).map { "\"\($0)\"" }.joined(separator: ", "))\n"
+        }
+
+        // Check if punchline ends on a weak word
+        let lastWord = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespacesAndNewlines).last?
+            .lowercased().trimmingCharacters(in: .punctuationCharacters) ?? ""
+        let weakEndings = ["it", "me", "that", "this", "one", "thing", "stuff", "there", "here"]
+        if weakEndings.contains(lastWord) {
+            response += "• You end on \"\(lastWord)\" — rearrange so the funniest or most surprising word lands last.\n"
+        }
+
+        if !suggestions.isEmpty {
+            response += "\n**Pro Edits:**\n"
             response += suggestions.map { "• \($0)" }.joined(separator: "\n") + "\n"
         }
-        
-        // Vocabulary upgrades from the joke text
-        let words = text.split(separator: " ")
+
+        // Vocabulary upgrades from the actual joke text
         var upgrades: [String] = []
         for word in words {
             let w = String(word).lowercased().trimmingCharacters(in: .punctuationCharacters)
@@ -1071,32 +1095,71 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             }
             if upgrades.count >= 4 { break }
         }
-        
         if !upgrades.isEmpty {
             response += "\n**Word Swaps:**\n"
             for upgrade in upgrades {
                 response += "• \(upgrade)\n"
             }
         }
-        
-        // Creative suggestions from the vocab bank
-        let vocabHits = BitBuddyResources.randomVocabSuggestions(count: 3)
-        response += "\n**Creative Ammo:**\n"
-        for hit in vocabHits {
-            response += "• \(hit)\n"
+
+        // Suggest next moves based on structure
+        response += "\n**Next Moves:**\n"
+        switch structure {
+        case .oneLiner:
+            response += "• Add a tag line — same premise, new angle. Extends the laugh without a new setup.\n"
+            response += "• Try a second version that uses the opposite technique (e.g. if it's wordplay, try misdirection).\n"
+        case .setupPunchline:
+            response += "• Write 2–3 tags that build on the same setup — turn this into a full bit.\n"
+            response += "• Try flipping the setup and punch — sometimes the punchline makes a better setup.\n"
+        case .anecdote:
+            response += "• Find the core premise and write a one-liner version. If the one-liner doesn't work, the premise might need sharpening.\n"
+            response += "• Add an act-out at the peak moment — physicalize the funniest beat.\n"
+        default:
+            response += "• Try the Rule of Three: set up a pattern with two items, then break it with the third.\n"
+            response += "• Write the punchline first, then build the minimum setup to make it land.\n"
         }
-        
-        // Suggest a technique to try
+
         if let technique = BitBuddyResources.jokeProTechniques.randomElement() {
-            response += "\n **Try this technique:** \(technique) — it could give this joke a whole new gear."
+            response += "• Experiment with **\(technique)** — it could give this joke a whole new gear."
         }
-        
+
         return response
     }
     
     private func premise(_ topic: String) -> String {
         let actualTopic = topic.isEmpty ? (userProfile.topTopics.max(by: { $0.value < $1.value })?.key ?? "dating") : topic
-        return "What if \(actualTopic) implied something totally different about us? (Example: \(actualTopic) is actually just adult hide and seek.)"
+
+        let observationalAngles = [
+            "Nobody talks about how \(actualTopic) is basically just [unexpected comparison] with better marketing.",
+            "The worst part about \(actualTopic) isn't what you think — it's that [hidden truth].",
+            "We all act like \(actualTopic) is normal, but if aliens saw us doing it they'd [alien reaction].",
+            "\(actualTopic.capitalized) is just society's way of saying [uncomfortable truth].",
+            "The real reason \(actualTopic) exists is because someone was too [adjective] to [simpler alternative]."
+        ]
+        let darkAngles = [
+            "What if \(actualTopic) is actually a cry for help that we all agreed to call a lifestyle?",
+            "\(actualTopic.capitalized) is proof that humans will pay money to make themselves miserable on a schedule.",
+            "At some point we decided \(actualTopic) was a good idea and nobody has had the guts to question it since."
+        ]
+        let absurdAngles = [
+            "Imagine explaining \(actualTopic) to someone from 1850. They'd think we were either geniuses or completely unhinged.",
+            "What if \(actualTopic) suddenly became illegal? Who panics first?",
+            "If \(actualTopic) were a person, it would be the friend who shows up uninvited and doesn't leave."
+        ]
+
+        var response = " **Premise Generator: \(actualTopic.capitalized)**\n\n"
+        response += "**Observational angle:**\n"
+        response += "• \(observationalAngles.randomElement()!)\n\n"
+        response += "**Dark/edgy angle:**\n"
+        response += "• \(darkAngles.randomElement()!)\n\n"
+        response += "**Absurd angle:**\n"
+        response += "• \(absurdAngles.randomElement()!)\n\n"
+
+        // Add a "what's funny about this" prompt
+        response += "**The question to ask:** What's the gap between how \(actualTopic) is supposed to work and how it actually works? That gap is your joke.\n\n"
+        response += "Pick one and say **\"expand this\"** — or give me a different topic."
+
+        return response
     }
 
     private func generate(_ topic: String) -> String {

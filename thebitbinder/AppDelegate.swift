@@ -22,9 +22,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        _ = MemoryManager.shared
-        _ = iCloudKeyValueStore.shared
-        
         // Configure audio session app-wide for both playback and recording
         configureAudioSession()
         

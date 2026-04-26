@@ -44,14 +44,7 @@ final class AppStartupCoordinator: ObservableObject {
         // Step 3: Basic validation (without context for now)
         statusText = "Validating system..."
         
-        // Log data protection readiness
         print(" [AppStartup] Data protection sequence completed")
-        print("   - Backup service ready")
-        print("   - Validation service ready")
-        print("   - Migration service ready")
-        
-        // Brief hold so the launch animation is visible but doesn't feel slow.
-        try? await Task.sleep(nanoseconds: 150_000_000) // 0.15 seconds
     }
     
     /// Call this after ModelContainer is available to complete data validation and migration
@@ -134,10 +127,12 @@ final class AppStartupCoordinator: ObservableObject {
         }
         
         // Purge soft-deleted items older than 30 days before validation runs
-        purgeExpiredTrashItems(context: context)
+        await purgeExpiredTrashItems(context: context)
+        await Task.yield()
 
         // Perform data validation
         let validation = await dataValidation.validateDataIntegrity(context: context)
+        await Task.yield()
         
         if validation.significantDataLoss && !validation.issues.isEmpty {
             print(" [AppStartup] CRITICAL: Significant data loss detected!")
@@ -161,13 +156,17 @@ final class AppStartupCoordinator: ObservableObject {
             }
         }
         
+        await Task.yield()
+
         // Handle schema changes
         await dataMigration.handleSchemaChanges(context: context)
-        
+        await Task.yield()
+
         // Verify CloudKit schema deployment
         schemaDeployment.logSchemaFields()
         await schemaDeployment.ensureSchemaDeployed(context: context)
-        
+        await Task.yield()
+
         // Perform any needed migrations
         let migrationResult = await dataMigration.performSafeMigration(context: context)
         
@@ -186,7 +185,7 @@ final class AppStartupCoordinator: ObservableObject {
     /// Hard-deletes any soft-deleted records whose `deletedDate` is more than 30 days ago.
     /// Runs once per app launch, before validation, so stale trash doesn't inflate counts.
     /// Recordings: audio files are deleted before the DB record is removed.
-    private func purgeExpiredTrashItems(context: ModelContext) {
+    private func purgeExpiredTrashItems(context: ModelContext) async {
         let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
         let distantFuture = Date.distantFuture
         var purgeCount = 0
@@ -198,6 +197,7 @@ final class AppStartupCoordinator: ObservableObject {
             for joke in jokes { context.delete(joke) }
             purgeCount += jokes.count
         }
+        await Task.yield()
 
         // BrainstormIdeas
         if let ideas = try? context.fetch(FetchDescriptor<BrainstormIdea>(
@@ -206,6 +206,7 @@ final class AppStartupCoordinator: ObservableObject {
             for idea in ideas { context.delete(idea) }
             purgeCount += ideas.count
         }
+        await Task.yield()
 
         // SetLists
         if let setLists = try? context.fetch(FetchDescriptor<SetList>(
@@ -222,6 +223,7 @@ final class AppStartupCoordinator: ObservableObject {
             for joke in roastJokes { context.delete(joke) }
             purgeCount += roastJokes.count
         }
+        await Task.yield()
 
         // NotebookPhotoRecords
         if let photos = try? context.fetch(FetchDescriptor<NotebookPhotoRecord>(
@@ -238,6 +240,7 @@ final class AppStartupCoordinator: ObservableObject {
             for target in targets { context.delete(target) }
             purgeCount += targets.count
         }
+        await Task.yield()
 
         // JokeFolders — nullifies joke relationships on delete
         if let folders = try? context.fetch(FetchDescriptor<JokeFolder>(
@@ -252,7 +255,6 @@ final class AppStartupCoordinator: ObservableObject {
             predicate: #Predicate { $0.isTrashed == true && ($0.deletedDate ?? distantFuture) < cutoff }
         )) {
             for recording in recordings {
-                // Resolve audio file URL (handles stale absolute paths)
                 let fileURL = recording.resolvedURL
                 if FileManager.default.fileExists(atPath: fileURL.path) {
                     do {
@@ -265,18 +267,10 @@ final class AppStartupCoordinator: ObservableObject {
             }
             purgeCount += recordings.count
         }
+        await Task.yield()
 
-        // Orphan recordings — active Recording entities whose backing audio
-        // file has been externally deleted. Soft-delete (move to trash) so the
-        // user can see what was cleaned up and restore if the file reappears
-        // (e.g. after an iCloud Drive sync completes). This matches the
-        // DataValidationService behavior and keeps recovery possible for 30 days.
-        // Soft-deleted recordings are excluded (their file may already have been
-        // removed by permanent-delete or auto-purge, which is expected).
-        //
-        // Also skip recordings already handled by DataValidationService to
-        // prevent the same orphans from being rediscovered every launch
-        // (e.g. when CloudKit re-syncs the record metadata).
+        // Orphan recordings — soft-delete active recordings whose backing
+        // audio file was externally deleted.
         let handledIDs = Set(UserDefaults.standard.stringArray(forKey: "DataValidation_HandledMissingRecordingIDs") ?? [])
         if let activeRecordings = try? context.fetch(FetchDescriptor<Recording>(
             predicate: #Predicate { $0.isTrashed == false }
@@ -294,7 +288,6 @@ final class AppStartupCoordinator: ObservableObject {
             }
             if orphanCount > 0 {
                 purgeCount += orphanCount
-                // Persist handled IDs (cap at 200)
                 UserDefaults.standard.set(Array(updatedHandledIDs.prefix(200)), forKey: "DataValidation_HandledMissingRecordingIDs")
                 print(" [OrphanCleanup] Moved \(orphanCount) orphan recording(s) to trash (recoverable for 30 days)")
             }

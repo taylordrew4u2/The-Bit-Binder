@@ -201,6 +201,13 @@ struct thebitbinderApp: App {
             .tint(roastMode ? FirePalette.core : .blue)
             .animation(.easeOut(duration: 0.35), value: startup.isReady)
             .task {
+                // Force-init @MainActor singletons here where MainActor
+                // isolation is guaranteed. Doing this in AppDelegate caused
+                // unsafeForcedSync warnings due to UIApplicationDelegateAdaptor
+                // bridging ambiguity.
+                _ = MemoryManager.shared
+                _ = iCloudKeyValueStore.shared
+
                 // RESTORE-PATH ONLY: delete the CloudKit zone BEFORE wiring
                 // up sync or registering for pushes. This prevents CloudKit
                 // from overwriting the restored local data with the (pre-restore)
@@ -226,16 +233,13 @@ struct thebitbinderApp: App {
                 // Start app initialization (lightweight — shows UI quickly)
                 await startup.start()
                 
-                // Complete data protection with model context
-                await startup.completeDataProtectionWithContext(sharedModelContainer.mainContext)
-                
-                //  Deferred heavy work — runs AFTER UI is visible
-                await performDeferredBackup()
-                
-                // General-case CloudKit schema cleanup (runs after backup so
-                // UI is already showing). If the restore-path call above already
-                // ran, the guard inside the function no-ops here.
-                await performAggressiveCloudKitCleanup()
+                // Heavy post-startup work — fire as a separate task so the
+                // main run loop can process UI events immediately.
+                Task {
+                    await startup.completeDataProtectionWithContext(sharedModelContainer.mainContext)
+                    await performDeferredBackup()
+                    await performAggressiveCloudKitCleanup()
+                }
             }
             .environmentObject(userPreferences)
             .alert(" Data Issue Detected", isPresented: $startup.showDataLossAlert) {

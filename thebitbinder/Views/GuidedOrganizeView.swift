@@ -21,8 +21,11 @@ struct GuidedOrganizeView: View {
     @State private var customFolderName = ""
     @State private var organizedCount = 0
     @State private var skippedCount = 0
+    @State private var trashedCount = 0
     @State private var showingSummary = false
     @State private var includeAlreadyOrganized = false
+    @State private var showingTrashConfirmation = false
+    @State private var jokeToTrash: Joke?
     
     private var unorganizedJokes: [Joke] {
         if includeAlreadyOrganized {
@@ -257,6 +260,22 @@ struct GuidedOrganizeView: View {
             // Bottom action bar
             HStack(spacing: 16) {
                 Button {
+                    jokeToTrash = joke
+                    showingTrashConfirmation = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "trash")
+                        Text("Trash")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                }
+
+                Button {
                     skipJoke()
                 } label: {
                     HStack(spacing: 6) {
@@ -265,14 +284,14 @@ struct GuidedOrganizeView: View {
                     }
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(Color(UIColor.tertiarySystemBackground))
                     .cornerRadius(8)
                 }
-                
+
                 Spacer()
-                
+
                 Button {
                     showingSummary = true
                 } label: {
@@ -284,6 +303,18 @@ struct GuidedOrganizeView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             .background(.bar)
+            .alert("Move to Trash?", isPresented: $showingTrashConfirmation) {
+                Button("Move to Trash", role: .destructive) {
+                    if let joke = jokeToTrash {
+                        trashJoke(joke)
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    jokeToTrash = nil
+                }
+            } message: {
+                Text("This joke will be moved to Trash and automatically deleted after 30 days. You can restore it from Trash before then.")
+            }
         }
     }
     
@@ -312,6 +343,15 @@ struct GuidedOrganizeView: View {
                     Spacer()
                     Text("\(skippedCount)")
                         .fontWeight(.semibold)
+                }
+                if trashedCount > 0 {
+                    HStack {
+                        Text("Trashed:")
+                        Spacer()
+                        Text("\(trashedCount)")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.red)
+                    }
                 }
                 HStack {
                     Text("Remaining:")
@@ -455,6 +495,21 @@ struct GuidedOrganizeView: View {
     
     private func skipJoke() {
         skippedCount += 1
+        advanceToNext()
+    }
+
+    private func trashJoke(_ joke: Joke) {
+        joke.moveToTrash()
+        do {
+            try modelContext.save()
+            trashedCount += 1
+            #if DEBUG
+            print(" [GuidedOrganize] Trashed '\(joke.title.prefix(20))'")
+            #endif
+        } catch {
+            print(" [GuidedOrganize] Failed to trash: \(error)")
+        }
+        jokeToTrash = nil
         advanceToNext()
     }
     
