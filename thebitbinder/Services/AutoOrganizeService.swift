@@ -176,7 +176,7 @@ class AutoOrganizeService {
     static var isAIAvailable: Bool {
 #if canImport(FoundationModels)
         if #available(iOS 26, *) {
-            if SystemLanguageModel.default.availability == .available {
+            if SystemLanguageModel(guardrails: .permissiveContentTransformations).isAvailable {
                 return true
             }
         }
@@ -815,8 +815,8 @@ class AutoOrganizeService {
         existingFolders: [String],
         mode: OrganizeMode
     ) async throws -> [CategoryMatch] {
-        let model = SystemLanguageModel.default
-        guard model.availability == .available else {
+        let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
+        guard model.isAvailable else {
             throw AutoOrganizeError.appleAIUnavailable
         }
 
@@ -839,17 +839,16 @@ class AutoOrganizeService {
             You are a comedy categorization engine. Categorize jokes by \(modeDescription). \
             Available categories: \(categoryList).\(folderHint) \
             Pick the single best-fitting category and give a confidence score from 0.0 to 1.0. \
-            Provide a short reason and list the key words from the joke that led to your pick.
+            Provide a short reason and list the key words from the joke that led to your pick. \
+            Return ONLY a JSON object with these fields: \
+            {"category": "name", "confidence": 0.8, "reasoning": "why", "matchedKeywords": ["word1", "word2"]}
             """
 
-        let session = LanguageModelSession(instructions: instructions)
-        let response = try await session.respond(
-            to: content,
-            generating: AppleAICategoryResult.self,
-            options: GenerationOptions(sampling: .greedy)
-        )
+        let session = LanguageModelSession(model: model, instructions: instructions)
+        let response = try await session.respond(to: content)
+        let output = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let result = response.content
+        let result = try parseAICategoryResult(from: output)
 
         // Enrich with style/tone/craft heuristics
         let normalized = normalize(content)
@@ -866,6 +865,30 @@ class AutoOrganizeService {
             craftSignals: style.craftSignals,
             structureScore: structure.structureConfidence
         )]
+    }
+
+    private struct ParsedCategoryResult: Decodable {
+        var category: String
+        var confidence: Double
+        var reasoning: String
+        var matchedKeywords: [String]
+    }
+
+    private static func parseAICategoryResult(from text: String) throws -> ParsedCategoryResult {
+        let jsonString: String
+        if let start = text.firstIndex(of: "{"),
+           let end = text.lastIndex(of: "}") {
+            jsonString = String(text[start...end])
+        } else {
+            jsonString = text
+        }
+
+        guard let data = jsonString.data(using: .utf8) else {
+            throw AutoOrganizeError.appleAIUnavailable
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(ParsedCategoryResult.self, from: data)
     }
 #endif
 

@@ -206,47 +206,74 @@ struct BrainstormView: View {
         )
     }
     
-    // MARK: - Idea Grid
+    // MARK: - Idea List
     private var ideaGrid: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 0) {
-                    ForEach(ideas) { idea in
-                        if isSelectMode {
-                            ideaSelectableCard(idea: idea)
-                        } else {
-                            Button {
-                                selectedIdea = idea
-                            } label: {
-                                IdeaCard(idea: idea, scale: effectiveGridScale, roastMode: roastMode, showFullContent: showFullContent)
+            List {
+                ForEach(ideas) { idea in
+                    if isSelectMode {
+                        ideaSelectableCard(idea: idea)
+                            .listRowSeparatorTint(Color(red: 0.6, green: 0.7, blue: 0.85).opacity(0.3))
+                    } else {
+                        Button {
+                            selectedIdea = idea
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(idea.content.components(separatedBy: .newlines).first ?? idea.content)
+                                    .font(.body.weight(.medium))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+
+                                HStack(spacing: 6) {
+                                    Text(idea.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+
+                                    if showFullContent {
+                                        Text(idea.content)
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
                             }
-                            .buttonStyle(.plain)
-                            .contentShape(Rectangle())
-                            .contextMenu {
-                                Button {
-                                    promoteToJoke(idea)
-                                } label: {
-                                    Label("Promote to Joke", systemImage: "arrow.up.doc.fill")
-                                }
-                                
-                                Divider()
-                                
-                                Button(role: .destructive) {
-                                    // Stage for confirmation — actual
-                                    // moveToTrash happens in the alert handler.
-                                    ideaToDelete = idea
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                            .padding(.vertical, 2)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                ideaToDelete = idea
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
                         }
+                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                            Button {
+                                promoteToJoke(idea)
+                            } label: {
+                                Label("Promote", systemImage: "arrow.up.doc.fill")
+                            }
+                            .tint(.accentColor)
+                        }
+                        .contextMenu {
+                            Button {
+                                promoteToJoke(idea)
+                            } label: {
+                                Label("Promote to Joke", systemImage: "arrow.up.doc.fill")
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                ideaToDelete = idea
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .listRowSeparatorTint(Color(red: 0.6, green: 0.7, blue: 0.85).opacity(0.3))
                     }
                 }
-                .animation(.easeOut(duration: 0.2), value: effectiveGridScale)
             }
-            .simultaneousGesture(pinchGesture)
-            
-            // Batch action bar
+            .listStyle(.plain)
+
             if isSelectMode {
                 brainstormBatchActionBar
             }

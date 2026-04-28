@@ -19,7 +19,7 @@ final class BitBuddyService: NSObject, ObservableObject {
     
     // MARK: - Dependencies
     private let authService = AuthService.shared
-    private let backend: BitBuddyBackend
+    private var backend: BitBuddyBackend
     private let intentRouter = BitBuddyIntentRouter.shared
     
     // MARK: - State
@@ -34,7 +34,12 @@ final class BitBuddyService: NSObject, ObservableObject {
     @Published var pendingNavigation: BitBuddySection? = nil
     /// Last structured response for action dispatch.
     @Published private(set) var lastActions: [BitBuddyAction] = []
-    
+    /// Joke the user is currently viewing — populates dataContext.focusedJoke.
+    var focusedJoke: BitBuddyJokeSummary?
+    /// Message to auto-send when the chat view opens (e.g. "Punch up this joke").
+    /// BitBuddyChatView consumes and clears this on appear.
+    var pendingMessage: String?
+
     private let maxConversationTurns = 16
     /// Maximum number of old conversations to retain in memory
     private let maxRetainedConversations = 3
@@ -67,8 +72,15 @@ final class BitBuddyService: NSObject, ObservableObject {
         super.init()
     }
     
+    func refreshBackend() {
+        let newBackend = BitBuddyBackendFactory.makeBackend()
+        backend = newBackend
+        backendName = newBackend.backendName
+        isConnected = newBackend.isAvailable
+    }
+
     // MARK: - Public API
-    
+
     /// Optional hook so BitBuddy can ground responses in current app joke data.
     ///
     /// - Important: Callers **must** use `[weak self]` (or `[weak viewModel]`)
@@ -131,6 +143,7 @@ final class BitBuddyService: NSObject, ObservableObject {
         var dataContext = BitBuddyDataContext()
         dataContext.userName = UserDefaults.standard.string(forKey: "userName") ?? "Comedian"
         dataContext.recentJokes = recentJokeProvider?() ?? []
+        dataContext.focusedJoke = focusedJoke
         dataContext.routedIntent = routeResult
         dataContext.activeSection = routeResult?.section
         dataContext.isRoastMode = UserDefaults.standard.bool(forKey: "roastModeEnabled")
@@ -138,20 +151,7 @@ final class BitBuddyService: NSObject, ObservableObject {
         do {
             let rawResponse: String
             statusMessage = statusMessage.isEmpty ? "Thinking…" : statusMessage
-            do {
-                rawResponse = try await backend.send(message: message, session: session, dataContext: dataContext)
-            } catch {
-                // Primary backend failed (e.g. MLX model not downloaded).
-                // Fall through to the always-available local engine so the
-                // user never sees a blank error in chat.
-                if backend is LocalFallbackBitBuddyService {
-                    throw error   // already the fallback — nothing left to try
-                }
-                print(" [BitBuddy] Primary backend (\(backend.backendName)) failed: \(error.localizedDescription). Falling back to local engine.")
-                rawResponse = try await LocalFallbackBitBuddyService.shared.send(
-                    message: message, session: session, dataContext: dataContext
-                )
-            }
+            rawResponse = try await backend.send(message: message, session: session, dataContext: dataContext)
             
             // Process the response through our JSON handler (handles
             // any future structured-JSON backends). For the local
@@ -392,15 +392,12 @@ final class BitBuddyService: NSObject, ObservableObject {
     /// - Returns: The cleaned response text to display in the chat UI
     func handleBitBuddyResponse(_ rawResponse: String) -> String {
         print(" [BitBuddy] Raw response: \(rawResponse.prefix(120))")
-        
+
         // Try to parse as JSON — only structured JSON responses can trigger actions.
         // Plain-text conversational responses are returned as-is with NO action dispatch.
         guard let jsonData = rawResponse.data(using: .utf8),
               let jsonObject = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-            // Not JSON — this is a normal conversational response. Do NOT try to
-            // execute any action path. This prevents treating "Sure, Taylor! What's
-            // the next joke?" as a save_joke payload.
-            return rawResponse
+            return Self.stripMarkdown(rawResponse)
         }
         
         // Extract the response text
@@ -427,9 +424,19 @@ final class BitBuddyService: NSObject, ObservableObject {
             }
         }
         
-        return responseText
+        return Self.stripMarkdown(responseText)
     }
-    
+
+    private static func stripMarkdown(_ text: String) -> String {
+        var s = text
+        s = s.replacingOccurrences(of: "**", with: "")
+        s = s.replacingOccurrences(of: "__", with: "")
+        s = s.replacingOccurrences(of: "###", with: "")
+        s = s.replacingOccurrences(of: "##", with: "")
+        s = s.replacingOccurrences(of: "# ", with: "")
+        return s
+    }
+
     /// Validates that a data-mutating action payload contains the required fields.
     /// Non-mutating actions (navigation, status checks) pass through without validation.
     private func validateActionPayload(_ action: [String: Any]) -> Bool {

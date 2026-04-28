@@ -2,9 +2,10 @@
 //  AIJokeExtractionManager.swift
 //  thebitbinder
 //
-//  Coordinates GagGrabber's on-device extraction providers.
-//  The Apple Foundation Model runs first when available (iOS 26+); otherwise
-//  the NLEmbedding segmenter handles the document. Both run entirely offline.
+//  Coordinates GagGrabber's extraction providers.
+//  The Apple Foundation Model runs first when available (iOS 26+), with an
+//  offline segmenter as the final local fallback. OpenAI is optional and only
+//  used when the user has explicitly added an API key.
 //
 //  HARDWIRED RESTRICTION: Extraction is only for the import pipeline.
 //  Callers must supply an `AIExtractionToken`. BitBuddy and other interactive
@@ -44,14 +45,14 @@ final class AIJokeExtractionManager {
 
     // MARK: - Providers
 
-    /// Apple's Foundation Model runs first when available — it understands
-    /// the detailed per-entry questions (jokeText / confidence / humorMechanism
-    /// / title) via guided generation. The embedding segmenter is the fallback
-    /// on older devices.
-    private let providerOrder: [AIProviderType] = [.appleOnDevice, .embeddingLocal]
+    /// Apple's Foundation Model runs first when available (iOS 26+). OpenAI is
+    /// an optional cloud fallback when the user has added a key. The embedding
+    /// segmenter is the last resort and always stays on-device.
+    private let providerOrder: [AIProviderType] = [.appleOnDevice, .openAI, .embeddingLocal]
 
     private let providers: [AIProviderType: AIJokeExtractionProvider] = [
-        .appleOnDevice:  AppleOnDeviceJokeExtractionProvider(),
+        .appleOnDevice: AppleOnDeviceJokeExtractionProvider(),
+        .openAI:        OpenAIJokeExtractionProvider(),
         .embeddingLocal: EmbeddingSegmenterProvider()
     ]
 
@@ -91,6 +92,15 @@ final class AIJokeExtractionManager {
                 print(" [Extraction] Trying \(providerType.displayName)…")
                 let jokes = try await provider.extractJokes(from: text, hints: hints)
                 print(" [Extraction] \(providerType.displayName) returned \(jokes.count) fragment(s)")
+
+                // Skip results that look like a failed parse — e.g. one giant
+                // blob that's basically the original text regurgitated.
+                if jokes.count == 1 && jokes[0].jokeText.count > 500 && text.count > 600 {
+                    print(" [Extraction] \(providerType.displayName) returned a single oversized block — trying next provider")
+                    errors[providerType] = AIProviderError.noJokesFound(providerType)
+                    continue
+                }
+
                 return (jokes, providerType)
             } catch {
                 print(" [Extraction] \(providerType.displayName) error: \(error.localizedDescription)")
@@ -98,9 +108,9 @@ final class AIJokeExtractionManager {
             }
         }
 
-        print(" [Extraction] All on-device providers failed")
+        print(" [Extraction] All providers failed")
         throw AIExtractionFailedError(
-            reason: "GagGrabber couldn't read this document — try a different file.",
+            reason: "GagGrabber couldn't read this document on-device. Add an OpenAI API key in Settings only if you want cloud fallback, or try a different file.",
             underlyingErrors: errors
         )
     }

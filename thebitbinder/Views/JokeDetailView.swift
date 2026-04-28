@@ -10,31 +10,36 @@
 
 import SwiftUI
 import SwiftData
+import Speech
+import AVFoundation
 
 struct JokeDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var bitBuddyDrawer: BitBuddyDrawerController
+    @EnvironmentObject private var userPreferences: UserPreferences
     @AppStorage("roastModeEnabled") private var roastMode = false
 
     @Bindable var joke: Joke
     @State private var showingFolderPicker = false
     @State private var showingDeleteAlert = false
     @State private var showingNotes = false
+    @State private var showingTags = false
     @State private var showingSetListPicker = false
     @State private var folders: [JokeFolder] = []
     @State private var setLists: [SetList] = []
 
     @StateObject private var autoSave = AutoSaveManager.shared
+    @StateObject private var speechManager = SpeechRecognitionManager()
+    @State private var isRecording = false
+    @State private var showingPermissionAlert = false
     @State private var saveError: String?
     @State private var showingSaveError = false
 
     @FocusState private var focusedField: Field?
 
-    @State private var newTagText = ""
-    @State private var isAddingTag = false
-
     private enum Field: Hashable {
-        case title, content, notes, newTag
+        case title, content
     }
 
     // MARK: - Computed Helpers
@@ -50,14 +55,6 @@ struct JokeDetailView: View {
         joke.content.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
     }
 
-    private var stageTimeEstimate: String {
-        let seconds = max(1, Int(round(Double(wordCount) / 1.75)))
-        if seconds < 60 { return "\u{2248} \(seconds) sec on stage" }
-        let m = seconds / 60
-        let s = seconds % 60
-        return s == 0 ? "\u{2248} \(m) min on stage" : "\u{2248} \(m)m \(s)s on stage"
-    }
-
     private var saveStatusText: String {
         if autoSave.isSaving { return "Saving\u{2026}" }
         if let last = autoSave.lastSaveTime,
@@ -65,14 +62,6 @@ struct JokeDetailView: View {
             return "Saved just now"
         }
         return "Saved"
-    }
-
-    private var notesSubtitle: String {
-        if joke.notes.isEmpty { return "Tap to add" }
-        let lines = joke.notes.components(separatedBy: "\n")
-            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        if lines.count == 1 { return "1 note \u{00B7} tap to open" }
-        return "\(lines.count) notes \u{00B7} tap to open"
     }
 
     // MARK: - Body
@@ -90,42 +79,37 @@ struct JokeDetailView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 6)
 
-                    // Meta strip
-                    metaStrip
-                        .padding(.horizontal, 20)
-                        .padding(.top, 6)
-
-                    // Status chips (Hit + Open Mic + Folder)
-                    statusChipsRow
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
+                    // Meta strip + folder chip (hidden while writing)
+                    if focusedField != .content {
+                        metaStrip
+                            .padding(.horizontal, 20)
+                            .padding(.top, 6)
+                    }
 
                     // The bit — plain text, no container
                     bitContentSection
                         .padding(.horizontal, 20)
-                        .padding(.top, 14)
-
-                    // Downstage tray — always-visible notes card
-                    downstageTray
-                        .padding(.horizontal, 20)
-                        .padding(.top, 18)
-
-                    // Tags
-                    tagsSection
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
+                        .padding(.top, 10)
 
                     Color.clear.frame(height: 90)
                 }
             }
             .scrollDismissesKeyboard(.interactively)
 
-            if focusedField == nil {
-                actionBar
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            VStack(spacing: 8) {
+                if isRecording {
+                    recordingBanner
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                if focusedField == nil || isRecording {
+                    actionBar
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
         .animation(EffortlessAnimation.smooth, value: focusedField == nil)
+        .animation(EffortlessAnimation.smooth, value: isRecording)
         .background(Color(UIColor.systemBackground))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
@@ -143,6 +127,29 @@ struct JokeDetailView: View {
         } message: {
             Text(saveError ?? "Your changes might not be saved. Try editing again.")
         }
+        .alert("Microphone Access Needed", isPresented: $showingPermissionAlert) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("BitBinder needs microphone and speech recognition access to transcribe your voice. Enable them in Settings.")
+        }
+        .onChange(of: speechManager.isRecording) { oldValue, newValue in
+            if oldValue && !newValue && isRecording {
+                stopRecordingAndAppend()
+            }
+        }
+        .onChange(of: speechManager.error) { _, newValue in
+            if let msg = newValue {
+                saveError = msg
+                showingSaveError = true
+                speechManager.error = nil
+                withAnimation { isRecording = false }
+            }
+        }
         .sheet(isPresented: $showingFolderPicker) {
             MultiFolderPickerView(
                 selectedFolders: Binding(
@@ -154,6 +161,12 @@ struct JokeDetailView: View {
         }
         .sheet(isPresented: $showingSetListPicker) {
             SetListPickerForJoke(joke: joke, allSetLists: setLists)
+        }
+        .sheet(isPresented: $showingNotes) {
+            NotesSheet(joke: joke, autoSave: { scheduleAutoSave() })
+        }
+        .sheet(isPresented: $showingTags) {
+            TagsSheet(joke: joke, autoSave: { scheduleAutoSave() })
         }
         .onChange(of: showingFolderPicker) { _, isOpen in
             if isOpen {
@@ -193,317 +206,92 @@ struct JokeDetailView: View {
 
     private var metaStrip: some View {
         HStack(spacing: 0) {
-            if focusedField == .content || focusedField == .notes {
-                Text("\(wordCount) words")
-                Text(" \u{00B7} ")
-                    .foregroundStyle(.tertiary)
-                Text(stageTimeEstimate)
-            } else {
-                Text(joke.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
-                Text(" \u{00B7} ")
-                    .foregroundStyle(.tertiary)
-                Text("\(wordCount) words")
-                Text(" \u{00B7} ")
-                    .foregroundStyle(.tertiary)
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(autoSave.isSaving ? Color.yellow : Color.green)
-                        .frame(width: 5, height: 5)
-                    Text(saveStatusText)
-                        .foregroundStyle(autoSave.isSaving ? .secondary : Color.green)
-                }
-            }
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .animation(.none, value: focusedField)
-    }
+            Text("\(wordCount) words")
+            Text(" \u{00B7} ")
+                .foregroundStyle(.tertiary)
+            Text(joke.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
+            Text(" \u{00B7} ")
+                .foregroundStyle(.tertiary)
+            Text(saveStatusText)
 
-    // MARK: - Status Chips
+            Spacer()
 
-    private var statusChipsRow: some View {
-        HStack(spacing: 6) {
-            // Hit / Fire
-            Button {
-                withAnimation { joke.isHit.toggle(); joke.dateModified = Date() }
-                HapticEngine.shared.starToggle(joke.isHit)
-                do { try modelContext.save() } catch {
-                    saveError = "Couldn't save: \(error.localizedDescription)"
-                    showingSaveError = true
-                }
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: joke.isHit
-                          ? (roastMode ? "flame.fill" : "star.fill")
-                          : (roastMode ? "flame" : "star"))
-                        .font(.system(size: 11))
-                    Text(roastMode ? "Fire" : "Hit")
-                }
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(joke.isHit ? Color(red: 0.54, green: 0.40, blue: 0) : .secondary)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(joke.isHit
-                              ? Color(red: 1, green: 0.97, blue: 0.88)
-                              : Color(UIColor.secondarySystemBackground))
-                )
-                .overlay {
-                    if joke.isHit {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(Color.yellow.opacity(0.35), lineWidth: 1)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-
-            // Open Mic
-            Button {
-                withAnimation { joke.isOpenMic.toggle(); joke.dateModified = Date() }
-                haptic(.medium)
-                do { try modelContext.save() } catch {
-                    saveError = "Couldn't save: \(error.localizedDescription)"
-                    showingSaveError = true
-                }
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: joke.isOpenMic ? "mic.fill" : "mic")
-                        .font(.system(size: 11))
-                    Text("Open Mic")
-                }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color(UIColor.secondarySystemBackground))
-                )
-            }
-            .buttonStyle(.plain)
-
-            // Folder
             Button {
                 HapticEngine.shared.tap()
                 showingFolderPicker = true
             } label: {
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Image(systemName: "folder")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                     Text(folderChipLabel)
                 }
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.secondary)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
                 .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color(UIColor.secondarySystemBackground))
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color(UIColor.tertiarySystemBackground))
                 )
             }
             .buttonStyle(.plain)
         }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     // MARK: - BIT Content
 
     private var bitContentSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("BIT")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color(UIColor.tertiaryLabel))
-                .kerning(0.9)
-
-            ZStack(alignment: .topLeading) {
-                if joke.content.isEmpty {
-                    Text("Start writing your bit\u{2026}")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(Color(UIColor.placeholderText))
-                        .padding(.top, 8)
-                        .padding(.leading, 5)
-                        .allowsHitTesting(false)
-                }
-
-                TextEditor(text: $joke.content)
+        ZStack(alignment: .topLeading) {
+            if joke.content.isEmpty {
+                Text("Start writing your bit\u{2026}")
                     .font(.system(size: 18, weight: .medium))
-                    .lineSpacing(8)
-                    .frame(minHeight: 200)
-                    .focused($focusedField, equals: .content)
-                    .scrollContentBackground(.hidden)
+                    .foregroundStyle(Color(UIColor.placeholderText))
+                    .padding(.top, 8)
+                    .padding(.leading, 5)
+                    .allowsHitTesting(false)
             }
+
+            TextEditor(text: $joke.content)
+                .font(.system(size: 18, weight: .medium))
+                .lineSpacing(8)
+                .frame(minHeight: 200)
+                .focused($focusedField, equals: .content)
+                .scrollContentBackground(.hidden)
+                .contextMenu {
+                    Button { insertBeat("\u{2022} ") } label: {
+                        Label("Bullet", systemImage: "list.bullet")
+                    }
+                    Button { insertBeat("\u{2014}") } label: {
+                        Label("Dash", systemImage: "minus")
+                    }
+                    Button { insertBeat("[beat] ") } label: {
+                        Label("Beat", systemImage: "pause")
+                    }
+                    Button { insertBeat("[act out] ") } label: {
+                        Label("Act Out", systemImage: "figure.stand")
+                    }
+                    Button { insertBeat("[callback] ") } label: {
+                        Label("Callback", systemImage: "arrow.uturn.backward")
+                    }
+                    Button { insertBeat("[tag] ") } label: {
+                        Label("Tag", systemImage: "text.append")
+                    }
+                }
         }
     }
 
-    // MARK: - Downstage Tray
-
-    private var downstageTray: some View {
-        VStack(spacing: 0) {
-            Button {
-                withAnimation(EffortlessAnimation.smooth) {
-                    showingNotes.toggle()
-                }
-                HapticEngine.shared.tap()
-            } label: {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(Color(UIColor.systemBackground))
-                            .frame(width: 24, height: 24)
-                            .shadow(color: .black.opacity(0.06), radius: 2, y: 1)
-                        Image(systemName: "lightbulb.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(red: 0.90, green: 0.64, blue: 0))
-                    }
-
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Notes & alternate punches")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(Color(red: 0.42, green: 0.30, blue: 0))
-                        Text(notesSubtitle)
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(red: 0.54, green: 0.45, blue: 0.25))
-                    }
-
-                    Spacer()
-
-                    Image(systemName: showingNotes ? "chevron.down" : "chevron.right")
-                        .font(.caption2.weight(.medium))
-                        .foregroundColor(Color(red: 0.54, green: 0.45, blue: 0.25))
-                }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(red: 0.96, green: 0.95, blue: 0.92))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color(red: 0.92, green: 0.89, blue: 0.84), lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
-
-            if showingNotes {
-                ZStack(alignment: .topLeading) {
-                    if joke.notes.isEmpty {
-                        Text("Alt punches, setup variants, stage notes\u{2026}")
-                            .font(.subheadline)
-                            .foregroundStyle(Color(UIColor.placeholderText))
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                            .allowsHitTesting(false)
-                    }
-
-                    TextEditor(text: $joke.notes)
-                        .font(.subheadline)
-                        .lineSpacing(5)
-                        .frame(minHeight: 100)
-                        .focused($focusedField, equals: .notes)
-                        .scrollContentBackground(.hidden)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(red: 0.96, green: 0.95, blue: 0.92))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color(red: 0.92, green: 0.89, blue: 0.84), lineWidth: 1)
-                )
-                .padding(.top, 2)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+    private func insertBeat(_ text: String) {
+        if joke.content.isEmpty || joke.content.hasSuffix("\n") {
+            joke.content += text
+        } else {
+            joke.content += "\n" + text
         }
+        scheduleAutoSave()
     }
 
-    // MARK: - Tags
-
-    private var tagsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text("TAGS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .kerning(0.8)
-
-                Rectangle()
-                    .fill(Color(UIColor.separator))
-                    .frame(height: 0.5)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(joke.tags, id: \.self) { tag in
-                        HStack(spacing: 4) {
-                            Text(tag)
-                                .font(.system(size: 12, weight: .medium))
-                            Button {
-                                var current = joke.tags
-                                current.removeAll { $0 == tag }
-                                joke.tags = current
-                                joke.dateModified = Date()
-                                scheduleAutoSave()
-                                haptic(.light)
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 8, weight: .bold))
-                            }
-                            .accessibilityLabel("Remove tag \(tag)")
-                        }
-                        .foregroundColor(.accentColor)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(Color.accentColor.opacity(0.1))
-                        )
-                    }
-
-                    if isAddingTag {
-                        TextField("tag", text: $newTagText)
-                            .font(.caption)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .focused($focusedField, equals: .newTag)
-                            .frame(minWidth: 50, maxWidth: 120)
-                            .onSubmit { commitNewTag() }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Color.accentColor.opacity(0.08))
-                            )
-                    } else {
-                        Button {
-                            isAddingTag = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                focusedField = .newTag
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 11))
-                                Text("tag")
-                                    .font(.system(size: 12))
-                            }
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .strokeBorder(
-                                        style: StrokeStyle(lineWidth: 1, dash: [4, 3])
-                                    )
-                                    .foregroundColor(Color(UIColor.tertiaryLabel))
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
+    // Downstage tray and tags are now in sheets — accessed from the overflow menu.
 
     // MARK: - Floating Action Bar
 
@@ -514,63 +302,28 @@ struct JokeDetailView: View {
                 haptic(.light)
             }
 
-            actionButton(icon: "sparkles", label: "Punch up", tint: .purple) {
-                haptic(.medium)
-            }
-
-            actionButton(icon: "mic", label: "Record") {
-                haptic(.light)
-            }
-
-            actionButton(icon: "list.bullet", label: "Add to set") {
-                showingSetListPicker = true
-                haptic(.light)
-            }
-
-            Rectangle()
-                .fill(Color(UIColor.separator))
-                .frame(width: 0.5, height: 24)
-                .padding(.horizontal, 2)
-
-            Menu {
-                if joke.isTrashed {
-                    Button {
-                        HapticEngine.shared.success()
-                        joke.restoreFromTrash()
-                        do { try modelContext.save() } catch {
-                            print(" [JokeDetailView] Failed to save after restore: \(error)")
-                        }
-                        dismiss()
-                    } label: {
-                        Label("Restore", systemImage: "arrow.uturn.backward.circle")
-                    }
-                } else {
-                    Button(role: .destructive) {
-                        HapticEngine.shared.warning()
-                        showingDeleteAlert = true
-                    } label: {
-                        Label("Move to Trash", systemImage: "trash")
-                    }
+            if userPreferences.bitBuddyEnabled {
+                actionButton(icon: "sparkles", label: "Punch up") {
+                    openBitBuddyPunchUp()
+                    haptic(.medium)
                 }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 14))
-                    .foregroundColor(.primary)
-                    .frame(width: 40, height: 40)
-                    .contentShape(Rectangle())
-                    .accessibilityLabel("More options")
             }
+
+            actionButton(
+                icon: isRecording ? "stop.circle.fill" : "mic",
+                label: isRecording ? "Stop" : "Record",
+                tint: isRecording ? .red : nil
+            ) {
+                toggleRecording()
+            }
+
         }
         .padding(8)
         .background(
-            .ultraThinMaterial,
+            .regularMaterial,
             in: RoundedRectangle(cornerRadius: 14, style: .continuous)
         )
-        .shadow(color: .black.opacity(0.08), radius: 16, y: 4)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.08), lineWidth: 0.5)
-        )
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
         .padding(.horizontal, 12)
         .padding(.bottom, 28)
     }
@@ -588,69 +341,131 @@ struct JokeDetailView: View {
                 Text(label)
                     .font(.system(size: 9, weight: .medium))
             }
-            .foregroundColor(tint ?? .primary)
+            .foregroundColor(tint ?? .secondary)
             .frame(maxWidth: .infinity)
             .frame(height: 40)
-            .background {
-                if let tint {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(tint.opacity(0.1))
-                }
-            }
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Tag Commit
+    // MARK: - BitBuddy Punch Up
 
-    private func commitNewTag() {
-        let trimmed = newTagText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if !trimmed.isEmpty && !joke.tags.contains(trimmed) {
-            var current = joke.tags
-            current.append(trimmed)
-            joke.tags = current
-            joke.dateModified = Date()
+    private func openBitBuddyPunchUp() {
+        let service = BitBuddyService.shared
+        service.focusedJoke = BitBuddyJokeSummary(
+            id: joke.id,
+            title: joke.title,
+            content: joke.content,
+            tags: joke.tags,
+            dateCreated: joke.dateCreated
+        )
+        service.pendingMessage = "Punch up this joke"
+        focusedField = nil
+        bitBuddyDrawer.open()
+    }
+
+    // MARK: - Recording Banner
+
+    private var recordingBanner: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(Color.red)
+                .frame(width: 8, height: 8)
+                .modifier(PulseEffect())
+
+            Text(speechManager.transcribedText.isEmpty
+                 ? "Listening..."
+                 : speechManager.transcribedText.suffix(80))
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            Button {
+                stopRecordingAndAppend()
+            } label: {
+                Text("Done")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.red, in: Capsule())
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            .regularMaterial,
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
+        .padding(.horizontal, 12)
+    }
+
+    // MARK: - Speech Recognition
+
+    private func toggleRecording() {
+        if isRecording {
+            stopRecordingAndAppend()
+        } else {
+            requestPermissionAndStartRecording()
+        }
+    }
+
+    private func requestPermissionAndStartRecording() {
+        SFSpeechRecognizer.requestAuthorization { status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized:
+                    if #available(iOS 17.0, *) {
+                        AVAudioApplication.requestRecordPermission { granted in
+                            DispatchQueue.main.async {
+                                if granted {
+                                    self.startRecording()
+                                } else {
+                                    self.showingPermissionAlert = true
+                                }
+                            }
+                        }
+                    } else {
+                        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                            DispatchQueue.main.async {
+                                if granted {
+                                    self.startRecording()
+                                } else {
+                                    self.showingPermissionAlert = true
+                                }
+                            }
+                        }
+                    }
+                default:
+                    self.showingPermissionAlert = true
+                }
+            }
+        }
+    }
+
+    private func startRecording() {
+        speechManager.transcribedText = ""
+        speechManager.startRecording()
+        withAnimation { isRecording = true }
+        haptic(.light)
+    }
+
+    private func stopRecordingAndAppend() {
+        speechManager.stopRecording()
+        let text = speechManager.transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty {
+            if joke.content.isEmpty {
+                joke.content = text
+            } else {
+                joke.content += "\n" + text
+            }
             scheduleAutoSave()
-            haptic(.light)
         }
-        newTagText = ""
-        isAddingTag = false
-    }
-
-    // MARK: - Formatting Helpers
-
-    private func insertBold() {
-        if joke.content.hasSuffix("\n") || joke.content.isEmpty {
-            joke.content += "**bold**"
-        } else {
-            joke.content += " **bold**"
-        }
-        scheduleAutoSave()
-    }
-
-    private func insertItalic() {
-        if joke.content.hasSuffix("\n") || joke.content.isEmpty {
-            joke.content += "_italic_"
-        } else {
-            joke.content += " _italic_"
-        }
-        scheduleAutoSave()
-    }
-
-    private func insertBullet() {
-        if joke.content.isEmpty {
-            joke.content = "\u{2022} "
-        } else if joke.content.hasSuffix("\n") {
-            joke.content += "\u{2022} "
-        } else {
-            joke.content += "\n\u{2022} "
-        }
-        scheduleAutoSave()
-    }
-
-    private func insertDash() {
-        joke.content += "\u{2014}"
-        scheduleAutoSave()
+        speechManager.transcribedText = ""
+        withAnimation { isRecording = false }
+        haptic(.medium)
     }
 
     // MARK: - Auto-Save
@@ -691,39 +506,95 @@ struct JokeDetailView: View {
                     focusedField = nil
                 }
                 .fontWeight(.semibold)
+            } else {
+                Menu {
+                    Button {
+                        showingNotes = true
+                    } label: {
+                        Label(
+                            joke.notes.isEmpty ? "Notes" : "Notes (\(joke.notes.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count))",
+                            systemImage: "lightbulb"
+                        )
+                    }
+
+                    Button {
+                        showingTags = true
+                    } label: {
+                        Label(
+                            joke.tags.isEmpty ? "Tags" : "Tags (\(joke.tags.count))",
+                            systemImage: "tag"
+                        )
+                    }
+
+                    Button {
+                        showingSetListPicker = true
+                    } label: {
+                        Label("Add to Set", systemImage: "list.bullet")
+                    }
+
+                    Divider()
+
+                    Button {
+                        withAnimation { joke.isHit.toggle(); joke.dateModified = Date() }
+                        HapticEngine.shared.starToggle(joke.isHit)
+                        do { try modelContext.save() } catch {
+                            saveError = "Couldn't save: \(error.localizedDescription)"
+                            showingSaveError = true
+                        }
+                    } label: {
+                        Label(
+                            joke.isHit ? "Remove Hit" : "Mark as Hit",
+                            systemImage: joke.isHit
+                                ? (roastMode ? "flame.fill" : "star.fill")
+                                : (roastMode ? "flame" : "star")
+                        )
+                    }
+
+                    Button {
+                        withAnimation { joke.isOpenMic.toggle(); joke.dateModified = Date() }
+                        haptic(.medium)
+                        do { try modelContext.save() } catch {
+                            saveError = "Couldn't save: \(error.localizedDescription)"
+                            showingSaveError = true
+                        }
+                    } label: {
+                        Label(
+                            joke.isOpenMic ? "Remove Open Mic" : "Open Mic Ready",
+                            systemImage: joke.isOpenMic ? "mic.fill" : "mic"
+                        )
+                    }
+
+                    Divider()
+
+                    if joke.isTrashed {
+                        Button {
+                            HapticEngine.shared.success()
+                            joke.restoreFromTrash()
+                            do { try modelContext.save() } catch {
+                                print(" [JokeDetailView] Failed to save after restore: \(error)")
+                            }
+                            dismiss()
+                        } label: {
+                            Label("Restore", systemImage: "arrow.uturn.backward.circle")
+                        }
+                    } else {
+                        Button(role: .destructive) {
+                            HapticEngine.shared.warning()
+                            showingDeleteAlert = true
+                        } label: {
+                            Label("Move to Trash", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 17))
+                }
             }
         }
 
         ToolbarItem(placement: .keyboard) {
-            HStack(spacing: 4) {
-                if focusedField == .content {
-                    keyboardButton(label: "B", bold: true) {
-                        insertBold(); haptic(.light)
-                    }
-                    keyboardButton(label: "I", isItalic: true) {
-                        insertItalic(); haptic(.light)
-                    }
-                    keyboardButton(label: "List") {
-                        insertBullet(); haptic(.light)
-                    }
-                    keyboardButton(label: "Dash") {
-                        insertDash(); haptic(.light)
-                    }
-
-                    Divider()
-                        .frame(height: 22)
-                        .padding(.horizontal, 4)
-
-                    keyboardButton(label: "BitBuddy", tint: .purple, bold: true) {
-                        haptic(.medium)
-                    }
-                    keyboardButton(label: "Mic") {
-                        haptic(.light)
-                    }
-                }
-
+            HStack {
                 Spacer()
-
                 Button("Done") {
                     focusedField = nil
                 }
@@ -732,36 +603,6 @@ struct JokeDetailView: View {
         }
     }
 
-    private func keyboardButton(
-        label: String,
-        isItalic: Bool = false,
-        tint: Color? = nil,
-        bold: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Group {
-                if isItalic {
-                    Text(label).italic()
-                } else {
-                    Text(label)
-                }
-            }
-            .font(.system(size: 16, weight: bold ? .bold : .medium))
-            .foregroundColor(tint ?? .primary)
-            .frame(minWidth: 34, minHeight: 34)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(Color(UIColor.systemBackground).opacity(0.9))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.06), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.04), radius: 1, y: 1)
-        }
-        .buttonStyle(.plain)
-    }
 
     // MARK: - Delete Alert
 
@@ -981,5 +822,207 @@ struct MultiFolderPickerView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Notes Sheet
+
+private struct NotesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var joke: Joke
+    var autoSave: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ZStack(alignment: .topLeading) {
+                if joke.notes.isEmpty {
+                    Text("Alt punches, setup variants, stage notes\u{2026}")
+                        .font(.body)
+                        .foregroundStyle(Color(UIColor.placeholderText))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .allowsHitTesting(false)
+                }
+
+                TextEditor(text: $joke.notes)
+                    .font(.body)
+                    .lineSpacing(6)
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+            }
+            .navigationTitle("Notes")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        autoSave()
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Tags Sheet
+
+private struct TagsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var joke: Joke
+    var autoSave: () -> Void
+
+    @State private var newTagText = ""
+    @FocusState private var isNewTagFocused: Bool
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                // Existing tags
+                if joke.tags.isEmpty {
+                    Text("No tags yet")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 40)
+                } else {
+                    FlowLayout(spacing: 8) {
+                        ForEach(joke.tags, id: \.self) { tag in
+                            HStack(spacing: 5) {
+                                Text(tag)
+                                    .font(.system(size: 14, weight: .medium))
+                                Button {
+                                    var current = joke.tags
+                                    current.removeAll { $0 == tag }
+                                    joke.tags = current
+                                    joke.dateModified = Date()
+                                    autoSave()
+                                    haptic(.light)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .foregroundColor(.accentColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.accentColor.opacity(0.1))
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+
+                Spacer()
+
+                // Add tag field
+                HStack(spacing: 10) {
+                    TextField("Add a tag\u{2026}", text: $newTagText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($isNewTagFocused)
+                        .onSubmit { commitTag() }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color(UIColor.secondarySystemBackground))
+                        )
+
+                    Button {
+                        commitTag()
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(.accentColor)
+                    }
+                    .disabled(newTagText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+            }
+            .navigationTitle("Tags")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                }
+            }
+            .onAppear { isNewTagFocused = true }
+        }
+    }
+
+    private func commitTag() {
+        let trimmed = newTagText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty, !joke.tags.contains(trimmed) else {
+            newTagText = ""
+            return
+        }
+        var current = joke.tags
+        current.append(trimmed)
+        joke.tags = current
+        joke.dateModified = Date()
+        autoSave()
+        haptic(.light)
+        newTagText = ""
+    }
+}
+
+// MARK: - Flow Layout for Tags
+
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        for (index, position) in result.positions.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y), proposal: .unspecified)
+        }
+    }
+
+    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> (positions: [CGPoint], size: CGSize) {
+        let maxWidth = proposal.width ?? .infinity
+        var positions: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var maxX: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            positions.append(CGPoint(x: x, y: y))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+            maxX = max(maxX, x - spacing)
+        }
+
+        return (positions, CGSize(width: maxX, height: y + rowHeight))
+    }
+}
+
+// MARK: - Pulse Animation
+
+private struct PulseEffect: ViewModifier {
+    @State private var isPulsing = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isPulsing ? 0.3 : 1)
+            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
+            .onAppear { isPulsing = true }
     }
 }

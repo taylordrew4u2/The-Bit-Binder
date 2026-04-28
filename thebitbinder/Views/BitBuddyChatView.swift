@@ -406,13 +406,22 @@ struct BitBuddyChatView: View {
     }
     
     private func handleAppear() {
-        // Greet the user on every fresh conversation
+        bitBuddy.refreshBackend()
+
         if messages.isEmpty {
             let greeting = roastMode
                 ? "Roast Buddy here. Give me a target and I'll sharpen the burns."
                 : "Hey! I'm BitBuddy, your comedy writing partner. Ask me to analyze a joke, build a set list, brainstorm premises, or anything else — I'm ready when you are."
             let intro = ChatBubbleMessage(text: greeting, isUser: false, conversationId: conversationId)
             messages.append(intro)
+        }
+
+        if let pending = bitBuddy.pendingMessage {
+            bitBuddy.pendingMessage = nil
+            inputText = pending
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                sendMessage()
+            }
         }
     }
     
@@ -682,13 +691,12 @@ struct BitBuddyAvatar: View {
         if roastMode {
             RoastBuddyAvatar(size: size)
         } else {
-            ZStack {
-                Image("BitBuddyIcon")
-                    .resizable()
-                    .scaledToFill()
-                    .clipShape(Circle())
-            }
-            .frame(width: size, height: size)
+            Image("BitBuddyIcon")
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+                .clipped()
         }
     }
 }

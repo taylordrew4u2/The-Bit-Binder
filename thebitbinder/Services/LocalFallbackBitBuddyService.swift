@@ -50,11 +50,11 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         let lower = trimmed.lowercased()
         
         if lower.starts(with: "analyze") {
-            let content = extractContent(from: trimmed, prefix: "analyze")
+            let content = dataContext.focusedJoke?.content ?? extractContent(from: trimmed, prefix: "analyze")
             return analyze(content)
         }
         if lower.starts(with: "improve") {
-            let content = extractContent(from: trimmed, prefix: "improve")
+            let content = dataContext.focusedJoke?.content ?? extractContent(from: trimmed, prefix: "improve")
             return improve(content)
         }
         if lower.starts(with: "premise") {
@@ -217,11 +217,11 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // BITBUDDY
         // ═══════════════════════════════════════════
         case "analyze_joke":
-            let content = extractContent(from: message, prefix: "analyze")
-            return analyze(content.isEmpty ? message : content)
+            let jokeText = dataContext.focusedJoke?.content ?? extractContent(from: message, prefix: "analyze")
+            return analyze(jokeText.isEmpty ? message : jokeText)
         case "improve_joke":
-            let content = extractContent(from: message, prefix: "improve")
-            return improve(content.isEmpty ? message : content)
+            let jokeText = dataContext.focusedJoke?.content ?? extractContent(from: message, prefix: "improve")
+            return improve(jokeText.isEmpty ? message : jokeText)
         case "generate_premise":
             let content = extractContent(from: message, prefix: "premise")
             return premise(content)
@@ -952,178 +952,82 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
     // MARK: - Handlers
     
     private func analyze(_ text: String) -> String {
-        guard !text.isEmpty else { return "Please provide text to analyze." }
-        
+        guard !text.isEmpty else { return "Give me something to look at." }
+
         let structure = JokeAnalyzer.structure(text)
-        
-        // Step 1: Acknowledge
-        var response = " **Analysis:**\n\n"
-        
-        // Step 2: Breakdown
-        var strengths: [String] = []
-        if structure != .unknown { strengths.append(structure.rawValue) }
-        
-        if let topic = JokeAnalyzer.detectTopic(text) {
-            strengths.append("clear topic (\(topic))")
-        }
-        
+        let lower = text.lowercased()
+        let words = text.split(separator: " ")
+        let wordCount = words.count
+
         let twistPatterns = [
             "\\bbut\\b", "\\bactually\\b", "\\bturns out\\b", "\\bplot twist\\b",
             "\\binstead\\b", "\\bexcept\\b", "\\bunless\\b", "\\buntil\\b",
             "\\blittle did\\b", "\\bnot really\\b", "\\bjust kidding\\b",
             "\\bsurprise\\b", "\\bthe real\\b", "\\bnope\\b"
         ]
-        let lower = text.lowercased()
         let twistCount = twistPatterns.filter { lower.range(of: $0, options: .regularExpression) != nil }.count
-        if twistCount >= 1 { strengths.append("twist") }
-        if twistCount >= 2 { strengths.append("double reversal") }
-        
-        // Detect pro techniques used
-        var detectedTechniques: [String] = []
-        if lower.contains("I ") || lower.contains("my ") { detectedTechniques.append("Self-Deprecation") }
-        if twistCount >= 1 { detectedTechniques.append("Misdirection") }
-        let words = text.split(separator: " ")
-        if words.count < 20 { detectedTechniques.append("Concise Punch") }
-        if words.count > 50 { detectedTechniques.append("Story / Long-Form") }
-        
-        if strengths.isEmpty { strengths.append("concise") }
-        
-        response += "**Breakdown:**\n"
-        response += "• Structure: \(structure.rawValue)\n"
-        response += "• Strengths: \(strengths.joined(separator: ", "))\n"
-        if !detectedTechniques.isEmpty {
-            response += "• Techniques spotted: \(detectedTechniques.joined(separator: ", "))\n"
-        }
-        
-        // Step 3: Rating
-        let wordCount = words.count
-        let hasSetup = lower.contains("why") || lower.contains("what") || lower.contains("I ")
-        let hasPunch = twistCount >= 1 || lower.contains("because") || lower.contains("turns out")
-        let originalityScore = min(10, max(4, 6 + (detectedTechniques.count > 1 ? 2 : 0) + (twistCount >= 2 ? 1 : 0)))
-        let punchDensity = min(10, max(3, wordCount < 30 ? 7 : wordCount < 50 ? 6 : 4) + twistCount)
-        let surpriseScore = min(10, max(3, 5 + twistCount * 2))
-        let deliveryScore = min(10, max(4, (hasSetup ? 2 : 0) + (hasPunch ? 3 : 0) + (wordCount < 40 ? 2 : 0) + 3))
-        
-        response += "\n**Rating:**\n"
-        response += "• Originality: \(originalityScore)/10\n"
-        response += "• Punch density: \(punchDensity)/10\n"
-        response += "• Surprise factor: \(surpriseScore)/10\n"
-        response += "• Delivery potential: \(deliveryScore)/10\n"
-        
-        // Step 4: Creative Vocabulary Upgrades
-        let vocabSuggestions = BitBuddyResources.randomVocabSuggestions(count: 3)
-        response += "\n**Vocabulary Glow-Up:**\n"
-        
-        // Try to find actual word upgrades from the joke text
-        var foundUpgrades: [String] = []
-        for word in words {
-            let w = String(word).lowercased().trimmingCharacters(in: .punctuationCharacters)
-            if let upgrade = BitBuddyResources.vocabularyUpgrade(for: w) {
-                foundUpgrades.append("• \(upgrade)")
-            }
-            if foundUpgrades.count >= 3 { break }
-        }
-        if !foundUpgrades.isEmpty {
-            response += foundUpgrades.joined(separator: "\n") + "\n"
-        }
-        for suggestion in vocabSuggestions.prefix(max(0, 3 - foundUpgrades.count)) {
-            response += "• \(suggestion)\n"
-        }
-        
-        // Step 5: Improvement suggestions
-        let editSuggestions = JokeAnalyzer.suggestEdits(text)
-        if !editSuggestions.isEmpty {
-            response += "\n**Pro Edits:**\n"
-            for edit in editSuggestions {
-                response += "• \(edit)\n"
-            }
-        }
-        
-        response += "\nSay **\"improve this\"** and I'll rewrite it sharper. Or **\"roast version\"** to turn it into a burn."
-        
-        return response
-    }
-    
-    private func improve(_ text: String) -> String {
-        guard !text.isEmpty else { return "Please provide a joke to improve." }
-        let suggestions = JokeAnalyzer.suggestEdits(text)
-        let structure = JokeAnalyzer.structure(text)
-        let words = text.split(separator: " ")
-        let wordCount = words.count
 
-        var response = " **Improvement Mode**\n\n"
-
-        // Quote the original so they see it analyzed
-        response += "**Your joke:** \(text.prefix(200))\(text.count > 200 ? "…" : "")\n\n"
-
-        // Structural diagnosis
-        response += "**Structure:** \(structure.rawValue)\n\n"
-
-        // Concrete tightening suggestions
-        response += "**Tighten It Up:**\n"
-        if wordCount > 30 {
-            response += "• Your setup is \(wordCount) words — try cutting it to \(max(10, wordCount * 2 / 3)). Ask: what's the minimum context the punchline needs?\n"
+        // Pick the single most useful observation
+        if twistCount == 0 {
+            return "Reads like a \(structure.rawValue.lowercased()). I'm not seeing a clear twist though — where's the surprise? What does the audience expect, and how can you flip it?"
         }
 
-        // Find and flag specific filler words in their text
-        let lower = text.lowercased()
-        let foundFillers = BitBuddyResources.fillerWords.filter { lower.contains($0) }
-        if !foundFillers.isEmpty {
-            response += "• Cut these filler words: \(foundFillers.prefix(4).map { "\"\($0)\"" }.joined(separator: ", "))\n"
+        if wordCount > 50 {
+            return "Reads like a \(structure.rawValue.lowercased()) — \(wordCount) words is a lot of setup. What's the one sentence in here that makes the audience laugh? Start there and build the minimum around it."
         }
 
-        // Check if punchline ends on a weak word
         let lastWord = text.trimmingCharacters(in: .whitespacesAndNewlines)
             .components(separatedBy: .whitespacesAndNewlines).last?
             .lowercased().trimmingCharacters(in: .punctuationCharacters) ?? ""
         let weakEndings = ["it", "me", "that", "this", "one", "thing", "stuff", "there", "here"]
         if weakEndings.contains(lastWord) {
-            response += "• You end on \"\(lastWord)\" — rearrange so the funniest or most surprising word lands last.\n"
+            return "Structure's solid — \(structure.rawValue.lowercased()) with a turn. But you're landing on \"\(lastWord)\". Can you rearrange so the funniest word comes last?"
         }
 
-        if !suggestions.isEmpty {
-            response += "\n**Pro Edits:**\n"
-            response += suggestions.map { "• \($0)" }.joined(separator: "\n") + "\n"
+        if wordCount < 15 && twistCount >= 1 {
+            return "Tight and it's got a turn. I'd say this is ready to try on stage. Want me to help you write a tag for it?"
         }
 
-        // Vocabulary upgrades from the actual joke text
-        var upgrades: [String] = []
-        for word in words {
-            let w = String(word).lowercased().trimmingCharacters(in: .punctuationCharacters)
-            if let upgrade = BitBuddyResources.vocabularyUpgrade(for: w) {
-                upgrades.append(upgrade)
-            }
-            if upgrades.count >= 4 { break }
-        }
-        if !upgrades.isEmpty {
-            response += "\n**Word Swaps:**\n"
-            for upgrade in upgrades {
-                response += "• \(upgrade)\n"
-            }
+        let editSuggestions = JokeAnalyzer.suggestEdits(text)
+        if let edit = editSuggestions.first {
+            return "\(structure.rawValue) structure, got a twist — that's working. One thing: \(edit)"
         }
 
-        // Suggest next moves based on structure
-        response += "\n**Next Moves:**\n"
-        switch structure {
-        case .oneLiner:
-            response += "• Add a tag line — same premise, new angle. Extends the laugh without a new setup.\n"
-            response += "• Try a second version that uses the opposite technique (e.g. if it's wordplay, try misdirection).\n"
-        case .setupPunchline:
-            response += "• Write 2–3 tags that build on the same setup — turn this into a full bit.\n"
-            response += "• Try flipping the setup and punch — sometimes the punchline makes a better setup.\n"
-        case .anecdote:
-            response += "• Find the core premise and write a one-liner version. If the one-liner doesn't work, the premise might need sharpening.\n"
-            response += "• Add an act-out at the peak moment — physicalize the funniest beat.\n"
-        default:
-            response += "• Try the Rule of Three: set up a pattern with two items, then break it with the third.\n"
-            response += "• Write the punchline first, then build the minimum setup to make it land.\n"
+        return "\(structure.rawValue) with a turn — the bones are there. Want me to punch it up or help you find a tag?"
+    }
+    
+    private func improve(_ text: String) -> String {
+        guard !text.isEmpty else { return "Give me the joke and I'll punch it up." }
+
+        let words = text.split(separator: " ")
+        let wordCount = words.count
+        let lower = text.lowercased()
+
+        let lastWord = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespacesAndNewlines).last?
+            .lowercased().trimmingCharacters(in: .punctuationCharacters) ?? ""
+        let weakEndings = ["it", "me", "that", "this", "one", "thing", "stuff", "there", "here"]
+
+        if wordCount > 40 {
+            return "OK I see the joke. The setup is \(wordCount) words — that's a lot of runway. What if we trimmed it down? What's the one detail the audience absolutely needs before the punch hits?"
         }
 
-        if let technique = BitBuddyResources.jokeProTechniques.randomElement() {
-            response += "• Experiment with **\(technique)** — it could give this joke a whole new gear."
+        if weakEndings.contains(lastWord) {
+            return "I like where this is going. One thing I notice — you're ending on \"\(lastWord)\". The last word is where the laugh lives. Can you rearrange so the funniest word lands at the end?"
         }
 
-        return response
+        let foundFillers = BitBuddyResources.fillerWords.filter { lower.contains($0) }
+        if foundFillers.count >= 2 {
+            let fillerList = foundFillers.prefix(3).map { "\"\($0)\"" }.joined(separator: " and ")
+            return "Good bones here. I'd look at \(fillerList) — those are softening the punch. Try reading it without them and see if it hits harder. Want to try that?"
+        }
+
+        let editSuggestions = JokeAnalyzer.suggestEdits(text)
+        if let edit = editSuggestions.first {
+            return "Nice. Here's one thing to try: \(edit)\nWant me to look at the punchline next?"
+        }
+
+        return "The wording's clean — I don't see obvious fat to cut. Have you tried it out loud yet? That usually shows you where to tighten. Or I can help write a tag to extend the laugh."
     }
     
     private func premise(_ topic: String) -> String {

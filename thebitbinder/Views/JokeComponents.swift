@@ -97,61 +97,26 @@ struct JokeRowView: View {
     private var isOpenMic: Bool { joke.isOpenMic }
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Hit / Open Mic accent strip
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(isHit ? Color.bitbinderAccent : (isOpenMic ? Color.bitbinderAccent : .clear))
-                .frame(width: 3, height: showFullContent ? 36 : 20)
-                .padding(.top, 2)
-            
-            // Content
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                    
-                    if isOpenMic {
-                        Image(systemName: "mic.fill")
-                            .font(.caption2)
-                            .foregroundColor(Color.bitbinderAccent)
-                    }
-                    
-                    if isHit {
-                        Image(systemName: "star.fill")
-                            .font(.caption2)
-                            .foregroundColor(Color.bitbinderAccent)
-                    }
-                }
-                
+        VStack(alignment: .leading, spacing: 4) {
+            Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
+                .font(.body.weight(.medium))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+
+            HStack(spacing: 6) {
+                Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
                 if showFullContent {
-                    Text(joke.content)
+                    Text(joke.content.components(separatedBy: .newlines).first ?? "")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
-                }
-                
-                HStack(spacing: 6) {
-                    Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
-                        .font(.caption)
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
-                    
-                    if let folders = joke.folders, let first = folders.first {
-                        Text("·")
-                            .font(.caption)
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
-                        Text(first.name)
-                            .font(.caption)
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
-                            .lineLimit(1)
-                    }
+                        .lineLimit(1)
                 }
             }
-            
-            Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
 

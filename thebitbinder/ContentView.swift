@@ -229,6 +229,7 @@ struct MainTabView: View {
     @State private var showGagGrabber = false
     @State private var showSetup = false
     @AppStorage("roastModeEnabled") private var roastMode = false
+    @EnvironmentObject private var userPreferences: UserPreferences
 
     // BitBuddy side drawer — replaces the old .sheet so users can chat
     // alongside whatever they're working on.
@@ -340,52 +341,54 @@ struct MainTabView: View {
             HybridGagGrabberSheet()
         }
         .overlay(alignment: .topLeading) {
-            GeometryReader { geo in
-                let bubbleSize: CGFloat = 56
-                let defaultX = geo.size.width - bubbleSize - 16
-                let defaultY = geo.size.height - 160
-                let posX = bitBuddyX < 0 ? defaultX : bitBuddyX
-                let posY = bitBuddyY < 0 ? defaultY : bitBuddyY
+            if userPreferences.bitBuddyEnabled {
+                GeometryReader { geo in
+                    let bubbleSize: CGFloat = 56
+                    let defaultX = geo.size.width - bubbleSize - 16
+                    let defaultY = geo.size.height - 160
+                    let posX = bitBuddyX < 0 ? defaultX : bitBuddyX
+                    let posY = bitBuddyY < 0 ? defaultY : bitBuddyY
 
-                BitBuddyAvatar(roastMode: roastMode, size: bubbleSize, symbolSize: 22)
-                    .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
-                    .scaleEffect(isDragging ? 1.15 : 1.0)
-                    .opacity(bitBuddyPresenter.mode == .closed ? 1 : 0)
-                    .contentShape(Circle().inset(by: -10)) // bigger tap/drag target
-                    .position(
-                        x: min(max(bubbleSize / 2, posX + dragOffset.width), geo.size.width - bubbleSize / 2),
-                        y: min(max(bubbleSize / 2, posY + dragOffset.height), geo.size.height - bubbleSize / 2)
-                    )
-                    .gesture(
-                        DragGesture(minimumDistance: 6)
-                            .onChanged { value in
-                                isDragging = true
-                                dragOffset = value.translation
-                            }
-                            .onEnded { value in
-                                let newX = (bitBuddyX < 0 ? defaultX : bitBuddyX) + value.translation.width
-                                let newY = (bitBuddyY < 0 ? defaultY : bitBuddyY) + value.translation.height
-                                bitBuddyX = min(max(bubbleSize / 2, newX), geo.size.width - bubbleSize / 2)
-                                bitBuddyY = min(max(bubbleSize / 2, newY), geo.size.height - bubbleSize / 2)
-                                dragOffset = .zero
-                                isDragging = false
-                            }
-                    )
-                    .simultaneousGesture(
-                        TapGesture()
-                            .onEnded {
-                                if !isDragging {
-                                    haptic(.light)
-                                    bitBuddyPresenter.openCompact()
+                    BitBuddyAvatar(roastMode: roastMode, size: bubbleSize, symbolSize: 22)
+                        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                        .scaleEffect(isDragging ? 1.15 : 1.0)
+                        .opacity(bitBuddyPresenter.mode == .closed ? 1 : 0)
+                        .contentShape(Circle().inset(by: -10))
+                        .position(
+                            x: min(max(bubbleSize / 2, posX + dragOffset.width), geo.size.width - bubbleSize / 2),
+                            y: min(max(bubbleSize / 2, posY + dragOffset.height), geo.size.height - bubbleSize / 2)
+                        )
+                        .gesture(
+                            DragGesture(minimumDistance: 6)
+                                .onChanged { value in
+                                    isDragging = true
+                                    dragOffset = value.translation
                                 }
-                            }
-                    )
-                    .animation(.easeInOut(duration: 0.2), value: bitBuddyDrawer.isOpen)
-                    .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
-                    .animation(.easeInOut(duration: 0.15), value: isDragging)
-                    .allowsHitTesting(bitBuddyPresenter.mode == .closed)
+                                .onEnded { value in
+                                    let newX = (bitBuddyX < 0 ? defaultX : bitBuddyX) + value.translation.width
+                                    let newY = (bitBuddyY < 0 ? defaultY : bitBuddyY) + value.translation.height
+                                    bitBuddyX = min(max(bubbleSize / 2, newX), geo.size.width - bubbleSize / 2)
+                                    bitBuddyY = min(max(bubbleSize / 2, newY), geo.size.height - bubbleSize / 2)
+                                    dragOffset = .zero
+                                    isDragging = false
+                                }
+                        )
+                        .simultaneousGesture(
+                            TapGesture()
+                                .onEnded {
+                                    if !isDragging {
+                                        haptic(.light)
+                                        bitBuddyPresenter.openCompact()
+                                    }
+                                }
+                        )
+                        .animation(.easeInOut(duration: 0.2), value: bitBuddyDrawer.isOpen)
+                        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
+                        .animation(.easeInOut(duration: 0.15), value: isDragging)
+                        .allowsHitTesting(bitBuddyPresenter.mode == .closed)
+                }
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
         }
         .bitBuddyDrawer(controller: bitBuddyDrawer, roastMode: roastMode)
         .bitBuddyCompactWindow(presenter: bitBuddyPresenter, roastMode: roastMode)

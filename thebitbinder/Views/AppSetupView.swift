@@ -11,6 +11,7 @@ import SwiftUI
 struct AppSetupView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var userPreferences: UserPreferences
+    @StateObject private var syncService = iCloudSyncService.shared
 
     // Persisted preferences
     @AppStorage("roastModeEnabled") private var roastMode = false
@@ -23,6 +24,7 @@ struct AppSetupView: View {
     @State private var currentPage = 0
     @State private var nameText = ""
     @State private var selectedTabs: Set<AppScreen> = []
+    @State private var iCloudSyncEnabled = false
 
     /// When true, presented as the first-launch onboarding. When false,
     /// it's opened from Settings so we skip the welcome page.
@@ -35,7 +37,7 @@ struct AppSetupView: View {
 
     private let defaultTabs: Set<AppScreen> = [.home, .jokes, .sets, .notebookSaver]
 
-    private var pageCount: Int { isFirstLaunch ? 5 : 4 }
+    private var pageCount: Int { isFirstLaunch ? 6 : 5 }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,15 +54,17 @@ struct AppSetupView: View {
             TabView(selection: $currentPage) {
                 if isFirstLaunch {
                     welcomePage.tag(0)
+                    privacyPage.tag(1)
+                    namePage.tag(2)
+                    tabsPage.tag(3)
+                    jokeViewPage.tag(4)
+                    readyPage.tag(5)
+                } else {
+                    privacyPage.tag(0)
                     namePage.tag(1)
                     tabsPage.tag(2)
                     jokeViewPage.tag(3)
                     readyPage.tag(4)
-                } else {
-                    namePage.tag(0)
-                    tabsPage.tag(1)
-                    jokeViewPage.tag(2)
-                    readyPage.tag(3)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -120,6 +124,7 @@ struct AppSetupView: View {
         .onAppear {
             nameText = userPreferences.userName == "there" ? "" : userPreferences.userName
             loadSelectedTabs()
+            iCloudSyncEnabled = syncService.isSyncEnabled
         }
     }
 
@@ -185,6 +190,65 @@ struct AppSetupView: View {
         }
         .onChange(of: nameText) { _, _ in
             saveNameIfNeeded()
+        }
+    }
+
+    private var privacyPage: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                Spacer(minLength: 24)
+
+                Image(systemName: "hand.raised.shield")
+                    .font(.system(size: 48))
+                    .foregroundColor(.accentColor)
+
+                Text("Start With Clear Data Rules")
+                    .font(.title2.bold())
+
+                Text("BitBinder stores your material on this device by default. Sync and cloud AI are both optional.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+
+                VStack(spacing: 12) {
+                    privacyFactRow(
+                        icon: "iphone",
+                        title: "Local First",
+                        detail: "Your jokes, recordings, and notes stay on this device unless you turn on a cloud feature."
+                    )
+                    privacyFactRow(
+                        icon: "icloud",
+                        title: "Optional iCloud Sync",
+                        detail: "Turn this on if you want your library synced through your private iCloud account."
+                    )
+                    privacyFactRow(
+                        icon: "sparkles.rectangle.stack",
+                        title: "Optional Cloud AI",
+                        detail: "OpenAI is only used after you add your own API key. Without one, AI features stay on-device."
+                    )
+                }
+                .padding(.horizontal, 20)
+
+                VStack(spacing: 0) {
+                    Toggle(isOn: $iCloudSyncEnabled) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Enable iCloud Sync")
+                                .font(.body)
+                            Text("Off by default for new installs")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 20)
+
+                Spacer(minLength: 60)
+            }
         }
     }
 
@@ -321,6 +385,8 @@ struct AppSetupView: View {
                 VStack(spacing: 0) {
                     summaryRow(icon: "person.circle", label: "Name", value: nameText.isEmpty ? "Not set" : nameText)
                     Divider().padding(.leading, 56)
+                    summaryRow(icon: "icloud", label: "iCloud Sync", value: iCloudSyncEnabled ? "On" : "Off")
+                    Divider().padding(.leading, 56)
                     summaryRow(icon: "dock.rectangle", label: "Tabs", value: "\(selectedTabs.count) selected")
                     Divider().padding(.leading, 56)
                     summaryRow(icon: jokesViewMode.icon, label: "Joke View", value: jokesViewMode.rawValue)
@@ -425,6 +491,30 @@ struct AppSetupView: View {
         .padding(.vertical, 10)
     }
 
+    private func privacyFactRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundColor(.accentColor)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.body.weight(.medium))
+                    .foregroundColor(.primary)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
     // MARK: - Helpers
 
     private func tabDescription(for screen: AppScreen) -> String {
@@ -465,8 +555,19 @@ struct AppSetupView: View {
     private func finishSetup() {
         saveNameIfNeeded()
         saveSelectedTabs()
+        applyPrivacyPreferences()
         hasCompletedSetup = true
         dismiss()
+    }
+
+    private func applyPrivacyPreferences() {
+        Task { @MainActor in
+            if iCloudSyncEnabled {
+                await syncService.enableiCloudSync()
+            } else {
+                syncService.disableiCloudSync()
+            }
+        }
     }
 }
 

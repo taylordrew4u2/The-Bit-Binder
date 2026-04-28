@@ -2,30 +2,37 @@
 //  AIJokeExtractionProvider.swift
 //  thebitbinder
 //
-//  Protocol + shared types for on-device joke extraction.
-//  GagGrabber runs entirely offline — no cloud providers, no API keys,
-//  no network calls. The concrete providers are:
+//  Protocol + shared types for joke extraction providers.
+//  GagGrabber prefers on-device extraction first. If the user adds an OpenAI
+//  key, the pipeline can also use a cloud fallback. The concrete providers are:
 //    • AppleOnDeviceJokeExtractionProvider — Apple Foundation Models (iOS 26+)
-//    • EmbeddingSegmenterProvider           — NLEmbedding sentence segmenter
+//    • OpenAIJokeExtractionProvider        — optional cloud fallback
+//    • EmbeddingSegmenterProvider          — NLEmbedding sentence segmenter
 //
 
 import Foundation
 
 // MARK: - Provider Identity
 
-/// On-device extraction providers GagGrabber can use.
+/// Extraction providers GagGrabber can use.
 enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     case appleOnDevice  = "AppleOnDevice"
+    case openAI         = "OpenAI"
     case embeddingLocal = "EmbeddingLocal"
 
     var id: String { rawValue }
 
-    /// All providers here run entirely on-device.
-    var isOnDevice: Bool { true }
+    var isOnDevice: Bool {
+        switch self {
+        case .appleOnDevice, .embeddingLocal: return true
+        case .openAI: return false
+        }
+    }
 
     var displayName: String {
         switch self {
         case .appleOnDevice:  return "On-Device (Apple)"
+        case .openAI:         return "OpenAI"
         case .embeddingLocal: return "On-Device (Offline Segmenter)"
         }
     }
@@ -33,6 +40,7 @@ enum AIProviderType: String, CaseIterable, Identifiable, Codable {
     var icon: String {
         switch self {
         case .appleOnDevice:  return "cpu"
+        case .openAI:         return "cloud"
         case .embeddingLocal: return "waveform.path.ecg"
         }
     }
@@ -62,7 +70,7 @@ enum AIProviderError: LocalizedError {
 
 // MARK: - Provider Protocol
 
-/// Any on-device service that can extract jokes from text.
+/// Any service that can extract jokes from text.
 protocol AIJokeExtractionProvider {
     var providerType: AIProviderType { get }
 

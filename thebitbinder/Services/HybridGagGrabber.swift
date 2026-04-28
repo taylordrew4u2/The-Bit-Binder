@@ -56,23 +56,53 @@ final class HybridGagGrabber: ObservableObject {
 
         print(" [GagGrabber] Text length: \(rawText.count) chars")
 
-        // Apply any user-selected ignore filters before the text reaches the
-        // model. Safe unconditionally — a no-op when no toggles are on.
         let preprocessed = hints.preprocess(rawText)
         if preprocessed.count != rawText.count {
             print(" [GagGrabber] Preprocessing trimmed \(rawText.count - preprocessed.count) chars")
         }
 
-        // Prepend a natural-language summary of the hints so the on-device
-        // provider knows how the document is structured. No-op when hints
-        // are unspecified.
-        let textToSend = hints.applyingPromptPrefix(to: preprocessed)
+        // Step 1: If the user told us the format, use it directly. No AI.
+        statusMessage = "Scanning your document…"
+        let hintSplit = Self.splitUsingHints(preprocessed, hints: hints)
 
+        if hintSplit.count >= 2 {
+            print(" [GagGrabber] Hint-based split found \(hintSplit.count) joke(s)")
+            let cleaned = hintSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
+            let deduped = Self.deduplicateJokes(cleaned)
+            if !deduped.isEmpty {
+                hints.saveAsLastUsed()
+                extractedJokes = deduped
+                isExtracting = false
+                stopElapsedTimer()
+                statusMessage = ""
+                return
+            }
+        }
+
+        // Step 2: Auto-detect structure (numbered, bullets, blank lines).
+        let smartSplit = SmartTextSplitter.split(preprocessed)
+
+        if smartSplit.count >= 2 {
+            print(" [GagGrabber] SmartTextSplitter found \(smartSplit.count) joke(s)")
+            let cleaned = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
+            let deduped = Self.deduplicateJokes(cleaned)
+            if !deduped.isEmpty {
+                hints.saveAsLastUsed()
+                extractedJokes = deduped
+                isExtracting = false
+                stopElapsedTimer()
+                statusMessage = ""
+                return
+            }
+        }
+
+        // Step 3: Structural splits didn't work — try AI providers.
+        let textToSend = hints.applyingPromptPrefix(to: preprocessed)
         let manager = AIJokeExtractionManager.shared
         let token = AIExtractionToken(caller: "HybridGagGrabber")
 
         if manager.availableProviders.isEmpty {
-            lastError = "GagGrabber isn't available on this device — on-device models couldn't start."
+            lastError = "GagGrabber needs either Apple Intelligence (iOS 26+) or an OpenAI API key in Settings."
             isExtracting = false
             stopElapsedTimer()
             statusMessage = ""
@@ -89,17 +119,24 @@ final class HybridGagGrabber: ObservableObject {
             statusMessage = "Cleaning up results…"
             let deduped = Self.deduplicateJokes(jokes)
             if deduped.isEmpty {
-                lastError = "GagGrabber read the whole file but couldn't spot any jokes. Try adjusting the hints above and give it another go!"
+                if !smartSplit.isEmpty {
+                    extractedJokes = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
+                } else {
+                    lastError = "GagGrabber read the whole file but couldn't spot any jokes. Try adjusting the hints above and give it another go!"
+                }
             } else {
-                // Only persist after a successful run so the next sheet open
-                // starts from hints that actually produced results.
                 hints.saveAsLastUsed()
+                extractedJokes = deduped
             }
-            extractedJokes = deduped
         } catch {
-            print(" [GagGrabber] Extraction failed: \(error.localizedDescription)")
-            lastError = "GagGrabber couldn't read this document. Try adjusting the hints above, or try a different file."
-            extractedJokes = []
+            print(" [GagGrabber] AI extraction failed: \(error.localizedDescription)")
+            if !smartSplit.isEmpty {
+                print(" [GagGrabber] Using SmartTextSplitter results as fallback (\(smartSplit.count) chunks)")
+                extractedJokes = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
+            } else {
+                lastError = error.localizedDescription
+                extractedJokes = []
+            }
         }
 
         isExtracting = false
@@ -135,12 +172,128 @@ final class HybridGagGrabber: ObservableObject {
         timerTask = nil
     }
 
+    // MARK: - Hint-Based Splitting
+
+    /// When the user tells us the format, split on that format directly.
+    /// No AI, no heuristics — just split where the user said to split.
+    nonisolated static func splitUsingHints(_ text: String, hints: ExtractionHints) -> [String] {
+        let lines = text.components(separatedBy: "\n")
+
+        switch hints.separator {
+        case .numbered:
+            return splitOnNumberedLines(lines)
+        case .bullets:
+            return splitOnBulletLines(lines)
+        case .blankLine:
+            return splitOnBlankLines(text)
+        case .headers, .noneOrFlowing, .mixed:
+            return []
+        }
+    }
+
+    /// Split where lines start with a number: 1. / 1) / 1: / 1- / #1 / Joke 1: etc.
+    private nonisolated static func splitOnNumberedLines(_ lines: [String]) -> [String] {
+        let pattern = #"^\s*(?:(?:joke|bit|gag|#)\s*)?#?\s*\d+\s*[.)\-:–—]\s*"#
+        var chunks: [String] = []
+        var current: [String] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let isNumbered = trimmed.range(
+                of: pattern,
+                options: [.regularExpression, .caseInsensitive]
+            ) != nil
+
+            if isNumbered && !current.isEmpty {
+                chunks.append(current.joined(separator: "\n"))
+                current = [trimmed]
+            } else if !trimmed.isEmpty || !current.isEmpty {
+                current.append(line)
+            }
+        }
+        if !current.isEmpty {
+            chunks.append(current.joined(separator: "\n"))
+        }
+        return chunks.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Split where lines start with a bullet: - / • / * / –
+    private nonisolated static func splitOnBulletLines(_ lines: [String]) -> [String] {
+        var chunks: [String] = []
+        var current: [String] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let isBullet = trimmed.range(
+                of: #"^\s*[•\-\*–—]\s+"#,
+                options: .regularExpression
+            ) != nil
+
+            if isBullet && !current.isEmpty {
+                chunks.append(current.joined(separator: "\n"))
+                current = [trimmed]
+            } else if !trimmed.isEmpty || !current.isEmpty {
+                current.append(line)
+            }
+        }
+        if !current.isEmpty {
+            chunks.append(current.joined(separator: "\n"))
+        }
+        return chunks.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Split on blank lines (one or more empty lines between jokes).
+    private nonisolated static func splitOnBlankLines(_ text: String) -> [String] {
+        text.components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     // MARK: - Cleaning Helpers
 
-    /// Strips leading numbered-list markers like "1.", "2)", "10." etc.
+    /// Strips all formatting artifacts so jokes land clean in the binder.
+    /// Handles numbered lists, bullets, dashes, separators, quotes, labels.
+    nonisolated static func cleanJokeText(_ text: String) -> String {
+        var t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Strip leading labels like "Joke 1:", "Bit #3:", "#1.", "Joke:", etc.
+        // Requires either a label word OR at least one digit before the separator
+        // so bare punctuation like "..." or "- text" isn't incorrectly eaten.
+        t = t.replacingOccurrences(
+            of: #"^\s*(?:(?:joke|bit|gag|premise|tag|closer)\s*#?\s*\d*\s*[.)\-:–—]\s*|#?\s*\d+\s*[.)\-:–—]\s*)"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+
+        // Strip leading bullets: •, -, *, –, —, >
+        t = t.replacingOccurrences(
+            of: #"^\s*[•\-\*–—>]\s+"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // Strip trailing separator lines: ---, ***, ===, etc.
+        t = t.replacingOccurrences(
+            of: #"\s*[-–—=\*]{3,}\s*$"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // Strip wrapping quotes if they surround the whole text
+        t = t.trimmingCharacters(in: .whitespacesAndNewlines)
+        if (t.hasPrefix("\"") && t.hasSuffix("\"")) ||
+           (t.hasPrefix("\u{201C}") && t.hasSuffix("\u{201D}")) {
+            t = String(t.dropFirst().dropLast())
+        }
+
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Backwards-compatible alias used by `AIExtractedJoke.toImportedJoke`.
     nonisolated static func stripLeadingNumber(_ text: String) -> String {
-        text.replacingOccurrences(of: #"^\s*\d+[.\)]\s*"#, with: "", options: .regularExpression)
-            .trimmingCharacters(in: .whitespaces)
+        cleanJokeText(text)
     }
 
     // MARK: - Dedup Helper
@@ -226,6 +379,8 @@ struct HybridGagGrabberSheet: View {
 
     @State private var showPicker = false
     @State private var savedJokeIDs: Set<Int> = []
+    @State private var showGoogleDocsInput = false
+    @State private var googleDocsURL = ""
 
     private var faceMood: GagGrabberFace.Mood {
         if grabber.isExtracting { return .working }
@@ -240,7 +395,7 @@ struct HybridGagGrabberSheet: View {
                 // MARK: Welcome Hero
                 Section {
                     VStack(spacing: 16) {
-                        GagGrabberFace(mood: faceMood, size: 110)
+                        GagGrabberFace(mood: faceMood, size: 56)
                             .padding(.top, 8)
 
                         Text("GagGrabber")
@@ -253,22 +408,17 @@ struct HybridGagGrabberSheet: View {
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
 
-                        HStack(spacing: 8) {
-                            ForEach(["TXT", "PDF", "RTF", "CSV"], id: \.self) { fmt in
+                        HStack(spacing: 6) {
+                            ForEach(["TXT", "PDF", "RTF", "Google Docs"], id: \.self) { fmt in
                                 Text(fmt)
                                     .font(.caption2.weight(.semibold))
                                     .foregroundColor(Color.accentColor)
-                                    .padding(.horizontal, 8)
+                                    .padding(.horizontal, 7)
                                     .padding(.vertical, 4)
                                     .background(Color.accentColor.opacity(0.1))
                                     .clipShape(Capsule())
                             }
                         }
-
-                        Label("Runs entirely on your device", systemImage: "lock.shield.fill")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 2)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -292,9 +442,42 @@ struct HybridGagGrabberSheet: View {
                     Button {
                         showPicker = true
                     } label: {
-                        Label("Pick a Document (.txt, .pdf, .rtf, …)", systemImage: "doc.badge.plus")
+                        Label("Pick a File (.txt, .pdf, .rtf, …)", systemImage: "doc.badge.plus")
                     }
                     .disabled(grabber.isExtracting)
+
+                    Button {
+                        withAnimation { showGoogleDocsInput.toggle() }
+                    } label: {
+                        Label("Import from Google Docs", systemImage: "link")
+                    }
+                    .disabled(grabber.isExtracting)
+
+                    if showGoogleDocsInput {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Paste Google Docs link", text: $googleDocsURL)
+                                .font(.footnote)
+                                .textContentType(.URL)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                                .keyboardType(.URL)
+
+                            Button {
+                                Task { await handleGoogleDocsImport() }
+                            } label: {
+                                Label("Fetch Document", systemImage: "arrow.down.circle.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .disabled(googleDocsURL.trimmingCharacters(in: .whitespaces).isEmpty || grabber.isExtracting)
+
+                            Text("The doc must be shared with \"Anyone with the link.\"")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
 
                 // MARK: Status
@@ -420,6 +603,76 @@ struct HybridGagGrabberSheet: View {
         }
     }
 
+    // MARK: - Google Docs Import
+
+    private func handleGoogleDocsImport() async {
+        let raw = googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return }
+
+        guard let docID = Self.extractGoogleDocID(from: raw) else {
+            grabber.lastError = "Couldn't read that link. Paste the full Google Docs URL (starts with docs.google.com)."
+            return
+        }
+
+        grabber.isExtracting = true
+        grabber.lastError = nil
+        grabber.extractedJokes = []
+        grabber.statusMessage = "Fetching from Google Docs…"
+
+        let exportURLString = "https://docs.google.com/document/d/\(docID)/export?format=txt"
+        guard let exportURL = URL(string: exportURLString) else {
+            grabber.lastError = "Invalid document link."
+            grabber.isExtracting = false
+            return
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: exportURL)
+
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                if http.statusCode == 404 {
+                    grabber.lastError = "Document not found. Check the link and make sure it's shared."
+                } else if http.statusCode == 403 {
+                    grabber.lastError = "Access denied. Make sure the doc is shared with \"Anyone with the link.\""
+                } else {
+                    grabber.lastError = "Google returned an error (status \(http.statusCode)). Make sure the doc is shared."
+                }
+                grabber.isExtracting = false
+                return
+            }
+
+            guard let text = String(data: data, encoding: .utf8),
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                grabber.lastError = "The document appears to be empty."
+                grabber.isExtracting = false
+                return
+            }
+
+            await grabber.extractJokes(from: text)
+        } catch {
+            grabber.lastError = "Failed to fetch document: \(error.localizedDescription)"
+            grabber.isExtracting = false
+        }
+    }
+
+    /// Extracts the document ID from various Google Docs URL formats.
+    private static func extractGoogleDocID(from urlString: String) -> String? {
+        // Formats:
+        //   https://docs.google.com/document/d/DOCID/edit
+        //   https://docs.google.com/document/d/DOCID/edit?usp=sharing
+        //   https://docs.google.com/document/d/DOCID
+        //   docs.google.com/document/d/DOCID/...
+        guard let regex = try? NSRegularExpression(
+            pattern: #"docs\.google\.com/document/d/([a-zA-Z0-9_\-]+)"#
+        ) else { return nil }
+
+        let range = NSRange(urlString.startIndex..., in: urlString)
+        guard let match = regex.firstMatch(in: urlString, range: range),
+              let idRange = Range(match.range(at: 1), in: urlString) else { return nil }
+
+        return String(urlString[idRange])
+    }
+
     // MARK: - Document Handling
 
     private func handlePickedDocument(_ url: URL) async {
@@ -466,6 +719,7 @@ struct HybridGagGrabberSheet: View {
             await grabber.extractJokes(from: text)
         } catch {
             grabber.lastError = "Failed to read document: \(error.localizedDescription)"
+            grabber.isExtracting = false
         }
     }
 

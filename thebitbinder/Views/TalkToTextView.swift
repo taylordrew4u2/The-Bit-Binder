@@ -7,7 +7,6 @@
 import SwiftUI
 import Speech
 import AVFoundation
-import AVFAudio
 
 struct TalkToTextView: View {
     @Environment(\.modelContext) private var modelContext
@@ -77,6 +76,7 @@ struct TalkToTextView: View {
                             if !transcribedText.isEmpty {
                                 Button("Clear") {
                                     transcribedText = ""
+                                    speechRecognizer.clearAccumulatedText()
                                 }
                                 .font(.caption)
                                 .foregroundColor(.accentColor)
@@ -197,6 +197,11 @@ struct TalkToTextView: View {
                 }
                 .onChange(of: speechRecognizer.error) { _, newValue in
                     errorMessage = newValue
+                }
+                .onChange(of: speechRecognizer.isTranscribing) { _, newValue in
+                    if !newValue && isRecording {
+                        isRecording = false
+                    }
                 }
                 .overlay {
                     if showSavedConfirmation {
@@ -334,6 +339,7 @@ struct TalkToTextView: View {
     }
     
     private func saveItem() {
+        guard !isSaving else { return }
         if saveToBrainstorm {
             saveBrainstormIdea()
         } else {
@@ -638,6 +644,14 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
             self.consecutiveEmptyRestarts = 0
             self.accumulatedText = self.transcribedText
             self.startRecognitionSession()
+        }
+    }
+
+    /// Clears accumulated text so the next recognition result starts fresh.
+    func clearAccumulatedText() {
+        accumulatedText = ""
+        DispatchQueue.main.async { [weak self] in
+            self?.transcribedText = ""
         }
     }
 

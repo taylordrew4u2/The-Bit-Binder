@@ -66,6 +66,7 @@ struct ExtractionProviderBadge: View {
         guard let type = matchedType else { return .secondary }
         switch type {
         case .appleOnDevice:  return .blue
+        case .openAI:         return .green
         case .embeddingLocal: return .teal
         }
     }
@@ -86,6 +87,8 @@ struct ExtractionProviderBadge: View {
         switch type {
         case .appleOnDevice:
             return "On-device • private • no network used"
+        case .openAI:
+            return "Extracted via OpenAI"
         case .embeddingLocal:
             return "Offline segmenter • everything went to review"
         }

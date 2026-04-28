@@ -56,10 +56,10 @@ final class iCloudSyncService: NSObject, ObservableObject {
         if hasSetSyncPreference {
             isSyncEnabled = UserDefaults.standard.bool(forKey: SyncedKeys.iCloudSyncEnabled)
         } else {
-            // Default to enabled for new installs - sync should work out of the box
-            isSyncEnabled = true
-            UserDefaults.standard.set(true, forKey: SyncedKeys.iCloudSyncEnabled)
-            print(" [iCloud] First launch - sync enabled by default")
+            // Default to local-only storage for new installs until the user opts in.
+            isSyncEnabled = false
+            UserDefaults.standard.set(false, forKey: SyncedKeys.iCloudSyncEnabled)
+            print(" [iCloud] First launch - sync disabled until user opts in")
         }
         
         if let lastSyncTimestamp = UserDefaults.standard.object(forKey: SyncedKeys.lastSyncDate) as? Double {

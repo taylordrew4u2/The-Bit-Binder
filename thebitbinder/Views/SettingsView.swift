@@ -116,6 +116,47 @@ struct SettingsView: View {
                 Text("Organize material by roast target instead of folder.")
             }
             
+            // MARK: - Buddy Section
+            Section {
+                Toggle(isOn: $userPreferences.bitBuddyEnabled) {
+                    HStack(spacing: 8) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(userPreferences.bitBuddyEnabled ? Color.accentColor.opacity(0.15) : Color(.systemGray5))
+                                .frame(width: 32, height: 32)
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(userPreferences.bitBuddyEnabled ? .accentColor : .secondary)
+                        }
+                        Text("Buddy")
+                            .font(.body.weight(.medium))
+                    }
+                }
+                .tint(.accentColor)
+
+                if userPreferences.bitBuddyEnabled {
+                    HStack {
+                        SecureField("OpenAI API Key", text: $userPreferences.openAIAPIKey)
+                            .font(.footnote.monospaced())
+                            .textContentType(.password)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+
+                        if !userPreferences.openAIAPIKey.isEmpty {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.body)
+                        }
+                    }
+                }
+            } footer: {
+                if userPreferences.bitBuddyEnabled {
+                    Text("Your API key powers two optional cloud fallbacks:\n• Buddy when on-device writing models aren't available\n• GagGrabber when on-device extraction can't finish the job\n\nThe key is stored in your device Keychain. Without a key, Buddy and GagGrabber stay on-device only.")
+                } else {
+                    Text("Turn on to get a writing partner for punch-ups and smarter joke extraction from files.")
+                }
+            }
+
             // MARK: - Data Section
             Section {
                 NavigationLink {

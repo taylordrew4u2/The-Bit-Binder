@@ -43,7 +43,7 @@ struct JokesView: View {
     @State private var roastTargetToDelete: RoastTarget?
     @State private var showingDeleteRoastAlert = false
     
-    @AppStorage("jokesViewMode") private var viewMode: JokesViewMode = .grid
+    @AppStorage("jokesViewMode") private var viewMode: JokesViewMode = .list
     @AppStorage("roastViewMode") private var roastViewMode: JokesViewMode = .list
     @AppStorage("showFullContent") private var showFullContent = true
     @AppStorage("jokesGridScale") private var jokesGridScale: Double = 1.0
@@ -266,7 +266,7 @@ struct JokesView: View {
             }
             .padding(.horizontal, 16)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
     }
     
     @ViewBuilder
@@ -397,9 +397,11 @@ struct JokesView: View {
             filtered = base.filter { matchesSearch($0, lower: lower) }
         }
 
-        // @Query already delivers jokes sorted by dateModified descending;
-        // filter() preserves that order, so no re-sort needed.
-        cachedFilteredJokes = filtered
+        if showRecentlyAdded {
+            cachedFilteredJokes = filtered.sorted { $0.dateCreated > $1.dateCreated }
+        } else {
+            cachedFilteredJokes = filtered
+        }
     }
     
     var body: some View {
@@ -621,6 +623,7 @@ struct JokesView: View {
                             ForEach(filteredJokes) { joke in
                                 if isSelectMode {
                                     jokeListSelectableRow(joke: joke)
+                                        .listRowSeparatorTint(Color(red: 0.6, green: 0.7, blue: 0.85).opacity(0.3))
                                 } else {
                                     NavigationLink(destination: JokeDetailView(joke: joke)) {
                                         JokeRowView(joke: joke, roastMode: roastMode, showFullContent: showFullContent)
@@ -736,11 +739,12 @@ struct JokesView: View {
                                         }
                                         .tint(.purple)
                                     }
+                                    .listRowSeparatorTint(Color(red: 0.6, green: 0.7, blue: 0.85).opacity(0.3))
                                 }
                             }
                             .onDelete(perform: deleteJokes)
                         }
-                        .listStyle(.insetGrouped)
+                        .listStyle(.plain)
                     }
                 }
                 

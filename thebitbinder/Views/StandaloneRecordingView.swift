@@ -306,6 +306,7 @@ struct StandaloneRecordingView: View {
         haptic(.light)
         if audioService.isPaused {
             audioService.resumeRecording()
+            timer?.invalidate()
             timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
                 recordingDuration += 1
             }

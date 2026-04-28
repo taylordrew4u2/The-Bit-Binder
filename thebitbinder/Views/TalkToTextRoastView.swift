@@ -8,7 +8,6 @@
 import SwiftUI
 import Speech
 import AVFoundation
-import AVFAudio
 
 struct TalkToTextRoastView: View {
     @Environment(\.modelContext) private var modelContext
@@ -79,6 +78,7 @@ struct TalkToTextRoastView: View {
                         if !transcribedText.isEmpty {
                             Button("Clear") {
                                 transcribedText = ""
+                                speechRecognizer.clearAccumulatedText()
                             }
                             .font(.caption)
                             .foregroundColor(accentColor)
@@ -191,6 +191,11 @@ struct TalkToTextRoastView: View {
             }
             .onChange(of: speechRecognizer.error) { _, newValue in
                 errorMessage = newValue
+            }
+            .onChange(of: speechRecognizer.isTranscribing) { _, newValue in
+                if !newValue && isRecording {
+                    isRecording = false
+                }
             }
         }
     }
