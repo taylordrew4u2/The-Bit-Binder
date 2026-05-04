@@ -141,6 +141,9 @@ final class SpeechRecognitionManager: NSObject, ObservableObject, SFSpeechRecogn
     }
 
     func startRecording() {
+        guard !shouldBeRunning, !isRecording, recognitionTask == nil else {
+            return
+        }
         error = nil
         shouldBeRunning = true
         isRestarting = false
@@ -276,9 +279,6 @@ final class SpeechRecognitionManager: NSObject, ObservableObject, SFSpeechRecogn
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
         request.taskHint = .dictation
-        if speechRecognizer?.supportsOnDeviceRecognition == true {
-            request.requiresOnDeviceRecognition = true
-        }
         return request
     }
 
@@ -306,6 +306,14 @@ final class SpeechRecognitionManager: NSObject, ObservableObject, SFSpeechRecogn
             }
 
             if SpeechErrorCode.isNoSpeechTimeout(nsError) || isFinal {
+                scheduleAutoRestart()
+                return
+            }
+
+            if SpeechErrorCode.isTransientRecoverable(nsError) {
+                #if DEBUG
+                print(" [SpeechRecognitionManager] Transient recognition error — restarting")
+                #endif
                 scheduleAutoRestart()
                 return
             }

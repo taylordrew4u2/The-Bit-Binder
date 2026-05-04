@@ -93,6 +93,7 @@ struct BitBuddyCompactWindow: View {
     private let windowWidth: CGFloat = 300
     private let windowHeight: CGFloat = 380
     private let margin: CGFloat = 14
+    private let headerHeight: CGFloat = 44
 
     @State private var dragOffset: CGSize = .zero
 
@@ -145,7 +146,7 @@ struct BitBuddyCompactWindow: View {
                 BitBuddyChatView()
                     .navigationBarHidden(true)
             }
-            .frame(height: windowHeight - 44) // 44 = header
+            .frame(height: max(0, windowHeight - headerHeight))
         }
         .frame(width: windowWidth, height: windowHeight)
         .background(
@@ -199,7 +200,7 @@ struct BitBuddyCompactWindow: View {
             .accessibilityLabel("Close BitBuddy")
         }
         .padding(.horizontal, 14)
-        .frame(height: 44)
+        .frame(height: headerHeight)
         .background(
             // Subtle accent tint on the header so the window feels tied to
             // the puck it came from.

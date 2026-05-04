@@ -70,6 +70,11 @@ enum SpeechErrorCode {
     /// "No speech detected" / session timeout. Treat as an auto-restart
     /// trigger, not a user-facing error.
     static let noSpeechTimeout = 1110
+    static let serviceBusy = 1700
+    static let localSpeechRecordingFailed = 1701
+    static let networkUnavailable = 203
+    static let audioInterruptedA = 1107
+    static let audioInterruptedB = 1109
 
     /// True if the error is the "task was cancelled" code — we should
     /// swallow it and not show an error to the user.
@@ -81,6 +86,18 @@ enum SpeechErrorCode {
     /// rather than surface the error.
     static func isNoSpeechTimeout(_ error: NSError) -> Bool {
         error.domain == domain && error.code == noSpeechTimeout
+    }
+
+    /// Errors that are often transient in practice and worth one automatic
+    /// recovery attempt instead of immediately surfacing as a hard failure.
+    static func isTransientRecoverable(_ error: NSError) -> Bool {
+        guard error.domain == domain else { return false }
+        switch error.code {
+        case serviceBusy, localSpeechRecordingFailed, networkUnavailable, audioInterruptedA, audioInterruptedB:
+            return true
+        default:
+            return false
+        }
     }
 }
 

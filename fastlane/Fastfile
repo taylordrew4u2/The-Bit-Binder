@@ -1,0 +1,49 @@
+default_platform(:ios)
+
+platform :ios do
+  before_all do
+    app_store_connect_api_key(
+      key_id: "JGMB68FUS8",
+      issuer_id: "bc5090b3-7a20-45df-815b-bf8e1ee0b9f4",
+      key_filepath: File.expand_path("~/.appstoreconnect/private_keys/AuthKey_JGMB68FUS8.p8"),
+      duration: 1200,
+      in_house: false
+    )
+  end
+
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    increment_build_number(xcodeproj: "thebitbinder.xcodeproj")
+    build_app(
+      scheme: "thebitbinder",
+      export_method: "app-store",
+      export_options: {
+        signingStyle: "automatic",
+        teamID: "R44WG942GS"
+      },
+      xcargs: "-allowProvisioningUpdates",
+      export_xcargs: "-allowProvisioningUpdates"
+    )
+    upload_to_testflight(skip_waiting_for_build_processing: true)
+  end
+
+  desc "Build and upload to App Store (for review)"
+  lane :release do
+    increment_build_number(xcodeproj: "thebitbinder.xcodeproj")
+    build_app(
+      scheme: "thebitbinder",
+      export_method: "app-store",
+      export_options: {
+        signingStyle: "automatic",
+        teamID: "R44WG942GS"
+      },
+      xcargs: "-allowProvisioningUpdates",
+      export_xcargs: "-allowProvisioningUpdates"
+    )
+    upload_to_app_store(
+      skip_metadata: true,
+      skip_screenshots: true,
+      submit_for_review: false
+    )
+  end
+end

@@ -23,9 +23,17 @@ struct SettingsView: View {
         return f
     }()
     @AppStorage("roastModeEnabled") private var roastMode = false
+    @AppStorage("appTextSize") private var appTextSizeRawValue = AppTextSize.standard.rawValue
     @State private var isEditingName = false
     @State private var editingNameText = ""
     @FocusState private var nameFieldFocused: Bool
+
+    private var appTextSize: Binding<AppTextSize> {
+        Binding(
+            get: { AppTextSize(rawValue: appTextSizeRawValue) ?? .standard },
+            set: { appTextSizeRawValue = $0.rawValue }
+        )
+    }
     
     var body: some View {
         List {
@@ -216,6 +224,12 @@ struct SettingsView: View {
             
             // MARK: - Customize Section
             Section {
+                Picker("Text Size", selection: appTextSize) {
+                    ForEach(AppTextSize.allCases) { size in
+                        Text(size.title).tag(size)
+                    }
+                }
+
                 NavigationLink {
                     AppSetupView(isFirstLaunch: false)
                         .environmentObject(userPreferences)
@@ -225,7 +239,7 @@ struct SettingsView: View {
             } header: {
                 Text("Customize")
             } footer: {
-                Text("Change your tabs, joke layout, and display preferences.")
+                Text("Change your text size, tabs, joke layout, and display preferences.")
             }
 
             // MARK: - Support Section

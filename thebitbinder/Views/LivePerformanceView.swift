@@ -121,11 +121,12 @@ struct LivePerformanceView: View {
                         jokeContent
                         
                         // Invisible tap zones for navigation
+                        let availableWidth = max(0, geo.size.width.isFinite ? geo.size.width : 0)
                         HStack(spacing: 0) {
                             // TAP LEFT = Previous
                             Color.clear
                                 .contentShape(Rectangle())
-                                .frame(width: geo.size.width * 0.25)
+                                .frame(width: availableWidth * 0.25)
                                 .onTapGesture {
                                     if canGoPrevious {
                                         goToPrevious()
@@ -139,7 +140,7 @@ struct LivePerformanceView: View {
                             // TAP CENTER = Toggle controls
                             Color.clear
                                 .contentShape(Rectangle())
-                                .frame(width: geo.size.width * 0.5)
+                                .frame(width: availableWidth * 0.5)
                                 .onTapGesture {
                                     withAnimation(.easeOut(duration: 0.2)) {
                                         showControls.toggle()
@@ -154,7 +155,7 @@ struct LivePerformanceView: View {
                             // TAP RIGHT = Next
                             Color.clear
                                 .contentShape(Rectangle())
-                                .frame(width: geo.size.width * 0.25)
+                                .frame(width: availableWidth * 0.25)
                                 .onTapGesture {
                                     if canGoNext {
                                         goToNext()
@@ -357,6 +358,10 @@ struct LivePerformanceView: View {
     
     private var progressBar: some View {
         GeometryReader { geo in
+            let availableWidth = max(0, geo.size.width.isFinite ? geo.size.width : 0)
+            let progress = safeItemCount > 0
+                ? min(max(CGFloat(safeCurrentIndex + 1) / CGFloat(safeItemCount), 0), 1)
+                : 0
             ZStack(alignment: .leading) {
                 // Background
                 Rectangle()
@@ -367,7 +372,7 @@ struct LivePerformanceView: View {
                 if safeItemCount > 0 {
                     Rectangle()
                         .fill(Color.white)
-                        .frame(width: geo.size.width * CGFloat(safeCurrentIndex + 1) / CGFloat(safeItemCount), height: 4)
+                        .frame(width: availableWidth * progress, height: 4)
                         .animation(.easeOut(duration: 0.2), value: currentIndex)
                 }
             }

@@ -22,6 +22,7 @@ struct TalkToTextRoastView: View {
     @State private var showingPermissionAlert = false
     @State private var errorMessage: String?
     @State private var targetInvalidated = false
+    @State private var isSaving = false
     
     @StateObject private var speechRecognizer = SpeechRecognizer()
     
@@ -79,6 +80,7 @@ struct TalkToTextRoastView: View {
                             Button("Clear") {
                                 transcribedText = ""
                                 speechRecognizer.clearAccumulatedText()
+                                QuickCaptureDraftStore.clearTalkToTextRoastDraft()
                             }
                             .font(.caption)
                             .foregroundColor(accentColor)
@@ -90,19 +92,18 @@ struct TalkToTextRoastView: View {
                              .fill(Color(UIColor.secondarySystemBackground))
                         
                         if transcribedText.isEmpty && !isRecording {
-                            Text("Your transcription will appear here...")
+                            Text("Your transcription will appear here. If the mic misses something, you can type or fix it here before saving.")
                                 .font(.body)
                                 .foregroundStyle(.tertiary)
                                 .padding(14)
                         }
-                        
-                        ScrollView {
-                            Text(transcribedText)
-                                .font(.body)
-                                .foregroundColor(.primary) // Ensure text is visible in light/dark mode
-                                .padding(14)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+
+                        TextEditor(text: $transcribedText)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .scrollContentBackground(.hidden)
+                            .padding(10)
+                            .disabled(isRecording || isSaving)
                     }
                     .frame(minHeight: 200)
                 }
@@ -148,6 +149,7 @@ struct TalkToTextRoastView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(Color.bitbinderAccent)
                         .controlSize(.large)
+                        .disabled(isSaving)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -165,6 +167,11 @@ struct TalkToTextRoastView: View {
                 }
             }
             .onAppear {
+                if let draft = QuickCaptureDraftStore.loadTalkToTextRoastDraft(),
+                   !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    transcribedText = draft
+                    speechRecognizer.restoreAccumulatedText(draft)
+                }
                 checkPermissions()
             }
             .onDisappear {
@@ -188,6 +195,9 @@ struct TalkToTextRoastView: View {
             }
             .onChange(of: speechRecognizer.transcribedText) { _, newValue in
                 transcribedText = newValue
+            }
+            .onChange(of: transcribedText) { _, newValue in
+                QuickCaptureDraftStore.saveTalkToTextRoastDraft(newValue)
             }
             .onChange(of: speechRecognizer.error) { _, newValue in
                 errorMessage = newValue
@@ -296,6 +306,7 @@ struct TalkToTextRoastView: View {
     }
     
     private func saveRoast() {
+        guard !isSaving else { return }
         let text = transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         
@@ -304,6 +315,9 @@ struct TalkToTextRoastView: View {
             errorMessage = "Target was deleted. Cannot save roast."
             return
         }
+
+        isSaving = true
+        errorMessage = nil
         
         let newJoke = RoastJoke(
             content: text,
@@ -315,15 +329,18 @@ struct TalkToTextRoastView: View {
         
         do {
             try modelContext.save()
+            QuickCaptureDraftStore.clearTalkToTextRoastDraft()
             #if DEBUG
             print(" [TalkToTextRoastView] Roast saved for '\(target.name)' (id: \(newJoke.id))")
             #endif
             dismiss()
         } catch {
+            modelContext.delete(newJoke)
+            isSaving = false
             #if DEBUG
             print(" [TalkToTextRoastView] Failed to save: \(error)")
             #endif
-            errorMessage = "Could not save roast: \(error.localizedDescription)"
+            errorMessage = "Could not save roast. Your transcription is preserved on this device."
         }
     }
 }

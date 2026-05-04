@@ -559,43 +559,27 @@ struct JokesView: View {
                                                     } label: {
                                                         Label("Move to Folder", systemImage: "folder")
                                                     }
-                                                    
+
                                                     Divider()
-                                                    
-                                                    if joke.isHit {
-                                                        Button {
-                                                            joke.isHit = false
-                                                            joke.dateModified = Date()
-                                                        } label: {
-                                                            Label("Remove from Hits", systemImage: "star.slash")
-                                                        }
-                                                    } else {
-                                                        Button {
-                                                            joke.isHit = true
-                                                            joke.dateModified = Date()
-                                                        } label: {
-                                                            Label("Add to Hits", systemImage: "star.fill")
-                                                        }
+
+                                                    Button {
+                                                        joke.isHit.toggle()
+                                                        joke.dateModified = Date()
+                                                    } label: {
+                                                        Label(joke.isHit ? "Remove from Hits" : "Add to Hits",
+                                                              systemImage: joke.isHit ? "star.slash" : "star.fill")
                                                     }
-                                                    
-                                                    if joke.isOpenMic {
-                                                        Button {
-                                                            joke.isOpenMic = false
-                                                            joke.dateModified = Date()
-                                                        } label: {
-                                                            Label("Remove from Open Mic", systemImage: "mic.slash")
-                                                        }
-                                                    } else {
-                                                        Button {
-                                                            joke.isOpenMic = true
-                                                            joke.dateModified = Date()
-                                                        } label: {
-                                                            Label("Open Mic", systemImage: "mic.fill")
-                                                        }
+
+                                                    Button {
+                                                        joke.isOpenMic.toggle()
+                                                        joke.dateModified = Date()
+                                                    } label: {
+                                                        Label(joke.isOpenMic ? "Remove from Open Mic" : "Open Mic",
+                                                              systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill")
                                                     }
-                                                    
+
                                                     Divider()
-                                                    
+
                                                     Button(role: .destructive) {
                                                         joke.moveToTrash()
                                                         do {
@@ -639,36 +623,20 @@ struct JokesView: View {
                                         
                                         Divider()
                                         
-                                        if joke.isHit {
-                                            Button {
-                                                joke.isHit = false
-                                                joke.dateModified = Date()
-                                            } label: {
-                                                Label("Remove from Hits", systemImage: "star.slash")
-                                            }
-                                        } else {
-                                            Button {
-                                                joke.isHit = true
-                                                joke.dateModified = Date()
-                                            } label: {
-                                                Label("Add to Hits", systemImage: "star.fill")
-                                            }
+                                        Button {
+                                            joke.isHit.toggle()
+                                            joke.dateModified = Date()
+                                        } label: {
+                                            Label(joke.isHit ? "Remove from Hits" : "Add to Hits",
+                                                  systemImage: joke.isHit ? "star.slash" : "star.fill")
                                         }
-                                        
-                                        if joke.isOpenMic {
-                                            Button {
-                                                joke.isOpenMic = false
-                                                joke.dateModified = Date()
-                                            } label: {
-                                                Label("Remove from Open Mic", systemImage: "mic.slash")
-                                            }
-                                        } else {
-                                            Button {
-                                                joke.isOpenMic = true
-                                                joke.dateModified = Date()
-                                            } label: {
-                                                Label("Open Mic", systemImage: "mic.fill")
-                                            }
+
+                                        Button {
+                                            joke.isOpenMic.toggle()
+                                            joke.dateModified = Date()
+                                        } label: {
+                                            Label(joke.isOpenMic ? "Remove from Open Mic" : "Open Mic",
+                                                  systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill")
                                         }
                                         
                                         Divider()

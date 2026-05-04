@@ -1,0 +1,251 @@
+{
+  "object" : {
+    "artifacts" : [
+
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "generative-ai-swift",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/google/generative-ai-swift",
+          "name" : "generative-ai-swift"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "44b8ce120425f9cf53ca756f3434ca2c2696f8bd",
+            "version" : "0.5.6"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "generative-ai-swift"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "mlx-swift",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/ml-explore/mlx-swift",
+          "name" : "mlx-swift"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "072b684acaae80b6a463abab3a103732f33774bf",
+            "version" : "0.29.1"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "mlx-swift"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "mlx-swift-lm",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/ml-explore/mlx-swift-lm",
+          "name" : "mlx-swift-lm"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "5064b8c5d8ed3b0bbb71385c4124f0fc102e74a2",
+            "version" : "2.29.3"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "mlx-swift-lm"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "openai",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/MacPaw/OpenAI.git",
+          "name" : "OpenAI"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "3f2cac98d3e98d6b4d90279bd737190fc343dbc4",
+            "version" : "0.4.8"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "OpenAI"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-algorithms",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/apple/swift-algorithms.git",
+          "name" : "swift-algorithms"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
+            "version" : "1.2.1"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-algorithms"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-asn1",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/apple/swift-asn1.git",
+          "name" : "swift-asn1"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "eb50cbd14606a9161cbc5d452f18797c90ef0bab",
+            "version" : "1.7.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-asn1"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-collections",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/apple/swift-collections.git",
+          "name" : "swift-collections"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "6675bc0ff86e61436e615df6fc5174e043e57924",
+            "version" : "1.4.1"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-collections"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-crypto",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/apple/swift-crypto.git",
+          "name" : "swift-crypto"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "476538ccb827f2dd18efc5de754cc87d77127a47",
+            "version" : "4.4.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-crypto"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-http-types",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/apple/swift-http-types",
+          "name" : "swift-http-types"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "45eb0224913ea070ec4fba17291b9e7ecf4749ca",
+            "version" : "1.5.1"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-http-types"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-jinja",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/huggingface/swift-jinja.git",
+          "name" : "swift-jinja"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "0aeefadec459ce8e11a333769950fb86183aca43",
+            "version" : "2.3.5"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-jinja"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-numerics",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/apple/swift-numerics.git",
+          "name" : "swift-numerics"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+            "version" : "1.1.1"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-numerics"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-openapi-runtime",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/apple/swift-openapi-runtime",
+          "name" : "swift-openapi-runtime"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "f039fa6d6338aab5164f3d1be16281524c9a8f89",
+            "version" : "1.11.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-openapi-runtime"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "swift-transformers",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/huggingface/swift-transformers",
+          "name" : "swift-transformers"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "150169bfba0889c229a2ce7494cf8949f18e6906",
+            "version" : "1.1.9"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "swift-transformers"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "yyjson",
+          "kind" : "remoteSourceControl",
+          "location" : "https://github.com/ibireme/yyjson.git",
+          "name" : "yyjson"
+        },
+        "state" : {
+          "checkoutState" : {
+            "revision" : "8b4a38dc994a110abaec8a400615567bd996105f",
+            "version" : "0.12.0"
+          },
+          "name" : "sourceControlCheckout"
+        },
+        "subpath" : "yyjson"
+      }
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}

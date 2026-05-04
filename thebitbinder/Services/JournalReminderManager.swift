@@ -62,11 +62,11 @@ final class JournalReminderManager: NSObject, ObservableObject {
     /// Safe to call on every app launch / foreground. No-op if already scheduled.
     func scheduleIfNeeded() {
         guard isEnabled else { return }
+        let id = notifID
         UNUserNotificationCenter.current().getPendingNotificationRequests { [weak self] requests in
-            guard let self else { return }
-            let alreadyScheduled = requests.contains { $0.identifier == self.notifID }
+            let alreadyScheduled = requests.contains { $0.identifier == id }
             if !alreadyScheduled {
-                Task { @MainActor in self.scheduleDaily() }
+                Task { @MainActor in self?.scheduleDaily() }
             }
         }
     }
@@ -133,8 +133,8 @@ final class JournalReminderManager: NSObject, ObservableObject {
 
     // MARK: - Observers
 
-    @objc private func timezoneDidChange() {
-        Task { @MainActor in self.rescheduleIfEnabled() }
+    @objc nonisolated private func timezoneDidChange() {
+        Task { @MainActor [weak self] in self?.rescheduleIfEnabled() }
     }
 
     /// Stable identifier so other code can suppress the banner if today is

@@ -14,6 +14,8 @@ final class BrainstormIdea: Identifiable {
     var content: String = ""
     var dateCreated: Date = Date()
     var colorHex: String = "F5E6D3"  // Store color as hex for variety in grid
+    var boardPositionX: Double = -1
+    var boardPositionY: Double = -1
     var isVoiceNote: Bool = false  // Track if it was created via voice
     var notes: String = ""  // Scratch notes / related thoughts
 
@@ -26,6 +28,8 @@ final class BrainstormIdea: Identifiable {
         self.content = content
         self.dateCreated = Date()
         self.colorHex = colorHex
+        self.boardPositionX = -1
+        self.boardPositionY = -1
         self.isVoiceNote = isVoiceNote
         self.isTrashed = false
         self.deletedDate = nil

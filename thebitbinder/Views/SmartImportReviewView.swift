@@ -328,13 +328,14 @@ struct SmartImportReviewView: View {
             
             // Progress bar
             GeometryReader { geo in
+                let availableWidth = max(0, geo.size.width.isFinite ? geo.size.width : 0)
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 3)
                         .fill(roastMode ? Color.white.opacity(0.1) : Color(UIColor.tertiarySystemBackground))
                     
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.bitbinderAccent)
-                        .frame(width: geo.size.width * progressFraction)
+                        .frame(width: availableWidth * progressFraction)
                         .animation(.easeInOut(duration: 0.3), value: progressFraction)
                 }
             }
@@ -350,7 +351,8 @@ struct SmartImportReviewView: View {
     private var progressFraction: CGFloat {
         guard !viewModel.reviewItems.isEmpty else { return 0 }
         let reviewed = viewModel.reviewItems.filter { $0.action != .pending }.count
-        return CGFloat(reviewed) / CGFloat(viewModel.reviewItems.count)
+        let fraction = CGFloat(reviewed) / CGFloat(viewModel.reviewItems.count)
+        return min(max(fraction, 0), 1)
     }
     
     private var miniDotIndicators: some View {

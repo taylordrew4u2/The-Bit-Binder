@@ -59,7 +59,8 @@ struct BitBuddyDrawerOverlay: View {
 
     var body: some View {
         GeometryReader { geo in
-            let drawerWidth = min(max(geo.size.width * 0.88, 320), 440)
+            let availableWidth = max(0, geo.size.width.isFinite ? geo.size.width : 0)
+            let drawerWidth = min(max(availableWidth * 0.88, 320), 440)
 
             ZStack(alignment: .trailing) {
                 // Scrim — catches taps outside the drawer to close it.

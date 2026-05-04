@@ -11,6 +11,33 @@ import SwiftUI
 
 // MARK: - Spacing
 
+enum AppTextSize: String, CaseIterable, Identifiable {
+    case small
+    case standard
+    case large
+    case extraLarge
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .small: return "Small"
+        case .standard: return "Standard"
+        case .large: return "Large"
+        case .extraLarge: return "Extra Large"
+        }
+    }
+
+    var dynamicTypeSize: DynamicTypeSize {
+        switch self {
+        case .small: return .small
+        case .standard: return .large
+        case .large: return .xLarge
+        case .extraLarge: return .xxLarge
+        }
+    }
+}
+
 enum DS {
     enum Spacing {
         static let xs: CGFloat = 4

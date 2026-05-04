@@ -99,13 +99,14 @@ struct HeatBar: View {
 
         HStack(spacing: 8) {
             GeometryReader { geo in
+                let trackWidth = max(0, geo.size.width.isFinite ? geo.size.width : 0)
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(FirePalette.text.opacity(0.06))
 
                     Capsule()
                         .fill(fill)
-                        .frame(width: geo.size.width * pct)
+                        .frame(width: trackWidth * pct)
                         .shadow(color: glowShadow, radius: clamped >= 60 ? 6 : 0)
                 }
             }

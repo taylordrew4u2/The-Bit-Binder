@@ -17,6 +17,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     
     private let container: CKContainer
     private let schemaVersion = "2.5.0"  // Increment when schema changes - Added SetList finalization & RoastJoke structure fields
+    private let ensuredSchemaVersionKey = "CloudKitSchemaEnsuredVersion"
 
     /// All CloudKit record types managed by this schema
     private let recordTypes: [String] = [
@@ -229,6 +230,12 @@ final class SchemaDeploymentService: @unchecked Sendable {
     /// Creates a test record to ensure schema is deployed
     @MainActor
     func ensureSchemaDeployed(context: ModelContext) async {
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: ensuredSchemaVersionKey) == schemaVersion {
+            print(" [Schema] Schema already ensured for version \(schemaVersion)")
+            return
+        }
+        
         print(" [Schema] Ensuring schema is deployed to CloudKit...")
         
         // The schema will be auto-deployed when SwiftData syncs
@@ -283,6 +290,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
             chatDescriptor.fetchLimit = 1
             let _: [ChatMessage] = try context.fetch(chatDescriptor)
             
+            defaults.set(schemaVersion, forKey: ensuredSchemaVersionKey)
             print(" [Schema] Schema sync triggered for all \(recordTypes.count) record types")
         } catch {
             print(" [Schema] Error during schema sync: \(error.localizedDescription)")
@@ -290,4 +298,3 @@ final class SchemaDeploymentService: @unchecked Sendable {
     }
     
 }
-

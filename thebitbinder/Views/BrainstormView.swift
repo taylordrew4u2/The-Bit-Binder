@@ -11,11 +11,29 @@ import Speech
 import AVFoundation
 
 struct BrainstormView: View {
+    private enum LayoutMode: String {
+        case board
+        case list
+    }
+
+    private struct BoardLayout {
+        let boardSize: CGSize
+        let noteWidth: CGFloat
+        let noteHeight: CGFloat
+        let columnCount: Int
+        let rowCount: Int
+        let horizontalSpacing: CGFloat
+        let verticalSpacing: CGFloat
+        let horizontalInset: CGFloat
+        let verticalInset: CGFloat
+    }
+
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<BrainstormIdea> { !$0.isTrashed }, sort: \BrainstormIdea.dateCreated, order: .reverse) private var ideas: [BrainstormIdea]
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("showFullContent") private var showFullContent = true
     @AppStorage("brainstormGridScale") private var brainstormGridScale: Double = 1.0
+    @AppStorage("brainstormLayoutMode") private var brainstormLayoutMode: String = LayoutMode.list.rawValue
     
     @State private var showAddSheet = false
     @GestureState private var pinchMagnification: CGFloat = 1.0
@@ -42,6 +60,7 @@ struct BrainstormView: View {
     @State private var showTalkToText = false
     @State private var persistenceError: String?
     @State private var showingErrorAlert = false
+    @State private var dragOffsets: [UUID: CGSize] = [:]
     
     // Pinch-to-zoom
     private var effectiveGridScale: CGFloat {
@@ -57,69 +76,57 @@ struct BrainstormView: View {
                 brainstormGridScale = Double(min(max(CGFloat(brainstormGridScale) * value.magnification, 0.5), 2.0))
             }
     }
-    
-    // Grid columns based on scale
-    private var columns: [GridItem] {
-        let count = max(2, Int(4 / effectiveGridScale))
-        return Array(repeating: GridItem(.flexible(), spacing: 0), count: count)
+
+    private var layoutMode: LayoutMode {
+        get { LayoutMode(rawValue: brainstormLayoutMode) ?? .board }
+        set { brainstormLayoutMode = newValue.rawValue }
+    }
+
+    private var batchDeleteAlertTitle: String {
+        let count = selectedIdeaIDs.count
+        return "Delete \(count) Thought\(count == 1 ? "" : "s")?"
+    }
+
+    private var recordingMenuLabel: String {
+        isRecording ? "Stop Recording" : "Voice Note"
+    }
+
+    private var recordingMenuIcon: String {
+        isRecording ? "stop.circle.fill" : "mic.fill"
+    }
+
+    private var layoutMenuLabel: String {
+        layoutMode == .board ? "Show as List" : "Show as Sticky Notes"
+    }
+
+    private var layoutMenuIcon: String {
+        layoutMode == .board ? "list.bullet.rectangle" : "square.grid.3x3.fill"
+    }
+
+    @ViewBuilder
+    private var brainstormContent: some View {
+        if ideas.isEmpty {
+            emptyState
+        } else if layoutMode == .board {
+            brainstormBoard
+        } else {
+            brainstormList
+        }
     }
     
     var body: some View {
         VStack(spacing: 0) {
-            if ideas.isEmpty {
-                emptyState
-            } else {
-                ideaGrid
-            }
+            brainstormContent
         }
         .navigationDestination(item: $selectedIdea) { idea in
             BrainstormDetailView(idea: idea)
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showAddSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                        .accessibilityLabel("Add idea")
-                }
+                addIdeaButton()
             }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button {
-                        toggleRecording()
-                    } label: {
-                        Label(isRecording ? "Stop Recording" : "Voice Note", systemImage: isRecording ? "stop.circle.fill" : "mic.fill")
-                    }
-                    Button {
-                        showTalkToText = true
-                    } label: {
-                        Label("Talk to Text", systemImage: "mic.badge.plus")
-                    }
-                    Section {
-                        Button(action: { showFullContent.toggle() }) {
-                            Label(showFullContent ? "Show Titles Only" : "Show Full Content",
-                                  systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
-                        }
-                        if !ideas.isEmpty {
-                            Button {
-                                isSelectMode.toggle()
-                                if !isSelectMode { selectedIdeaIDs.removeAll() }
-                            } label: {
-                                Label(isSelectMode ? "Cancel Select" : "Select Multiple",
-                                      systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle")
-                            }
-                        }
-                    }
-                    Section {
-                        Button { showingTrash = true } label: {
-                            Label("Trash", systemImage: "trash")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .accessibilityLabel("More Actions")
-                }
+                moreActionsMenu()
             }
         }
         .navigationDestination(isPresented: $showingTrash) {
@@ -173,7 +180,7 @@ struct BrainstormView: View {
         }
         // Batch-delete confirmation. Title adapts to count for grammar.
         .alert(
-            "Delete \(selectedIdeaIDs.count) Thought\(selectedIdeaIDs.count == 1 ? "" : "s")?",
+            batchDeleteAlertTitle,
             isPresented: $showingBatchDeleteConfirmation
         ) {
             Button("Cancel", role: .cancel) {}
@@ -197,6 +204,73 @@ struct BrainstormView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private func addIdeaButton() -> some View {
+        Button {
+            showAddSheet = true
+        } label: {
+            Image(systemName: "plus")
+                .accessibilityLabel("Add idea")
+        }
+    }
+
+    @ViewBuilder
+    private func moreActionsMenu() -> some View {
+        Menu {
+            Button {
+                toggleRecording()
+            } label: {
+                Label(recordingMenuLabel, systemImage: recordingMenuIcon)
+            }
+
+            Button {
+                showTalkToText = true
+            } label: {
+                Label("Talk to Text", systemImage: "mic.badge.plus")
+            }
+
+            Section {
+                Button(action: { showFullContent.toggle() }) {
+                    Label(
+                        showFullContent ? "Show Titles Only" : "Show Full Content",
+                        systemImage: showFullContent ? "list.bullet" : "text.justify.leading"
+                    )
+                }
+
+                Button {
+                    brainstormLayoutMode = layoutMode == .board ? LayoutMode.list.rawValue : LayoutMode.board.rawValue
+                } label: {
+                    Label(layoutMenuLabel, systemImage: layoutMenuIcon)
+                }
+
+                if !ideas.isEmpty {
+                    Button {
+                        isSelectMode.toggle()
+                        if !isSelectMode {
+                            selectedIdeaIDs.removeAll()
+                        }
+                    } label: {
+                        Label(
+                            isSelectMode ? "Cancel Select" : "Select Multiple",
+                            systemImage: isSelectMode ? "xmark.circle" : "checkmark.circle"
+                        )
+                    }
+                }
+            }
+
+            Section {
+                Button {
+                    showingTrash = true
+                } label: {
+                    Label("Trash", systemImage: "trash")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .accessibilityLabel("More Actions")
+        }
+    }
     
     // MARK: - Empty State
     private var emptyState: some View {
@@ -206,13 +280,35 @@ struct BrainstormView: View {
         )
     }
     
-    // MARK: - Idea List
-    private var ideaGrid: some View {
+    // MARK: - Board
+    private var brainstormBoard: some View {
+        VStack(spacing: 0) {
+            GeometryReader { geo in
+                let layout = boardLayout(for: geo.size)
+
+                ZStack {
+                    boardBackground(boardSize: layout.boardSize)
+
+                    ForEach(Array(ideas.enumerated()), id: \.element.id) { index, idea in
+                        boardNote(idea: idea, index: index, layout: layout)
+                    }
+                }
+                .frame(width: layout.boardSize.width, height: layout.boardSize.height, alignment: .topLeading)
+                .background(Color(UIColor.systemGroupedBackground))
+            }
+
+            if isSelectMode {
+                brainstormBatchActionBar
+            }
+        }
+    }
+
+    private var brainstormList: some View {
         VStack(spacing: 0) {
             List {
                 ForEach(ideas) { idea in
                     if isSelectMode {
-                        ideaSelectableCard(idea: idea)
+                        listSelectableCard(idea: idea)
                             .listRowSeparatorTint(Color(red: 0.6, green: 0.7, blue: 0.85).opacity(0.3))
                     } else {
                         Button {
@@ -280,21 +376,158 @@ struct BrainstormView: View {
         }
     }
     
-    // MARK: - Batch Select Views
-    
     @ViewBuilder
-    private func ideaSelectableCard(idea: BrainstormIdea) -> some View {
+    private func boardNote(idea: BrainstormIdea, index: Int, layout: BoardLayout) -> some View {
         let isSelected = selectedIdeaIDs.contains(idea.id)
+        let noteCenter = resolvedPosition(for: idea, index: index, layout: layout)
+        let dragOffset = dragOffsets[idea.id] ?? .zero
+
+        IdeaCard(idea: idea, scale: 1.0, roastMode: roastMode, showFullContent: showFullContent)
+            .frame(width: layout.noteWidth)
+            .position(x: noteCenter.x + dragOffset.width, y: noteCenter.y + dragOffset.height)
+            .scaleEffect(isSelectMode && isSelected ? 0.96 : 1.0)
+            .overlay(alignment: .topTrailing) {
+                if isSelectMode {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundColor(isSelected ? Color.accentColor : .white.opacity(0.92))
+                        .padding(8)
+                }
+            }
+            .dsShadow(.light)
+            .onTapGesture {
+                if isSelectMode {
+                    toggleIdeaSelection(idea)
+                } else {
+                    selectedIdea = idea
+                }
+            }
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        guard !isSelectMode else { return }
+                        dragOffsets[idea.id] = value.translation
+                    }
+                    .onEnded { value in
+                        guard !isSelectMode else { return }
+                        dragOffsets[idea.id] = nil
+                        let nextPoint = CGPoint(
+                            x: noteCenter.x + value.translation.width,
+                            y: noteCenter.y + value.translation.height
+                        )
+                        updateBoardPosition(for: idea, point: nextPoint, layout: layout)
+                    }
+            )
+            .contextMenu {
+                Button {
+                    promoteToJoke(idea)
+                } label: {
+                    Label("Promote to Joke", systemImage: "arrow.up.doc.fill")
+                }
+                Divider()
+                Button(role: .destructive) {
+                    ideaToDelete = idea
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+    }
+
+    private func boardLayout(for viewport: CGSize) -> BoardLayout {
+        let safeWidth = max(320, viewport.width)
+        let safeHeight = max(420, viewport.height)
+        let horizontalInset: CGFloat = 18
+        let verticalInset: CGFloat = 18
+        let boardWidth = max(0, safeWidth - (horizontalInset * 2))
+        let boardHeight = max(0, safeHeight - (verticalInset * 2))
+
+        let noteHeight: CGFloat = showFullContent ? 152 : 116
+        let minNoteWidth: CGFloat = 120
+        let maxNoteWidth: CGFloat = 178
+        let targetColumns = min(4, max(2, Int(ceil(sqrt(Double(max(ideas.count, 1)))))))
+        let columnCount = min(max(targetColumns, 1), max(1, ideas.count))
+        let rowCount = max(1, Int(ceil(Double(max(ideas.count, 1)) / Double(columnCount))))
+        let horizontalSpacing: CGFloat = 12
+        let verticalSpacing: CGFloat = 12
+
+        let availableWidth = boardWidth - CGFloat(columnCount - 1) * horizontalSpacing - 24
+        let noteWidth = min(maxNoteWidth, max(minNoteWidth, availableWidth / CGFloat(max(columnCount, 1))))
+
+        return BoardLayout(
+            boardSize: CGSize(width: boardWidth, height: boardHeight),
+            noteWidth: noteWidth,
+            noteHeight: noteHeight,
+            columnCount: columnCount,
+            rowCount: rowCount,
+            horizontalSpacing: horizontalSpacing,
+            verticalSpacing: verticalSpacing,
+            horizontalInset: 12,
+            verticalInset: 12
+        )
+    }
+
+    private func resolvedPosition(for idea: BrainstormIdea, index: Int, layout: BoardLayout) -> CGPoint {
+        if idea.boardPositionX >= 0, idea.boardPositionY >= 0 {
+            return clampedBoardPoint(
+                CGPoint(x: idea.boardPositionX, y: idea.boardPositionY),
+                layout: layout
+            )
+        }
+
+        let row = index / layout.columnCount
+        let column = index % layout.columnCount
+        let baseX = layout.horizontalInset + layout.noteWidth / 2 + CGFloat(column) * (layout.noteWidth + layout.horizontalSpacing)
+        let baseY = layout.verticalInset + layout.noteHeight / 2 + CGFloat(row) * (layout.noteHeight + layout.verticalSpacing)
+
+        return clampedBoardPoint(
+            CGPoint(x: baseX, y: baseY),
+            layout: layout
+        )
+    }
+
+    private func clampedBoardPoint(_ point: CGPoint, layout: BoardLayout) -> CGPoint {
+        let halfWidth = layout.noteWidth / 2
+        let halfHeight = layout.noteHeight / 2
+        let x = min(max(point.x, halfWidth + layout.horizontalInset), layout.boardSize.width - halfWidth - layout.horizontalInset)
+        let y = min(max(point.y, halfHeight + layout.verticalInset), layout.boardSize.height - halfHeight - layout.verticalInset)
+        return CGPoint(x: x, y: y)
+    }
+
+    private func updateBoardPosition(for idea: BrainstormIdea, point: CGPoint, layout: BoardLayout) {
+        let clamped = clampedBoardPoint(point, layout: layout)
+        idea.boardPositionX = clamped.x
+        idea.boardPositionY = clamped.y
+
+        do {
+            try modelContext.save()
+        } catch {
+            print(" [BrainstormView] Failed to save board position: \(error)")
+            persistenceError = "Could not save note position: \(error.localizedDescription)"
+            showingErrorAlert = true
+        }
+    }
+
+    @ViewBuilder
+    private func boardBackground(boardSize: CGSize) -> some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(Color(UIColor.systemGroupedBackground))
+            .frame(width: boardSize.width, height: boardSize.height)
+    }
+
+    @ViewBuilder
+    private func listSelectableCard(idea: BrainstormIdea) -> some View {
+        let isSelected = selectedIdeaIDs.contains(idea.id)
+
         Button {
             toggleIdeaSelection(idea)
         } label: {
             ZStack(alignment: .topTrailing) {
                 IdeaCard(idea: idea, scale: effectiveGridScale, roastMode: roastMode, showFullContent: showFullContent)
-                    .opacity(isSelected ? 0.7 : 1.0)
-                
+                    .opacity(isSelected ? 0.72 : 1.0)
+
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundColor(isSelected ? Color.accentColor : .gray.opacity(0.5))
+                    .foregroundColor(isSelected ? Color.accentColor : .gray.opacity(0.55))
                     .padding(6)
             }
         }
@@ -410,6 +643,7 @@ struct BrainstormView: View {
     }
     
     private func startRecording() {
+        guard !isRecording, !speechManager.isRecording else { return }
         speechManager.startRecording()
         isRecording = true
     }
@@ -488,61 +722,41 @@ struct IdeaCard: View {
     let scale: CGFloat
     let roastMode: Bool
     var showFullContent: Bool = true
-    
-    private var accentColor: Color {
-        let hex = idea.colorHex
-        if !hex.isEmpty, let parsed = Color(hex: hex) {
-            return parsed
-        }
-        return Color.accentColor
+
+    private var previewText: String {
+        idea.content.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Thin color accent bar at the top
-            accentColor
-                .frame(height: 3)
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10))
-            
-            VStack(alignment: .leading, spacing: 6) {
-                // Voice indicator (subtle badge)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 6) {
+                Text(previewText.isEmpty ? "Untitled thought" : previewText)
+                    .font(showFullContent ? .subheadline : .headline)
+                    .foregroundColor(.primary)
+                    .lineLimit(showFullContent ? 4 : 2)
+
+                Spacer(minLength: 4)
+
                 if idea.isVoiceNote {
-                    HStack(spacing: 4) {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 9, weight: .semibold))
-                        Text("Voice")
-                            .font(.caption2.weight(.medium))
-                    }
-                    .foregroundStyle(roastMode ? Color.bitbinderAccent.opacity(0.7) : .accentColor.opacity(0.6))
+                    Image(systemName: "mic.fill")
+                        .font(.caption)
+                    .foregroundColor(Color.bitbinderAccent)
                 }
-                
-                // Content
-                if showFullContent {
-                    Text(idea.content)
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
-                        .lineSpacing(2)
-                        .lineLimit(6)
-                } else {
-                    Text(idea.content.components(separatedBy: .newlines).first ?? idea.content)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                }
-                
-                Spacer(minLength: 0)
-                
-                // Timestamp (minimal)
+            }
+
+            HStack(spacing: 6) {
                 Text(idea.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
                     .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .foregroundColor(Color(UIColor.tertiaryLabel))
+
+                Spacer()
             }
-            .padding(.horizontal, max(8, 10 * scale))
-            .padding(.vertical, max(8, 10 * scale))
         }
+        .padding(.leading, 8)
+        .padding(.trailing, 12)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .background(Color(UIColor.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

@@ -287,13 +287,15 @@ struct GuidedRoastTargetSheet: View {
             VStack(spacing: 0) {
                 // Progress bar
                 GeometryReader { geo in
+                    let availableWidth = max(0, geo.size.width.isFinite ? geo.size.width : 0)
+                    let normalizedStep = min(max(CGFloat(step), 0), 4)
                     RoundedRectangle(cornerRadius: 2)
                         .fill(accentColor.opacity(0.2))
                         .frame(height: 4)
                         .overlay(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(accentColor)
-                                .frame(width: geo.size.width * CGFloat(step) / 4, height: 4)
+                                .frame(width: availableWidth * normalizedStep / 4, height: 4)
                                 .animation(.easeOut, value: step)
                         }
                 }

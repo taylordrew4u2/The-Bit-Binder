@@ -17,6 +17,7 @@ struct AddBrainstormIdeaSheet: View {
     @State private var isVoiceNote: Bool
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
+    @State private var isSaving = false
     let initialText: String
 
     init(isVoiceNote: Bool = false, initialText: String = "") {
@@ -57,14 +58,22 @@ struct AddBrainstormIdeaSheet: View {
                      Button("Save") { saveIdea() }
                          .fontWeight(.semibold)
                          .foregroundColor(Color.bitbinderAccent)
-                         .disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                         .disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
                  }
              }
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .onAppear {
-            if !initialText.isEmpty { content = initialText }
+            if let draft = QuickCaptureDraftStore.loadBrainstormDraft(),
+               !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                content = draft
+            } else if !initialText.isEmpty {
+                content = initialText
+            }
+        }
+        .onChange(of: content) { _, newValue in
+            QuickCaptureDraftStore.saveBrainstormDraft(newValue)
         }
         .alert("Save Failed", isPresented: $showSaveError) {
             Button("OK", role: .cancel) { }
@@ -74,16 +83,21 @@ struct AddBrainstormIdeaSheet: View {
     }
 
     private func saveIdea() {
+        guard !isSaving else { return }
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        isSaving = true
         let idea = BrainstormIdea(content: trimmed, colorHex: BrainstormIdea.randomColor(), isVoiceNote: isVoiceNote)
         modelContext.insert(idea)
         do {
             try modelContext.save()
+            QuickCaptureDraftStore.clearBrainstormDraft()
             dismiss()
         } catch {
+            modelContext.delete(idea)
+            isSaving = false
             print(" [AddBrainstormIdeaSheet] Failed to save idea: \(error)")
-            saveErrorMessage = "Could not save thought: \(error.localizedDescription)"
+            saveErrorMessage = "Could not save thought. Your draft is preserved on this device."
             showSaveError = true
         }
     }

@@ -189,6 +189,11 @@ struct thebitbinderApp: App {
     /// SwiftUI control that uses the environment tint (.accentColor, Buttons,
     /// Toggles, Links, ProgressViews, navigation tint, etc.) turns red.
     @AppStorage("roastModeEnabled") private var roastMode: Bool = false
+    @AppStorage("appTextSize") private var appTextSizeRawValue: String = AppTextSize.standard.rawValue
+
+    private var appTextSize: AppTextSize {
+        AppTextSize(rawValue: appTextSizeRawValue) ?? .standard
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -201,6 +206,7 @@ struct thebitbinderApp: App {
                 }
             }
             .tint(roastMode ? FirePalette.core : .blue)
+            .dynamicTypeSize(appTextSize.dynamicTypeSize)
             .animation(.easeOut(duration: 0.35), value: startup.isReady)
             .task {
                 // Force-init @MainActor singletons here where MainActor
