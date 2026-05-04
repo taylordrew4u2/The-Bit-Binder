@@ -14,6 +14,7 @@ struct BitBuddyChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dismissBitBuddyDrawer) private var dismissDrawer
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject var userPreferences: UserPreferences
     @Query(sort: \Joke.dateCreated, order: .reverse) private var jokes: [Joke]
     @StateObject private var bitBuddy = BitBuddyService.shared
@@ -99,6 +100,7 @@ struct BitBuddyChatView: View {
                     isInputFocused = false
                     // Brief delay lets keyboard frame animation complete
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        guard scenePhase == .active else { return }
                         dismissDrawer()
                         dismiss()
                     }
@@ -267,6 +269,7 @@ struct BitBuddyChatView: View {
                 userInfo: ["screen": appScreen.rawValue]
             )
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                guard scenePhase == .active else { return }
                 dismiss()
             }
         }
@@ -420,6 +423,7 @@ struct BitBuddyChatView: View {
             bitBuddy.pendingMessage = nil
             inputText = pending
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                guard scenePhase == .active else { return }
                 sendMessage()
             }
         }

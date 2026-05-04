@@ -14,6 +14,7 @@ import SwiftData
 struct BrainstormDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("roastModeEnabled") private var roastMode = false
 
     @Query(filter: #Predicate<JokeFolder> { !$0.isTrashed }, sort: \JokeFolder.name) private var folders: [JokeFolder]
@@ -128,6 +129,7 @@ struct BrainstormDetailView: View {
         .onAppear {
             // Auto-focus so you can start typing right away
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                guard scenePhase == .active else { return }
                 if idea.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     focusedField = .content
                 }
@@ -165,12 +167,6 @@ struct BrainstormDetailView: View {
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
-                Text(KeywordTitleGenerator.displayTitle(from: idea.content))
-                    .font(.title2.bold())
-                    .foregroundColor(.primary)
-
-                Spacer()
-
                 // Voice badge
                 if idea.isVoiceNote {
                     HStack(spacing: 4) {
@@ -187,6 +183,8 @@ struct BrainstormDetailView: View {
                             .fill(accentColor.opacity(0.12))
                     )
                 }
+
+                Spacer()
             }
 
             // Word count + auto-save status
@@ -517,6 +515,7 @@ struct BrainstormDetailView: View {
 
         // Dismiss after a brief moment so the user sees the toast
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            guard scenePhase == .active else { return }
             dismiss()
         }
     }

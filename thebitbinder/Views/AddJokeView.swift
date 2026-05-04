@@ -12,6 +12,7 @@ import SwiftData
 struct AddJokeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @Query(filter: #Predicate<JokeFolder> { !$0.isTrashed }) private var folders: [JokeFolder]
     
     @State private var title = ""
@@ -19,6 +20,7 @@ struct AddJokeView: View {
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
     @State private var isSaving = false
+    @State private var hasRecoveredDraft = false
     @FocusState private var titleFocused: Bool
     @FocusState private var contentFocused: Bool
     
@@ -119,9 +121,25 @@ struct AddJokeView: View {
                 }
             }
             .onAppear {
+                if let draft = QuickCaptureDraftStore.loadJokeDraft() {
+                    if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        title = draft.title
+                    }
+                    if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        content = draft.content
+                    }
+                    hasRecoveredDraft = !draft.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    guard scenePhase == .active else { return }
                     contentFocused = true
                 }
+            }
+            .onChange(of: title) { _, newValue in
+                QuickCaptureDraftStore.saveJokeDraft(title: newValue, content: content)
+            }
+            .onChange(of: content) { _, newValue in
+                QuickCaptureDraftStore.saveJokeDraft(title: title, content: newValue)
             }
             .alert("Save Failed", isPresented: $showSaveError) {
                 Button("OK", role: .cancel) {}
@@ -132,25 +150,32 @@ struct AddJokeView: View {
     }
     
     private func saveJoke() {
+        guard !isSaving else { return }
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else { return }
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+
         isSaving = true
         haptic(.light)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            let joke = Joke(content: content, title: title, folder: selectedFolder)
-            modelContext.insert(joke)
-            
-            do {
-                try modelContext.save()
-                haptic(.success)
-                NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
-                dismiss()
-            } catch {
-                isSaving = false
-                haptic(.error)
-                print("[AddJokeView] Failed to save joke: \(error)")
-                saveErrorMessage = "Could not save joke: \(error.localizedDescription)"
-                showSaveError = true
-            }
+
+        let joke = Joke(content: trimmedContent, title: trimmedTitle, folder: selectedFolder)
+        modelContext.insert(joke)
+
+        do {
+            try modelContext.save()
+            QuickCaptureDraftStore.clearJokeDraft()
+            haptic(.success)
+            NotificationCenter.default.post(name: .jokeDatabaseDidChange, object: nil)
+            dismiss()
+        } catch {
+            modelContext.delete(joke)
+            isSaving = false
+            haptic(.error)
+            print("[AddJokeView] Failed to save joke: \(error)")
+            saveErrorMessage = hasRecoveredDraft
+                ? "Could not save joke. Your recovered draft is still preserved on this device."
+                : "Could not save joke. Your draft is preserved on this device."
+            showSaveError = true
         }
     }
 }

@@ -1,4 +1,5 @@
 //
+//
 //  DataValidationService.swift
 //  thebitbinder
 //
@@ -21,6 +22,8 @@ final class DataValidationService: ObservableObject {
     private var isValidating = false
     /// Timestamp of last completed validation — enforces a minimum gap.
     private var lastValidationDate: Date = .distantPast
+    /// Tracks whether the last completed validation included full entity scans.
+    private var lastValidationIncludedDeepScan = false
     /// Minimum seconds between validation runs (prevents duplicates on rapid launch paths).
     private let validationCooldown: TimeInterval = 10
     
@@ -35,21 +38,28 @@ final class DataValidationService: ObservableObject {
     
     // MARK: - Data Integrity Checks
     
-    /// Performs comprehensive data validation
-    func validateDataIntegrity(context: ModelContext) async -> DataValidationResult {
+    /// Performs data validation.
+    /// - Parameter includeDeepScan: When `true`, fetches full entities and walks
+    ///   relationships to detect corruption. When `false`, only count-based
+    ///   checks run to keep launch-time validation lightweight.
+    func validateDataIntegrity(context: ModelContext, includeDeepScan: Bool = true) async -> DataValidationResult {
         // Guard: prevent concurrent or rapid back-to-back runs
         guard !isValidating else {
             print(" [DataValidation] Validation already in progress — skipping duplicate run")
             return DataValidationResult()
         }
-        guard Date().timeIntervalSince(lastValidationDate) >= validationCooldown else {
-            print(" [DataValidation] Validation ran recently (\(String(format: "%.0f", Date().timeIntervalSince(lastValidationDate)))s ago) — skipping")
+        let secondsSinceLastValidation = Date().timeIntervalSince(lastValidationDate)
+        let shouldHonorCooldown = secondsSinceLastValidation < validationCooldown &&
+            (!includeDeepScan || lastValidationIncludedDeepScan)
+        guard !shouldHonorCooldown else {
+            print(" [DataValidation] Validation ran recently (\(String(format: "%.0f", secondsSinceLastValidation))s ago) — skipping")
             return DataValidationResult()
         }
         isValidating = true
         defer {
             isValidating = false
             lastValidationDate = Date()
+            lastValidationIncludedDeepScan = includeDeepScan
         }
         
         var result = DataValidationResult()
@@ -70,10 +80,13 @@ final class DataValidationService: ObservableObject {
         result.importBatchesCount = await countEntities(of: ImportBatch.self, context: context)
         result.chatMessagesCount = await countEntities(of: ChatMessage.self, context: context)
         
-        // Check for data corruption patterns
-        await validateJokes(context: context, result: &result)
-        await validateRecordings(context: context, result: &result)
-        await validateRelationships(context: context, result: &result)
+        // Deep scans fault full entities and relationships, so keep them for
+        // explicit validation/repair flows rather than every launch.
+        if includeDeepScan {
+            await validateJokes(context: context, result: &result)
+            await validateRecordings(context: context, result: &result)
+            await validateRelationships(context: context, result: &result)
+        }
         
         // Compare with previous counts
         let previousCounts = getPreviousCounts()
@@ -168,7 +181,9 @@ final class DataValidationService: ObservableObject {
     
     private func validateJokes(context: ModelContext, result: inout DataValidationResult) async {
         do {
-            let jokes = try context.fetch(FetchDescriptor<Joke>())
+            let jokes = try context.fetch(
+                FetchDescriptor<Joke>(predicate: #Predicate { $0.isTrashed == false })
+            )
             
             var emptyJokes = 0
             var jokesWithoutDates = 0
@@ -213,16 +228,15 @@ final class DataValidationService: ObservableObject {
     
     private func validateRecordings(context: ModelContext, result: inout DataValidationResult) async {
         do {
-            let recordings = try context.fetch(FetchDescriptor<Recording>())
+            let recordings = try context.fetch(
+                FetchDescriptor<Recording>(predicate: #Predicate { $0.isTrashed == false })
+            )
             let handledIDs = getHandledMissingRecordingIDs()
             
             var invalidFileURLs = 0
             var missingFiles = 0
             
             for recording in recordings {
-                // Skip soft-deleted recordings — they may have had their file removed already
-                if recording.isTrashed { continue }
-                
                 // Check if file URL is valid
                 if recording.fileURL.isEmpty {
                     invalidFileURLs += 1
@@ -257,15 +271,18 @@ final class DataValidationService: ObservableObject {
     private func validateRelationships(context: ModelContext, result: inout DataValidationResult) async {
         do {
             // Check joke-folder relationships
-            let jokes = try context.fetch(FetchDescriptor<Joke>())
+            let jokes = try context.fetch(
+                FetchDescriptor<Joke>(predicate: #Predicate { $0.isTrashed == false })
+            )
             let folders = try context.fetch(FetchDescriptor<JokeFolder>())
+            let folderIDs = Set(folders.map(\.id))
             
             var brokenFolderRelationships = 0
             
             for joke in jokes {
                 if let folder = joke.folder {
                     // Check if the folder actually exists in the database
-                    if !folders.contains(where: { $0.id == folder.id }) {
+                    if !folderIDs.contains(folder.id) {
                         brokenFolderRelationships += 1
                     }
                 }
@@ -276,14 +293,17 @@ final class DataValidationService: ObservableObject {
             }
             
             // Check roast target relationships
-            let roastJokes = try context.fetch(FetchDescriptor<RoastJoke>())
+            let roastJokes = try context.fetch(
+                FetchDescriptor<RoastJoke>(predicate: #Predicate { $0.isTrashed == false })
+            )
             let roastTargets = try context.fetch(FetchDescriptor<RoastTarget>())
+            let roastTargetIDs = Set(roastTargets.map(\.id))
             
             var brokenRoastRelationships = 0
             
             for roastJoke in roastJokes {
                 if let target = roastJoke.target {
-                    if !roastTargets.contains(where: { $0.id == target.id }) {
+                    if !roastTargetIDs.contains(target.id) {
                         brokenRoastRelationships += 1
                     }
                 }

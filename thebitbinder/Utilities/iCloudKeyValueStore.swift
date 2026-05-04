@@ -54,13 +54,13 @@ enum SyncedKeys {
         journalReminderEnabled,
         journalReminderMinute,
         userId,
-        lastSyncDate,
     ]
 }
 
 /// Singleton that keeps UserDefaults and NSUbiquitousKeyValueStore in sync.
-/// On launch it pulls from iCloud  local. On local writes it pushes to iCloud.
+/// On launch it pulls from iCloud → local. On local writes it pushes to iCloud.
 /// Also observes UserDefaults so @AppStorage changes are pushed automatically.
+@MainActor
 final class iCloudKeyValueStore {
     static let shared = iCloudKeyValueStore()
     
@@ -68,6 +68,8 @@ final class iCloudKeyValueStore {
     private let local = UserDefaults.standard
     /// Prevents feedback loops when pulling from cloud triggers local observation
     private var isSyncing = false
+    private var lastPullDate: Date = .distantPast
+    private let minimumPullInterval: TimeInterval = 2.0
     
     /// Performance: Debounce sync operations
     private var syncDebounceWorkItem: DispatchWorkItem?
@@ -95,7 +97,7 @@ final class iCloudKeyValueStore {
         
         // Trigger initial sync from iCloud
         cloud.synchronize()
-        pullFromCloud()
+        pullFromCloud(force: true)
     }
     
     // MARK: - Write (local  iCloud)
@@ -167,14 +169,13 @@ final class iCloudKeyValueStore {
     /// thread performed the write. Hop to main before touching instance
     /// state (`isSyncing`, `syncDebounceWorkItem`) so Swift concurrency
     /// doesn't insert an `unsafeForcedSync` hazard hop at runtime.
-    @objc private func defaultsDidChange() {
-        guard Thread.isMainThread else {
-            DispatchQueue.main.async { [weak self] in
-                self?.defaultsDidChange()
-            }
-            return
+    @objc nonisolated private func defaultsDidChange() {
+        Task { @MainActor [weak self] in
+            self?.handleDefaultsDidChange()
         }
+    }
 
+    private func handleDefaultsDidChange() {
         guard !isSyncing else { return }  // Don't push back what we just pulled
 
         // Performance: Debounce sync operations to prevent excessive iCloud calls
@@ -241,9 +242,15 @@ final class iCloudKeyValueStore {
     // MARK: - Pull (iCloud  local)
     
     /// Pull all synced keys from iCloud into UserDefaults
-    func pullFromCloud() {
+    func pullFromCloud(force: Bool = false) {
+        if !force, Date().timeIntervalSince(lastPullDate) < minimumPullInterval {
+            return
+        }
         isSyncing = true
-        defer { isSyncing = false }
+        defer {
+            isSyncing = false
+            lastPullDate = Date()
+        }
         
         for key in SyncedKeys.all {
             if let cloudValue = cloud.object(forKey: key) {
@@ -268,7 +275,13 @@ final class iCloudKeyValueStore {
     
     // MARK: - Remote Change Handler
     
-    @objc private func cloudDidChange(_ notification: Notification) {
+    @objc nonisolated private func cloudDidChange(_ notification: Notification) {
+        Task { @MainActor [weak self] in
+            self?.handleCloudDidChange(notification)
+        }
+    }
+
+    private func handleCloudDidChange(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let reason = userInfo[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int else {
             print(" [iCloudKV] Remote change received but no reason key — ignoring")
@@ -318,13 +331,11 @@ final class iCloudKeyValueStore {
                 print(" [iCloudKV] Successfully synced \(successCount) keys from \(reasonString)")
                 
                 // Post notification so views can refresh
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(
-                        name: .iCloudKVDidChange, 
-                        object: nil, 
-                        userInfo: ["keys": syncedChangedKeys, "reason": reasonString]
-                    )
-                }
+                NotificationCenter.default.post(
+                    name: .iCloudKVDidChange,
+                    object: nil,
+                    userInfo: ["keys": syncedChangedKeys, "reason": reasonString]
+                )
             }
             
             print(" [iCloudKV] Received \(reasonString) for \(changedKeys.count) key(s), \(syncedChangedKeys.count) synced: \(syncedChangedKeys.joined(separator: ", "))")
@@ -345,7 +356,7 @@ final class iCloudKeyValueStore {
         print(" [iCloudKV] synchronize() returned: \(syncResult)")
         
         // Pull any changes from cloud  local
-        pullFromCloud()
+        pullFromCloud(force: true)
         
         // Push any local changes to cloud
         pushToCloud()

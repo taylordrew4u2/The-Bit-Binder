@@ -46,12 +46,6 @@ final class MemoryManager {
     // that touches instance state.
 
     private func setupObservers() {
-        // Memory warning - highest priority.
-        // `queue: .main` guarantees the closure body runs on the main thread,
-        // so `MainActor.assumeIsolated` is sound and avoids the async hop
-        // (and accompanying `unsafeForcedSync` runtime warning) that an
-        // unannotated closure would otherwise trigger when calling into
-        // `@MainActor` instance methods.
         memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
@@ -62,7 +56,6 @@ final class MemoryManager {
             }
         }
 
-        // Background transition - clear caches to reduce footprint
         backgroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil,
@@ -73,7 +66,6 @@ final class MemoryManager {
             }
         }
 
-        // Foreground transition - good time to report memory state
         foregroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
             object: nil,
@@ -87,34 +79,35 @@ final class MemoryManager {
     
     /// Called when system sends memory warning.
     ///
-    /// Returns quickly — iOS expects memory-warning handlers to yield control
-    /// back fast, so the actual cleanup is deferred to the next runloop via
-    /// a `Task { @MainActor }`. MainActor isolation serialises access to
-    /// `isClearing`, so no explicit lock is needed.
+    /// Keep this path distinct from proactive cleanup so logs accurately
+    /// reflect whether the OS warned or we voluntarily reduced pressure.
     func handleMemoryWarning() {
+        performCleanup(reason: "Memory warning received")
+    }
+
+    private func performCleanup(reason: String) {
         guard !isClearing else { return }
         isClearing = true
 
-        print(" [MemoryManager] Memory warning received - clearing caches")
+        print(" [MemoryManager] \(reason) - clearing caches")
         reportMemoryUsage()
 
-        Task { @MainActor [weak self] in
-            // 1. Clear URL caches
-            URLCache.shared.removeAllCachedResponses()
-            URLCache.shared.memoryCapacity = 0
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s breather
+        // 1. Clear URL caches immediately.
+        URLCache.shared.removeAllCachedResponses()
+        URLCache.shared.memoryCapacity = 0
+
+        // 2. Clear temp files (scratch recordings, import artifacts, etc.).
+        clearTempFiles()
+
+        // 3. Clear BitBuddy conversation history — can be substantial after
+        //    many turns, and is not user-critical data.
+        BitBuddyService.shared.startNewConversation()
+
+        // 4. Restore a small in-memory cache budget on the next runloop tick.
+        DispatchQueue.main.async { [weak self] in
             URLCache.shared.memoryCapacity = MemoryManager.postFlushURLCacheBytes
-
-            // 2. Clear BitBuddy conversation history — can be substantial after
-            //    many turns, and is not user-critical data.
-            BitBuddyService.shared.startNewConversation()
-
-            // 3. Clear temp files (scratch recordings, import artifacts, etc.)
-            self?.clearTempFiles()
-
             self?.reportMemoryUsage()
             print(" [MemoryManager] Caches cleared")
-
             self?.isClearing = false
         }
     }
@@ -130,9 +123,7 @@ final class MemoryManager {
         clearTempFiles()
         
         // Release BitBuddy conversation history
-        Task { @MainActor in
-            BitBuddyService.shared.startNewConversation()
-        }
+        BitBuddyService.shared.startNewConversation()
     }
     
     /// Called when app enters foreground
@@ -144,7 +135,7 @@ final class MemoryManager {
     
     /// Call this to proactively reduce memory usage
     func reduceMemoryUsage() {
-        handleMemoryWarning()
+        performCleanup(reason: "Preemptive memory cleanup")
     }
     
     /// Report current memory usage
@@ -212,5 +203,3 @@ final class MemoryManager {
         }
     }
 }
-
-

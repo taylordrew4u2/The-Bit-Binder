@@ -12,6 +12,7 @@ import Speech
 
 struct RecordingDetailView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     
     @Bindable var recording: Recording
     @StateObject private var audioPlayer = AudioPlayerService()
@@ -200,6 +201,7 @@ struct RecordingDetailView: View {
         .onAppear {
             // Small delay to ensure audio session is ready
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                guard scenePhase == .active else { return }
                 audioPlayer.loadAudio(from: recording.resolvedURL)
             }
         }
@@ -393,8 +395,9 @@ class AudioPlayerService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     @objc private func handleMemoryWarning() {
         // Pause playback on memory warning
-        if isPlaying {
-            pause()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isPlaying else { return }
+            self.pause()
             print(" Memory warning - pausing playback")
         }
     }
@@ -504,16 +507,20 @@ class AudioPlayerService: NSObject, ObservableObject, AVAudioPlayerDelegate {
     
     // AVAudioPlayerDelegate methods
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        isPlaying = false
-        currentTime = 0
-        stopTimer()
+        DispatchQueue.main.async { [weak self] in
+            self?.isPlaying = false
+            self?.currentTime = 0
+            self?.stopTimer()
+        }
     }
     
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
-        if let error = error {
-            print("Audio player decode error: \(error.localizedDescription)")
-        }
-        isPlaying = false
-        stopTimer()
+        DispatchQueue.main.async { [weak self] in
+            if let error = error {
+                print("Audio player decode error: \(error.localizedDescription)")
+            }
+            self?.isPlaying = false
+            self?.stopTimer()
+        } 
     }
 }

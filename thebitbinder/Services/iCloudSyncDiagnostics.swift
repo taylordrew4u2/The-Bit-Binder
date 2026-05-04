@@ -333,8 +333,8 @@ final class iCloudSyncDiagnostics: ObservableObject {
     private func checkKeyValueStore() async {
         diagnosticResults.append("🔍 Checking iCloud Key-Value Store...")
         
-        // iCloudKeyValueStore is not @MainActor — safe to call directly.
-        // Using Task.detached previously caused non-Sendable capture warnings.
+        // iCloudKeyValueStore is MainActor-isolated because its notification
+        // callbacks mutate shared state; this async context can call it safely.
         let kvDiagnostics = iCloudKeyValueStore.shared.diagnostics()
         
         diagnosticResults.append("📋 Key-Value Store Status:")
@@ -368,7 +368,6 @@ final class iCloudSyncDiagnostics: ObservableObject {
     func forceKeyValueSync() async {
         diagnosticResults.append("🔄 Forcing Key-Value Store sync...")
         
-        // iCloudKeyValueStore is not @MainActor — safe to call directly.
         iCloudKeyValueStore.shared.forceSync()
         
         diagnosticResults.append("✅ Key-Value Store force sync completed")

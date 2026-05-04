@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import UIKit
 
 @MainActor
 final class AppStartupCoordinator: ObservableObject {
@@ -19,6 +20,9 @@ final class AppStartupCoordinator: ObservableObject {
     
     /// Prevents `completeDataProtectionWithContext` from running more than once.
     private var hasCompletedDataProtection = false
+    /// Prevents overlapping attempts while still allowing a retry if the app
+    /// backgrounds before post-startup work finishes.
+    private var isCompletingDataProtection = false
     
     func start() async {
         guard !isReady else { return }
@@ -49,12 +53,21 @@ final class AppStartupCoordinator: ObservableObject {
     
     /// Call this after ModelContainer is available to complete data validation and migration
     func completeDataProtectionWithContext(_ context: ModelContext) async {
-        // Guard: prevent this from running more than once per launch
+        // Guard: prevent overlaps and skip if already finished this launch.
         guard !hasCompletedDataProtection else {
             print(" [AppStartup] completeDataProtectionWithContext already ran — skipping")
             return
         }
-        hasCompletedDataProtection = true
+        guard !isCompletingDataProtection else {
+            print(" [AppStartup] completeDataProtectionWithContext already in progress — skipping")
+            return
+        }
+        guard UIApplication.shared.applicationState == .active else {
+            print(" [AppStartup] Deferring post-startup work until app is active")
+            return
+        }
+        isCompletingDataProtection = true
+        defer { isCompletingDataProtection = false }
         
         print(" [AppStartup] Completing data protection with model context...")
         
@@ -129,9 +142,14 @@ final class AppStartupCoordinator: ObservableObject {
         // Purge soft-deleted items older than 30 days before validation runs
         await purgeExpiredTrashItems(context: context)
         await Task.yield()
+        guard shouldContinueForegroundStartup() else { return }
 
-        // Perform data validation
-        let validation = await dataValidation.validateDataIntegrity(context: context)
+        // Launch-time validation stays lightweight to avoid faulting large
+        // portions of the store before the app is interactive.
+        let validation = await dataValidation.validateDataIntegrity(
+            context: context,
+            includeDeepScan: false
+        )
         await Task.yield()
         
         if validation.significantDataLoss && !validation.issues.isEmpty {
@@ -157,15 +175,18 @@ final class AppStartupCoordinator: ObservableObject {
         }
         
         await Task.yield()
+        guard shouldContinueForegroundStartup() else { return }
 
         // Handle schema changes
         await dataMigration.handleSchemaChanges(context: context)
         await Task.yield()
+        guard shouldContinueForegroundStartup() else { return }
 
         // Verify CloudKit schema deployment
         schemaDeployment.logSchemaFields()
         await schemaDeployment.ensureSchemaDeployed(context: context)
         await Task.yield()
+        guard shouldContinueForegroundStartup() else { return }
 
         // Perform any needed migrations
         let migrationResult = await dataMigration.performSafeMigration(context: context)
@@ -178,6 +199,16 @@ final class AppStartupCoordinator: ObservableObject {
         case .failure(let message):
             print(" [AppStartup] Migration: \(message)")
         }
+        
+        hasCompletedDataProtection = true
+    }
+
+    private func shouldContinueForegroundStartup() -> Bool {
+        guard UIApplication.shared.applicationState == .active else {
+            print(" [AppStartup] Pausing post-startup work because app is no longer active")
+            return false
+        }
+        return true
     }
     
     // MARK: - Trash Auto-Purge

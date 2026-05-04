@@ -11,7 +11,8 @@ import UserNotifications
 
 /// Notification manager - thread-safe via SwiftUI's @Published property dispatch.
 /// UNUserNotificationCenterDelegate callbacks are already dispatched on main thread by the system.
-final class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
+@MainActor
+final class NotificationManager: NSObject, ObservableObject, @preconcurrency UNUserNotificationCenterDelegate {
 
     static let shared = NotificationManager()
     
@@ -193,12 +194,11 @@ final class NotificationManager: NSObject, ObservableObject, UNUserNotificationC
     /// Call once on app launch / didBecomeActive
     func scheduleIfNeeded() {
         guard isEnabled else { return }
-        // Only schedule if there isn't one already pending
+        let id = notifID
         UNUserNotificationCenter.current().getPendingNotificationRequests { [weak self] reqs in
-            guard let self else { return }
-            let hasPending = reqs.contains { $0.identifier == self.notifID }
+            let hasPending = reqs.contains { $0.identifier == id }
             if !hasPending {
-                self.scheduleNext()
+                DispatchQueue.main.async { self?.scheduleNext() }
             }
         }
     }
@@ -214,8 +214,8 @@ final class NotificationManager: NSObject, ObservableObject, UNUserNotificationC
 
     private func requestPermissionAndSchedule() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, _ in
-            guard granted, let self else { return }
-            self.scheduleNext()
+            guard granted else { return }
+            DispatchQueue.main.async { self?.scheduleNext() }
         }
     }
 
@@ -264,8 +264,10 @@ final class NotificationManager: NSObject, ObservableObject, UNUserNotificationC
 
     // MARK: - Observers
 
-    @objc private func timezoneDidChange() {
-        rescheduleIfEnabled()
+    @objc nonisolated private func timezoneDidChange() {
+        Task { @MainActor [weak self] in
+            self?.rescheduleIfEnabled()
+        }
     }
 
     // MARK: - UNUserNotificationCenterDelegate

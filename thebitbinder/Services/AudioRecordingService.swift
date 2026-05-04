@@ -61,10 +61,20 @@ class AudioRecordingService: NSObject, ObservableObject {
         )
     }
     
-    @objc private func handleMemoryWarning() {
-        // Stop recording if memory is low
-        if isRecording {
-            print(" Memory warning during recording - consider stopping")
+    @objc nonisolated private func handleMemoryWarning() {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                if self.isRecording {
+                    print(" Memory warning during recording - consider stopping")
+                }
+            }
+        } else {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if self.isRecording {
+                    print(" Memory warning during recording - consider stopping")
+                }
+            }
         }
     }
     

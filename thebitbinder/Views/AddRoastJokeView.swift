@@ -10,6 +10,7 @@ import SwiftData
 struct AddRoastJokeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     let target: RoastTarget
 
@@ -172,6 +173,7 @@ struct AddRoastJokeView: View {
             }
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    guard scenePhase == .active else { return }
                     isTextFocused = true
                 }
             }

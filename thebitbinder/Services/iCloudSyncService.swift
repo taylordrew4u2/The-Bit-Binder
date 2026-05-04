@@ -26,6 +26,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
     /// Task-based debounce — replaces Timer to stay within structured
     /// concurrency and avoid `unsafeForcedSync` from non-@MainActor Timer callbacks.
     private var debouncedSyncTask: Task<Void, Never>?
+    private var isProcessingRemoteChange = false
     private var lastSyncCompletionDate: Date = .distantPast
     private let syncCooldown: TimeInterval = 3.0 // 3 seconds (reduced from 5 for faster sync)
 
@@ -91,40 +92,49 @@ final class iCloudSyncService: NSObject, ObservableObject {
             object: nil
         )
     }
-    
-    @objc nonisolated private func handleRemoteChange(_ notification: Notification) {
-        // Capture weak self once at the top of the outer Task; reuse that
-        // binding inside the debounce Task rather than re-capturing weak
-        // self a second time. This avoids a brief window where the outer
-        // `guard let self` succeeds but the inner re-weakified self could
-        // become nil mid-chain, which was confusing to reason about.
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.debouncedSyncTask?.cancel()
-            self.debouncedSyncTask = Task { @MainActor [weak self] in
-                // Use try/catch instead of try? so cancellation is a clean
-                // early-return rather than a swallowed error.
-                do {
-                    try await Task.sleep(nanoseconds: 1_000_000_000) // 1s debounce
-                } catch {
-                    return // cancelled — expected path, no work to do
-                }
-                guard !Task.isCancelled else { return }
-                await self?.processRemoteChangeAsync()
-            }
-        }
+
+    /// Debounced entry point for silent CloudKit pushes delivered through
+    /// UIApplicationDelegate. This avoids spoofing Core Data's internal
+    /// remote-change notification, which can cause duplicate merge work.
+    func handleSilentPushNotification() {
+        scheduleRemoteChangeProcessing(trigger: "silent push")
     }
     
-    private func processRemoteChangeAsync() async {
+    @objc nonisolated private func handleRemoteChange(_ notification: Notification) {
+        Task { @MainActor [weak self] in
+            self?.scheduleRemoteChangeProcessing(trigger: "persistent store remote change")
+        }
+    }
+
+    private func scheduleRemoteChangeProcessing(trigger: String) {
+        debouncedSyncTask?.cancel()
+        debouncedSyncTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            await self?.processRemoteChangeAsync(trigger: trigger)
+        }
+    }
+
+    private func processRemoteChangeAsync(trigger: String) async {
         guard !UserDefaults.standard.bool(forKey: "DataProtection_PendingRestoreRestart") else {
             print(" [iCloud] Sync suppressed — pending restore restart")
             return
         }
-        guard Date().timeIntervalSince(lastSyncCompletionDate) >= syncCooldown else {
-            print(" [iCloud] Sync request ignored due to cooldown.")
+        guard !isProcessingRemoteChange else {
+            print(" [iCloud] Remote change from \(trigger) ignored — merge already in progress")
             return
         }
-        
+        guard Date().timeIntervalSince(lastSyncCompletionDate) >= syncCooldown else {
+            print(" [iCloud] Remote change from \(trigger) ignored due to cooldown.")
+            return
+        }
+
+        isProcessingRemoteChange = true
+        defer { isProcessingRemoteChange = false }
         syncStatus = .syncing
         
         // Refresh the SwiftData context so it merges remote CloudKit changes
@@ -140,14 +150,13 @@ final class iCloudSyncService: NSObject, ObservableObject {
                 
                 // Step 2: Fetch current count to verify sync is working
                 let jokeCount = try ctx.fetchCount(FetchDescriptor<Joke>())
-                print(" [iCloud] Current joke count after merge: \(jokeCount)")
                 
                 // Step 3: Post notification so SwiftUI views using @Query will refresh
                 // @Query automatically observes the model context and should update,
                 // but posting this notification allows custom observers to react too.
                 NotificationCenter.default.post(name: .iCloudDataDidChange, object: nil)
-                
-                print(" [iCloud] Context successfully refreshed with remote changes")
+
+                print(" [iCloud] Remote changes merged successfully - \(jokeCount) jokes in store")
             } catch {
                 print(" [iCloud] Context operation during remote merge failed: \(error.localizedDescription)")
                 syncStatus = .error("Failed to merge remote changes: \(error.localizedDescription)")
@@ -172,8 +181,6 @@ final class iCloudSyncService: NSObject, ObservableObject {
         if let syncDate = lastSyncDate {
             UserDefaults.standard.set(syncDate.timeIntervalSince1970, forKey: SyncedKeys.lastSyncDate)
         }
-        
-        print(" [iCloud] Remote changes received and merged — UI will refresh")
         
         // Haptic feedback to let user know sync completed
         hapticFeedback()
@@ -274,38 +281,8 @@ final class iCloudSyncService: NSObject, ObservableObject {
             // 3. Push user settings to iCloud KV store
             print(" [iCloud] Syncing user preferences...")
             iCloudKeyValueStore.shared.pushToCloud()
-            
-            // 4. Trigger CloudKit sync by touching the container
-            // This encourages SwiftData to push/pull with CloudKit
-            let database = container.privateCloudDatabase
-            let zoneID = CKRecordZone.ID(
-                zoneName: "com.apple.coredata.cloudkit.zone",
-                ownerName: CKCurrentUserDefaultName
-            )
-            
-            // Try to access the zone to trigger connectivity check
-            do {
-                _ = try await database.recordZone(for: zoneID)
-                print(" [iCloud] CloudKit zone accessible")
-            } catch let error as CKError where error.code == .zoneNotFound {
-                print(" [iCloud] CloudKit zone doesn't exist yet - will be created on first save")
-            } catch {
-                print(" [iCloud] Warning: Could not access CloudKit zone: \(error.localizedDescription)")
-                // Continue anyway - zone might be created automatically
-            }
-            
-            // 5. Sync all data types (placeholder for future custom logic)
-            await syncJokes()
-            await syncRoastTargets()
-            await syncRoastJokes()
-            await syncSetLists()
-            await syncRecordings()
-            await syncNotebookPhotos()
-            await syncBrainstormIdeas()
-            await syncImportBatches()
-            await syncChatMessages()
-            
-            // 6. Final context save to persist any pending local changes.
+
+            // 4. Final context save to persist any pending local changes.
             // Do NOT post .NSPersistentStoreRemoteChange here — that triggers
             // handleRemoteChange which cascades into another full sync.
             if let ctx = modelContext {
@@ -316,7 +293,7 @@ final class iCloudSyncService: NSObject, ObservableObject {
                     
                     // Verify sync by checking counts
                     let jokeCount = try ctx.fetchCount(FetchDescriptor<Joke>())
-                    print(" [iCloud] Final context save completed - \(jokeCount) jokes in store")
+                    print(" [iCloud] Full sync checkpoint - \(jokeCount) jokes in store")
                 } catch {
                     print(" [iCloud] Warning: Final context save failed: \(error.localizedDescription)")
                 }
@@ -342,50 +319,6 @@ final class iCloudSyncService: NSObject, ObservableObject {
             syncStatus = .error(message)
             errorMessage = message
         }
-    }
-    
-    // MARK: - Incremental Syncs
-    // SwiftData + CloudKit handles record-level sync automatically.
-    // These methods exist only to hook into performFullSync() for
-    // future per-type logic (e.g. conflict resolution, dedup).
-    
-    private func syncJokes() async {
-        // No-op: SwiftData auto-syncs Joke records via CloudKit.
-    }
-    
-    private func syncRoastTargets() async {
-        // No-op: SwiftData auto-syncs RoastTarget records via CloudKit.
-        // The @Relationship to RoastJoke ensures targets and their jokes stay linked.
-    }
-    
-    private func syncRoastJokes() async {
-        // No-op: SwiftData auto-syncs RoastJoke records via CloudKit.
-    }
-    
-    private func syncSetLists() async {
-        // No-op: SwiftData auto-syncs SetList records via CloudKit.
-    }
-    
-    private func syncRecordings() async {
-        // No-op: SwiftData auto-syncs Recording records via CloudKit.
-        // Audio files stored at fileURL are NOT synced — only the metadata record.
-    }
-    
-    private func syncNotebookPhotos() async {
-        // No-op: SwiftData auto-syncs NotebookPhotoRecord records via CloudKit.
-        // imageData uses @Attribute(.externalStorage), synced as a CKAsset.
-    }
-    
-    private func syncBrainstormIdeas() async {
-        // No-op: SwiftData auto-syncs BrainstormIdea records via CloudKit.
-    }
-    
-    private func syncImportBatches() async {
-        // No-op: SwiftData auto-syncs ImportBatch and related records via CloudKit.
-    }
-    
-    private func syncChatMessages() async {
-        // No-op: SwiftData auto-syncs ChatMessage records via CloudKit.
     }
     
     // MARK: - Sync Thoughts (Notepad)

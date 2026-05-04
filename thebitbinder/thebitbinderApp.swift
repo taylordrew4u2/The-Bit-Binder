@@ -8,11 +8,13 @@
 import SwiftUI
 import SwiftData
 
+@MainActor
 @main
 struct thebitbinderApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var startup = AppStartupCoordinator()
     @StateObject private var userPreferences = UserPreferences()
+    @State private var postStartupTask: Task<Void, Never>?
     
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -222,24 +224,13 @@ struct thebitbinderApp: App {
                 // notifications can call refreshAllObjects() on the right context
                 iCloudSyncService.shared.modelContext = sharedModelContainer.mainContext
                 
-                // Register for remote push notifications — CloudKit uses silent
-                // pushes to tell the app "new data available, please fetch"
-                UIApplication.shared.registerForRemoteNotifications()
-                
                 #if DEBUG
                 CloudKitResetUtility.logContainerInfo()
                 #endif
                 
                 // Start app initialization (lightweight — shows UI quickly)
                 await startup.start()
-                
-                // Heavy post-startup work — fire as a separate task so the
-                // main run loop can process UI events immediately.
-                Task {
-                    await startup.completeDataProtectionWithContext(sharedModelContainer.mainContext)
-                    await performDeferredBackup()
-                    await performAggressiveCloudKitCleanup()
-                }
+                startPostStartupWorkIfNeeded()
             }
             .environmentObject(userPreferences)
             .alert(" Data Issue Detected", isPresented: $startup.showDataLossAlert) {
@@ -252,56 +243,58 @@ struct thebitbinderApp: App {
             }
         }
         .modelContainer(sharedModelContainer)
-        .onChange(of: scenePhase) {
-            switch scenePhase {
-            case .background:
-                print(" [AppLifecycle] App moved to background")
-                // Save any pending changes before going to background
-                do {
-                    if sharedModelContainer.mainContext.hasChanges {
-                        try sharedModelContainer.mainContext.save()
-                        print(" [AppLifecycle] Saved pending changes to background")
-                    }
-                } catch {
-                    print(" [AppLifecycle] Failed to save on background: \(error)")
-                    DataOperationLogger.shared.logError(error, operation: "BackgroundSave")
-                }
-                
-                // Push any local settings changes to iCloud
-                iCloudKeyValueStore.shared.pushToCloud()
-                
-            case .active:
-                print(" [AppLifecycle] App became active")
-                // Pull latest settings from iCloud
-                iCloudKeyValueStore.shared.pullFromCloud()
-                
-                // Save to trigger SwiftData to merge any pending remote changes into the UI
-                do {
-                    try sharedModelContainer.mainContext.save()
-                    print(" [AppLifecycle] Context refreshed on foreground")
-                } catch {
-                    print(" [AppLifecycle] Failed to save on foreground: \(error)")
-                    DataOperationLogger.shared.logError(error, operation: "ForegroundSave")
-                }
-                
-                // Ensure notifications are scheduled
-                NotificationManager.shared.scheduleIfNeeded()
-                JournalReminderManager.shared.scheduleIfNeeded()
-                
-            case .inactive:
-                print(" [AppLifecycle] App became inactive")
-                // Quick save to preserve any in-flight changes
+        .onChange(of: scenePhase) { _, newPhase in
+            handleScenePhaseChange(newPhase)
+        }
+    }
+
+    @MainActor
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        switch phase {
+        case .background:
+            print(" [AppLifecycle] App moved to background")
+            postStartupTask?.cancel()
+            postStartupTask = nil
+            appDelegate.scheduleBackgroundTasksForAppTransition()
+            do {
                 if sharedModelContainer.mainContext.hasChanges {
-                    do {
-                        try sharedModelContainer.mainContext.save()
-                    } catch {
-                        print(" [AppLifecycle] Failed to save on inactive: \(error)")
-                    }
+                    try sharedModelContainer.mainContext.save()
+                    print(" [AppLifecycle] Saved pending changes to background")
                 }
-                
-            @unknown default:
-                print(" [AppLifecycle] Unknown scene phase: \(scenePhase)")
+            } catch {
+                print(" [AppLifecycle] Failed to save on background: \(error)")
+                DataOperationLogger.shared.logError(error, operation: "BackgroundSave")
             }
+
+            iCloudKeyValueStore.shared.pushToCloud()
+
+        case .active:
+            print(" [AppLifecycle] App became active")
+            startPostStartupWorkIfNeeded()
+            iCloudKeyValueStore.shared.pullFromCloud()
+            print(" [AppLifecycle] Foreground save skipped")
+
+            NotificationManager.shared.scheduleIfNeeded()
+            JournalReminderManager.shared.scheduleIfNeeded()
+
+        case .inactive:
+            print(" [AppLifecycle] App became inactive")
+
+        @unknown default:
+            print(" [AppLifecycle] Unknown scene phase: \(phase)")
+        }
+    }
+
+    @MainActor
+    private func startPostStartupWorkIfNeeded() {
+        guard postStartupTask == nil else { return }
+        postStartupTask = Task { @MainActor in
+            defer { postStartupTask = nil }
+            await startup.completeDataProtectionWithContext(sharedModelContainer.mainContext)
+            guard scenePhase == .active else { return }
+            await performDeferredBackup()
+            guard scenePhase == .active else { return }
+            await performAggressiveCloudKitCleanup()
         }
     }
     

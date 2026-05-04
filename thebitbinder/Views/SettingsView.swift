@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var jokes: [Joke]
     @EnvironmentObject private var userPreferences: UserPreferences
 
@@ -71,6 +72,7 @@ struct SettingsView: View {
                             editingNameText = userPreferences.userName
                             isEditingName = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                guard scenePhase == .active else { return }
                                 nameFieldFocused = true
                             }
                         } label: {

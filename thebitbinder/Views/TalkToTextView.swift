@@ -7,11 +7,13 @@
 import SwiftUI
 import Speech
 import AVFoundation
+import UIKit
 
 struct TalkToTextView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     
     let selectedFolder: JokeFolder?
     let saveToBrainstorm: Bool
@@ -77,6 +79,7 @@ struct TalkToTextView: View {
                                 Button("Clear") {
                                     transcribedText = ""
                                     speechRecognizer.clearAccumulatedText()
+                                    QuickCaptureDraftStore.clearTalkToTextDraft(saveToBrainstorm: saveToBrainstorm)
                                 }
                                 .font(.caption)
                                 .foregroundColor(.accentColor)
@@ -88,18 +91,17 @@ struct TalkToTextView: View {
                                 .fill(Color(UIColor.secondarySystemBackground))
                             
                             if transcribedText.isEmpty && !isRecording {
-                                Text("Your transcription will appear here...")
+                                Text("Your transcription will appear here. If the mic misses something, you can type or fix it here before saving.")
                                     .font(.body)
                                     .foregroundStyle(.tertiary)
                                     .padding(14)
                             }
-                            
-                            ScrollView {
-                                Text(transcribedText)
-                                    .font(.body)
-                                    .padding(14)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
+
+                            TextEditor(text: $transcribedText)
+                                .font(.body)
+                                .scrollContentBackground(.hidden)
+                                .padding(10)
+                                .disabled(isRecording || isSaving)
                         }
                         .frame(minHeight: 200)
                     }
@@ -171,6 +173,11 @@ struct TalkToTextView: View {
                     }
                 }
                 .onAppear {
+                    if let draft = QuickCaptureDraftStore.loadTalkToTextDraft(saveToBrainstorm: saveToBrainstorm),
+                       !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        transcribedText = draft
+                        speechRecognizer.restoreAccumulatedText(draft)
+                    }
                     checkPermissions()
                 }
                 .onDisappear {
@@ -194,6 +201,9 @@ struct TalkToTextView: View {
                 }
                 .onChange(of: speechRecognizer.transcribedText) { _, newValue in
                     transcribedText = newValue
+                }
+                .onChange(of: transcribedText) { _, newValue in
+                    QuickCaptureDraftStore.saveTalkToTextDraft(newValue, saveToBrainstorm: saveToBrainstorm)
                 }
                 .onChange(of: speechRecognizer.error) { _, newValue in
                     errorMessage = newValue
@@ -368,6 +378,7 @@ struct TalkToTextView: View {
         
         do {
             try modelContext.save()
+            QuickCaptureDraftStore.clearTalkToTextDraft(saveToBrainstorm: true)
             #if DEBUG
             print(" [TalkToTextView] Brainstorm idea saved — id: \(idea.id)")
             #endif
@@ -377,14 +388,16 @@ struct TalkToTextView: View {
             
             // Brief confirmation then dismiss
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                guard scenePhase == .active else { return }
                 dismiss()
             }
         } catch {
+            modelContext.delete(idea)
             isSaving = false
             #if DEBUG
             print(" [TalkToTextView] Failed to save brainstorm idea: \(error)")
             #endif
-            errorMessage = "Could not save idea: \(error.localizedDescription)"
+            errorMessage = "Could not save idea. Your transcription is preserved on this device."
         }
     }
     
@@ -410,6 +423,7 @@ struct TalkToTextView: View {
         
         do {
             try modelContext.save()
+            QuickCaptureDraftStore.clearTalkToTextDraft(saveToBrainstorm: false)
             #if DEBUG
             print(" [TalkToTextView] Joke saved — id: \(newJoke.id), title: \"\(title)\", folder: \(selectedFolder?.name ?? "none")")
             #endif
@@ -422,14 +436,16 @@ struct TalkToTextView: View {
             
             // Brief confirmation then dismiss
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                guard scenePhase == .active else { return }
                 dismiss()
             }
         } catch {
+            modelContext.delete(newJoke)
             isSaving = false
             #if DEBUG
             print(" [TalkToTextView] Failed to save joke: \(error)")
             #endif
-            errorMessage = "Could not save joke: \(error.localizedDescription)"
+            errorMessage = "Could not save joke. Your transcription is preserved on this device."
         }
     }
     
@@ -509,6 +525,10 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
     /// Observer token for media-services-reset (audio stack crash).
     private var mediaResetObserver: NSObjectProtocol?
 
+    private var isAppActive: Bool {
+        UIApplication.shared.applicationState == .active
+    }
+
     override init() {
         super.init()
         interruptionObserver = NotificationCenter.default.addObserver(
@@ -587,7 +607,8 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
             isStarting = false
             tearDown(deactivateSession: false)
             DispatchQueue.main.asyncAfter(deadline: .now() + SpeechReliability.restartDelay) { [weak self] in
-                self?.startRecognitionSession()
+                guard let self, self.shouldBeRunning, self.isAppActive else { return }
+                self.startRecognitionSession()
             }
         default:
             break
@@ -603,7 +624,8 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
         isStarting = false
         tearDown(deactivateSession: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + SpeechReliability.restartDelay) { [weak self] in
-            self?.startRecognitionSession()
+            guard let self, self.shouldBeRunning, self.isAppActive else { return }
+            self.startRecognitionSession()
         }
     }
 
@@ -625,7 +647,8 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
             if options.contains(.shouldResume) && shouldBeRunning {
                 isStarting = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    self?.startRecognitionSession()
+                    guard let self, self.shouldBeRunning, self.isAppActive else { return }
+                    self.startRecognitionSession()
                 }
             }
         @unknown default:
@@ -640,6 +663,11 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.error = nil
+            guard self.isAppActive else {
+                self.shouldBeRunning = false
+                self.isTranscribing = false
+                return
+            }
             self.shouldBeRunning = true
             self.consecutiveEmptyRestarts = 0
             self.accumulatedText = self.transcribedText
@@ -652,6 +680,13 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
         accumulatedText = ""
         DispatchQueue.main.async { [weak self] in
             self?.transcribedText = ""
+        }
+    }
+
+    func restoreAccumulatedText(_ text: String) {
+        accumulatedText = text
+        DispatchQueue.main.async { [weak self] in
+            self?.transcribedText = text
         }
     }
 
@@ -684,6 +719,15 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
 
     private func startRecognitionSession() {
         guard !isStarting else { return }
+        guard isAppActive else {
+            shouldBeRunning = false
+            isStarting = false
+            tearDown(deactivateSession: true)
+            DispatchQueue.main.async { [weak self] in
+                self?.isTranscribing = false
+            }
+            return
+        }
         isStarting = true
 
         // 1. Clean up any prior session (keep audio session active for fast restart).
@@ -723,7 +767,7 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
             // Retry once after a brief async delay — another app may have
             // briefly held the audio category (e.g. a phone-app pre-roll).
             DispatchQueue.main.asyncAfter(deadline: .now() + SpeechReliability.audioSessionRetryDelay) { [weak self] in
-                guard let self, self.shouldBeRunning else { return }
+                guard let self, self.shouldBeRunning, self.isAppActive else { return }
                 do {
                     try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
                     try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
@@ -807,9 +851,6 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
             request.addsPunctuation = true
         }
         request.taskHint = .dictation
-        if speechRecognizer?.supportsOnDeviceRecognition == true {
-            request.requiresOnDeviceRecognition = true
-        }
         return request
     }
 
@@ -838,6 +879,14 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
             }
 
             if SpeechErrorCode.isNoSpeechTimeout(nsError) || isFinal {
+                scheduleAutoRestart()
+                return
+            }
+
+            if SpeechErrorCode.isTransientRecoverable(nsError) {
+                #if DEBUG
+                print(" [SpeechRecognizer] Transient recognition error — restarting")
+                #endif
                 scheduleAutoRestart()
                 return
             }
@@ -928,7 +977,7 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
             let extra = Double(self.consecutiveEmptyRestarts) * SpeechReliability.restartBackoffStep
             let delay = SpeechReliability.restartDelay + extra
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self = self, self.shouldBeRunning else { return }
+                guard let self = self, self.shouldBeRunning, self.isAppActive else { return }
                 if let engine = self.audioEngine, engine.isRunning {
                     self.restartRecognitionInPlace()
                 } else {

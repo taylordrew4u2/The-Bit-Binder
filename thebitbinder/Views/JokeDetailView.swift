@@ -16,6 +16,7 @@ import AVFoundation
 struct JokeDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var bitBuddyDrawer: BitBuddyDrawerController
     @EnvironmentObject private var userPreferences: UserPreferences
     @AppStorage("roastModeEnabled") private var roastMode = false
@@ -189,17 +190,8 @@ struct JokeDetailView: View {
         .onChange(of: joke.content) { _, _ in scheduleAutoSave() }
         .onChange(of: joke.title) { _, _ in scheduleAutoSave() }
         .onChange(of: joke.notes) { _, _ in scheduleAutoSave() }
-        .onAppear {
-            if joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    focusedField = .content
-                }
-            }
-        }
-        .onDisappear {
-            saveJokeNow()
-            folders = []
-        }
+        .onAppear(perform: handleAppear)
+        .onDisappear(perform: handleDisappear)
     }
 
     // MARK: - Meta Strip
@@ -238,6 +230,19 @@ struct JokeDetailView: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+
+    private func handleAppear() {
+        guard joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            guard scenePhase == .active else { return }
+            focusedField = .content
+        }
+    }
+
+    private func handleDisappear() {
+        saveJokeNow()
+        folders = []
     }
 
     // MARK: - BIT Content
@@ -485,6 +490,10 @@ struct JokeDetailView: View {
     }
 
     private func saveJokeNow() {
+        if joke.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            joke.title = KeywordTitleGenerator.title(from: joke.content)
+        }
         joke.dateModified = Date()
         joke.updateWordCount()
         do {

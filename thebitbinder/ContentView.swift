@@ -12,6 +12,7 @@ import UIKit
 struct ContentView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @State private var takeoverProgress: CGFloat = 0
     @State private var showTakeover = false
     @State private var previousRoastMode = false
@@ -35,10 +36,16 @@ struct ContentView: View {
         .onAppear {
             previousRoastMode = roastMode
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase != .active {
+                showTakeover = false
+                takeoverProgress = 0
+            }
+        }
     }
 
     private func runTakeover() {
-        if reduceMotion {
+        if reduceMotion || scenePhase != .active {
             return
         }
         showTakeover = true
@@ -229,6 +236,7 @@ struct MainTabView: View {
     @State private var showGagGrabber = false
     @State private var showSetup = false
     @AppStorage("roastModeEnabled") private var roastMode = false
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var userPreferences: UserPreferences
 
     // BitBuddy side drawer — replaces the old .sheet so users can chat
@@ -303,7 +311,7 @@ struct MainTabView: View {
         }
         .tint(Color.bitbinderAccent)
         .onAppear {
-            if !hasCompletedSetup {
+            if !hasCompletedSetup && scenePhase == .active {
                 showSetup = true
             }
             // Mark first launch complete after showing Home
@@ -321,6 +329,21 @@ struct MainTabView: View {
             // Redirect to valid tab when mode changes
             if !visibleTabs.contains(selectedTab.wrappedValue) {
                 selectedTabRaw = (isRoast ? AppScreen.jokes : .home).rawValue
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .active:
+                if !hasCompletedSetup && !showSetup {
+                    showSetup = true
+                }
+            case .background, .inactive:
+                showGagGrabber = false
+                showSetup = false
+                bitBuddyDrawer.close()
+                bitBuddyPresenter.close()
+            @unknown default:
+                break
             }
         }
         .onChange(of: setupSelectedTabs) { _, _ in

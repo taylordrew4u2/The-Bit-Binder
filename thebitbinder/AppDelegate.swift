@@ -19,6 +19,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     // (via Task { @MainActor }) before touching any instance state.
     private var isRefreshTaskScheduled = false
     private var isSyncTaskScheduled = false
+    private var hasLoggedRemoteNotificationRegistration = false
+    private var hasLoggedInitialCloudKitAccountStatus = false
     
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -59,6 +61,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         Task {
             do {
                 let status = try await CKContainer(identifier: "iCloud.The-BitBinder.thebitbinder").accountStatus()
+                guard !self.hasLoggedInitialCloudKitAccountStatus else { return }
+                self.hasLoggedInitialCloudKitAccountStatus = true
                 switch status {
                 case .available:
                     print(" [CloudKit] iCloud account available — sync enabled")
@@ -85,6 +89,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        guard !hasLoggedRemoteNotificationRegistration else { return }
+        hasLoggedRemoteNotificationRegistration = true
         print(" [CloudKit] Registered for remote notifications")
     }
     
@@ -117,17 +123,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         switch ckNotification.notificationType {
         case .recordZone, .query, .database:
             // This is a CloudKit data change notification
-            print(" [CloudKit] CloudKit data change notification - triggering merge")
-            
-            // Post notification to trigger iCloudSyncService remote change handler.
-            // The handler debounces into processRemoteChangeAsync() which refreshes
-            // the SwiftData context. No additional syncNow() needed — that would
-            // cascade into a second full sync via performFullSync().
-            NotificationCenter.default.post(
-                name: .NSPersistentStoreRemoteChange,
-                object: nil,
-                userInfo: userInfo
-            )
+            print(" [CloudKit] CloudKit data change notification - scheduling refresh")
+            iCloudSyncService.shared.handleSilentPushNotification()
             
             completionHandler(.newData)
             
@@ -137,14 +134,27 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
     }
     
-    func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
-        MemoryManager.shared.handleMemoryWarning()
+    /// UIKit may invoke this delegate callback outside a Swift concurrency
+    /// isolation domain. Hop explicitly to MainActor before touching
+    /// `@MainActor` singletons to avoid runtime `unsafeForcedSync` warnings.
+    nonisolated func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                MemoryManager.shared.handleMemoryWarning()
+            }
+        } else {
+            Task { @MainActor in
+                MemoryManager.shared.handleMemoryWarning()
+            }
+        }
     }
     
     /// Called when the app moves to background — schedule pending background tasks.
-    func applicationDidEnterBackground(_ application: UIApplication) {
-        scheduleBackgroundRefresh()
-        scheduleBackgroundSync()
+    /// Keep this nonisolated because `UIApplicationDelegateAdaptor` can deliver
+    /// the callback from a Swift concurrent context during scene transitions.
+    nonisolated func applicationDidEnterBackground(_ application: UIApplication) {
+        // Background scheduling is driven from SwiftUI scenePhase so this
+        // UIKit bridge stays passive during app background transitions.
     }
     
     // MARK: - Background Task Registration
@@ -249,6 +259,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
     
     // MARK: - Background Task Scheduling
+
+    func scheduleBackgroundTasksForAppTransition() {
+        scheduleBackgroundRefresh()
+        scheduleBackgroundSync()
+    }
     
     private func scheduleBackgroundRefresh() {
         if isRefreshTaskScheduled {
@@ -264,10 +279,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             try BGTaskScheduler.shared.submit(request)
             isRefreshTaskScheduled = true
             print(" [BGTask] Scheduled background refresh")
-        } catch let e as NSError where e.domain == "BGTaskSchedulerErrorDomain" && e.code == 3 {
-            // BGTaskSchedulerErrorCodeTooManyPendingTaskRequests — already submitted
+        } catch let error as BGTaskScheduler.Error where error.code == .tooManyPendingTaskRequests {
             isRefreshTaskScheduled = true
             print(" [BGTask] Refresh task already pending (too many requests)")
+        } catch let error as BGTaskScheduler.Error where error.code == .notPermitted {
+            isRefreshTaskScheduled = false
+            print(" [BGTask] Refresh task not permitted — verify UIBackgroundModes and BGTaskSchedulerPermittedIdentifiers")
         } catch {
             print(" [BGTask] Could not schedule refresh: \(error.localizedDescription)")
             isRefreshTaskScheduled = false
@@ -286,10 +303,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             try BGTaskScheduler.shared.submit(request)
             isSyncTaskScheduled = true
             print(" [BGTask] Scheduled background sync")
-        } catch let e as NSError where e.domain == "BGTaskSchedulerErrorDomain" && e.code == 3 {
-            // Already submitted
+        } catch let error as BGTaskScheduler.Error where error.code == .tooManyPendingTaskRequests {
             isSyncTaskScheduled = true
             print(" [BGTask] Sync task already pending (too many requests)")
+        } catch let error as BGTaskScheduler.Error where error.code == .notPermitted {
+            isSyncTaskScheduled = false
+            print(" [BGTask] Sync task not permitted — verify UIBackgroundModes and BGTaskSchedulerPermittedIdentifiers")
         } catch {
             print(" [BGTask] Could not schedule sync: \(error.localizedDescription)")
             isSyncTaskScheduled = false
