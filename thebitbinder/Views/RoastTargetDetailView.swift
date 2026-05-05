@@ -207,7 +207,7 @@ struct RoastTargetDetailView: View {
             if heat >= 60 {
                 Circle()
                     .fill(RadialGradient(
-                        colors: [FirePalette.core.opacity(0.2), .clear],
+                        colors: [FirePalette.core.opacity(DS.Opacity.medium), .clear],
                         center: .center,
                         startRadius: 0,
                         endRadius: 100
@@ -217,17 +217,15 @@ struct RoastTargetDetailView: View {
                     .offset(x: 40, y: -30)
             }
 
-            VStack(spacing: 12) {
-                AsyncAvatarView(
+            VStack(spacing: DS.Spacing.md) {
+                RoastSubjectAvatar(
                     photoData: target.photoData,
-                    size: 72,
                     fallbackInitial: String(safeTargetName.prefix(1).uppercased()),
                     accentColor: accentColor
                 )
-                .overlay(Circle().stroke(accentColor.opacity(0.5), lineWidth: 2))
 
                 Text(safeTargetName)
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.title3.bold())
                     .foregroundColor(FirePalette.text)
 
                 HeatBar(heat: heat)
@@ -242,7 +240,7 @@ struct RoastTargetDetailView: View {
                 }
 
                 if !target.traits.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                         ForEach(target.traits, id: \.self) { trait in
                             HStack(alignment: .top, spacing: 6) {
                                 Text("•")
@@ -255,10 +253,10 @@ struct RoastTargetDetailView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, DS.Spacing.xxl)
                 }
 
-                HStack(spacing: 16) {
+                HStack(spacing: DS.Spacing.lg) {
                     StatBadge(
                         count: target.jokeCount,
                         label: "roast",
@@ -285,7 +283,7 @@ struct RoastTargetDetailView: View {
                     }
                 }
             }
-            .padding()
+            .padding(DS.Spacing.lg)
             .frame(maxWidth: .infinity)
         }
         .background(FirePalette.card)
@@ -308,7 +306,7 @@ struct RoastTargetDetailView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DS.Spacing.lg)
             }
 
             // Sort menu pinned outside the scroll so it never disappears
@@ -327,11 +325,11 @@ struct RoastTargetDetailView: View {
                         .font(.caption2)
                 }
                 .foregroundColor(accentColor)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, DS.Spacing.md)
                 .padding(.vertical, 8)
                 .background(
                     Capsule()
-                        .fill(accentColor.opacity(0.12))
+                        .fill(accentColor.opacity(DS.Opacity.light))
                 )
                 .overlay(
                     Capsule()
@@ -339,17 +337,17 @@ struct RoastTargetDetailView: View {
                 )
             }
             .accessibilityLabel("Sort roasts by \(sortOption.rawValue)")
-            .padding(.trailing, 12)
+            .padding(.trailing, DS.Spacing.md)
         }
         .padding(.vertical, 10)
         .background(FirePalette.bg.opacity(0.95))
     }
     
     private var emptyState: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: DS.Spacing.xl) {
             Image(systemName: filterMode == .all ? "flame" : filterMode.icon)
-                .font(.system(size: 50))
-                .foregroundColor(accentColor.opacity(0.4))
+                .font(.largeTitle)
+                .foregroundColor(accentColor.opacity(DS.Opacity.scrim))
 
             if filterMode == .all {
                 Text("No roasts yet")
@@ -363,7 +361,7 @@ struct RoastTargetDetailView: View {
                 EmberCTAButton(title: "Write First Roast") {
                     showingAddRoast = true
                 }
-                .padding(.top, 8)
+                .padding(.top, DS.Spacing.sm)
             } else {
                 Text("No \(filterMode.rawValue.lowercased()) roasts")
                     .font(.title3.bold())
@@ -375,7 +373,7 @@ struct RoastTargetDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        .padding(DS.Spacing.lg)
     }
     
     private var jokesList: some View {
@@ -429,24 +427,24 @@ struct RoastTargetDetailView: View {
                 Button {
                     showingAddRoast = true
                 } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: DS.Spacing.sm + 2) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(accentColor.opacity(0.12))
+                            RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous)
+                                .fill(accentColor.opacity(DS.Opacity.light))
                                 .frame(width: 42, height: 42)
                             Image(systemName: "plus")
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.title3.weight(.semibold))
                                 .foregroundColor(accentColor)
                         }
                         
                         Text("Add another roast")
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.subheadline.weight(.medium))
                             .foregroundColor(accentColor)
                         
                         Spacer()
                     }
                     .padding(.vertical, 6)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DS.Spacing.lg)
                 }
                 .buttonStyle(.plain)
             }
@@ -619,54 +617,6 @@ struct RoastTargetDetailView: View {
 
 // MARK: - Supporting Views
 
-struct StatBadge: View {
-    let count: Int
-    let label: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.caption)
-            Text("\(count) \(label)\(count == 1 ? "" : "s")")
-                .font(.caption.weight(.semibold))
-        }
-        .foregroundColor(.white)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(color)
-        .clipShape(Capsule())
-    }
-}
-
-struct FilterChip: View {
-    let title: String
-    let icon: String
-    let isSelected: Bool
-    let accentColor: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption)
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-            }
-            .foregroundColor(isSelected ? .white : accentColor)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(isSelected ? accentColor : accentColor.opacity(0.1))
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Draggable Roast Card
 
 struct DraggableRoastCard: View {
@@ -700,7 +650,7 @@ struct DraggableRoastCard: View {
     private let deleteThreshold: CGFloat = -150
     private let killerThreshold: CGFloat = 100
     
-    private let cardCornerRadius: CGFloat = 16
+    private let cardCornerRadius: CGFloat = DS.Corner.lg
     
     var body: some View {
         ZStack {
@@ -710,16 +660,16 @@ struct DraggableRoastCard: View {
                     RoundedRectangle(cornerRadius: cardCornerRadius)
                         .fill(Color.bitbinderAccent)
                     
-                    HStack(spacing: 8) {
+                    HStack(spacing: DS.Spacing.sm) {
                         Image(systemName: joke.isKiller ? "star.slash.fill" : "star.fill")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.title3.weight(.semibold))
                         if isSwipeKiller {
                             Text(joke.isKiller ? "Remove" : "Killer!")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.subheadline.bold())
                         }
                     }
                     .foregroundColor(.black.opacity(0.8))
-                    .opacity(swipeOffset > 50 ? 1 : 0.7)
+                    .opacity(swipeOffset > 50 ? 1 : DS.Opacity.heavy)
                     .scaleEffect(isSwipeKiller ? 1.1 : 1.0)
                 }
                 .frame(width: max(80, swipeOffset))
@@ -734,16 +684,16 @@ struct DraggableRoastCard: View {
                     RoundedRectangle(cornerRadius: cardCornerRadius)
                         .fill(Color.destructive)
                     
-                    HStack(spacing: 8) {
+                    HStack(spacing: DS.Spacing.sm) {
                         Image(systemName: isSwipeDeleting ? "trash.fill" : "trash")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.title3.weight(.semibold))
                         if isSwipeDeleting {
                             Text("Release")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.subheadline.weight(.semibold))
                         }
                     }
                     .foregroundColor(.white)
-                    .opacity(swipeOffset < swipeThreshold ? 1 : 0.7)
+                    .opacity(swipeOffset < swipeThreshold ? 1 : DS.Opacity.heavy)
                     .scaleEffect(isSwipeDeleting ? 1.1 : 1.0)
                 }
                 .frame(width: max(80, -swipeOffset))
@@ -833,97 +783,14 @@ struct DraggableRoastCard: View {
     }
     
     private var cardContent: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Drag handle (visible when drag is enabled)
-            if isDragEnabled {
-                VStack {
-                    Spacer()
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.secondary.opacity(0.5))
-                        .frame(width: 24)
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            
-            // Icon - tappable for killer toggle
-            Button {
-                onToggleKiller?()
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(joke.isKiller ? Color.bitbinderAccent.opacity(0.2) : accentColor.opacity(0.12))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: joke.isKiller ? "star.fill" : "flame.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(accentColor)
-                }
-            }
-            .buttonStyle(.plain)
-
-            // Content
-            VStack(alignment: .leading, spacing: 6) {
-                if showFullContent {
-                    Text(joke.content)
-                        .font(.system(size: 15))
-                        .foregroundColor(FirePalette.text)
-                        .lineLimit(4)
-                } else {
-                    Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(FirePalette.text)
-                        .lineLimit(2)
-                }
-                
-                // Badges row
-                HStack(spacing: 6) {
-                    // Opening roast badge
-                    if joke.isOpeningRoast {
-                        BadgePill(text: "OPENER", icon: "star.circle.fill", color: Color.accentColor)
-                    } else if joke.parentOpeningRoastID != nil {
-                        BadgePill(text: "BACKUP", icon: "arrow.turn.down.right", color: Color.accentColor)
-                    }
-
-                    // Tested badge - tappable
-                    if joke.isTested {
-                        Button {
-                            onToggleTested?()
-                        } label: {
-                            BadgePill(text: "\(joke.performanceCount)×", icon: "checkmark.circle.fill", color: Color.accentColor)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    
-                    // Relatability
-                    if joke.relatabilityScore > 0 {
-                        HStack(spacing: 1) {
-                            ForEach(0..<5, id: \.self) { i in
-                                Circle()
-                                    .fill(i < joke.relatabilityScore ? Color.accentColor : Color.gray.opacity(DS.Opacity.medium))
-                                    .frame(width: 5, height: 5)
-                            }
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    Text(joke.dateCreated, format: .dateTime.month(.abbreviated).day())
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            
-            Spacer(minLength: 0)
-            
-            // Chevron
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .padding(.top, 4)
-        }
-        .padding(14)
-        .contentShape(Rectangle())
+        RoastJokeCardContent(
+            joke: joke,
+            showFullContent: showFullContent,
+            accentColor: accentColor,
+            showsDragHandle: isDragEnabled,
+            onToggleKiller: onToggleKiller,
+            onToggleTested: onToggleTested
+        )
         .contextMenu {
             contextMenuContent
         }
@@ -1114,26 +981,6 @@ struct DraggableRoastCard: View {
 
 // MARK: - Badge Pill
 
-struct BadgePill: View {
-    let text: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.system(size: 9))
-            Text(text)
-                .font(.system(size: 10, weight: .semibold))
-        }
-        .foregroundColor(color)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(color.opacity(0.15))
-        .clipShape(Capsule())
-    }
-}
-
 // MARK: - Double Extension
 
 extension Double {
@@ -1206,11 +1053,11 @@ struct EditRoastJokeView: View {
                             TextEditor(text: $joke.content)
                                 .focused($isContentFocused)
                                 .frame(minHeight: 120)
-                                .padding(12)
+                                .padding(DS.Spacing.md)
                                 .background(Color(.secondarySystemBackground))
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous))
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, DS.Spacing.lg)
                         
                         // Optional structure fields - collapsible
                         DisclosureGroup(isExpanded: $showAdvancedOptions) {
@@ -1221,9 +1068,9 @@ struct EditRoastJokeView: View {
                                         .font(.caption.bold())
                                         .foregroundColor(.secondary)
                                     TextField("The lead-in...", text: $joke.setup, axis: .vertical)
-                                        .padding(10)
+                                        .padding(DS.Spacing.sm + 2)
                                         .background(Color(.secondarySystemBackground))
-                                        .cornerRadius(8)
+                                        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
                                 }
                                 
                                 // Punchline
@@ -1232,9 +1079,9 @@ struct EditRoastJokeView: View {
                                         .font(.caption.bold())
                                         .foregroundColor(.secondary)
                                     TextField("The payoff...", text: $joke.punchline, axis: .vertical)
-                                        .padding(10)
+                                        .padding(DS.Spacing.sm + 2)
                                         .background(Color(.secondarySystemBackground))
-                                        .cornerRadius(8)
+                                        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
                                 }
                                 
                                 // Performance notes
@@ -1243,9 +1090,9 @@ struct EditRoastJokeView: View {
                                         .font(.caption.bold())
                                         .foregroundColor(.secondary)
                                     TextField("Timing, delivery, reactions...", text: $joke.performanceNotes, axis: .vertical)
-                                        .padding(10)
+                                        .padding(DS.Spacing.sm + 2)
                                         .background(Color(.secondarySystemBackground))
-                                        .cornerRadius(8)
+                                        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
                                 }
                                 
                         // Relatability score
@@ -1261,7 +1108,7 @@ struct EditRoastJokeView: View {
                                             } label: {
                                                 Image(systemName: score <= joke.relatabilityScore ? "person.fill" : "person")
                                                     .font(.title2)
-                                                    .foregroundColor(score <= joke.relatabilityScore ? Color.accentColor : .gray.opacity(0.3))
+                                                    .foregroundColor(score <= joke.relatabilityScore ? accentColor : .gray.opacity(DS.Opacity.scrim))
                                             }
                                             .buttonStyle(.plain)
                                         }
@@ -1311,12 +1158,12 @@ struct EditRoastJokeView: View {
                                     .labelsHidden()
                                 }
                                 .padding(12)
-                                .background(joke.isOpeningRoast ? Color.bitbinderAccent.opacity(0.1) : Color(.secondarySystemBackground))
-                                .cornerRadius(10)
+                                .background(joke.isOpeningRoast ? Color.bitbinderAccent.opacity(DS.Opacity.light) : Color(.secondarySystemBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous))
                                 
                                 // Backup assignment (only if not an opening roast)
                                 if !joke.isOpeningRoast {
-                                    VStack(alignment: .leading, spacing: 8) {
+                                    VStack(alignment: .leading, spacing: DS.Spacing.sm) {
                                         Text("Assign as Backup For")
                                             .font(.caption.bold())
                                             .foregroundColor(.secondary)
@@ -1329,60 +1176,27 @@ struct EditRoastJokeView: View {
                                                     .font(.caption)
                                                     .foregroundColor(.secondary)
                                             }
-                                            .padding(12)
+                                            .padding(DS.Spacing.md)
                                             .background(Color(.secondarySystemBackground))
-                                            .cornerRadius(8)
+                                            .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
                                         } else {
-                                            // None option
-                                            Button {
+                                            RoastSelectionRow(
+                                                title: "None (Unassigned)",
+                                                isSelected: joke.parentOpeningRoastID == nil,
+                                                accentColor: .bitbinderAccent
+                                            ) {
                                                 joke.parentOpeningRoastID = nil
-                                            } label: {
-                                                HStack {
-                                                    Text("None (Unassigned)")
-                                                        .font(.subheadline)
-                                                    Spacer()
-                                                    if joke.parentOpeningRoastID == nil {
-                                                        Image(systemName: "checkmark.circle.fill")
-                                                            .foregroundColor(Color.bitbinderAccent)
-                                                    }
-                                                }
-                                                .padding(12)
-                                                .background(joke.parentOpeningRoastID == nil ? Color.gray.opacity(DS.Opacity.medium) : Color(.secondarySystemBackground))
-                                                .cornerRadius(8)
                                             }
-                                            .buttonStyle(.plain)
                                             
-                                            // Opening roast options
                                             ForEach(Array(openingRoastsForTarget.enumerated()), id: \.element.id) { index, opening in
-                                                Button {
+                                                RoastSelectionRow(
+                                                    title: String(opening.content.prefix(40)) + (opening.content.count > 40 ? "..." : ""),
+                                                    leadingNumber: index + 1,
+                                                    isSelected: joke.parentOpeningRoastID == opening.id,
+                                                    accentColor: .bitbinderAccent
+                                                ) {
                                                     joke.parentOpeningRoastID = opening.id
-                                                } label: {
-                                                    HStack(spacing: 10) {
-                                                        Text("\(index + 1)")
-                                                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                                                            .foregroundColor(.black)
-                                                            .frame(width: 24, height: 24)
-                                                            .background(Color.bitbinderAccent)
-                                                            .clipShape(Circle())
-                                                        
-                                                        Text(opening.content.prefix(40) + (opening.content.count > 40 ? "..." : ""))
-                                                            .font(.subheadline)
-                                                            .foregroundColor(.primary)
-                                                            .lineLimit(2)
-                                                            .multilineTextAlignment(.leading)
-                                                        
-                                                        Spacer()
-                                                        
-                                                        if joke.parentOpeningRoastID == opening.id {
-                                                            Image(systemName: "checkmark.circle.fill")
-                                                                .foregroundColor(Color.bitbinderAccent)
-                                                        }
-                                                    }
-                                                    .padding(12)
-                                                    .background(joke.parentOpeningRoastID == opening.id ? Color.bitbinderAccent.opacity(0.15) : Color(.secondarySystemBackground))
-                                                    .cornerRadius(8)
                                                 }
-                                                .buttonStyle(.plain)
                                             }
                                         }
                                     }
@@ -1456,31 +1270,12 @@ struct EditRoastJokeView: View {
     // MARK: - Quick Actions Row
     
     private var quickActions: some View {
-        HStack(spacing: 0) {
-            // Killer toggle
-            QuickToggleButton(
-                isOn: $joke.isKiller,
-                icon: "star.fill",
-                label: "Killer",
-                activeColor: Color.accentColor
-            )
-
-            Divider()
-                .frame(height: 30)
-
-            // Tested toggle
-            QuickToggleButton(
-                isOn: $joke.isTested,
-                icon: "checkmark.circle.fill",
-                label: "Tested",
-                activeColor: Color.accentColor
-            )
-            
-            Divider()
-                .frame(height: 30)
-            
-            // -1 Performance button
-            Button {
+        PerformanceQuickActions(
+            isKiller: $joke.isKiller,
+            isTested: $joke.isTested,
+            performanceCount: joke.performanceCount,
+            accentColor: .accentColor,
+            onDecrement: {
                 if joke.performanceCount > 0 {
                     joke.performanceCount -= 1
                     if joke.performanceCount == 0 {
@@ -1489,87 +1284,24 @@ struct EditRoastJokeView: View {
                     }
                     haptic(.light)
                 }
-            } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "minus.circle")
-                        .font(.subheadline)
-                    Text("-1")
-                        .font(.caption2)
-                }
-                .foregroundColor(joke.performanceCount > 0 ? Color.accentColor : .secondary.opacity(0.3))
-                .frame(width: 44)
-                .padding(.vertical, 8)
-            }
-            .buttonStyle(.plain)
-            .disabled(joke.performanceCount == 0)
-            
-            // +1 Performance button
-            Button {
+            },
+            onIncrement: {
                 joke.performanceCount += 1
                 joke.lastPerformedDate = Date()
                 joke.isTested = true
                 haptic(.light)
-            } label: {
-                VStack(spacing: 2) {
-                    HStack(spacing: 2) {
-                        Image(systemName: "plus")
-                            .font(.caption2.bold())
-                        Text("\(joke.performanceCount)")
-                            .font(.subheadline.bold().monospacedDigit())
-                    }
-                    Text("Performed")
-                        .font(.caption2)
-                }
-                .foregroundColor(joke.performanceCount > 0 ? Color.accentColor : .secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
             }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color(.secondarySystemBackground))
+        )
     }
     
     // MARK: - Performance Stats
     
     private var performanceStats: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .foregroundColor(Color.bitbinderAccent)
-                Text("Performance")
-                    .font(.subheadline.bold())
-                Spacer()
-            }
-            
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(joke.performanceCount)")
-                        .font(.title2.bold().monospacedDigit())
-                        .foregroundColor(Color.bitbinderAccent)
-                    Text("times")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                if let lastDate = joke.lastPerformedDate {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(lastDate, format: .dateTime.month(.abbreviated).day())
-                            .font(.subheadline.bold())
-                        Text("last performed")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Spacer()
-            }
-        }
-        .padding(12)
-        .background(Color.bitbinderAccent.opacity(0.08))
-        .cornerRadius(12)
-        .padding(.horizontal, 16)
+        PerformanceStatsCard(
+            performanceCount: joke.performanceCount,
+            lastPerformedDate: joke.lastPerformedDate,
+            accentColor: .bitbinderAccent
+        )
     }
     
     private func saveJoke() {
@@ -1642,36 +1374,11 @@ struct EditRoastTargetView: View {
                     HStack {
                         Spacer()
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                            if let photoImage {
-                                Image(uiImage: photoImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(Circle())
-                                    .overlay(Circle().stroke(accentColor, lineWidth: 3))
-                            } else if let photoData = target.photoData,
-                                      let uiImage = UIImage(data: photoData) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(Circle())
-                                    .overlay(Circle().stroke(accentColor, lineWidth: 3))
-                            } else {
-                                ZStack {
-                                    Circle()
-                                        .fill(accentColor.opacity(0.12))
-                                        .frame(width: 100, height: 100)
-                                    VStack(spacing: 4) {
-                                        Image(systemName: "person.crop.circle.badge.plus")
-                                            .font(.system(size: 32))
-                                            .foregroundColor(accentColor)
-                                        Text("Add Photo")
-                                            .font(.caption2)
-                                            .foregroundColor(accentColor)
-                                    }
-                                }
-                            }
+                            RoastEditableAvatar(
+                                uiImage: photoImage,
+                                photoData: target.photoData,
+                                accentColor: accentColor
+                            )
                         }
                         Spacer()
                     }
@@ -1719,7 +1426,7 @@ struct EditRoastTargetView: View {
                                         }
                                     } label: {
                                         Image(systemName: "minus.circle.fill")
-                                            .foregroundColor(.red.opacity(0.7))
+                                            .foregroundColor(Color.destructive.opacity(DS.Opacity.heavy))
                                     }
                                     .buttonStyle(.plain)
                                 }

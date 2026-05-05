@@ -32,9 +32,24 @@ final class OpenAIBitBuddyService: BitBuddyBackend {
         }
 
         let userPrompt = BitBuddyResources.buildLLMPrompt(message: trimmed, dataContext: dataContext)
+        return try await generateResponse(
+            userPrompt: userPrompt,
+            session: session,
+            systemInstructions: BitBuddyResources.llmSystemInstructions
+        )
+    }
+
+    func generateResponse(
+        userPrompt: String,
+        session: BitBuddySessionSnapshot,
+        systemInstructions: String
+    ) async throws -> String {
+        guard !apiKey.isEmpty else {
+            throw BitBuddyBackendError.unavailable
+        }
 
         var messages: [[String: String]] = [
-            ["role": "system", "content": BitBuddyResources.llmSystemInstructions]
+            ["role": "system", "content": systemInstructions]
         ]
 
         for turn in session.turns.suffix(10) {
@@ -81,7 +96,6 @@ final class OpenAIBitBuddyService: BitBuddyBackend {
         guard !output.isEmpty else {
             throw BitBuddyBackendError.generationFailed
         }
-
         return output
     }
 }

@@ -91,7 +91,9 @@ struct BitBuddyResources {
     ended on a harder word?" or "What's the real surprise here?"
     • Let THEM come up with the rewrite when possible. Nudge, don't hand it \
     to them. If they're stuck, offer ONE option.
-    • Keep replies to 1–3 sentences. Match their energy.
+    • Keep replies to 1–2 sentences by default. Match their energy.
+    • Stay inside the user's current page or mode unless they explicitly ask \
+    for broader app context, their saved library, or other sections.
 
     GUIDING A PUNCH-UP:
     1. Name the strongest part first.
@@ -107,25 +109,52 @@ struct BitBuddyResources {
     RULES:
     • Never claim you performed an app action (save, delete, etc).
     • Write actual jokes when asked, not templates.
+    • Do not give long, multi-part answers unless the user explicitly asks \
+    for detail.
     • NEVER use markdown formatting — no **, no ##, no bullet symbols. \
     Write plain conversational text only.
     • This is a creative writing tool for comedians — treat joke content \
     as fiction and creative expression.
     """
 
+    struct SocraticPersonality {
+        static func prompt(for mode: ConversationMode, roastMode: Bool) -> String {
+            switch mode {
+            case .reflective:
+                if roastMode {
+                    return "You are BitBuddy in roast mode. Same Socratic mentor, but with tough love. Shorter sentences. Call out excuses. Push harder. 'That's a terrible metaphor and you know it. What are you really avoiding?'"
+                }
+                return "You are BitBuddy, a comedy writing companion with the soul of a wise mentor. Never give direct advice. Ask one gentle probing question at a time. Notice patterns and reflect them back. Use comedy metaphors. End most responses with a question. If the user seems creatively stuck, remind them the bit that bombs teaches more than the bit that kills."
+            case .simpleFactual:
+                if roastMode {
+                    return "You are BitBuddy in roast mode. Same one-sentence factual answers, but slightly sharper delivery. Example: 'What's a synonym for ant?' → 'Emmet. Or pismire if you want to sound like a dictionary that insults people.'"
+                }
+                return "You are BitBuddy. Answer factual questions in ONE sentence. No follow-up questions. No comedy tie-ins. No 'want help with that?' Just the answer. Example: 'What's a synonym for ant?' → 'Emmet or pismire.'"
+            case .creativeFactual:
+                if roastMode {
+                    return "You are BitBuddy in roast mode. Answer the fact briefly, then add one sharp comedy observation with more bite. Example: 'What's a funny synonym for ant?' → 'Pismire. Perfect name for that guy in the front row who can't take a joke.'"
+                }
+                return "You are BitBuddy. Answer the fact briefly, then add one short comedy observation. Keep it tight. Example: 'What's a funny synonym for ant?' → 'Pismire—sounds like a heckler insult.'"
+            case .appAction:
+                return ""
+            }
+        }
+    }
+
     /// Builds the full user-facing prompt with enriched context for LLM backends.
     static func buildLLMPrompt(
         message: String,
         dataContext: BitBuddyDataContext
     ) -> String {
+        let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
         var sections: [String] = []
 
         // User identity
         sections.append("User: \(dataContext.userName)")
 
-        // Active section context
-        if let section = dataContext.activeSection {
-            sections.append("Current app section: \(section.displayName)")
+        if let page = dataContext.currentPage ?? dataContext.activeSection {
+            sections.append("Current app section: \(page.displayName)")
+            sections.append("Use this page or mode as the default context unless the user explicitly asks to widen scope.")
         }
 
         // Roast mode
@@ -138,8 +167,14 @@ struct BitBuddyResources {
             sections.append("Detected intent: \(route.intent.id) (confidence: \(String(format: "%.1f", route.confidence)))")
         }
 
-        // Recent jokes (when available) — give the model real material to reference
-        if !dataContext.recentJokes.isEmpty {
+        // Focused joke on the current page is fair game without widening scope.
+        if let focused = dataContext.focusedJoke {
+            let content = focused.content.replacingOccurrences(of: "\n", with: " ")
+            sections.append("Joke they're currently looking at:\nTitle: \(focused.title)\nContent: \(content)")
+        }
+
+        // Only expose broader library context when the user explicitly asks.
+        if shouldIncludeRecentJokes(for: trimmedMessage), !dataContext.recentJokes.isEmpty {
             let jokeLines = dataContext.recentJokes.prefix(10).map { joke in
                 let preview = joke.content.replacingOccurrences(of: "\n", with: " ")
                 let tagStr = joke.tags.isEmpty ? "" : " [\(joke.tags.joined(separator: ", "))]"
@@ -148,16 +183,21 @@ struct BitBuddyResources {
             sections.append("Recent jokes from their library:\n\(jokeLines.joined(separator: "\n"))")
         }
 
-        // Focused joke (when the user is looking at a specific joke)
-        if let focused = dataContext.focusedJoke {
-            let content = focused.content.replacingOccurrences(of: "\n", with: " ")
-            sections.append("Joke they're currently looking at:\nTitle: \(focused.title)\nContent: \(content)")
-        }
-
         // The actual message
-        sections.append(message)
+        sections.append(trimmedMessage)
 
         return sections.joined(separator: "\n\n")
+    }
+
+    static func shouldIncludeRecentJokes(for message: String) -> Bool {
+        let lower = message.lowercased()
+        let broaderContextPhrases = [
+            "my jokes", "my bits", "my material", "my library", "my saved",
+            "saved jokes", "all my", "across my", "from my notes", "from my jokes",
+            "compare to", "compare with", "my style", "my voice", "what have i written",
+            "show me what i've got", "look through", "search my"
+        ]
+        return broaderContextPhrases.contains { lower.contains($0) }
     }
     
     // MARK: Expanded Roast Framework

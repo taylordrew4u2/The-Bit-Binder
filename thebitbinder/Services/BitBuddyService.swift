@@ -21,6 +21,7 @@ final class BitBuddyService: NSObject, ObservableObject {
     private let authService = AuthService.shared
     private var backend: BitBuddyBackend
     private let intentRouter = BitBuddyIntentRouter.shared
+    private let socraticGuideBackend = SocraticGuideBackend.shared
     
     // MARK: - State
     @Published var isLoading = false
@@ -76,7 +77,7 @@ final class BitBuddyService: NSObject, ObservableObject {
     ]
     
     private override init() {
-        let selectedBackend = BitBuddyBackendFactory.makeBackend()
+        let selectedBackend = BitBuddyBackendFactory.makeOperationalBackend()
         self.backend = selectedBackend
         self.backendName = selectedBackend.backendName
         self.isConnected = selectedBackend.isAvailable
@@ -84,7 +85,7 @@ final class BitBuddyService: NSObject, ObservableObject {
     }
     
     func refreshBackend() {
-        let newBackend = BitBuddyBackendFactory.makeBackend()
+        let newBackend = BitBuddyBackendFactory.makeOperationalBackend()
         backend = newBackend
         backendName = newBackend.backendName
         isConnected = newBackend.isAvailable
@@ -112,10 +113,14 @@ final class BitBuddyService: NSObject, ObservableObject {
             isLoading = false
             statusMessage = ""
         }
-        
+    
+        return try await processMessage(message)
+    }
+
+    private func processMessage(_ message: String) async throws -> String {
         lastActions = []
         pendingNavigation = nil
-        
+
         // Check if the user is confirming a previously suggested navigation
         let lowerMessage = message.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let confirmationPhrases = ["yes", "yeah", "yep", "sure", "ok", "okay", "take me there",
@@ -142,15 +147,17 @@ final class BitBuddyService: NSObject, ObservableObject {
             conversationId: activeConversationId,
             turns: turnsByConversation[activeConversationId] ?? []
         )
-        
-        // Route the intent
-        let routeResult = intentRouter.route(message)
-        
-        // Update status based on what we're about to do
+
+        let roastMode = UserDefaults.standard.bool(forKey: "roastModeEnabled")
+        let conversationMode = ConversationModeClassifier.classify(message)
+        let routeResult = conversationMode == .appAction ? intentRouter.route(message) : nil
+
         if let route = routeResult {
             statusMessage = statusHint(for: route.intent.id)
+        } else {
+            statusMessage = statusHint(for: conversationMode)
         }
-        
+
         var dataContext = BitBuddyDataContext()
         dataContext.userName = UserDefaults.standard.string(forKey: "userName") ?? "Comedian"
         dataContext.recentJokes = recentJokeProvider?() ?? []
@@ -161,13 +168,27 @@ final class BitBuddyService: NSObject, ObservableObject {
         // resolve to the right context.
         dataContext.activeSection = routeResult?.section ?? currentPage
         dataContext.currentPage = currentPage
-        dataContext.isRoastMode = UserDefaults.standard.bool(forKey: "roastModeEnabled")
-        
+        dataContext.isRoastMode = roastMode
+
         do {
             let rawResponse: String
             statusMessage = statusMessage.isEmpty ? "Thinking…" : statusMessage
-            rawResponse = try await backend.send(message: message, session: session, dataContext: dataContext)
-            
+            switch conversationMode {
+            case .reflective, .simpleFactual, .creativeFactual:
+                rawResponse = try await socraticGuideBackend.respond(
+                    message: message,
+                    session: session,
+                    dataContext: dataContext,
+                    roastMode: roastMode
+                ) ?? ""
+            case .appAction:
+                rawResponse = try await backend.send(
+                    message: message,
+                    session: session,
+                    dataContext: dataContext
+                )
+            }
+
             // Process the response through our JSON handler (handles
             // any future structured-JSON backends). For the local
             // rule-based backend this is a no-op pass-through.
@@ -215,6 +236,17 @@ final class BitBuddyService: NSObject, ObservableObject {
         } catch {
             isConnected = false
             throw error
+        }
+    }
+
+    private func statusHint(for conversationMode: ConversationMode) -> String {
+        switch conversationMode {
+        case .reflective:
+            return "Reflecting…"
+        case .simpleFactual, .creativeFactual:
+            return "Checking facts…"
+        case .appAction:
+            return "Thinking…"
         }
     }
     
