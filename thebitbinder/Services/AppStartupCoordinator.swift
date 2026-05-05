@@ -28,9 +28,7 @@ final class AppStartupCoordinator: ObservableObject {
         guard !isReady else { return }
 
         await performDataProtectionSequence()
-
-        statusText = "Ready"
-        isReady = true
+        statusText = "Preparing your library..."
     }
 
     private func performDataProtectionSequence() async {
@@ -70,6 +68,7 @@ final class AppStartupCoordinator: ObservableObject {
         defer { isCompletingDataProtection = false }
         
         print(" [AppStartup] Completing data protection with model context...")
+        statusText = "Preparing your library..."
         
         // Ensure memory headroom before running expensive validation/migration
         MemoryManager.shared.ensureMemoryHeadroom()
@@ -140,12 +139,14 @@ final class AppStartupCoordinator: ObservableObject {
         }
         
         // Purge soft-deleted items older than 30 days before validation runs
+        statusText = "Cleaning up old data..."
         await purgeExpiredTrashItems(context: context)
         await Task.yield()
         guard shouldContinueForegroundStartup() else { return }
 
         // Launch-time validation stays lightweight to avoid faulting large
         // portions of the store before the app is interactive.
+        statusText = "Validating your library..."
         let validation = await dataValidation.validateDataIntegrity(
             context: context,
             includeDeepScan: false
@@ -178,17 +179,20 @@ final class AppStartupCoordinator: ObservableObject {
         guard shouldContinueForegroundStartup() else { return }
 
         // Handle schema changes
+        statusText = "Updating app data..."
         await dataMigration.handleSchemaChanges(context: context)
         await Task.yield()
         guard shouldContinueForegroundStartup() else { return }
 
         // Verify CloudKit schema deployment
+        statusText = "Checking sync setup..."
         schemaDeployment.logSchemaFields()
         await schemaDeployment.ensureSchemaDeployed(context: context)
         await Task.yield()
         guard shouldContinueForegroundStartup() else { return }
 
         // Perform any needed migrations
+        statusText = "Finalizing your library..."
         let migrationResult = await dataMigration.performSafeMigration(context: context)
         
         switch migrationResult {
@@ -201,6 +205,12 @@ final class AppStartupCoordinator: ObservableObject {
         }
         
         hasCompletedDataProtection = true
+    }
+
+    func finishLaunching() {
+        guard !isReady else { return }
+        statusText = "Ready"
+        isReady = true
     }
 
     private func shouldContinueForegroundStartup() -> Bool {

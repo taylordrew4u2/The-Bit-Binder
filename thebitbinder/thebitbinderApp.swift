@@ -198,11 +198,13 @@ struct thebitbinderApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                if startup.isReady {
-                    ContentView()
-                        .transition(.opacity)
-                } else {
+                ContentView()
+                    .opacity(startup.isReady ? 1 : 0)
+                    .allowsHitTesting(startup.isReady)
+
+                if !startup.isReady {
                     LaunchScreenView(statusText: startup.statusText, userName: userPreferences.userName)
+                        .transition(.opacity)
                 }
             }
             .tint(roastMode ? FirePalette.core : .blue)
@@ -297,6 +299,8 @@ struct thebitbinderApp: App {
         postStartupTask = Task { @MainActor in
             defer { postStartupTask = nil }
             await startup.completeDataProtectionWithContext(sharedModelContainer.mainContext)
+            guard scenePhase == .active else { return }
+            startup.finishLaunching()
             guard scenePhase == .active else { return }
             await performDeferredBackup()
             guard scenePhase == .active else { return }

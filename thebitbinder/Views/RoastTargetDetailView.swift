@@ -769,34 +769,7 @@ struct DraggableRoastCard: View {
             }
             
             // Main card
-            cardContent
-                .background(
-                    RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                        .fill(Color(FirePalette.card))
-                        .shadow(
-                            color: isDragging ? accentColor.opacity(0.3) : Color.black.opacity(isPressed ? 0.15 : 0.08),
-                            radius: isDragging ? 20 : (isPressed ? 12 : 6),
-                            x: 0,
-                            y: isDragging ? 12 : (isPressed ? 6 : 2)
-                        )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                        .strokeBorder(
-                            isDragging ? accentColor : (joke.isKiller ? FirePalette.core.opacity(0.4) : FirePalette.edge),
-                            lineWidth: isDragging ? 2 : 0.5
-                        )
-                )
-                .scaleEffect(isDragging ? 1.03 : (isPressed ? 0.98 : 1.0))
-                .rotationEffect(.degrees(isDragging ? Double(dragOffset.width / 30).clamped(to: -3...3) : 0))
-                .offset(x: swipeOffset, y: dragOffset.height)
-                .offset(dragOffset.height == 0 ? .zero : CGSize(width: dragOffset.width, height: 0))
-                .zIndex(isDragging ? 100 : 0)
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDragging)
-                .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isPressed)
-                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: swipeOffset)
-                .simultaneousGesture(swipeGesture)
-                .simultaneousGesture(combinedGesture)
+            interactiveCard
         }
         .padding(.horizontal, 16)
         .confirmationDialog("Delete Roast?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
@@ -967,6 +940,47 @@ struct DraggableRoastCard: View {
         }
     }
     
+    @ViewBuilder
+    private var interactiveCard: some View {
+        let baseCard = cardContent
+            .background(
+                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                    .fill(Color(FirePalette.card))
+                    .shadow(
+                        color: isDragging ? accentColor.opacity(0.3) : Color.black.opacity(isPressed ? 0.15 : 0.08),
+                        radius: isDragging ? 20 : (isPressed ? 12 : 6),
+                        x: 0,
+                        y: isDragging ? 12 : (isPressed ? 6 : 2)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                    .strokeBorder(
+                        isDragging ? accentColor : (joke.isKiller ? FirePalette.core.opacity(0.4) : FirePalette.edge),
+                        lineWidth: isDragging ? 2 : 0.5
+                    )
+            )
+            .scaleEffect(isDragging ? 1.03 : (isPressed ? 0.98 : 1.0))
+            .rotationEffect(.degrees(isDragging ? Double(dragOffset.width / 30).clamped(to: -3...3) : 0))
+            .offset(x: swipeOffset, y: dragOffset.height)
+            .offset(dragOffset.height == 0 ? .zero : CGSize(width: dragOffset.width, height: 0))
+            .zIndex(isDragging ? 100 : 0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isDragging)
+            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isPressed)
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: swipeOffset)
+            .simultaneousGesture(swipeGesture)
+
+        if isDragEnabled {
+            baseCard
+                .simultaneousGesture(combinedGesture)
+        } else {
+            baseCard
+                .onTapGesture {
+                    onTap?()
+                }
+        }
+    }
+
     private var combinedGesture: some Gesture {
         let tap = TapGesture()
             .onEnded {
@@ -1006,21 +1020,10 @@ struct DraggableRoastCard: View {
                     isDragging = false
                 }
             }
-        
-        let press = DragGesture(minimumDistance: 0)
-            .onChanged { _ in
-                if !isDragging {
-                    isPressed = true
-                }
-            }
-            .onEnded { _ in
-                isPressed = false
-            }
-        
+
         return tap
             .simultaneously(with: longPress)
             .simultaneously(with: drag)
-            .simultaneously(with: press)
     }
     
     private func findTargetJoke(for translation: CGSize) -> RoastJoke? {
@@ -2148,4 +2151,3 @@ struct RoastExportSheet: View {
         }
     }
 }
-

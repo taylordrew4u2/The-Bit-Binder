@@ -284,6 +284,7 @@ struct JokesView: View {
     private var roastSection: some View {
         if roastTargets.isEmpty {
             RoastColdStateView(onAddTarget: { showingAddRoastTarget = true })
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } else {
             roastHomeView
         }
@@ -295,8 +296,8 @@ struct JokesView: View {
         let maxHeat = roastTargets.map { targetHeat($0) }.max() ?? 0
         let isCold = maxHeat < 30 && roastTargets.count <= 1
 
-        ScrollView {
-            VStack(spacing: 0) {
+        ScrollView(.vertical) {
+            LazyVStack(spacing: 0) {
                 RoastHomeHeader(
                     subjectCount: roastTargets.count,
                     hotCount: roastTargets.filter { targetHeat($0) >= 60 }.count,
@@ -346,7 +347,9 @@ struct JokesView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 32)
             }
+            .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(FirePalette.bg.ignoresSafeArea())
     }
 
