@@ -333,15 +333,21 @@ struct JokesView: View {
     /// The "fire home" — header + ranked subject cards over the fire bg.
     @ViewBuilder
     private var roastHomeView: some View {
-        let maxHeat = roastTargets.map { targetHeat($0) }.max() ?? 0
-        let isCold = maxHeat < 30 && roastTargets.count <= 1
+        let heats = roastTargets.map { targetHeat($0) }
+        let maxHeat = heats.max() ?? 0
+        let warmingState = WarmingState.state(targetCount: roastTargets.count, maxHeat: maxHeat)
+        let hotCount  = heats.filter { $0 >= 60 }.count
+        let warmCount = heats.filter { (30..<60).contains($0) }.count
+        let coldCount = heats.filter { $0 < 30 }.count
 
         ScrollView(.vertical) {
             LazyVStack(spacing: 0) {
                 RoastHomeHeader(
                     subjectCount: roastTargets.count,
-                    hotCount: roastTargets.filter { targetHeat($0) >= 60 }.count,
-                    isCold: isCold
+                    hotCount: hotCount,
+                    warmCount: warmCount,
+                    coldCount: coldCount,
+                    isCold: warmingState != .hot
                 )
 
                 let ranked = roastTargets.sorted { targetHeat($0) > targetHeat($1) }
@@ -364,24 +370,8 @@ struct JokesView: View {
                     }
                 }
 
-                Button {
+                EmberOutlineButton(title: "Add subject") {
                     showingAddRoastTarget = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 14, weight: .bold))
-                        Text("Add subject")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
-                    .foregroundColor(FirePalette.core)
-                    .padding(.vertical, 14)
-                    .frame(maxWidth: .infinity)
-                    .background(FirePalette.core.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(FirePalette.edge, lineWidth: 0.5)
-                    )
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -390,13 +380,33 @@ struct JokesView: View {
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(FirePalette.bg.ignoresSafeArea())
+        .background(roastBackground(for: warmingState).ignoresSafeArea())
+    }
+
+    /// Background palette per warming state. `cold` falls back to ash; `warm`
+    /// uses the standard fire bg with a slight amber wash; `hot` uses the
+    /// full ambient gradient.
+    @ViewBuilder
+    private func roastBackground(for state: WarmingState) -> some View {
+        switch state {
+        case .cold:
+            ColdPalette.bg
+        case .warm:
+            ZStack {
+                FirePalette.bg
+                LinearGradient(
+                    colors: [FirePalette.bright.opacity(0.06), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        case .hot:
+            FirePalette.ambient
+        }
     }
 
     private func targetHeat(_ target: RoastTarget) -> Int {
-        let bits = target.jokeCount
-        let base = bits * 4
-        return min(100, max(0, base))
+        RoastHeatService.heat(for: target)
     }
 
     
@@ -1720,7 +1730,7 @@ struct RoastColdStateView: View {
                     Image(systemName: "flame")
                         .font(.system(size: 10))
                         .foregroundColor(ColdPalette.grey)
-                    Text("ROAST MODE")
+                    Text("ROAST MODE · IDLE")
                         .font(.system(size: 10, weight: .heavy))
                         .foregroundColor(ColdPalette.grey)
                         .tracking(1.4)
@@ -1730,10 +1740,6 @@ struct RoastColdStateView: View {
                 .background(Color.white.opacity(0.04))
                 .clipShape(Capsule())
                 .overlay(Capsule().strokeBorder(ColdPalette.edge, lineWidth: 0.5))
-
-                Text("no fire yet")
-                    .font(.system(size: 11))
-                    .foregroundColor(ColdPalette.sub)
 
                 Spacer()
             }
@@ -1755,6 +1761,7 @@ struct RoastColdStateView: View {
                             .offset(y: -10)
                     }
                     .frame(width: 140, height: 140)
+                    .accessibilityHidden(true)
 
                 VStack(spacing: 10) {
                     Text("Nothing to burn yet.")
@@ -1763,32 +1770,30 @@ struct RoastColdStateView: View {
                         .tracking(-0.5)
 
                     Text("Add a subject — your mom, your coworker, your landlord. BitBuddy will start collecting bits.")
-                        .font(.system(size: 14))
+                        .font(.system(size: 15))
                         .foregroundColor(ColdPalette.sub)
                         .multilineTextAlignment(.center)
                         .lineSpacing(4)
                         .frame(maxWidth: 280)
                 }
 
-                Button(action: onAddTarget) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "flame")
-                            .font(.system(size: 14))
-                        Text("Light the first match")
-                            .font(.system(size: 15, weight: .bold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 14)
-                    .background(FirePalette.emberCTA)
-                    .clipShape(Capsule())
-                    .shadow(color: FirePalette.core.opacity(0.3), radius: 14, y: 6)
-                }
-                .padding(.top, 6)
+                EmberCTAButton(title: "Light the first match", action: onAddTarget)
+                    .padding(.top, 6)
 
-                Text("or import from Contacts")
-                    .font(.system(size: 11))
-                    .foregroundColor(ColdPalette.sub)
+                VStack(spacing: 2) {
+                    Button {} label: {
+                        Text("or import from Contacts")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(ColdPalette.sub)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                    }
+                    .disabled(true)
+                    Text("coming soon")
+                        .font(.system(size: 10))
+                        .foregroundColor(ColdPalette.sub.opacity(0.7))
+                        .tracking(0.3)
+                }
             }
 
             Spacer()
@@ -1802,11 +1807,23 @@ struct RoastColdStateView: View {
 struct RoastHomeHeader: View {
     let subjectCount: Int
     let hotCount: Int
+    let warmCount: Int
+    let coldCount: Int
     let isCold: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var subtitle: String? {
+        var parts: [String] = []
+        if hotCount > 0  { parts.append("\(hotCount) burning") }
+        if warmCount > 0 { parts.append("\(warmCount) warm") }
+        if coldCount > 0 { parts.append("\(coldCount) cold") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            if !isCold {
+            if !isCold && !reduceMotion {
                 Circle()
                     .fill(RadialGradient(
                         colors: [FirePalette.core.opacity(0.2), .clear],
@@ -1823,8 +1840,8 @@ struct RoastHomeHeader: View {
                 HStack(spacing: 10) {
                     RoastModeBadge(small: true, lit: !isCold)
 
-                    if hotCount > 0 {
-                        Text("\(hotCount) burning · \(subjectCount - hotCount) warm")
+                    if let subtitle {
+                        Text(subtitle)
                             .font(.system(size: 11))
                             .foregroundColor(FirePalette.sub)
                     }
@@ -1837,7 +1854,7 @@ struct RoastHomeHeader: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
-                Text("\(subjectCount) people")
+                Text("\(subjectCount) \(subjectCount == 1 ? "person" : "people")")
                     .font(.system(size: 13))
                     .foregroundColor(FirePalette.sub)
             }
@@ -1887,10 +1904,14 @@ struct RoastSubjectCard: View {
     let heat: Int
     let rank: Int
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var isTop: Bool { rank == 1 }
+    private var showsRank: Bool { rank <= 3 }
     private var safeName: String { target.isValid ? target.name : "" }
     private var safeNotes: String { target.isValid ? target.notes : "" }
     private var safeBits: Int { target.isValid ? target.jokeCount : 0 }
+    private var tier: FirePalette.HeatTier { .from(heat) }
 
     private var initials: String {
         safeName.split(separator: " ")
@@ -1900,20 +1921,28 @@ struct RoastSubjectCard: View {
     }
 
     private var avatarGradient: LinearGradient {
-        if heat >= 85 {
+        switch tier {
+        case .ember:
             return LinearGradient(colors: [FirePalette.core, Color(red: 0.76, green: 0.21, blue: 0.09)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        } else if heat >= 60 {
+        case .hot:
             return LinearGradient(colors: [FirePalette.bright, Color(red: 0.82, green: 0.48, blue: 0.0)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        } else if heat >= 30 {
+        case .warm:
             return LinearGradient(colors: [Color(red: 0.36, green: 0.50, blue: 0.85), Color(red: 0.18, green: 0.29, blue: 0.65)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        } else {
+        case .ash:
             return LinearGradient(colors: [Color(red: 0.48, green: 0.42, blue: 0.36), Color(red: 0.23, green: 0.19, blue: 0.15)], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
     }
 
+    private var a11ySummary: String {
+        var s = safeName
+        if !safeNotes.isEmpty { s += ", \(safeNotes)" }
+        s += ". \(safeBits) bit\(safeBits == 1 ? "" : "s"). Heat \(heat) degrees. Ranked #\(rank)."
+        return s
+    }
+
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            if isTop {
+        ZStack(alignment: .topLeading) {
+            if isTop && !reduceMotion {
                 Circle()
                     .fill(RadialGradient(
                         colors: [FirePalette.core.opacity(0.27), .clear],
@@ -1946,14 +1975,14 @@ struct RoastSubjectCard: View {
                         .frame(width: 44, height: 44)
                     }
 
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(safeName)
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: 18, weight: .heavy))
                             .foregroundColor(FirePalette.text)
                             .tracking(-0.2)
                         if !safeNotes.isEmpty {
                             Text(safeNotes)
-                                .font(.system(size: 12))
+                                .font(.system(size: 13))
                                 .foregroundColor(FirePalette.sub)
                                 .lineLimit(1)
                         }
@@ -1963,10 +1992,10 @@ struct RoastSubjectCard: View {
 
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("\(safeBits)")
-                            .font(.system(size: 20, weight: .heavy))
+                            .font(.system(size: 16, weight: .heavy))
                             .foregroundColor(FirePalette.text)
                         Text("BITS")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(FirePalette.sub)
                             .tracking(0.8)
                     }
@@ -1976,6 +2005,29 @@ struct RoastSubjectCard: View {
                     .padding(.top, 12)
             }
             .padding(16)
+
+            // Rank pill (top 3 only)
+            if showsRank {
+                Text("#\(rank)")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(0.4)
+                    .foregroundColor(isTop ? .white : FirePalette.sub)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule().fill(isTop
+                            ? AnyShapeStyle(FirePalette.emberCTA)
+                            : AnyShapeStyle(Color.white.opacity(0.06)))
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(
+                            isTop ? FirePalette.core.opacity(0.5) : FirePalette.edge,
+                            lineWidth: 0.5
+                        )
+                    )
+                    .padding(.top, 10)
+                    .padding(.leading, 10)
+            }
         }
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1992,6 +2044,9 @@ struct RoastSubjectCard: View {
         .shadow(color: isTop ? FirePalette.core.opacity(0.15) : .clear, radius: 12, y: 4)
         .padding(.horizontal, 16)
         .padding(.vertical, 3)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(a11ySummary)
+        .accessibilityAddTraits(.isButton)
     }
 }
 

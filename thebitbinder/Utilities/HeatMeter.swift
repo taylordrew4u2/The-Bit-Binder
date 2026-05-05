@@ -17,13 +17,15 @@ struct HeatMeter: View {
     var gap: CGFloat = 3
     var glowWhenHot: Bool = true
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         let clamped = min(max(value, 0), 1)
         let filledCount = Int(round(clamped * Double(segments)))
-        let isHot = clamped >= 0.85
+        let isEmber = FirePalette.HeatTier.from(clamped * 100) == .ember
 
         ZStack {
-            if isHot && glowWhenHot {
+            if isEmber && glowWhenHot && !reduceMotion {
                 Capsule()
                     .fill(FirePalette.spark.opacity(0.35))
                     .blur(radius: 14)
@@ -42,7 +44,7 @@ struct HeatMeter: View {
                               : AnyShapeStyle(Color.primary.opacity(0.08))
                         )
                         .frame(height: segmentHeight)
-                        .animation(.easeOut(duration: 0.25).delay(Double(i) * 0.02), value: filledCount)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.25).delay(Double(i) * 0.02), value: filledCount)
                 }
             }
         }
@@ -60,24 +62,26 @@ struct HeatBar: View {
     var body: some View {
         let clamped = min(max(heat, 0), 100)
         let pct = CGFloat(clamped) / 100.0
+        let tier = FirePalette.HeatTier.from(clamped)
 
         let fill: LinearGradient = {
-            if clamped < 30 {
+            switch tier {
+            case .ash:
                 return LinearGradient(colors: [
                     Color(red: 0.35, green: 0.29, blue: 0.25),
                     Color(red: 0.48, green: 0.42, blue: 0.35)
                 ], startPoint: .leading, endPoint: .trailing)
-            } else if clamped < 60 {
+            case .warm:
                 return LinearGradient(colors: [
                     Color(red: 0.54, green: 0.42, blue: 0.23),
                     FirePalette.bright
                 ], startPoint: .leading, endPoint: .trailing)
-            } else if clamped < 85 {
+            case .hot:
                 return LinearGradient(colors: [
                     FirePalette.bright,
                     FirePalette.core
                 ], startPoint: .leading, endPoint: .trailing)
-            } else {
+            case .ember:
                 return LinearGradient(colors: [
                     FirePalette.core,
                     Color(red: 1.0, green: 0.18, blue: 0.0)
@@ -86,15 +90,19 @@ struct HeatBar: View {
         }()
 
         let glowShadow: Color = {
-            if clamped < 60 { return .clear }
-            if clamped < 85 { return FirePalette.core.opacity(0.33) }
-            return FirePalette.core.opacity(0.67)
+            switch tier {
+            case .ash, .warm: return .clear
+            case .hot:        return FirePalette.core.opacity(0.33)
+            case .ember:      return FirePalette.core.opacity(0.67)
+            }
         }()
 
         let numColor: Color = {
-            if clamped < 30 { return ColdPalette.grey }
-            if clamped < 60 { return FirePalette.bright }
-            return FirePalette.core
+            switch tier {
+            case .ash:        return ColdPalette.grey
+            case .warm:       return FirePalette.bright
+            case .hot, .ember: return FirePalette.core
+            }
         }()
 
         HStack(spacing: 8) {
@@ -107,7 +115,7 @@ struct HeatBar: View {
                     Capsule()
                         .fill(fill)
                         .frame(width: trackWidth * pct)
-                        .shadow(color: glowShadow, radius: clamped >= 60 ? 6 : 0)
+                        .shadow(color: glowShadow, radius: (tier == .hot || tier == .ember) ? 6 : 0)
                 }
             }
             .frame(height: 4)

@@ -36,4 +36,38 @@ extension View {
     func roastModeTint() -> some View {
         modifier(RoastModeTint())
     }
+
+    /// Themes a SwiftUI Form/List into the Roast Mode v2 fire palette: dark
+    /// bg, ember accent tint, fire text. Apply on the outermost container of
+    /// any sheet that should match the roast list surface.
+    func roastFormTheme() -> some View {
+        modifier(RoastFormTheme())
+    }
+}
+
+/// Pulls a Form/List into the fire palette so add/edit sheets feel like
+/// they belong to Roast Mode rather than dropping back to native Form chrome.
+struct RoastFormTheme: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .scrollContentBackground(.hidden)
+            .background(FirePalette.bg.ignoresSafeArea())
+            .tint(FirePalette.core)
+            .foregroundColor(FirePalette.text)
+            .preferredColorScheme(.dark)
+    }
+}
+
+/// Convenience for individual rows: paints the row bg with the fire card.
+struct RoastRowBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        content.listRowBackground(FirePalette.card)
+    }
+}
+
+extension View {
+    /// Apply Roast Mode card row background to a Form section row.
+    func roastRowBackground() -> some View {
+        modifier(RoastRowBackground())
+    }
 }

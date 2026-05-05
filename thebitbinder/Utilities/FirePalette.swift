@@ -30,7 +30,8 @@ enum FirePalette {
     // MARK: - Text & borders
 
     static let text    = Color(red: 0.961, green: 0.933, blue: 0.906) // #F5EEE7
-    static let sub     = Color(red: 0.961, green: 0.933, blue: 0.906).opacity(0.55)
+    /// Bumped from 0.55 → 0.70 so 12pt copy on `card` clears WCAG AA.
+    static let sub     = Color(red: 0.961, green: 0.933, blue: 0.906).opacity(0.70)
     static let edge    = Color(red: 1.0, green: 0.47, blue: 0.196).opacity(DS.Opacity.light)
 
     // MARK: - Gradients
@@ -70,6 +71,29 @@ enum FirePalette {
 
     // MARK: - Heat scale
 
+    /// Single source of truth for heat thresholds across HeatBar, HeatMeter,
+    /// avatar gradients, header counts, and warming-state branching.
+    enum HeatTier {
+        case ash    // 0..29 — cold, hasn't earned heat
+        case warm   // 30..59 — bits coming in
+        case hot    // 60..84 — burning
+        case ember  // 85..100 — peak
+
+        static func from(_ value: Int) -> HeatTier {
+            let v = min(max(value, 0), 100)
+            switch v {
+            case 0..<30:   return .ash
+            case 30..<60:  return .warm
+            case 60..<85:  return .hot
+            default:       return .ember
+            }
+        }
+
+        static func from(_ value: Double) -> HeatTier {
+            from(Int(min(max(value, 0), 100)))
+        }
+    }
+
     static func heat(_ value: Double) -> Color {
         let t = min(max(value, 0), 1)
         switch t {
@@ -94,7 +118,8 @@ enum ColdPalette {
     static let card = Color(red: 0.122, green: 0.102, blue: 0.094) // #1F1A18
     static let edge = Color.white.opacity(DS.Opacity.subtle)
     static let text = Color(red: 0.788, green: 0.765, blue: 0.749) // #C9C3BF
-    static let sub  = Color(red: 0.788, green: 0.765, blue: 0.749).opacity(0.5)
+    /// Bumped from 0.50 → 0.75 so cold-state body copy clears WCAG AA.
+    static let sub  = Color(red: 0.788, green: 0.765, blue: 0.749).opacity(0.75)
     static let grey = Color(red: 0.416, green: 0.392, blue: 0.376) // #6A6460
 }
 

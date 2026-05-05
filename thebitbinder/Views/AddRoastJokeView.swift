@@ -46,44 +46,52 @@ struct AddRoastJokeView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Roasting")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(FirePalette.sub)
                         Text(safeName)
                             .font(.subheadline.bold())
+                            .foregroundColor(FirePalette.text)
                     }
                     Spacer()
-                    
+
                     if savedCount > 0 {
                         Text("\(savedCount) added")
                             .font(.caption.bold())
-                            .foregroundColor(Color.bitbinderAccent)
+                            .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.bitbinderAccent.opacity(0.15))
+                            .background(FirePalette.emberCTA)
                             .clipShape(Capsule())
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(accentColor.opacity(0.08))
-                
+                .background(FirePalette.card)
+                .overlay(
+                    Rectangle()
+                        .fill(FirePalette.edge)
+                        .frame(height: 0.5),
+                    alignment: .bottom
+                )
+
                 // Main text area - big and focused
                 ZStack(alignment: .topLeading) {
                     if content.isEmpty {
                         Text("Write your roast...")
-                            .foregroundColor(.secondary)
+                            .foregroundColor(FirePalette.sub)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 16)
                     }
-                    
+
                     TextEditor(text: $content)
                         .focused($isTextFocused)
                         .scrollContentBackground(.hidden)
+                        .foregroundColor(FirePalette.text)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                 }
                 .frame(maxHeight: .infinity)
-                .background(Color(.systemBackground))
-                
+                .background(FirePalette.bg)
+
                 // Bottom controls
                 VStack(spacing: 12) {
                     // Keep adding toggle
@@ -92,15 +100,16 @@ struct AddRoastJokeView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "bolt.fill")
                                     .font(.caption)
-                                    .foregroundColor(keepAdding ? accentColor : .secondary)
+                                    .foregroundColor(keepAdding ? accentColor : FirePalette.sub)
                                 Text("Rapid Fire Mode")
                                     .font(.subheadline)
+                                    .foregroundColor(FirePalette.text)
                             }
                         }
                         .tint(accentColor)
                     }
                     .padding(.horizontal, 16)
-                    
+
                     // Action buttons
                     HStack(spacing: 12) {
                         Button {
@@ -110,11 +119,15 @@ struct AddRoastJokeView: View {
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background(Color(.systemGray5))
-                                .foregroundColor(.primary)
+                                .background(Color.white.opacity(0.06))
+                                .foregroundColor(FirePalette.text)
                                 .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(FirePalette.edge, lineWidth: 0.5)
+                                )
                         }
-                        
+
                         Button {
                             saveRoast()
                         } label: {
@@ -126,8 +139,10 @@ struct AddRoastJokeView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(canSave ? accentColor : Color(.systemGray4))
-                            .foregroundColor(.white)
+                            .background(canSave
+                                ? AnyShapeStyle(FirePalette.emberCTA)
+                                : AnyShapeStyle(Color.white.opacity(0.08)))
+                            .foregroundColor(canSave ? .white : FirePalette.sub)
                             .cornerRadius(12)
                         }
                         .disabled(!canSave)
@@ -135,8 +150,16 @@ struct AddRoastJokeView: View {
                     .padding(.horizontal, 16)
                 }
                 .padding(.vertical, 12)
-                .background(Color(.secondarySystemBackground))
+                .background(FirePalette.card)
+                .overlay(
+                    Rectangle()
+                        .fill(FirePalette.edge)
+                        .frame(height: 0.5),
+                    alignment: .top
+                )
             }
+            .background(FirePalette.bg.ignoresSafeArea())
+            .preferredColorScheme(.dark)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -145,7 +168,7 @@ struct AddRoastJokeView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                            .foregroundColor(FirePalette.sub)
                     }
                 }
                 

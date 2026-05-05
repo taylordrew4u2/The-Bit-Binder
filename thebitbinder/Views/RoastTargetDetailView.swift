@@ -292,52 +292,54 @@ struct RoastTargetDetailView: View {
     }
     
     private var filterChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(RoastFilterMode.allCases, id: \.rawValue) { mode in
-                    FilterChip(
-                        title: mode.rawValue,
-                        icon: mode.icon,
-                        isSelected: filterMode == mode,
-                        accentColor: accentColor
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            filterMode = mode
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(RoastFilterMode.allCases, id: \.rawValue) { mode in
+                        FilterChip(
+                            title: mode.rawValue,
+                            icon: mode.icon,
+                            isSelected: filterMode == mode,
+                            accentColor: accentColor
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                filterMode = mode
+                            }
                         }
                     }
                 }
-                
-                Divider()
-                    .frame(height: 24)
-                    .padding(.horizontal, 4)
-                
-                // Sort menu
-                Menu {
-                    ForEach(RoastJokeSortOption.allCases) { option in
-                        Button {
-                            sortOption = option
-                        } label: {
-                            Label(option.rawValue, systemImage: option.icon)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: sortOption.icon)
-                        Text("Sort")
-                            .font(.subheadline.weight(.medium))
-                        Image(systemName: "chevron.down")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(accentColor)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(accentColor.opacity(0.1))
-                    )
-                }
+                .padding(.horizontal, 16)
             }
-            .padding(.horizontal, 16)
+
+            // Sort menu pinned outside the scroll so it never disappears
+            Menu {
+                ForEach(RoastJokeSortOption.allCases) { option in
+                    Button {
+                        sortOption = option
+                    } label: {
+                        Label(option.rawValue, systemImage: option.icon)
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: sortOption.icon)
+                    Image(systemName: "chevron.down")
+                        .font(.caption2)
+                }
+                .foregroundColor(accentColor)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(accentColor.opacity(0.12))
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(accentColor.opacity(0.25), lineWidth: 0.5)
+                )
+            }
+            .accessibilityLabel("Sort roasts by \(sortOption.rawValue)")
+            .padding(.trailing, 12)
         }
         .padding(.vertical, 10)
         .background(FirePalette.bg.opacity(0.95))
@@ -358,21 +360,8 @@ struct RoastTargetDetailView: View {
                     .font(.subheadline)
                     .foregroundColor(FirePalette.sub)
 
-                Button {
+                EmberCTAButton(title: "Write First Roast") {
                     showingAddRoast = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "flame")
-                            .font(.system(size: 14))
-                        Text("Write First Roast")
-                            .font(.system(size: 15, weight: .bold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 14)
-                    .background(FirePalette.emberCTA)
-                    .clipShape(Capsule())
-                    .shadow(color: FirePalette.core.opacity(0.3), radius: 12, y: 4)
                 }
                 .padding(.top, 8)
             } else {
