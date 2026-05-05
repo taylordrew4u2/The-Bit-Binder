@@ -51,20 +51,11 @@ final class MLXBitBuddyService: BitBuddyBackend {
             dataContext: dataContext
         )
 
-        do {
-            let output = try await MLXSharedRuntime.shared.generateChatResponse(
-                userPrompt,
-                conversationId: session.conversationId,
-                instructions: systemInstructions
-            )
-            let cleaned = sanitizeModelOutput(output)
-            if cleaned.isEmpty {
-                throw BitBuddyBackendError.generationFailed
-            }
-            return cleaned
-        } catch {
-            throw BitBuddyBackendError.generationFailed
-        }
+        return try await generateResponse(
+            userPrompt: userPrompt,
+            conversationId: session.conversationId,
+            systemInstructions: systemInstructions
+        )
 #else
         throw BitBuddyBackendError.unavailable
 #endif
@@ -91,5 +82,30 @@ final class MLXBitBuddyService: BitBuddyBackend {
             .replacingOccurrences(of: "<|im_start|>", with: "")
             .replacingOccurrences(of: "<|endoftext|>", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func generateResponse(
+        userPrompt: String,
+        conversationId: String,
+        systemInstructions: String
+    ) async throws -> String {
+#if canImport(MLXLLM) && canImport(MLXLMCommon)
+        do {
+            let output = try await MLXSharedRuntime.shared.generateChatResponse(
+                userPrompt,
+                conversationId: conversationId,
+                instructions: systemInstructions
+            )
+            let cleaned = sanitizeModelOutput(output)
+            if cleaned.isEmpty {
+                throw BitBuddyBackendError.generationFailed
+            }
+            return cleaned
+        } catch {
+            throw BitBuddyBackendError.generationFailed
+        }
+#else
+        throw BitBuddyBackendError.unavailable
+#endif
     }
 }

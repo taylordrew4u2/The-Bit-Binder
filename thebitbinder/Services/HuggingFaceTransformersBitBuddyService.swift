@@ -66,19 +66,11 @@ final class HuggingFaceTransformersBitBuddyService: BitBuddyBackend {
         }
 
         let prompt = buildPrompt(message: trimmed, session: session, dataContext: dataContext)
-        do {
-            guard #available(iOS 18.0, *) else {
-                throw BitBuddyBackendError.unavailable
-            }
-            let output = try await HFTransformersRuntime.shared.generate(prompt: prompt)
-            let cleaned = sanitizeModelOutput(output)
-            if cleaned.isEmpty {
-                throw BitBuddyBackendError.generationFailed
-            }
-            return cleaned
-        } catch {
-            throw BitBuddyBackendError.generationFailed
-        }
+        return try await generateResponse(
+            userPrompt: prompt,
+            session: session,
+            systemInstructions: BitBuddyResources.llmSystemInstructions
+        )
 #else
         throw BitBuddyBackendError.unavailable
 #endif
@@ -117,6 +109,51 @@ final class HuggingFaceTransformersBitBuddyService: BitBuddyBackend {
         output
             .replacingOccurrences(of: "</s>", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func generateResponse(
+        userPrompt: String,
+        session: BitBuddySessionSnapshot,
+        systemInstructions: String
+    ) async throws -> String {
+#if canImport(Models) && canImport(Tokenizers) && canImport(Generation) && canImport(CoreML)
+        let recentTurns = session.turns.suffix(4)
+        let history = recentTurns.map { turn in
+            let role: String
+            switch turn.role {
+            case .system: role = "system"
+            case .user: role = "user"
+            case .assistant: role = "assistant"
+            }
+            return "\(role): \(turn.text)"
+        }.joined(separator: "\n")
+
+        let prompt = """
+        \(systemInstructions)
+
+        Conversation:
+        \(history)
+
+        \(userPrompt)
+        Assistant:
+        """
+
+        do {
+            guard #available(iOS 18.0, *) else {
+                throw BitBuddyBackendError.unavailable
+            }
+            let output = try await HFTransformersRuntime.shared.generate(prompt: prompt)
+            let cleaned = sanitizeModelOutput(output)
+            if cleaned.isEmpty {
+                throw BitBuddyBackendError.generationFailed
+            }
+            return cleaned
+        } catch {
+            throw BitBuddyBackendError.generationFailed
+        }
+#else
+        throw BitBuddyBackendError.unavailable
+#endif
     }
 
     fileprivate static func configuredModelPath() -> String? {

@@ -13,14 +13,14 @@ final class NoBitBuddyBackend: BitBuddyBackend {
     }
 }
 
-/// Prefers on-device LLM backends in this order:
+/// Prefers operational backends in this order:
 /// 1) Apple Intelligence (FoundationModels, iOS 26+) — smartest, no download
 /// 2) MLX Qwen 2.5 3B
 /// 3) Hugging Face CoreML (swift-transformers)
 /// 4) OpenAI (user-provided API key)
 /// 5) Local fallback intent-driven chat engine
 enum BitBuddyBackendFactory {
-    static func makeBackend() -> BitBuddyBackend {
+    static func makeOperationalBackend() -> BitBuddyBackend {
         if AppleIntelligenceBitBuddyService.shared.isAvailable {
             return AppleIntelligenceBitBuddyService.shared
         }

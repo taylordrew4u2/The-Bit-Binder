@@ -35,28 +35,16 @@ final class AppleIntelligenceBitBuddyService: BitBuddyBackend {
         session: BitBuddySessionSnapshot,
         dataContext: BitBuddyDataContext
     ) async throws -> String {
-#if canImport(FoundationModels)
-        if #available(iOS 26, *) {
-            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                return "Give me a prompt and I can help with jokes, rewrites, brainstorming, and general chat."
-            }
-
-            let userPrompt = buildPrompt(message: trimmed, dataContext: dataContext)
-
-            let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
-            let lmSession = LanguageModelSession(model: model, instructions: systemInstructions)
-            let response = try await lmSession.respond(to: userPrompt)
-            let output = response.content
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard !output.isEmpty, !Self.isRefusal(output) else {
-                throw BitBuddyBackendError.generationFailed
-            }
-            return output
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return "Give me a prompt and I can help with jokes, rewrites, brainstorming, and general chat."
         }
-#endif
-        throw BitBuddyBackendError.unavailable
+
+        let userPrompt = buildPrompt(message: trimmed, dataContext: dataContext)
+        return try await generateResponse(
+            userPrompt: userPrompt,
+            systemInstructions: systemInstructions
+        )
     }
 
     // MARK: - Refusal Detection
@@ -87,5 +75,25 @@ final class AppleIntelligenceBitBuddyService: BitBuddyBackend {
         dataContext: BitBuddyDataContext
     ) -> String {
         BitBuddyResources.buildLLMPrompt(message: message, dataContext: dataContext)
+    }
+
+    func generateResponse(
+        userPrompt: String,
+        systemInstructions: String
+    ) async throws -> String {
+#if canImport(FoundationModels)
+        if #available(iOS 26, *) {
+            let model = SystemLanguageModel(guardrails: .permissiveContentTransformations)
+            let lmSession = LanguageModelSession(model: model, instructions: systemInstructions)
+            let response = try await lmSession.respond(to: userPrompt)
+            let output = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard !output.isEmpty, !Self.isRefusal(output) else {
+                throw BitBuddyBackendError.generationFailed
+            }
+            return output
+        }
+#endif
+        throw BitBuddyBackendError.unavailable
     }
 }
