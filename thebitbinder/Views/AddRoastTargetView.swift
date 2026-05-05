@@ -66,12 +66,14 @@ struct AddRoastTargetView: View {
                 Section("Who are you roasting?") {
                     TextField("Name", text: $name)
                         .font(.headline)
+                        .roastRowBackground()
                 }
 
                 Section("Notes (optional)") {
                     TextField("e.g. friend, coworker, celebrity...", text: $notes)
+                        .roastRowBackground()
                 }
-                
+
                 Section {
                     Picker("Main Roasts", selection: $openingRoastCount) {
                         ForEach(1...10, id: \.self) { count in
@@ -79,6 +81,7 @@ struct AddRoastTargetView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .roastRowBackground()
                 } header: {
                     Text("Performance Settings")
                 } footer: {
@@ -109,6 +112,7 @@ struct AddRoastTargetView: View {
                                     .buttonStyle(.plain)
                                 }
                             }
+                            .roastRowBackground()
                         }
                     }
                     Button {
@@ -117,6 +121,7 @@ struct AddRoastTargetView: View {
                         Label("Add another", systemImage: "plus.circle")
                             .foregroundColor(accentColor)
                     }
+                    .roastRowBackground()
                 } header: {
                     Text("What do you know about them?")
                 } footer: {
@@ -136,17 +141,17 @@ struct AddRoastTargetView: View {
                                     .foregroundColor(accentColor)
                                 Text("Answer questions to build the profile")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(FirePalette.sub)
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
+                                .foregroundColor(FirePalette.sub)
                         }
                     }
+                    .roastRowBackground()
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color(UIColor.systemBackground))
+            .roastFormTheme()
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: true)
