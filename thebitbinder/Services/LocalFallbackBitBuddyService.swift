@@ -79,12 +79,37 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
     // MARK: - Intent-Routed Dispatch
     
     private func handleRoutedIntent(_ route: BitBuddyRouteResult, message: String, dataContext: BitBuddyDataContext) -> String {
+        let response = dispatchIntent(route, message: message, dataContext: dataContext)
+        if dataContext.isRoastMode {
+            return applyRoastVoice(response, intentId: route.intent.id)
+        }
+        return response
+    }
+
+    private func applyRoastVoice(_ response: String, intentId: String) -> String {
+        let alreadyRoasty: Set<String> = [
+            "roast_line_generation", "toggle_roast_mode", "create_roast_target",
+            "add_roast_joke", "search_roasts", "create_roast_set",
+            "present_roast_set", "attach_photo_to_target",
+            "analyze_joke", "improve_joke", "generate_premise", "generate_joke",
+            "shorten_joke", "expand_joke", "crowdwork_help",
+            "explain_comedy_theory", "rewrite_in_my_style",
+        ]
+        if alreadyRoasty.contains(intentId) { return response }
+
+        let prefixes = ["Sharp.", "Done.", "Handled.", "On it.", "Locked in."]
+        let prefix = prefixes.randomElement()!
+        let cleaned = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(prefix) \(cleaned)"
+    }
+
+    private func dispatchIntent(_ route: BitBuddyRouteResult, message: String, dataContext: BitBuddyDataContext) -> String {
         let intent = route.intent
         let entities = route.extractedEntities
         let userName = dataContext.userName
-        
+
         switch intent.id {
-            
+
         // ═══════════════════════════════════════════
         // JOKES
         // ═══════════════════════════════════════════
@@ -272,23 +297,25 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             Keep it light and curious — never punching down at someone who didn't sign up for it. Channel your inner Chappelle (story) or Carlin (observational).
             """
         case "roast_line_generation":
+            let intensity: String
+            let lower = message.lowercased()
+            if lower.contains("savage") || lower.contains("brutal") || lower.contains("destroy") {
+                intensity = "savage"
+            } else if lower.contains("light") || lower.contains("gentle") || lower.contains("soft") {
+                intensity = "light"
+            } else {
+                intensity = "medium"
+            }
+            let example = BitBuddyResources.randomRoastExample(intensity: intensity)
+                ?? BitBuddyResources.randomRoastExample() ?? ""
             let technique = BitBuddyResources.roastTechniques.randomElement() ?? "Callback"
-            let example = BitBuddyResources.randomRoastExample(intensity: "medium") ?? ""
-            let vocabHit = BitBuddyResources.vocabPunchyAdjectives.randomElement() ?? "razor-sharp"
+            let desc = BitBuddyResources.roastIntensityDescriptions[intensity] ?? "Medium"
             return """
-             **Master Roast Guide**
-            
-            **The 4-Step Structure:**
-            \(BitBuddyResources.roastStructure.joined(separator: "\n"))
-            
-            **Pro Technique to Try:** \(technique)
-            
-            **Example (\(BitBuddyResources.roastIntensityDescriptions["medium"] ?? "Medium")):**
+            Here's a \(desc.lowercased()) burn to get you started:
+
             \(example)
-            
-            **Vocab Power-Up:** Aim for "\(vocabHit)" delivery.
-            
-            Write 5 lines, keep 2. The best roast jokes feel specific and earned. Say **"light"**, **"medium"**, or **"savage"** to set the intensity.
+
+            That one uses **\(technique)**. Want more, or should I dial it up? Say "savage" or "light" to change the heat.
             """
         case "compare_versions":
             let adj = BitBuddyResources.vocabPunchyAdjectives.randomElement() ?? "razor-sharp"
@@ -929,12 +956,23 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
     
     private func buildHelpResponse(for dataContext: BitBuddyDataContext) -> String {
         let userName = dataContext.userName
+        let roast = dataContext.isRoastMode
 
-        // Page-aware: if the user is on a specific section and we couldn't
-        // route their message, anchor the response to the page they're on
-        // so it feels like a chatbot helper, not a generic menu.
         if let page = dataContext.currentPage {
-            return pageAwareHelpResponse(userName: userName, page: page)
+            return pageAwareHelpResponse(userName: userName, page: page, roastMode: roast)
+        }
+
+        if roast {
+            return """
+            Didn't catch that, \(userName) — but I'm still dangerous. I can do everything the normal me does, just meaner.
+
+            **Burns**: "roast my friend Mike", "write 5 burns about bad drivers"
+            **Jokes**: "analyze this joke", "punch this up", "generate a premise about ___"
+            **Sets**: "build a 10-minute set", "reorder my lineup"
+            **Everything else**: tags, folders, recordings, imports — same as always
+
+            What do you need?
+            """
         }
 
         return """
@@ -957,10 +995,10 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         """
     }
 
-    /// Returns a contextual chatbot-style hint based on which screen the user
-    /// is currently looking at. Keeps the assistant feeling present instead
-    /// of dumping a global menu when an unrouted question lands.
-    private func pageAwareHelpResponse(userName: String, page: BitBuddySection) -> String {
+    private func pageAwareHelpResponse(userName: String, page: BitBuddySection, roastMode: Bool) -> String {
+        if roastMode {
+            return roastPageAwareHelpResponse(userName: userName, page: page)
+        }
         switch page {
         case .jokes:
             return """
@@ -1042,6 +1080,75 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         case .bitbuddy:
             return """
             We're already chatting, \(userName) — what do you want to work on? Try "punch up this joke" or "give me a premise about ___".
+            """
+        }
+    }
+
+    private func roastPageAwareHelpResponse(userName: String, page: BitBuddySection) -> String {
+        switch page {
+        case .jokes:
+            return """
+            You're in the war room, \(userName). I can sharpen anything here:
+            • "Punch this up" or "analyze this joke" — I'll tear it apart and rebuild it
+            • "Find jokes about ___" or "show me hits"
+            • Tags, folders, favorites — all the usual
+            • Or just say "roast ___" and I'll start writing burns
+            What are we working on?
+            """
+        case .brainstorm:
+            return """
+            Brainstorm's open, \(userName). Even in roast mode I can:
+            • Capture ideas — "save this idea: …"
+            • Generate premises — "give me a premise about ___"
+            • Promote ideas to jokes
+            Feed me a topic and I'll make it mean.
+            """
+        case .setLists:
+            return """
+            Set Lists, \(userName). I can build a roast set or a regular one:
+            • "Build a roast set for Mike's birthday"
+            • Reorder, shuffle, estimate runtime
+            • "Add my sharpest burns to this set"
+            Who's getting destroyed tonight?
+            """
+        case .recordings:
+            return """
+            Recordings, \(userName). Same tools, darker intentions:
+            • Record, transcribe, clip
+            • Attach to a set
+            Capture the carnage.
+            """
+        case .notebook:
+            return """
+            Notebook's open, \(userName). Save notes, attach photos, search — roast mode doesn't change how the scratch pad works. What do you need?
+            """
+        case .roastMode:
+            return """
+            This is home base, \(userName). Give me a target and tell me how savage.
+            • "Add a target" — name someone
+            • "Write burns about ___"
+            • "Build a roast set"
+            Let's cook.
+            """
+        case .importFlow:
+            return """
+            Import, \(userName). I can pull jokes from PDFs, images, or files — even in roast mode. Want me to check the queue?
+            """
+        case .sync:
+            return """
+            Sync, \(userName). iCloud status, manual sync, diagnostics — same as always. What's the issue?
+            """
+        case .settings:
+            return """
+            Settings, \(userName). Export, cache, appearance, sync toggles — I handle it all. What needs changing?
+            """
+        case .help:
+            return """
+            Help, \(userName). Ask me anything — "how do tags work?", "what is The Hits?", "how do I import?" Roast mode doesn't limit what I know.
+            """
+        case .bitbuddy:
+            return """
+            We're talking, \(userName). I can do everything — jokes, sets, brainstorm, burns, analysis. Just tell me what you need.
             """
         }
     }
