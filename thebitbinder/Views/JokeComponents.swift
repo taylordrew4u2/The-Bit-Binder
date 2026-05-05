@@ -194,6 +194,43 @@ struct TheHitsChip: View {
     }
 }
 
+// MARK: - Tag Filter Chip
+
+struct TagFilterChip: View {
+    let activeTag: String?
+    let isSelected: Bool
+    var roastMode: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: {
+            haptic(.selection)
+            action()
+        }) {
+            HStack(spacing: 4) {
+                Image(systemName: "tag.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(isSelected ? .white : Color.accentColor)
+
+                Text(activeTag.map { "#\($0)" } ?? "Tags")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .foregroundColor(isSelected ? .white : .primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                isSelected
+                    ? AnyShapeStyle(Color.bitbinderAccent)
+                    : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
+            )
+            .clipShape(Capsule())
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Open Mic Chip
 
 struct OpenMicChip: View {
@@ -454,4 +491,88 @@ enum JokesViewMode: String, CaseIterable {
         }())
     }
     .listStyle(.insetGrouped)
+}
+// MARK: - Tag Filter Sheet
+//
+// Native picker sheet for filtering jokes by an arbitrary tag. Uses standard
+// inset-grouped list, system search, and ContentUnavailableView for the empty
+// state — matches Apple's HIG patterns.
+struct TagFilterSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let allTags: [String]
+    let selectedTag: String?
+    let onSelect: (String?) -> Void
+
+    @State private var query = ""
+
+    private var filtered: [String] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return allTags }
+        return allTags.filter { $0.localizedCaseInsensitiveContains(q) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if allTags.isEmpty {
+                    ContentUnavailableView(
+                        "No Tags Yet",
+                        systemImage: "tag",
+                        description: Text("Tags appear here once you add them to a joke.")
+                    )
+                } else {
+                    List {
+                        Section {
+                            Button {
+                                onSelect(nil)
+                            } label: {
+                                HStack {
+                                    Label("All Tags", systemImage: "tray.full")
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    if selectedTag == nil {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(.tint)
+                                    }
+                                }
+                            }
+                        }
+
+                        Section {
+                            if filtered.isEmpty {
+                                Text("No tags match \"\(query)\"")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(filtered, id: \.self) { tag in
+                                    Button {
+                                        onSelect(tag)
+                                    } label: {
+                                        HStack {
+                                            Text("#\(tag)")
+                                                .foregroundStyle(.primary)
+                                            Spacer()
+                                            if selectedTag == tag {
+                                                Image(systemName: "checkmark")
+                                                    .foregroundStyle(.tint)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                    .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search tags")
+                }
+            }
+            .navigationTitle("Filter by Tag")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
 }

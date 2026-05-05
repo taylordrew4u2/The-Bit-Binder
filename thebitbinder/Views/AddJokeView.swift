@@ -14,20 +14,51 @@ struct AddJokeView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Query(filter: #Predicate<JokeFolder> { !$0.isTrashed }) private var folders: [JokeFolder]
-    
+    @Query(filter: #Predicate<Joke> { !$0.isTrashed }) private var allJokes: [Joke]
+
     @State private var title = ""
     @State private var content = ""
+    @State private var tags: [String] = []
+    @State private var tagDraft = ""
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
     @State private var isSaving = false
     @State private var hasRecoveredDraft = false
     @FocusState private var titleFocused: Bool
     @FocusState private var contentFocused: Bool
-    
+    @FocusState private var tagFocused: Bool
+
     var selectedFolder: JokeFolder?
-    
+
     private var canSave: Bool {
         !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Tags already used across the corpus, ranked by frequency desc.
+    private var existingTagPool: [String] {
+        var counts: [String: Int] = [:]
+        for joke in allJokes {
+            for t in joke.tags {
+                let trimmed = t.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                counts[trimmed, default: 0] += 1
+            }
+        }
+        return counts.sorted {
+            if $0.value != $1.value { return $0.value > $1.value }
+            return $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending
+        }.map { $0.key }
+    }
+
+    /// Autocomplete suggestions matching the current draft prefix.
+    private var tagSuggestions: [String] {
+        let draft = tagDraft.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !draft.isEmpty else { return [] }
+        let added = Set(tags.map { $0.lowercased() })
+        return existingTagPool
+            .filter { $0.lowercased().hasPrefix(draft) && !added.contains($0.lowercased()) }
+            .prefix(6)
+            .map { $0 }
     }
     
     var body: some View {
@@ -68,7 +99,13 @@ struct AddJokeView: View {
                     Divider()
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
-                    
+
+                    // Tag entry — native chip row with autocomplete
+                    tagSection
+
+                    Divider()
+                        .padding(.horizontal, 20)
+
                     // Content editor — the main writing canvas
                     ZStack(alignment: .topLeading) {
                         if content.isEmpty {
@@ -116,6 +153,7 @@ struct AddJokeView: View {
                         Button("Done") {
                             contentFocused = false
                             titleFocused = false
+                            tagFocused = false
                         }
                     }
                 }
@@ -149,16 +187,128 @@ struct AddJokeView: View {
         }
     }
     
+    // MARK: - Tag entry section
+
+    @ViewBuilder
+    private var tagSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Active tag chips
+            if !tags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(tags, id: \.self) { tag in
+                            HStack(spacing: 4) {
+                                Text("#\(tag)")
+                                    .font(.subheadline)
+                                Button {
+                                    tags.removeAll { $0 == tag }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .imageScale(.small)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Remove tag \(tag)")
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color(UIColor.tertiarySystemFill))
+                            .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+
+            // Inline entry field
+            HStack(spacing: 8) {
+                Image(systemName: "tag")
+                    .foregroundStyle(.secondary)
+                TextField("Add tag", text: $tagDraft)
+                    .textFieldStyle(.plain)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .submitLabel(.done)
+                    .focused($tagFocused)
+                    .onSubmit { commitTagDraft() }
+                    .onChange(of: tagDraft) { _, new in
+                        if new.contains(",") || new.contains("\n") {
+                            commitTagDraft()
+                        }
+                    }
+                if !tagDraft.isEmpty {
+                    Button(action: commitTagDraft) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(.tint)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .font(.subheadline)
+            .padding(.horizontal, 20)
+
+            // Suggestions or recent quick-picks
+            let suggestionList: [String] = tagDraft.isEmpty
+                ? Array(existingTagPool.filter { t in !tags.contains(where: { $0.lowercased() == t.lowercased() }) }.prefix(8))
+                : tagSuggestions
+            if !suggestionList.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(suggestionList, id: \.self) { s in
+                            Button {
+                                addTag(s)
+                            } label: {
+                                Text("#\(s)")
+                                    .font(.caption)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Color(UIColor.secondarySystemFill))
+                                    .foregroundStyle(.primary)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+        }
+        .padding(.top, 10)
+    }
+
+    private func commitTagDraft() {
+        let parts = tagDraft.split(whereSeparator: { $0 == "," || $0 == "\n" }).map(String.init)
+        for raw in parts { addTag(raw) }
+        tagDraft = ""
+    }
+
+    private func addTag(_ raw: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        // Tag model strips commas at write-time; do the same here.
+        let cleaned = trimmed.replacingOccurrences(of: ",", with: "")
+        guard !cleaned.isEmpty else { return }
+        if !tags.contains(where: { $0.caseInsensitiveCompare(cleaned) == .orderedSame }) {
+            tags.append(cleaned)
+        }
+    }
+
     private func saveJoke() {
         guard !isSaving else { return }
         let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedContent.isEmpty else { return }
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        // Flush any pending tag draft so user-typed text isn't lost.
+        commitTagDraft()
+
         isSaving = true
         haptic(.light)
 
         let joke = Joke(content: trimmedContent, title: trimmedTitle, folder: selectedFolder)
+        if !tags.isEmpty {
+            joke.tags = tags
+        }
         modelContext.insert(joke)
 
         do {

@@ -32,7 +32,13 @@ struct BitBuddyDataContext: Sendable {
 
     // Intent routing context (populated by BitBuddyIntentRouter)
     var routedIntent: BitBuddyRouteResult?
+    /// Section the assistant should treat as "active" for this turn. This is
+    /// either the section the user's intent routed to, or — if no intent
+    /// matched — the page they're currently viewing.
     var activeSection: BitBuddySection?
+    /// The literal page the user is on right now. Set independently of intent
+    /// routing so backends can answer "where am I?" / "help me here" correctly.
+    var currentPage: BitBuddySection?
     var isRoastMode: Bool = false
 }
 

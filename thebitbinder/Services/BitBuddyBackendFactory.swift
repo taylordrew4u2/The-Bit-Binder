@@ -18,6 +18,7 @@ final class NoBitBuddyBackend: BitBuddyBackend {
 /// 2) MLX Qwen 2.5 3B
 /// 3) Hugging Face CoreML (swift-transformers)
 /// 4) OpenAI (user-provided API key)
+/// 5) Local fallback intent-driven chat engine
 enum BitBuddyBackendFactory {
     static func makeBackend() -> BitBuddyBackend {
         if AppleIntelligenceBitBuddyService.shared.isAvailable {
@@ -34,6 +35,10 @@ enum BitBuddyBackendFactory {
 
         if OpenAIBitBuddyService.shared.isAvailable {
             return OpenAIBitBuddyService.shared
+        }
+
+        if LocalFallbackBitBuddyService.shared.isAvailable {
+            return LocalFallbackBitBuddyService.shared
         }
 
         return NoBitBuddyBackend.shared

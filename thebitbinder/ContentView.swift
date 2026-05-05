@@ -128,6 +128,23 @@ enum AppScreen: String, CaseIterable {
     case journal = "Journal"
     case settings = "Settings"
 
+    /// Maps the active tab to BitBuddy's section enum so the chatbot knows
+    /// which page the user is on when they ask a question. Returns nil for
+    /// .home — Home is a meta-page (overview), and the assistant should rely
+    /// on routing instead of pretending it's "in" a feature area.
+    var bitBuddySection: BitBuddySection? {
+        switch self {
+        case .home:          return nil
+        case .brainstorm:    return .brainstorm
+        case .jokes:         return .jokes
+        case .sets:          return .setLists
+        case .recordings:    return .recordings
+        case .notebookSaver: return .notebook
+        case .journal:       return nil
+        case .settings:      return .settings
+        }
+    }
+
     static var roastScreens: [AppScreen] {
         [.jokes, .settings]
     }
@@ -275,38 +292,11 @@ struct MainTabView: View {
     }
     
     var body: some View {
-        TabView(selection: selectedTab) {
-            ForEach(visibleTabs, id: \.self) { screen in
-                NavigationStack {
-                    screenView(for: screen)
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            // GagGrabber file upload — Jokes page only
-                            if screen == .jokes {
-                                ToolbarItem(placement: .navigationBarTrailing) {
-                                    Button {
-                                        showGagGrabber = true
-                                    } label: {
-                                        Image("GagGrabberGlyph")
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .frame(width: 20, height: 20)
-                                    }
-                                }
-                            }
-
-                        }
-                }
-                .tabItem {
-                    Label(
-                        roastMode ? screen.roastName : screen.rawValue,
-                        systemImage: selectedTab.wrappedValue == screen
-                            ? (roastMode ? screen.roastSelectedIcon : screen.selectedIcon)
-                            : (roastMode ? screen.roastIcon : screen.icon)
-                    )
-                }
-                .tag(screen)
+        Group {
+            if roastMode {
+                roastModeRoot
+            } else {
+                standardTabRoot
             }
         }
         .tint(Color.bitbinderAccent)
@@ -320,6 +310,17 @@ struct MainTabView: View {
                     hasLaunchedBefore = true
                 }
             }
+            // Seed BitBuddy with the initial page so the very first chat turn
+            // is page-aware (the user can ask "what is this" before tapping a
+            // different tab).
+            BitBuddyService.shared.setCurrentPage(selectedTab.wrappedValue.bitBuddySection)
+        }
+        .onChange(of: selectedTab.wrappedValue) { _, newTab in
+            // Keep BitBuddy aware of which page the user is on. Asked
+            // questions like "help me here" or "what can I do on this page"
+            // resolve against this rather than defaulting to a generic
+            // response.
+            BitBuddyService.shared.setCurrentPage(newTab.bitBuddySection)
         }
         .fullScreenCover(isPresented: $showSetup) {
             AppSetupView(isFirstLaunch: !hasLaunchedBefore)
@@ -419,6 +420,67 @@ struct MainTabView: View {
             // Keep the full-drawer controller in sync with the presenter so
             // existing call sites that open .full still route correctly.
             bitBuddyDrawer.isOpen = (mode == .full)
+        }
+    }
+
+    private var standardTabRoot: some View {
+        TabView(selection: selectedTab) {
+            ForEach(visibleTabs, id: \.self) { screen in
+                NavigationStack {
+                    screenView(for: screen)
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            // GagGrabber file upload — Jokes page only
+                            if screen == .jokes {
+                                ToolbarItem(placement: .navigationBarTrailing) {
+                                    Button {
+                                        showGagGrabber = true
+                                    } label: {
+                                        Image("GagGrabberGlyph")
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(width: 20, height: 20)
+                                    }
+                                }
+                            }
+
+                        }
+                }
+                .tabItem {
+                    Label(
+                        screen.rawValue,
+                        systemImage: selectedTab.wrappedValue == screen ? screen.selectedIcon : screen.icon
+                    )
+                }
+                .tag(screen)
+            }
+        }
+    }
+
+    private var roastModeRoot: some View {
+        NavigationStack {
+            JokesView()
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Exit Roast Mode") {
+                            roastMode = false
+                        }
+                    }
+
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            showGagGrabber = true
+                        } label: {
+                            Image("GagGrabberGlyph")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 20, height: 20)
+                        }
+                    }
+                }
         }
     }
     

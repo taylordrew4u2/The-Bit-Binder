@@ -173,6 +173,26 @@ struct JokesView: View {
     }
     @State private var showingOpenMicFilter = false
 
+    // MARK: - Tag Filter
+    @State private var activeTagFilter: String? = nil
+    @State private var showingTagFilterSheet = false
+
+    /// All distinct tags across non-trashed jokes, sorted by frequency desc.
+    private var allTags: [String] {
+        var counts: [String: Int] = [:]
+        for j in jokes {
+            for t in j.tags {
+                let trimmed = t.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { continue }
+                counts[trimmed, default: 0] += 1
+            }
+        }
+        return counts.sorted {
+            if $0.value != $1.value { return $0.value > $1.value }
+            return $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending
+        }.map { $0.key }
+    }
+
 
     private var folderChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -206,6 +226,26 @@ struct JokesView: View {
                         }
                     }
                 )
+
+                // Tag filter chip — opens picker sheet, shows active tag inline
+                TagFilterChip(
+                    activeTag: activeTagFilter,
+                    isSelected: activeTagFilter != nil,
+                    roastMode: roastMode,
+                    action: { showingTagFilterSheet = true }
+                )
+
+                if activeTagFilter != nil {
+                    Button {
+                        activeTagFilter = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .imageScale(.medium)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear tag filter")
+                }
                 
                 // All Jokes
                 FolderChip(
@@ -370,13 +410,14 @@ struct JokesView: View {
         let openMic = showingOpenMicFilter ? "1" : "0"
         let recent = showRecentlyAdded  ? "1" : "0"
         let search = debouncedSearchText
-        return "\(folder)|\(hits)|\(openMic)|\(recent)|\(search)"
+        let tag    = activeTagFilter ?? "nil"
+        return "\(folder)|\(hits)|\(openMic)|\(recent)|\(search)|\(tag)"
     }
 
     var filteredJokes: [Joke] { cachedFilteredJokes }
 
     private func rebuildFilteredJokes() {
-        let base: [Joke]
+        var base: [Joke]
         if showingHitsFilter {
             base = jokes.filter { $0.isHit }
         } else if showingOpenMicFilter {
@@ -389,6 +430,11 @@ struct JokesView: View {
             base = jokes.filter { ($0.folders ?? []).contains(where: { $0.id == folderId }) }
         } else {
             base = jokes
+        }
+
+        // Tag filter is independent of folder/hits/etc — it composes on top.
+        if let tag = activeTagFilter {
+            base = base.filter { $0.tags.contains(tag) }
         }
 
         let trimmed = debouncedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -445,6 +491,17 @@ struct JokesView: View {
                 }
                 .sheet(isPresented: $showingGagGrabber) {
                     HybridGagGrabberSheet()
+                }
+                .sheet(isPresented: $showingTagFilterSheet) {
+                    TagFilterSheet(
+                        allTags: allTags,
+                        selectedTag: activeTagFilter,
+                        onSelect: { tag in
+                            activeTagFilter = tag
+                            showingTagFilterSheet = false
+                        }
+                    )
+                    .presentationDetents([.medium, .large])
                 }
                 .fullScreenCover(item: $smartImportResult) { result in
                     SmartImportReviewView(

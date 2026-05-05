@@ -39,6 +39,17 @@ final class BitBuddyService: NSObject, ObservableObject {
     /// Message to auto-send when the chat view opens (e.g. "Punch up this joke").
     /// BitBuddyChatView consumes and clears this on appear.
     var pendingMessage: String?
+    /// Current page the user is on. Set by ContentView/MainTabView whenever
+    /// the active tab changes. BitBuddy uses this so questions like
+    /// "what is this", "help me here", or "what can I do on this page" get
+    /// page-aware answers instead of generic responses.
+    @Published private(set) var currentPage: BitBuddySection?
+
+    /// Updates the page context. Idempotent — safe to call on every tab change.
+    func setCurrentPage(_ page: BitBuddySection?) {
+        guard currentPage != page else { return }
+        currentPage = page
+    }
 
     private let maxConversationTurns = 16
     /// Maximum number of old conversations to retain in memory
@@ -145,7 +156,11 @@ final class BitBuddyService: NSObject, ObservableObject {
         dataContext.recentJokes = recentJokeProvider?() ?? []
         dataContext.focusedJoke = focusedJoke
         dataContext.routedIntent = routeResult
-        dataContext.activeSection = routeResult?.section
+        // Prefer the routed section (the user's intent), fall back to the
+        // page they're currently viewing so generic asks like "help me here"
+        // resolve to the right context.
+        dataContext.activeSection = routeResult?.section ?? currentPage
+        dataContext.currentPage = currentPage
         dataContext.isRoastMode = UserDefaults.standard.bool(forKey: "roastModeEnabled")
         
         do {

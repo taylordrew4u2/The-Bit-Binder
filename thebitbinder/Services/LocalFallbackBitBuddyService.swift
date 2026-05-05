@@ -929,9 +929,17 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
     
     private func buildHelpResponse(for dataContext: BitBuddyDataContext) -> String {
         let userName = dataContext.userName
+
+        // Page-aware: if the user is on a specific section and we couldn't
+        // route their message, anchor the response to the page they're on
+        // so it feels like a chatbot helper, not a generic menu.
+        if let page = dataContext.currentPage {
+            return pageAwareHelpResponse(userName: userName, page: page)
+        }
+
         return """
         Hey \(userName)! I didn't quite catch that. Here's what I can do:
-        
+
          **Jokes**: save, edit, tag, search, share, organize into folders
          **Brainstorm**: capture ideas, voice notes, promote to jokes
          **Set Lists**: create, reorder, shuffle, estimate time, present
@@ -944,9 +952,98 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
          **Sync**: iCloud status, manual sync, toggle
          **Settings**: export, clear cache
          **Help**: explain any feature
-        
+
         Try something like: "analyze this joke" or "what makes a good punchline"
         """
+    }
+
+    /// Returns a contextual chatbot-style hint based on which screen the user
+    /// is currently looking at. Keeps the assistant feeling present instead
+    /// of dumping a global menu when an unrouted question lands.
+    private func pageAwareHelpResponse(userName: String, page: BitBuddySection) -> String {
+        switch page {
+        case .jokes:
+            return """
+            You're on **Jokes**, \(userName). I can:
+            • Filter or search your library — try "show me hits" or "find jokes about my dad"
+            • Move jokes between folders or sets — "move this to my Monday set"
+            • Punch up a joke if you tap one open and ask "improve this"
+            • Tag, untag, or favorite — "tag this as crowdwork"
+            What do you want to do here?
+            """
+        case .brainstorm:
+            return """
+            You're in **Brainstorm**, \(userName). Best moves here:
+            • "Save this idea: …" — I'll capture it
+            • Ask "give me a premise about commuting" or "suggest a topic"
+            • Promote any idea to a polished joke — "turn this into a joke"
+            What's rattling around?
+            """
+        case .setLists:
+            return """
+            You're on **Set Lists**, \(userName). I can:
+            • Create a new set — "make a 10-minute set about dating"
+            • Reorder, shuffle, or estimate runtime
+            • Add jokes — "add my hits to this set"
+            Which set are you working on?
+            """
+        case .recordings:
+            return """
+            You're in **Recordings**, \(userName). Try:
+            • "Start a new recording" or "transcribe this"
+            • Clip a moment — "make a clip from 1:20 to 2:05"
+            • Attach a recording to a set
+            What needs capturing?
+            """
+        case .notebook:
+            return """
+            You're in the **Notebook**, \(userName). I can:
+            • Save a quick note — "save this thought: …"
+            • Pull up older notes — "find notes about Vegas"
+            • Attach photos to a note
+            What's on your mind?
+            """
+        case .roastMode:
+            return """
+            You're in **Roast Mode**, \(userName). I can:
+            • Add a target — "add my brother as a target"
+            • Build burns — "give me 5 jokes about his car"
+            • Pull together a roast set
+            Who's on the chopping block?
+            """
+        case .importFlow:
+            return """
+            You're in **Import**, \(userName). I can:
+            • Review what's in the queue — "show me what's pending"
+            • Approve or reject jokes
+            • Pull text from PDFs and photos
+            Want me to walk through the pending items?
+            """
+        case .sync:
+            return """
+            You're in **Sync**, \(userName). I can:
+            • Check iCloud status — "am I synced?"
+            • Trigger a manual sync
+            • Explain why something didn't sync
+            What's going on?
+            """
+        case .settings:
+            return """
+            You're in **Settings**, \(userName). I can help with:
+            • Exporting your library
+            • Clearing the cache
+            • Toggling appearance, sync, or roast mode
+            What are you trying to change?
+            """
+        case .help:
+            return """
+            You're in **Help**, \(userName). Ask me anything about a feature — "how do tags work?", "what is The Hits?", "how do I import a PDF?"
+            """
+        case .bitbuddy:
+            return """
+            We're already chatting, \(userName) — what do you want to work on? Try "punch up this joke" or "give me a premise about ___".
+            """
+        }
     }
     
     // MARK: - Handlers
