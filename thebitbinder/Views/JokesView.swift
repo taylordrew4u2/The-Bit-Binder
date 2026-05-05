@@ -333,12 +333,20 @@ struct JokesView: View {
     /// The "fire home" — header + ranked subject cards over the fire bg.
     @ViewBuilder
     private var roastHomeView: some View {
-        let heats = roastTargets.map { targetHeat($0) }
+        // Compute heat exactly once per target, then reuse for sort, counts,
+        // and per-card rendering. `RoastHeatService.heat(for:)` walks every
+        // joke + does Calendar work, so recomputing it inside a sort
+        // comparator and again per card was O(n log n)·k cost.
+        let heatByID: [UUID: Int] = Dictionary(
+            uniqueKeysWithValues: roastTargets.map { ($0.id, targetHeat($0)) }
+        )
+        let heats = roastTargets.map { heatByID[$0.id] ?? 0 }
         let maxHeat = heats.max() ?? 0
         let warmingState = WarmingState.state(targetCount: roastTargets.count, maxHeat: maxHeat)
         let hotCount  = heats.filter { $0 >= 60 }.count
         let warmCount = heats.filter { (30..<60).contains($0) }.count
         let coldCount = heats.filter { $0 < 30 }.count
+        let ranked = roastTargets.sorted { (heatByID[$0.id] ?? 0) > (heatByID[$1.id] ?? 0) }
 
         ScrollView(.vertical) {
             LazyVStack(spacing: 0) {
@@ -350,12 +358,11 @@ struct JokesView: View {
                     isCold: warmingState != .hot
                 )
 
-                let ranked = roastTargets.sorted { targetHeat($0) > targetHeat($1) }
                 ForEach(Array(ranked.enumerated()), id: \.element.id) { index, target in
                     NavigationLink(destination: RoastTargetDetailView(target: target)) {
                         RoastSubjectCard(
                             target: target,
-                            heat: targetHeat(target),
+                            heat: heatByID[target.id] ?? 0,
                             rank: index + 1
                         )
                     }
