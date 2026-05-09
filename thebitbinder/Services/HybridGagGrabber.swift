@@ -43,15 +43,22 @@ final class HybridGagGrabber: ObservableObject {
     /// Extract jokes from `rawText` on-device. If no on-device provider is
     /// available, surfaces a clear error.
     func extractJokes(from rawText: String) async {
+        isExtracting = true
+        lastError = nil
+        extractedJokes = []
+        statusMessage = "Reading your document…"
+
+        defer {
+            isExtracting = false
+            stopElapsedTimer()
+            statusMessage = ""
+        }
+
         guard !rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             lastError = "Document is empty — nothing to extract."
             return
         }
 
-        isExtracting = true
-        lastError = nil
-        extractedJokes = []
-        statusMessage = "Reading your document…"
         startElapsedTimer()
 
         print(" [GagGrabber] Text length: \(rawText.count) chars")
@@ -72,40 +79,37 @@ final class HybridGagGrabber: ObservableObject {
             if !deduped.isEmpty {
                 hints.saveAsLastUsed()
                 extractedJokes = deduped
-                isExtracting = false
-                stopElapsedTimer()
-                statusMessage = ""
                 return
             }
         }
 
-        // Step 2: Auto-detect structure (numbered, bullets, blank lines).
-        let smartSplit = SmartTextSplitter.split(preprocessed)
+        // Step 2: Auto-detect structure with confidence level.
+        let (smartSplit, splitConfidence) = SmartTextSplitter.splitWithConfidence(preprocessed)
 
-        if smartSplit.count >= 2 {
-            print(" [GagGrabber] SmartTextSplitter found \(smartSplit.count) joke(s)")
+        if smartSplit.count >= 2 && splitConfidence == .high {
+            print(" [GagGrabber] SmartTextSplitter found \(smartSplit.count) joke(s) (high confidence)")
             let cleaned = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
             let deduped = Self.deduplicateJokes(cleaned)
             if !deduped.isEmpty {
                 hints.saveAsLastUsed()
                 extractedJokes = deduped
-                isExtracting = false
-                stopElapsedTimer()
-                statusMessage = ""
                 return
             }
         }
 
-        // Step 3: Structural splits didn't work — try AI providers.
+        // Step 3: AI providers — for medium/low confidence or when structural splits failed.
         let textToSend = hints.applyingPromptPrefix(to: preprocessed)
         let manager = AIJokeExtractionManager.shared
         let token = AIExtractionToken(caller: "HybridGagGrabber")
 
         if manager.availableProviders.isEmpty {
-            lastError = "GagGrabber needs either Apple Intelligence (iOS 26+) or an OpenAI API key in Settings."
-            isExtracting = false
-            stopElapsedTimer()
-            statusMessage = ""
+            if smartSplit.count >= 2 {
+                print(" [GagGrabber] No AI available, using SmartTextSplitter results (\(smartSplit.count) chunks)")
+                let cleaned = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
+                extractedJokes = Self.deduplicateJokes(cleaned)
+            } else {
+                lastError = "GagGrabber needs either Apple Intelligence (iOS 26+) or an OpenAI API key in Settings."
+            }
             return
         }
 
@@ -118,19 +122,24 @@ final class HybridGagGrabber: ObservableObject {
 
             statusMessage = "Cleaning up results…"
             let deduped = Self.deduplicateJokes(jokes)
+
             if deduped.isEmpty {
-                if !smartSplit.isEmpty {
+                if smartSplit.count >= 2 {
                     extractedJokes = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
                 } else {
                     lastError = "GagGrabber read the whole file but couldn't spot any jokes. Try adjusting the hints above and give it another go!"
                 }
+            } else if deduped.count == 1 && smartSplit.count > deduped.count {
+                print(" [GagGrabber] AI returned single blob, preferring SmartTextSplitter (\(smartSplit.count) chunks)")
+                let cleaned = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
+                extractedJokes = Self.deduplicateJokes(cleaned)
             } else {
                 hints.saveAsLastUsed()
                 extractedJokes = deduped
             }
         } catch {
             print(" [GagGrabber] AI extraction failed: \(error.localizedDescription)")
-            if !smartSplit.isEmpty {
+            if smartSplit.count >= 2 {
                 print(" [GagGrabber] Using SmartTextSplitter results as fallback (\(smartSplit.count) chunks)")
                 extractedJokes = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
             } else {
@@ -138,10 +147,6 @@ final class HybridGagGrabber: ObservableObject {
                 extractedJokes = []
             }
         }
-
-        isExtracting = false
-        stopElapsedTimer()
-        statusMessage = ""
     }
 
     // MARK: - Elapsed Timer
@@ -623,6 +628,7 @@ struct HybridGagGrabberSheet: View {
         guard let exportURL = URL(string: exportURLString) else {
             grabber.lastError = "Invalid document link."
             grabber.isExtracting = false
+            grabber.statusMessage = ""
             return
         }
 
@@ -638,6 +644,7 @@ struct HybridGagGrabberSheet: View {
                     grabber.lastError = "Google returned an error (status \(http.statusCode)). Make sure the doc is shared."
                 }
                 grabber.isExtracting = false
+                grabber.statusMessage = ""
                 return
             }
 
@@ -645,6 +652,7 @@ struct HybridGagGrabberSheet: View {
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 grabber.lastError = "The document appears to be empty."
                 grabber.isExtracting = false
+                grabber.statusMessage = ""
                 return
             }
 
@@ -652,6 +660,7 @@ struct HybridGagGrabberSheet: View {
         } catch {
             grabber.lastError = "Failed to fetch document: \(error.localizedDescription)"
             grabber.isExtracting = false
+            grabber.statusMessage = ""
         }
     }
 
@@ -708,6 +717,11 @@ struct HybridGagGrabberSheet: View {
                     documentAttributes: nil
                 )
                 text = attributed.string
+            } else if ext == "doc" || ext == "docx" {
+                grabber.lastError = "Word documents (.doc/.docx) aren't supported yet. Save as PDF or plain text and try again."
+                grabber.isExtracting = false
+                grabber.statusMessage = ""
+                return
             } else {
                 if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
                     text = utf8
@@ -720,6 +734,7 @@ struct HybridGagGrabberSheet: View {
         } catch {
             grabber.lastError = "Failed to read document: \(error.localizedDescription)"
             grabber.isExtracting = false
+            grabber.statusMessage = ""
         }
     }
 

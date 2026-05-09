@@ -158,6 +158,8 @@ struct AddRoastJokeView: View {
                     alignment: .top
                 )
             }
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
             .background(FirePalette.bg.ignoresSafeArea())
             .preferredColorScheme(.dark)
             .navigationTitle("")

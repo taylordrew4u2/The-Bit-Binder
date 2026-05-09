@@ -25,27 +25,30 @@ struct AddBrainstormIdeaSheet: View {
         self.initialText = initialText
     }
 
+    @FocusState private var isFocused: Bool
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    ZStack(alignment: .topLeading) {
-                        if content.isEmpty {
-                            Text(roastMode ? "What's the burn?" : "What's on your mind?")
-                                .font(.body)
-                                .foregroundColor(Color(UIColor.tertiaryLabel))
-                                .padding(.top, 8)
-                                .padding(.leading, 4)
-                        }
-                        
-                        TextEditor(text: $content)
-                            .scrollContentBackground(.hidden)
-                            .font(.body)
-                            .foregroundColor(.primary)
-                            .frame(minHeight: 160)
-                    }
+            ZStack(alignment: .topLeading) {
+                if content.isEmpty {
+                    Text(roastMode ? "What's the burn?" : "What's on your mind?")
+                        .font(.body)
+                        .foregroundColor(Color(UIColor.placeholderText))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .allowsHitTesting(false)
                 }
+
+                TextEditor(text: $content)
+                    .scrollContentBackground(.hidden)
+                    .font(.body)
+                    .lineSpacing(5)
+                    .foregroundColor(.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .focused($isFocused)
             }
+            .background(Color(UIColor.systemBackground))
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .bitBinderToolbar(roastMode: roastMode)
@@ -70,6 +73,9 @@ struct AddBrainstormIdeaSheet: View {
                 content = draft
             } else if !initialText.isEmpty {
                 content = initialText
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isFocused = true
             }
         }
         .onChange(of: content) { _, newValue in

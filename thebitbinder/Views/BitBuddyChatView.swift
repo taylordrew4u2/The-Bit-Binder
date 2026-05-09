@@ -60,12 +60,19 @@ struct BitBuddyChatView: View {
                                     displayedText: displayedText
                                 )
                                 .id(message.id)
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .opacity.combined(with: .move(edge: .bottom)).combined(with: .scale(scale: 0.95, anchor: message.isUser ? .bottomTrailing : .bottomLeading)),
+                                        removal: .opacity
+                                    )
+                                )
                             }
                         }
                         
                         if isTyping {
                             TypingIndicator(roastMode: roastMode, statusMessage: bitBuddy.statusMessage)
                                 .id("typing-indicator")
+                                .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .bottomLeading)))
                         }
                     }
                     .padding()
@@ -298,7 +305,7 @@ struct BitBuddyChatView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
-            
+
             // Suggestion chips — one per major section
             VStack(spacing: 8) {
                 if roastMode {
@@ -414,9 +421,11 @@ struct BitBuddyChatView: View {
         if messages.isEmpty {
             let greeting = roastMode
                 ? "Roast Buddy here. Give me a target and I'll sharpen the burns."
-                : "Hey! I'm BitBuddy, your comedy writing partner. Ask me to analyze a joke, build a set list, brainstorm premises, or anything else — I'm ready when you are."
+                : "What are we working on?"
             let intro = ChatBubbleMessage(text: greeting, isUser: false, conversationId: conversationId)
-            messages.append(intro)
+            withAnimation(.spring(duration: 0.4, bounce: 0.15).delay(0.2)) {
+                messages.append(intro)
+            }
         }
 
         if let pending = bitBuddy.pendingMessage {
@@ -451,9 +460,13 @@ struct BitBuddyChatView: View {
         typingMessageId = nil
         
         let userMessage = ChatBubbleMessage(text: message, isUser: true, conversationId: conversationId)
-        messages.append(userMessage)
+        withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
+            messages.append(userMessage)
+        }
         inputText = ""
-        isTyping = true
+        withAnimation(.easeOut(duration: 0.25)) {
+            isTyping = true
+        }
         
         activeResponseTask = Task {
             do {
@@ -463,46 +476,44 @@ struct BitBuddyChatView: View {
                 guard !Task.isCancelled else { return }
                 
                 await MainActor.run {
-                    isTyping = false
                     let aiMessage = ChatBubbleMessage(text: response, isUser: false, conversationId: conversationId)
-                    messages.append(aiMessage)
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        isTyping = false
+                    }
+                    withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
+                        messages.append(aiMessage)
+                    }
                     typingMessageId = aiMessage.id
                     displayedText = ""
                 }
-                // Typewriter: reveal word by word
                 let words = response.split(separator: " ", omittingEmptySubsequences: false)
+                var accumulated = ""
                 for (index, word) in words.enumerated() {
-                    // Check cancellation before each word so we stop quickly
-                    // when the user sends a new message or dismisses the sheet.
-                    guard !Task.isCancelled else {
-                        return
-                    }
-                    try? await Task.sleep(nanoseconds: 15_000_000) // 15ms per word
-                    // Re-check after sleep — cancellation may have fired while
-                    // we were waiting. Without this second guard a cancelled
-                    // task writes one stale word into displayedText, which
-                    // contaminates the *next* response's typewriter output
-                    // and produces garbled text with missing or wrong letters.
-                    guard !Task.isCancelled else {
-                        return
-                    }
+                    guard !Task.isCancelled else { return }
+                    accumulated += (index == 0 ? "" : " ") + String(word)
+                    let snapshot = accumulated
+                    let delay: UInt64 = index < 3 ? 50_000_000 : 25_000_000
+                    try? await Task.sleep(nanoseconds: delay)
+                    guard !Task.isCancelled else { return }
                     await MainActor.run {
-                        if index == 0 {
-                            displayedText = String(word)
-                        } else {
-                            displayedText += " " + String(word)
-                        }
+                        displayedText = snapshot
                     }
                 }
                 await MainActor.run {
-                    typingMessageId = nil
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        typingMessageId = nil
+                    }
                 }
             } catch {
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    isTyping = false
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        isTyping = false
+                    }
                     let errorMsg = ChatBubbleMessage(text: "Sorry, I encountered an error. Please try again.", isUser: false, conversationId: conversationId)
-                    messages.append(errorMsg)
+                    withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
+                        messages.append(errorMsg)
+                    }
                 }
             }
         }

@@ -9,6 +9,24 @@ import UIKit
 import PDFKit
 
 class PDFExportService {
+    private static func roastExportText(for joke: RoastJoke) -> String {
+        var lines: [String] = []
+
+        if !joke.setup.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            lines.append("SETUP: \(joke.setup)")
+        }
+
+        let content = joke.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !content.isEmpty {
+            lines.append(content)
+        }
+
+        if !joke.punchline.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            lines.append("PUNCHLINE: \(joke.punchline)")
+        }
+
+        return lines.joined(separator: "\n")
+    }
     
     static func exportJokesToPDF(jokes: [Joke], fileName: String = "BitBinder_Jokes") -> URL? {
         let pdfMetaData = [
@@ -261,10 +279,11 @@ class PDFExportService {
                         yPosition += openersLabelSize.height + 8.0
                         
                         for (i, joke) in openingRoasts.enumerated() {
-                            let jokeLabel = "\(i + 1)."
+                            let jokeLabel = "Opener \(i + 1)"
                             let jokeLabelSize = jokeLabel.size(withAttributes: jokeNumberAttributes)
+                            let openerText = roastExportText(for: joke)
                             
-                            let jokeContentSize = joke.content.boundingRect(
+                            let jokeContentSize = openerText.boundingRect(
                                 with: CGSize(width: contentWidth - 25.0, height: .greatestFiniteMagnitude),
                                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                                 attributes: jokeContentAttributes,
@@ -279,7 +298,7 @@ class PDFExportService {
                             }
                             
                             jokeLabel.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: jokeNumberAttributes)
-                            joke.content.draw(
+                            openerText.draw(
                                 in: CGRect(x: margin + 25.0, y: yPosition, width: contentWidth - 25.0, height: jokeContentSize.height),
                                 withAttributes: jokeContentAttributes
                             )
@@ -287,25 +306,29 @@ class PDFExportService {
                             
                             // Draw backups for this opening roast
                             let backupsForOpener = backupRoasts.filter { $0.parentOpeningRoastID == joke.id }
-                            for backup in backupsForOpener {
-                                let backupContentSize = backup.content.boundingRect(
+                            for (backupIndex, backup) in backupsForOpener.enumerated() {
+                                let backupLabel = "↳ Backup \(backupIndex + 1)"
+                                let backupLabelSize = backupLabel.size(withAttributes: backupLabelAttrs)
+                                let backupText = roastExportText(for: backup)
+                                let backupContentSize = backupText.boundingRect(
                                     with: CGSize(width: contentWidth - 45.0, height: .greatestFiniteMagnitude),
                                     options: [.usesLineFragmentOrigin, .usesFontLeading],
                                     attributes: jokeContentAttributes,
                                     context: nil
                                 ).size
                                 
-                                if yPosition + backupContentSize.height + 15.0 > pageHeight - margin {
+                                let backupTotalHeight = max(backupLabelSize.height, backupContentSize.height) + 15.0
+                                if yPosition + backupTotalHeight > pageHeight - margin {
                                     context.beginPage()
                                     yPosition = margin
                                 }
                                 
-                                "↳".draw(at: CGPoint(x: margin + 20.0, y: yPosition), withAttributes: backupLabelAttrs)
-                                backup.content.draw(
+                                backupLabel.draw(at: CGPoint(x: margin + 20.0, y: yPosition), withAttributes: backupLabelAttrs)
+                                backupText.draw(
                                     in: CGRect(x: margin + 40.0, y: yPosition, width: contentWidth - 45.0, height: backupContentSize.height),
                                     withAttributes: jokeContentAttributes
                                 )
-                                yPosition += backupContentSize.height + 8.0
+                                yPosition += max(backupLabelSize.height, backupContentSize.height) + 8.0
                             }
                             
                             jokeIndex += 1
@@ -327,8 +350,9 @@ class PDFExportService {
                         for joke in unassignedRoasts {
                             let jokeLabel = "\(jokeIndex)."
                             let jokeLabelSize = jokeLabel.size(withAttributes: jokeNumberAttributes)
+                            let roastText = roastExportText(for: joke)
                             
-                            let jokeContentSize = joke.content.boundingRect(
+                            let jokeContentSize = roastText.boundingRect(
                                 with: CGSize(width: contentWidth - 25.0, height: .greatestFiniteMagnitude),
                                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                                 attributes: jokeContentAttributes,
@@ -343,7 +367,7 @@ class PDFExportService {
                             }
                             
                             jokeLabel.draw(at: CGPoint(x: margin, y: yPosition), withAttributes: jokeNumberAttributes)
-                            joke.content.draw(
+                            roastText.draw(
                                 in: CGRect(x: margin + 25.0, y: yPosition, width: contentWidth - 25.0, height: jokeContentSize.height),
                                 withAttributes: jokeContentAttributes
                             )

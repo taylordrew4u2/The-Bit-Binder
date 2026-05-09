@@ -37,45 +37,23 @@ struct SettingsView: View {
     
     var body: some View {
         List {
-            // MARK: - Profile Header
+            // MARK: - Profile
             Section {
-                HStack(spacing: 14) {
-                    // Avatar circle with initial
-                    ZStack {
-                        Circle()
-                            .fill(roastMode ? Color.bitbinderAccent.opacity(0.15) : Color.accentColor.opacity(0.12))
-                            .frame(width: 52, height: 52)
-                        
-                        Text(userPreferences.userName.isEmpty ? "?" : String(userPreferences.userName.prefix(1)).uppercased())
-                            .font(.title2.weight(.semibold))
-                            .foregroundColor(Color.bitbinderAccent)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        if isEditingName {
-                            TextField("Your name", text: $editingNameText)
-                                .font(.body.weight(.semibold))
-                                .textFieldStyle(.plain)
-                                .focused($nameFieldFocused)
-                                .onSubmit { saveName() }
-                                .submitLabel(.done)
-                        } else {
-                            Text(userPreferences.userName.isEmpty ? "Set Your Name" : userPreferences.userName)
-                                .font(.body.weight(.semibold))
-                                .foregroundColor(userPreferences.userName.isEmpty ? .secondary : .primary)
-                        }
-                        
-                        Text("\(jokes.filter { !$0.isTrashed }.count) jokes")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
+                HStack {
                     if isEditingName {
+                        TextField("Your name", text: $editingNameText)
+                            .font(.body.weight(.semibold))
+                            .textFieldStyle(.plain)
+                            .focused($nameFieldFocused)
+                            .onSubmit { saveName() }
+                            .submitLabel(.done)
                         Button("Done") { saveName() }
                             .font(.subheadline.weight(.semibold))
                     } else {
+                        Text(userPreferences.userName.isEmpty ? "Set Your Name" : userPreferences.userName)
+                            .font(.body.weight(.semibold))
+                            .foregroundColor(userPreferences.userName.isEmpty ? .secondary : .primary)
+                        Spacer()
                         Button {
                             editingNameText = userPreferences.userName
                             isEditingName = true
@@ -92,7 +70,8 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.vertical, 4)
+            } header: {
+                Text("Name")
             }
             
             // MARK: - Mode Section
@@ -144,27 +123,10 @@ struct SettingsView: View {
                 }
                 .tint(.accentColor)
 
-                if userPreferences.bitBuddyEnabled {
-                    HStack {
-                        SecureField("OpenAI API Key", text: $userPreferences.openAIAPIKey)
-                            .font(.footnote.monospaced())
-                            .textContentType(.password)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-
-                        if !userPreferences.openAIAPIKey.isEmpty {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.body)
-                        }
-                    }
-                }
             } footer: {
-                if userPreferences.bitBuddyEnabled {
-                    Text("Your API key powers two optional cloud fallbacks:\n• Buddy when on-device writing models aren't available\n• GagGrabber when on-device extraction can't finish the job\n\nThe key is stored in your device Keychain. Without a key, Buddy and GagGrabber stay on-device only.")
-                } else {
-                    Text("Turn on to get a writing partner for punch-ups and smarter joke extraction from files.")
-                }
+                Text(userPreferences.bitBuddyEnabled
+                    ? "Your on-device writing partner for punch-ups and smarter joke extraction."
+                    : "Turn on to get a writing partner for punch-ups and smarter joke extraction from files.")
             }
 
             // MARK: - Data Section
@@ -182,7 +144,7 @@ struct SettingsView: View {
                 NavigationLink {
                     DataSafetyView()
                 } label: {
-                    Label("Data Protection", systemImage: "shield.checkered")
+                    Label("Privacy & Data Safety", systemImage: "shield.checkered")
                 }
                 
                 NavigationLink {

@@ -24,8 +24,9 @@ struct AddJokeView: View {
     @State private var saveErrorMessage = ""
     @State private var isSaving = false
     @State private var hasRecoveredDraft = false
-    @FocusState private var titleFocused: Bool
+    @State private var showDetails = false
     @FocusState private var contentFocused: Bool
+    @FocusState private var titleFocused: Bool
     @FocusState private var tagFocused: Bool
 
     var selectedFolder: JokeFolder?
@@ -65,68 +66,62 @@ struct AddJokeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    
-                    // Title field — feels like a page heading
-                    TextField("Title (optional)", text: $title, axis: .vertical)
-                        .font(.title2.weight(.semibold))
-                        .lineLimit(3)
-                        .focused($titleFocused)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
-                    
-                    // Folder badge
-                    if let folder = selectedFolder {
-                        HStack(spacing: 4) {
-                            Image(systemName: "folder.fill")
-                                .font(.caption2)
-                            Text(folder.name)
-                                .font(.caption)
-                        }
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 6)
-                    }
-                    
-                    // Word count
-                    if !content.isEmpty {
-                        Text("\(content.split(separator: " ").count) words")
-                            .font(.caption)
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
-                            .padding(.horizontal, 20)
-                            .padding(.top, 8)
-                    }
-                    
-                    Divider()
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
-
-                    // Tag entry — native chip row with autocomplete
-                    tagSection
-
-                    Divider()
-                        .padding(.horizontal, 20)
 
                     // Content editor — the main writing canvas
                     ZStack(alignment: .topLeading) {
                         if content.isEmpty {
-                            Text("Start writing your joke…")
+                            Text("What's the bit?")
                                 .font(.body)
                                 .foregroundColor(Color(UIColor.placeholderText))
                                 .padding(.horizontal, 24)
                                 .padding(.top, 16)
                                 .allowsHitTesting(false)
                         }
-                        
+
                         TextEditor(text: $content)
                             .font(.body)
                             .lineSpacing(6)
-                            .frame(minHeight: 350)
+                            .frame(minHeight: 300)
                             .scrollContentBackground(.hidden)
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
                             .focused($contentFocused)
                     }
+
+                    Divider()
+                        .padding(.horizontal, 20)
+
+                    // Details — title, tags, folder
+                    DisclosureGroup("Details", isExpanded: $showDetails) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            TextField("Title (optional)", text: $title, axis: .vertical)
+                                .font(.title3.weight(.semibold))
+                                .lineLimit(3)
+                                .focused($titleFocused)
+                                .padding(.top, 10)
+
+                            if let folder = selectedFolder {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "folder.fill")
+                                        .font(.caption2)
+                                    Text(folder.name)
+                                        .font(.caption)
+                                }
+                                .foregroundColor(.secondary)
+                                .padding(.top, 6)
+                            }
+
+                            Divider()
+                                .padding(.top, 10)
+
+                            tagSection
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
                 }
+                .frame(maxWidth: 700)
+                .frame(maxWidth: .infinity)
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color(UIColor.systemBackground))

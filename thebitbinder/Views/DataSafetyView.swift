@@ -44,6 +44,17 @@ struct DataSafetyView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Your material stays under your control.")
+                            .font(.headline)
+                        Text("Back up, restore, validate, or export your library from here. Cloud features stay optional.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 6)
+                }
+
                 #if DEBUG
                 // Status Section (debug only)
                 Section("Data Protection Status") {
@@ -244,7 +255,7 @@ struct DataSafetyView: View {
                     }
                 }
             }
-            .navigationTitle("")
+            .navigationTitle("Data Safety")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable {
                 await loadBackupInfo()

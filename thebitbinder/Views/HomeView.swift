@@ -92,7 +92,7 @@ struct HomeView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
             }
-            
+
             // MARK: - Daily Journal
             Section {
                 Button {
@@ -314,6 +314,7 @@ struct HomeView: View {
             return "\(allJokes.count) joke\(allJokes.count == 1 ? "" : "s") and counting"
         }
     }
+
 }
 
 // MARK: - Stat Card

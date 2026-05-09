@@ -407,7 +407,6 @@ struct MainTabView: View {
                                 }
                         )
                         .animation(.easeInOut(duration: 0.2), value: bitBuddyDrawer.isOpen)
-                        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
                         .animation(.easeInOut(duration: 0.15), value: isDragging)
                         .allowsHitTesting(bitBuddyPresenter.mode == .closed)
                 }

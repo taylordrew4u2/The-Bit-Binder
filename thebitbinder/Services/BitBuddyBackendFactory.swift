@@ -9,7 +9,7 @@ final class NoBitBuddyBackend: BitBuddyBackend {
     var isAvailable: Bool { true }
     var supportsStreaming: Bool { false }
     func send(message: String, session: BitBuddySessionSnapshot, dataContext: BitBuddyDataContext) async throws -> String {
-        return "No writing partner is available right now. On-device models aren't ready on this device, and no OpenAI fallback key is set in Settings."
+        return "No writing partner is available right now. On-device models aren't ready on this device yet."
     }
 }
 

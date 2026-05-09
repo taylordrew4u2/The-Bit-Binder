@@ -71,8 +71,7 @@ enum FirePalette {
 
     // MARK: - Heat scale
 
-    /// Single source of truth for heat thresholds across HeatBar, HeatMeter,
-    /// avatar gradients, header counts, and warming-state branching.
+    /// Single source of truth for heat thresholds across heat-based UI.
     enum HeatTier {
         case ash    // 0..29 — cold, hasn't earned heat
         case warm   // 30..59 — bits coming in

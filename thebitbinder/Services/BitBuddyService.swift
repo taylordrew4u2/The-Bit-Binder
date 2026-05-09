@@ -8,8 +8,9 @@
 import Foundation
 import AVFoundation
 
-/// BitBuddy — Your on-device comedy writing assistant.
-/// 100% local and rule-based. NEVER uses the GagGrabber extraction providers.
+/// BitBuddy — your comedy writing assistant.
+/// Prefers on-device/local backends and only uses OpenAI when the user has
+/// configured an API key. NEVER uses the GagGrabber extraction providers.
 /// GagGrabber's on-device extraction providers are reserved exclusively for
 /// file imports and are token-gated via `AIExtractionToken`.
 /// Powered by a 93-intent router that covers all 11 app sections.
@@ -148,9 +149,18 @@ final class BitBuddyService: NSObject, ObservableObject {
             turns: turnsByConversation[activeConversationId] ?? []
         )
 
+        if let currentFact = CurrentFacts.answer(for: message) {
+            appendTurn(.init(role: .assistant, text: currentFact), conversationId: activeConversationId)
+            isConnected = true
+            return currentFact
+        }
+
         let roastMode = UserDefaults.standard.bool(forKey: "roastModeEnabled")
-        let conversationMode = ConversationModeClassifier.classify(message)
-        let routeResult = conversationMode == .appAction ? intentRouter.route(message) : nil
+        let questionLike = Self.isQuestionLike(lowerMessage)
+        let routeResult = intentRouter.route(message)
+        let conversationMode: ConversationMode = routeResult != nil
+            ? .appAction
+            : ConversationModeClassifier.classifyWithoutRouting(message)
 
         if let route = routeResult {
             statusMessage = statusHint(for: route.intent.id)
@@ -220,12 +230,12 @@ final class BitBuddyService: NSObject, ObservableObject {
                 // Store navigation target for confirmation — BitBuddy will ask
                 // the user before navigating. The user can say "yes" or "take me there"
                 // in their next message to trigger the navigation.
-                if route.category == .navigation && route.section != .bitbuddy {
+                if !questionLike && route.category == .navigation && route.section != .bitbuddy {
                     awaitingNavigationConfirmation = route.section
                 }
                 
                 // For import_file / import_image, offer navigation to Jokes
-                if route.intent.id == "import_file" || route.intent.id == "import_image" {
+                if !questionLike && (route.intent.id == "import_file" || route.intent.id == "import_image") {
                     awaitingNavigationConfirmation = .importFlow
                 }
             }
@@ -248,6 +258,15 @@ final class BitBuddyService: NSObject, ObservableObject {
         case .appAction:
             return "Thinking…"
         }
+    }
+
+    private static func isQuestionLike(_ text: String) -> Bool {
+        if text.hasSuffix("?") { return true }
+        let starters = [
+            "how ", "what ", "what's ", "whats ", "why ", "where ", "when ",
+            "who ", "which ", "can you explain", "tell me about"
+        ]
+        return starters.contains { text.hasPrefix($0) }
     }
     
     /// Start a new conversation.
@@ -438,13 +457,15 @@ final class BitBuddyService: NSObject, ObservableObject {
     /// - Parameter rawResponse: The raw response string from the LLM
     /// - Returns: The cleaned response text to display in the chat UI
     func handleBitBuddyResponse(_ rawResponse: String) -> String {
-        print(" [BitBuddy] Raw response: \(rawResponse.prefix(120))")
-
         // Try to parse as JSON — only structured JSON responses can trigger actions.
         // Plain-text conversational responses are returned as-is with NO action dispatch.
         guard let jsonData = rawResponse.data(using: .utf8),
               let jsonObject = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
-            return Self.stripMarkdown(rawResponse)
+            let displayText = Self.stripMarkdown(rawResponse)
+            #if DEBUG
+            print(" [BitBuddy] Response: \(displayText.prefix(120))")
+            #endif
+            return displayText
         }
         
         // Extract the response text

@@ -138,14 +138,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     /// isolation domain. Hop explicitly to MainActor before touching
     /// `@MainActor` singletons to avoid runtime `unsafeForcedSync` warnings.
     nonisolated func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
-        if Thread.isMainThread {
-            MainActor.assumeIsolated {
-                MemoryManager.shared.handleMemoryWarning()
-            }
-        } else {
-            Task { @MainActor in
-                MemoryManager.shared.handleMemoryWarning()
-            }
+        Task { @MainActor in
+            MemoryManager.shared.handleMemoryWarning()
         }
     }
     
@@ -331,8 +325,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                     .mixWithOthers
                 ]
             )
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-            print(" [Audio] Audio session configured for playback and recording")
+            print(" [Audio] Audio session category configured for playback and recording")
         } catch {
             print(" [Audio] Failed to configure audio session: \(error.localizedDescription)")
         }

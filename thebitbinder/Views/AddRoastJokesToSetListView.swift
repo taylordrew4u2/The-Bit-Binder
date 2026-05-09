@@ -198,11 +198,20 @@ struct AddRoastJokesToSetListView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     if showFullContent {
+                        if !joke.setup.isEmpty {
+                            Text("SETUP")
+                                .font(.caption2.weight(.bold))
+                                .foregroundColor(accent)
+                            Text(joke.setup)
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                        }
+
                         Text(joke.content)
                             .font(.subheadline)
                             .foregroundColor(.primary)
                     } else {
-                        Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
+                        Text(joke.previewDisplayText)
                             .font(.subheadline.weight(.medium))
                             .foregroundColor(.primary)
                             .lineLimit(1)

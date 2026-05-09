@@ -198,7 +198,7 @@ struct AppSetupView: View {
             VStack(spacing: 20) {
                 Spacer(minLength: 24)
 
-                Image(systemName: "hand.raised.shield")
+                Image(systemName: "hand.raised.fill")
                     .font(.system(size: 48))
                     .foregroundColor(.accentColor)
 
@@ -224,8 +224,8 @@ struct AppSetupView: View {
                     )
                     privacyFactRow(
                         icon: "sparkles.rectangle.stack",
-                        title: "Optional Cloud AI",
-                        detail: "OpenAI is only used after you add your own API key. Without one, AI features stay on-device."
+                        title: "AI Stays Optional",
+                        detail: "On-device tools are preferred. Cloud AI is only used when you choose to configure a cloud provider."
                     )
                 }
                 .padding(.horizontal, 20)

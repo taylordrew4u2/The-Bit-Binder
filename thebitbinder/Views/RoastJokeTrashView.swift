@@ -59,11 +59,20 @@ struct RoastJokeTrashView: View {
                                     .font(.headline)
                             }
                             if showFullContent {
+                                if !joke.setup.isEmpty {
+                                    Text("SETUP")
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(Color.bitbinderAccent)
+                                    Text(joke.setup)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.primary)
+                                }
+
                                 Text(joke.content)
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             } else if joke.title.isEmpty {
-                                Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
+                                Text(joke.previewDisplayText)
                                     .font(.subheadline.weight(.medium))
                                     .lineLimit(1)
                             }
