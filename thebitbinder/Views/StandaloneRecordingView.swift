@@ -13,7 +13,7 @@ struct StandaloneRecordingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     
-    @StateObject private var audioService = AudioRecordingService()
+    @ObservedObject private var audioService = AudioRecordingService.shared
     @State private var recordingName = ""
     @State private var showingSaveAlert = false
     @State private var showingDiscardAlert = false

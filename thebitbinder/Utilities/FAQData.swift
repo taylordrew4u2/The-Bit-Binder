@@ -69,7 +69,9 @@ enum FAQData {
         ]),
         FAQSectionModel(title: "Recordings", icon: "waveform.circle.fill", items: [
             FAQItem("How do I record a set?",
-                    "Go to Recordings and tap the mic button (top-right) or the + button. Press stop when done. The recording is saved with a timestamp."),
+                    "Go to Recordings and tap the mic button (top-right) or the + button. You can also record directly from inside a set list."),
+            FAQItem("Can I leave the page while recording?",
+                    "Yes — recording continues in the background when you navigate away. Come back anytime to stop and save."),
             FAQItem("Can I transcribe a recording?",
                     "Yes — open a recording and tap the transcribe button. It uses Apple's on-device speech recognition."),
             FAQItem("How do I export my recordings?",
@@ -84,6 +86,10 @@ enum FAQData {
                     "Yes — roasts are stored completely separately and only visible when Roast Mode is on. Your regular jokes stay safe."),
             FAQItem("How do I add a roast target?",
                     "In Roast Mode, go to the Roasts section and tap + to add a target. Then add roast jokes under that person."),
+            FAQItem("What are the All, Openers, and Backups filters?",
+                    "Inside a roast target, use the filter chips to view All roasts, only Openers (your main jokes), or only Backups (alternates assigned to an opener)."),
+            FAQItem("How do I access Roast Sets?",
+                    "Tap the overflow menu (•••) in Roast Mode and choose 'Roast Sets' under Performance. You can create, edit, and perform from your roast set lists."),
         ]),
         FAQSectionModel(title: "iCloud Sync", icon: "icloud.and.arrow.up.fill", items: [
             FAQItem("How do I enable iCloud Sync?",

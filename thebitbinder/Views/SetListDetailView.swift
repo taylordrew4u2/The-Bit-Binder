@@ -28,12 +28,10 @@ struct SetListDetailView: View {
     @State private var operationError: String?
     @State private var showingOperationError = false
     
-    // Recording inline
-    @StateObject private var audioService = AudioRecordingService()
+    // Recording inline — uses shared service so recording persists across navigation
+    @ObservedObject private var audioService = AudioRecordingService.shared
     @State private var recordingName = ""
-    @State private var recordingDuration: TimeInterval = 0
     @State private var lastRecordingURL: URL?
-    @State private var timer: Timer?
     @State private var showingSaveAlert = false
     @State private var showRecordingSaveError = false
     @State private var recordingSaveErrorMessage = ""
@@ -69,7 +67,7 @@ struct SetListDetailView: View {
                              .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
                          Text("Recording").font(.headline).foregroundColor(.recording)
                          Spacer()
-                         Text(timeString(from: recordingDuration))
+                         Text(timeString(from: audioService.recordingTime))
                              .font(.system(.title3, design: .monospaced))
                              .foregroundColor(.primary)
                      } else {
@@ -215,9 +213,14 @@ struct SetListDetailView: View {
                         Label(isEditing ? "Done" : "Edit Order", systemImage: "arrow.up.arrow.down")
                     }
                     .disabled(setList.isFinalized)
-                    
+
+                    Button { shareSetList() } label: {
+                        Label("Share Set List", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(setList.totalItemCount == 0)
+
                     Divider()
-                    
+
                     Button(role: .destructive) {
                         showingDeleteSetAlert = true
                     } label: {
@@ -279,39 +282,24 @@ struct SetListDetailView: View {
             recordingName = "\(setList.name) - \(Date().formatted(date: .abbreviated, time: .shortened))"
             cleanDanglingIDs()
         }
-        .onDisappear {
-            timer?.invalidate()
-        }
     }
     
     private func startRecording() {
         let name = recordingName.isEmpty ? setList.name : recordingName
-        if audioService.startRecording(fileName: name) {
-            recordingDuration = 0
-            timer?.invalidate()
-            timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-                recordingDuration += 1
-            }
-        }
+        _ = audioService.startRecording(fileName: name)
     }
     
     private func pauseResumeRecording() {
         if audioService.isPaused {
             audioService.resumeRecording()
-            timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-                recordingDuration += 1
-            }
         } else {
             audioService.pauseRecording()
-            timer?.invalidate()
         }
     }
     
     private func stopRecording() {
-        timer?.invalidate()
         let result = audioService.stopRecording()
         lastRecordingURL = result.url
-        recordingDuration = result.duration
         showingSaveAlert = true
     }
     
@@ -324,7 +312,7 @@ struct SetListDetailView: View {
         let recording = Recording(
             title: recordingName.isEmpty ? "Recording \(Date())" : recordingName,
             fileURL: fileURL.lastPathComponent,
-            duration: recordingDuration
+            duration: audioService.recordingTime
         )
         modelContext.insert(recording)
 
@@ -334,7 +322,6 @@ struct SetListDetailView: View {
             print("Recording saved successfully: \(recording.title)")
             #endif
             lastRecordingURL = nil
-            recordingDuration = 0
         } catch {
             #if DEBUG
             print(" Failed to save recording: \(error)")
@@ -382,11 +369,20 @@ struct SetListDetailView: View {
                  
                  VStack(alignment: .leading, spacing: 4) {
                      if showFullContent {
+                         if !joke.setup.isEmpty {
+                             Text("SETUP")
+                                 .font(.caption2.weight(.bold))
+                                 .foregroundColor(Color.accentColor)
+                             Text(joke.setup)
+                                 .font(.system(size: 14))
+                                 .foregroundColor(.secondary)
+                         }
+
                          Text(joke.content)
                              .font(.system(size: 15))
                              .foregroundColor(.primary)
                      } else {
-                         Text(joke.content.components(separatedBy: .newlines).first ?? joke.content)
+                         Text(joke.previewDisplayText)
                              .font(.system(size: 15, weight: .medium))
                              .foregroundColor(.primary)
                              .lineLimit(1)
@@ -540,6 +536,24 @@ struct SetListDetailView: View {
         }
     }
     
+    private func shareSetList() {
+        var lines: [String] = [setList.name, ""]
+        for (index, joke) in setListJokes.enumerated() {
+            let title = joke.title.isEmpty ? "Joke \(index + 1)" : joke.title
+            lines.append("\(index + 1). \(title)")
+            if !joke.content.isEmpty { lines.append(joke.content) }
+            lines.append("")
+        }
+        for (index, joke) in setListRoastJokes.enumerated() {
+            let num = setListJokes.count + index + 1
+            let label = joke.title.isEmpty ? joke.content.prefix(40).description : joke.title
+            lines.append("\(num). \(label)")
+            if !joke.content.isEmpty { lines.append(joke.content) }
+            lines.append("")
+        }
+        ShareHelper.shareText(lines.joined(separator: "\n"))
+    }
+
     private func deleteSet() {
         setList.moveToTrash()
         do {

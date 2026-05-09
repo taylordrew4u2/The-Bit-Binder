@@ -44,7 +44,7 @@ struct SetListsView: View {
             } else {
                 List {
                     ForEach(filteredSetLists) { setList in
-                        NavigationLink(value: setList) {
+                        NavigationLink(destination: SetListDetailView(setList: setList)) {
                             SetListRowView(setList: setList)
                         }
                         .contextMenu {
@@ -59,9 +59,6 @@ struct SetListsView: View {
                 }
                 .listStyle(.insetGrouped)
             }
-        }
-        .navigationDestination(for: SetList.self) { setList in
-            SetListDetailView(setList: setList)
         }
         .searchable(text: $searchText, prompt: roastMode ? "Search roast sets" : "Search sets")
         .toolbar {
