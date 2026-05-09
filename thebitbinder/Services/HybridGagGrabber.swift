@@ -29,19 +29,12 @@ final class HybridGagGrabber: ObservableObject {
     @Published var isExtracting: Bool = false
     @Published var lastError: String?
 
-    /// Structured hints the user supplies before extraction. Drives both
-    /// preprocessing (stripping stage directions / timestamps / etc.) and the
-    /// instructions the on-device model receives with the document.
-    @Published var hints: ExtractionHints = .loadLastUsed()
-
     @Published var statusMessage: String = ""
     @Published var elapsedSeconds: Int = 0
     private var timerTask: Task<Void, Never>?
 
     // MARK: - Main Extraction Entry Point
 
-    /// Extract jokes from `rawText` on-device. If no on-device provider is
-    /// available, surfaces a clear error.
     func extractJokes(from rawText: String) async {
         isExtracting = true
         lastError = nil
@@ -60,92 +53,43 @@ final class HybridGagGrabber: ObservableObject {
         }
 
         startElapsedTimer()
-
+        statusMessage = "Scanning for jokes…"
         print(" [GagGrabber] Text length: \(rawText.count) chars")
 
-        let preprocessed = hints.preprocess(rawText)
-        if preprocessed.count != rawText.count {
-            print(" [GagGrabber] Preprocessing trimmed \(rawText.count - preprocessed.count) chars")
-        }
+        let results = SmartTextSplitter.split(rawText)
 
-        // Step 1: If the user told us the format, use it directly. No AI.
-        statusMessage = "Scanning your document…"
-        let hintSplit = Self.splitUsingHints(preprocessed, hints: hints)
-
-        if hintSplit.count >= 2 {
-            print(" [GagGrabber] Hint-based split found \(hintSplit.count) joke(s)")
-            let cleaned = hintSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
+        if results.count >= 2 {
+            let cleaned = results.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
             let deduped = Self.deduplicateJokes(cleaned)
             if !deduped.isEmpty {
-                hints.saveAsLastUsed()
+                print(" [GagGrabber] Structural split found \(deduped.count) joke(s)")
                 extractedJokes = deduped
                 return
             }
         }
 
-        // Step 2: Auto-detect structure with confidence level.
-        let (smartSplit, splitConfidence) = SmartTextSplitter.splitWithConfidence(preprocessed)
-
-        if smartSplit.count >= 2 && splitConfidence == .high {
-            print(" [GagGrabber] SmartTextSplitter found \(smartSplit.count) joke(s) (high confidence)")
-            let cleaned = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
-            let deduped = Self.deduplicateJokes(cleaned)
-            if !deduped.isEmpty {
-                hints.saveAsLastUsed()
-                extractedJokes = deduped
-                return
-            }
-        }
-
-        // Step 3: AI providers — for medium/low confidence or when structural splits failed.
-        let textToSend = hints.applyingPromptPrefix(to: preprocessed)
         let manager = AIJokeExtractionManager.shared
-        let token = AIExtractionToken(caller: "HybridGagGrabber")
-
-        if manager.availableProviders.isEmpty {
-            if smartSplit.count >= 2 {
-                print(" [GagGrabber] No AI available, using SmartTextSplitter results (\(smartSplit.count) chunks)")
-                let cleaned = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
-                extractedJokes = Self.deduplicateJokes(cleaned)
-            } else {
-                lastError = "GagGrabber needs either Apple Intelligence (iOS 26+) or an OpenAI API key in Settings."
+        if !manager.availableProviders.isEmpty {
+            statusMessage = "Trying deeper analysis…"
+            let token = AIExtractionToken(caller: "HybridGagGrabber")
+            do {
+                let result = try await manager.extractJokes(from: rawText, hints: .unspecified, token: token)
+                let jokes = result.jokes.map { Self.stripLeadingNumber($0.jokeText) }
+                let deduped = Self.deduplicateJokes(jokes)
+                if deduped.count >= 2 {
+                    print(" [GagGrabber] AI found \(deduped.count) joke(s)")
+                    extractedJokes = deduped
+                    return
+                }
+            } catch {
+                print(" [GagGrabber] AI fallback failed: \(error.localizedDescription)")
             }
-            return
         }
 
-        statusMessage = "GagGrabber is scanning for jokes…"
-
-        do {
-            let result = try await manager.extractJokes(from: textToSend, hints: hints, token: token)
-            let jokes = result.jokes.map { Self.stripLeadingNumber($0.jokeText) }
-            print(" [GagGrabber] \(result.provider.displayName) returned \(jokes.count) joke(s)")
-
-            statusMessage = "Cleaning up results…"
-            let deduped = Self.deduplicateJokes(jokes)
-
-            if deduped.isEmpty {
-                if smartSplit.count >= 2 {
-                    extractedJokes = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
-                } else {
-                    lastError = "GagGrabber read the whole file but couldn't spot any jokes. Try adjusting the hints above and give it another go!"
-                }
-            } else if deduped.count == 1 && smartSplit.count > deduped.count {
-                print(" [GagGrabber] AI returned single blob, preferring SmartTextSplitter (\(smartSplit.count) chunks)")
-                let cleaned = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
-                extractedJokes = Self.deduplicateJokes(cleaned)
-            } else {
-                hints.saveAsLastUsed()
-                extractedJokes = deduped
-            }
-        } catch {
-            print(" [GagGrabber] AI extraction failed: \(error.localizedDescription)")
-            if smartSplit.count >= 2 {
-                print(" [GagGrabber] Using SmartTextSplitter results as fallback (\(smartSplit.count) chunks)")
-                extractedJokes = smartSplit.map { Self.cleanJokeText($0) }.filter { !$0.isEmpty }
-            } else {
-                lastError = error.localizedDescription
-                extractedJokes = []
-            }
+        if results.count == 1 {
+            lastError = "GagGrabber found your text but couldn't tell where one joke ends and the next begins.\n\nPut a blank line between each joke and try again."
+        } else {
+            lastError = "GagGrabber couldn't find any jokes in this file.\n\nMake sure your file has text with a blank line between each joke."
         }
     }
 
@@ -175,85 +119,6 @@ final class HybridGagGrabber: ObservableObject {
     private func stopElapsedTimer() {
         timerTask?.cancel()
         timerTask = nil
-    }
-
-    // MARK: - Hint-Based Splitting
-
-    /// When the user tells us the format, split on that format directly.
-    /// No AI, no heuristics — just split where the user said to split.
-    nonisolated static func splitUsingHints(_ text: String, hints: ExtractionHints) -> [String] {
-        let lines = text.components(separatedBy: "\n")
-
-        switch hints.separator {
-        case .numbered:
-            return splitOnNumberedLines(lines)
-        case .bullets:
-            return splitOnBulletLines(lines)
-        case .blankLine:
-            return splitOnBlankLines(text)
-        case .headers, .noneOrFlowing, .mixed:
-            return []
-        }
-    }
-
-    /// Split where lines start with a number: 1. / 1) / 1: / 1- / #1 / Joke 1: etc.
-    private nonisolated static func splitOnNumberedLines(_ lines: [String]) -> [String] {
-        let pattern = #"^\s*(?:(?:joke|bit|gag|#)\s*)?#?\s*\d+\s*[.)\-:–—]\s*"#
-        var chunks: [String] = []
-        var current: [String] = []
-
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            let isNumbered = trimmed.range(
-                of: pattern,
-                options: [.regularExpression, .caseInsensitive]
-            ) != nil
-
-            if isNumbered && !current.isEmpty {
-                chunks.append(current.joined(separator: "\n"))
-                current = [trimmed]
-            } else if !trimmed.isEmpty || !current.isEmpty {
-                current.append(line)
-            }
-        }
-        if !current.isEmpty {
-            chunks.append(current.joined(separator: "\n"))
-        }
-        return chunks.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
-
-    /// Split where lines start with a bullet: - / • / * / –
-    private nonisolated static func splitOnBulletLines(_ lines: [String]) -> [String] {
-        var chunks: [String] = []
-        var current: [String] = []
-
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            let isBullet = trimmed.range(
-                of: #"^\s*[•\-\*–—]\s+"#,
-                options: .regularExpression
-            ) != nil
-
-            if isBullet && !current.isEmpty {
-                chunks.append(current.joined(separator: "\n"))
-                current = [trimmed]
-            } else if !trimmed.isEmpty || !current.isEmpty {
-                current.append(line)
-            }
-        }
-        if !current.isEmpty {
-            chunks.append(current.joined(separator: "\n"))
-        }
-        return chunks.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
-
-    /// Split on blank lines (one or more empty lines between jokes).
-    private nonisolated static func splitOnBlankLines(_ text: String) -> [String] {
-        text.components(separatedBy: "\n\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
     }
 
     // MARK: - Cleaning Helpers
@@ -397,33 +262,20 @@ struct HybridGagGrabberSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                // MARK: Welcome Hero
+                // MARK: Welcome
                 Section {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 14) {
                         GagGrabberFace(mood: faceMood, size: 56)
                             .padding(.top, 8)
 
                         Text("GagGrabber")
                             .font(.title2.weight(.bold))
-                            .foregroundColor(.primary)
 
-                        Text("Drop in a file with your jokes and GagGrabber will read through it and pull out each one individually — so you can add them to your library one by one.")
+                        Text("Import a file and GagGrabber will pull out each joke so you can add them to your library.")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
-
-                        HStack(spacing: 6) {
-                            ForEach(["TXT", "PDF", "RTF", "Google Docs"], id: \.self) { fmt in
-                                Text(fmt)
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundColor(Color.accentColor)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 4)
-                                    .background(Color.accentColor.opacity(0.1))
-                                    .clipShape(Capsule())
-                            }
-                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -431,19 +283,62 @@ struct HybridGagGrabberSheet: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
                 }
 
-                // MARK: Document Format Hints
+                // MARK: Formatting Instructions
                 Section {
-                    ExtractionHintsForm(hints: $grabber.hints, compact: true)
-                        .padding(.vertical, 4)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Put a **blank line** between each joke:")
+                            .font(.subheadline)
+
+                        Text("""
+                        Why did the chicken cross the road?
+                        To get to the other side.
+
+                        I told my wife she draws her eyebrows too high.
+                        She looked surprised.
+
+                        What do you call a fake noodle?
+                        An impasta.
+                        """)
+                            .font(.caption)
+                            .monospaced()
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(DS.Corner.md)
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.caption)
+                            Text("Also works with numbered lists, bullets (- or •), and --- separators.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
                 } header: {
-                    Label("Tell GagGrabber about your document (optional)", systemImage: "text.magnifyingglass")
-                } footer: {
-                    Text("Skip this and tap Extract — GagGrabber will try to figure it out on its own.")
-                        .font(.caption)
+                    Label("How to format your file", systemImage: "doc.text")
+                }
+
+                // MARK: Supported Formats
+                Section {
+                    HStack(spacing: 6) {
+                        ForEach(["TXT", "PDF", "RTF", "Google Docs"], id: \.self) { fmt in
+                            Text(fmt)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(Color.accentColor)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(Color.accentColor.opacity(0.1))
+                                .clipShape(Capsule())
+                        }
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
                 }
 
                 // MARK: Source
-                Section("Document") {
+                Section("Import") {
                     Button {
                         showPicker = true
                     } label: {
