@@ -551,9 +551,15 @@ struct BrainstormView: View {
             
             Spacer()
             
+            Button {
+                shareSelectedIdeas()
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+                    .font(.subheadline.bold())
+            }
+            .disabled(selectedIdeaIDs.isEmpty)
+
             Button(role: .destructive) {
-                // Stage for confirmation — actual batch delete happens
-                // in the alert handler below.
                 showingBatchDeleteConfirmation = true
             } label: {
                 Label("Delete", systemImage: "trash")
@@ -561,7 +567,7 @@ struct BrainstormView: View {
             }
             .disabled(selectedIdeaIDs.isEmpty)
             .tint(.accentColor)
-            
+
             Button {
                 isSelectMode = false
                 selectedIdeaIDs.removeAll()
@@ -573,6 +579,17 @@ struct BrainstormView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(.bar)
+    }
+
+    private func shareSelectedIdeas() {
+        let selected = ideas.filter { selectedIdeaIDs.contains($0.id) }
+        guard !selected.isEmpty else { return }
+        let text = selected.map { idea in
+            var line = idea.content
+            if !idea.notes.isEmpty { line += "\n\(idea.notes)" }
+            return line
+        }.joined(separator: "\n\n---\n\n")
+        ShareHelper.shareText(text)
     }
     
     private func toggleIdeaSelection(_ idea: BrainstormIdea) {

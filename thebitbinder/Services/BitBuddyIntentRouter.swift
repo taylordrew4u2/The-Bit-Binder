@@ -77,22 +77,23 @@ struct BitBuddyIntent: Sendable, Identifiable {
     let keywords: [String]       // quick match tokens
     let examplePatterns: [String] // full example phrases
 
-    /// Returns true when `text` fuzzy-matches this intent.
-    func matches(_ text: String) -> Double {
-        let lower = text.lowercased()
+    /// Returns a match score for `text` against this intent.
+    /// When `precomputed` is true, `text` is already lowercased.
+    func matches(_ text: String, precomputed: Bool = false) -> Double {
+        let lower = precomputed ? text : text.lowercased()
         var score: Double = 0
 
-        // Keyword hits
         for keyword in keywords {
             if lower.contains(keyword) { score += 1.0 }
         }
 
-        // Example-phrase partial match (best substring overlap)
+        // Skip expensive example matching if no keywords hit
+        guard score > 0 else { return 0 }
+
         for example in examplePatterns {
             let exLower = example.lowercased()
             if lower == exLower { score += 10.0; continue }
             if lower.contains(exLower) || exLower.contains(lower) { score += 3.0; continue }
-            // Token overlap
             let exTokens = Set(exLower.split(separator: " ").map(String.init))
             let inTokens = Set(lower.split(separator: " ").map(String.init))
             let overlap = Double(exTokens.intersection(inTokens).count) / Double(max(exTokens.count, 1))
@@ -121,9 +122,11 @@ final class BitBuddyIntentRouter: Sendable {
     static let shared = BitBuddyIntentRouter()
 
     let allIntents: [BitBuddyIntent]
+    private let quoteRegex: NSRegularExpression?
 
     private init() {
         self.allIntents = Self.buildIntentCatalog()
+        self.quoteRegex = try? NSRegularExpression(pattern: #""([^"]+)""#)
     }
 
     // MARK: - Public API
@@ -131,31 +134,37 @@ final class BitBuddyIntentRouter: Sendable {
     /// Find the best-matching intent for a user message.
     /// Returns `nil` when no intent scores above the threshold.
     func route(_ message: String) -> BitBuddyRouteResult? {
-        let scored = allIntents.map { intent -> (BitBuddyIntent, Double) in
-            (intent, intent.matches(message))
+        let lower = message.lowercased()
+        var bestIntent: BitBuddyIntent?
+        var bestScore: Double = 0
+
+        for intent in allIntents {
+            let score = intent.matches(lower, precomputed: true)
+            if score > bestScore {
+                bestScore = score
+                bestIntent = intent
+            }
         }
-        .sorted { $0.1 > $1.1 }
 
-        guard let best = scored.first, best.1 > 1.0 else { return nil }
+        guard let best = bestIntent, bestScore > 1.0 else { return nil }
 
-        let maxPossible = max(best.1, 1.0)
-        let confidence = min(best.1 / max(maxPossible, 10.0), 1.0)
-
-        let entities = extractEntities(from: message, intent: best.0)
+        let confidence = min(bestScore / max(bestScore, 10.0), 1.0)
+        let entities = extractEntities(from: message, intent: best)
 
         return BitBuddyRouteResult(
-            intent: best.0,
+            intent: best,
             confidence: confidence,
-            section: best.0.section,
-            category: best.0.category,
+            section: best.section,
+            category: best.category,
             extractedEntities: entities
         )
     }
 
     /// Return top-N matching intents (useful for disambiguation).
     func topMatches(_ message: String, limit: Int = 3) -> [BitBuddyRouteResult] {
-        allIntents
-            .map { ($0, $0.matches(message)) }
+        let lower = message.lowercased()
+        return allIntents
+            .map { ($0, $0.matches(lower, precomputed: true)) }
             .sorted { $0.1 > $1.1 }
             .prefix(limit)
             .filter { $0.1 > 0.5 }
@@ -209,10 +218,8 @@ final class BitBuddyIntentRouter: Sendable {
             }
         }
 
-        // Extract quoted strings as explicit entity values
-        let quotePattern = try? NSRegularExpression(pattern: #""([^"]+)""#)
         let nsString = message as NSString
-        if let match = quotePattern?.firstMatch(in: message, range: NSRange(location: 0, length: nsString.length)) {
+        if let match = quoteRegex?.firstMatch(in: message, range: NSRange(location: 0, length: nsString.length)) {
             let quoted = nsString.substring(with: match.range(at: 1))
             entities["quoted_value"] = quoted
         }

@@ -17,6 +17,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
     // by BitBuddyService (a @MainActor singleton). BitBuddyService serializes
     // access via its isLoading guard. Do NOT call send() from a non-main-actor context.
     nonisolated(unsafe) private var userProfile: UserStyleProfile = .empty()
+    nonisolated(unsafe) private var lastProfileJokeCount: Int = -1
     private let intentRouter = BitBuddyIntentRouter.shared
     
     /// Intent IDs that actually need the user's joke profile data.
@@ -36,7 +37,11 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // in casual conversation — jokes are only used when the user asks.
         let intentId = dataContext.routedIntent?.intent.id
         if let intentId, Self.profileDependentIntents.contains(intentId) {
-            updateProfile(from: dataContext.recentJokes)
+            let currentCount = dataContext.recentJokes.count
+            if currentCount != lastProfileJokeCount {
+                updateProfile(from: dataContext.recentJokes)
+                lastProfileJokeCount = currentCount
+            }
         }
         
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -337,7 +342,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // NOTEBOOK
         // ═══════════════════════════════════════════
         case "open_notebook":
-            return " The **Notebook** is your scratch pad — anything goes. Quick notes, random thoughts, stage observations.\n\n**Would you like me to take you there?**"
+            return "Notebook is your scratch pad for quick notes, stage observations, photos, and loose ideas. Open it from the tab bar when you want a place that does not have to be a finished joke yet."
         case "save_notebook_text":
             return " Saved to your Notebook! Quick notes add up — review them weekly for hidden gems."
         case "attach_photo_to_notebook":
@@ -385,7 +390,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             
             GagGrabber supports **PDF**, **text files** (.txt, .md), and **documents** (.doc, .docx, .rtf). It'll extract individual jokes automatically and let you review each one before saving.
             
-            **Would you like me to take you to the Jokes page so you can use GagGrabber?** Just say "yes" or "take me there."
+            Use it when you want a review step before anything lands in your library.
             """
         case "import_image":
             return """
@@ -401,7 +406,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             
              **Tips:** Good lighting, flat page, and typed/printed text give the best results.
             
-            **Would you like me to take you to the Jokes page?** Just say "yes" or "take me there."
+            Use it when you want to turn handwritten or photographed material into editable text.
             """
         case "review_import_queue":
             return """
@@ -462,7 +467,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // HELP
         // ═══════════════════════════════════════════
         case "open_help_faq":
-            return " **Help & FAQ** has guides for every feature in the app.\n\n**Would you like me to take you there?**"
+            return "Help & FAQ has guides for every feature in the app. Open it from Settings when you want the longer walkthroughs."
         case "explain_feature":
             return buildFeatureExplanation(from: message)
             
@@ -1093,7 +1098,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             • "Find jokes about ___" or "show me hits"
             • Tags, folders, favorites — all the usual
             • Or just say "roast ___" and I'll start writing burns
-            What are we working on?
+            Send the line or topic and I'll give you a direct pass.
             """
         case .brainstorm:
             return """

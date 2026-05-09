@@ -15,19 +15,15 @@ enum RoastJokeSortOption: String, CaseIterable, Identifiable {
     case custom = "Custom Order"
     case newest = "Newest First"
     case oldest = "Oldest First"
-    case mostPerformed = "Most Performed"
-    case killers = "Killers First"
     case relatability = "Most Relatable"
-    
+
     var id: String { rawValue }
-    
+
     var icon: String {
         switch self {
         case .custom: return "line.3.horizontal"
         case .newest: return "clock"
         case .oldest: return "clock.arrow.circlepath"
-        case .mostPerformed: return "flame"
-        case .killers: return "star.fill"
         case .relatability: return "person.3.fill"
         }
     }
@@ -76,16 +72,6 @@ final class RoastTarget: Identifiable {
         }.sorted { $0.displayOrder < $1.displayOrder }
     }
     
-    /// Jokes sorted by performance count (most performed first)
-    @Transient
-    var jokesByPerformance: [RoastJoke] {
-        guard let jokeArray = jokes else { return [] }
-        return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isTrashed else { return nil }
-            return joke
-        }.sorted { $0.performanceCount > $1.performanceCount }
-    }
-    
     /// Jokes sorted by relatability score (highest first)
     @Transient
     var jokesByRelatability: [RoastJoke] {
@@ -94,36 +80,6 @@ final class RoastTarget: Identifiable {
             guard !joke.isTrashed else { return nil }
             return joke
         }.sorted { $0.relatabilityScore > $1.relatabilityScore }
-    }
-    
-    /// Only "killer" jokes that always land
-    @Transient
-    var killerJokes: [RoastJoke] {
-        guard let jokeArray = jokes else { return [] }
-        return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isTrashed && joke.isKiller else { return nil }
-            return joke
-        }.sorted { $0.dateCreated > $1.dateCreated }
-    }
-    
-    /// Tested jokes only
-    @Transient
-    var testedJokes: [RoastJoke] {
-        guard let jokeArray = jokes else { return [] }
-        return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isTrashed && joke.isTested else { return nil }
-            return joke
-        }.sorted { $0.performanceCount > $1.performanceCount }
-    }
-    
-    /// Untested jokes (material that needs stage time)
-    @Transient
-    var untestedJokes: [RoastJoke] {
-        guard let jokeArray = jokes else { return [] }
-        return jokeArray.compactMap { joke -> RoastJoke? in
-            guard !joke.isTrashed && !joke.isTested else { return nil }
-            return joke
-        }.sorted { $0.dateCreated > $1.dateCreated }
     }
     
     /// Get jokes sorted by specified option
@@ -135,13 +91,6 @@ final class RoastTarget: Identifiable {
             return sortedJokes
         case .oldest:
             return sortedJokes.reversed()
-        case .mostPerformed:
-            return jokesByPerformance
-        case .killers:
-            // Killers first, then non-killers by date
-            let killers = killerJokes
-            let nonKillers = sortedJokes.filter { !$0.isKiller }
-            return killers + nonKillers
         case .relatability:
             return jokesByRelatability
         }
@@ -151,16 +100,6 @@ final class RoastTarget: Identifiable {
     var jokeCount: Int {
         guard let jokeArray = jokes else { return 0 }
         return jokeArray.filter { !$0.isTrashed }.count
-    }
-    
-    @Transient
-    var killerCount: Int {
-        killerJokes.count
-    }
-    
-    @Transient
-    var testedCount: Int {
-        testedJokes.count
     }
     
     /// Safely checks if the model is in a valid state for UI access

@@ -104,18 +104,11 @@ struct AudioImportView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Info
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundColor(.accentColor)
-                        Text("Audio is transcribed to text and saved as a joke. The original audio file is not kept.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding()
-                    .background(Color(UIColor.secondarySystemBackground))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
+                    Text("Imported audio is transcribed into editable joke text. The copied audio file is removed after import.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
                     
                     if !authorizationStatus.isEmpty {
                         Text(authorizationStatus)

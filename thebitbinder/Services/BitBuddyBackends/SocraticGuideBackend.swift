@@ -338,92 +338,67 @@ final class SocraticGuideBackend: BitBuddyBackend {
 
         if let prefix = extractSuffix(in: normalized, markers: Self.prefixMarkers) {
             let matches = wordsStarting(with: prefix)
-            guard !matches.isEmpty else {
-                return formatLanguageFallback(
-                    "I couldn't find a clean list for words starting with \(prefix).",
+            if !matches.isEmpty {
+                return formatLanguageResult(
+                    intro: "Words starting with \(prefix)",
+                    items: matches,
                     mode: mode,
                     roastMode: roastMode
                 )
             }
-
-            return formatLanguageResult(
-                intro: "Words starting with \(prefix)",
-                items: matches,
-                mode: mode,
-                roastMode: roastMode
-            )
+            return nil
         }
 
         if let term = extractSuffix(in: normalized, markers: Self.synonymMarkers) {
             let matches = synonyms(for: term)
-            guard !matches.isEmpty else {
-                return formatLanguageFallback(
-                    "I don't have a strong synonym list for \(term) yet.",
+            if !matches.isEmpty {
+                return formatLanguageResult(
+                    intro: "Synonyms for \(term)",
+                    items: matches,
                     mode: mode,
                     roastMode: roastMode
                 )
             }
-
-            return formatLanguageResult(
-                intro: "Synonyms for \(term)",
-                items: matches,
-                mode: mode,
-                roastMode: roastMode
-            )
+            return nil
         }
 
         if let term = extractSuffix(in: normalized, markers: Self.antonymMarkers) {
             let matches = antonyms(for: term)
-            guard !matches.isEmpty else {
-                return formatLanguageFallback(
-                    "I don't have a clean opposite list for \(term) yet.",
+            if !matches.isEmpty {
+                return formatLanguageResult(
+                    intro: "Opposites for \(term)",
+                    items: matches,
                     mode: mode,
                     roastMode: roastMode
                 )
             }
-
-            return formatLanguageResult(
-                intro: "Opposites for \(term)",
-                items: matches,
-                mode: mode,
-                roastMode: roastMode
-            )
+            return nil
         }
 
         if let term = extractSuffix(in: normalized, markers: Self.rhymeMarkers) {
             let matches = rhymes(for: term)
-            guard !matches.isEmpty else {
-                return formatLanguageFallback(
-                    "I couldn't find a clean rhyme set for \(term).",
+            if !matches.isEmpty {
+                return formatLanguageResult(
+                    intro: "Rhymes with \(term)",
+                    items: matches,
                     mode: mode,
                     roastMode: roastMode
                 )
             }
-
-            return formatLanguageResult(
-                intro: "Rhymes with \(term)",
-                items: matches,
-                mode: mode,
-                roastMode: roastMode
-            )
+            return nil
         }
 
         if let term = extractSuffix(in: normalized, markers: Self.soundLikeMarkers) {
             let matches = soundsLike(term)
-            guard !matches.isEmpty else {
-                return formatLanguageFallback(
-                    "I couldn't find a clean sounds-like list for \(term).",
+            if !matches.isEmpty {
+                return formatLanguageResult(
+                    intro: "Sounds like \(term)",
+                    items: matches,
                     mode: mode,
                     roastMode: roastMode
                 )
             }
-
-            return formatLanguageResult(
-                intro: "Sounds like \(term)",
-                items: matches,
-                mode: mode,
-                roastMode: roastMode
-            )
+            return nil
         }
 
         return nil

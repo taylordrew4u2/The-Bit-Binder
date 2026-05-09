@@ -663,6 +663,11 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.error = nil
+            guard !(self.isStarting || self.audioEngine?.isRunning == true || self.recognitionTask != nil) else {
+                self.shouldBeRunning = true
+                self.isTranscribing = true
+                return
+            }
             guard self.isAppActive else {
                 self.shouldBeRunning = false
                 self.isTranscribing = false
@@ -719,6 +724,13 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
 
     private func startRecognitionSession() {
         guard !isStarting else { return }
+        guard audioEngine?.isRunning != true, recognitionTask == nil else {
+            shouldBeRunning = true
+            DispatchQueue.main.async { [weak self] in
+                self?.isTranscribing = true
+            }
+            return
+        }
         guard isAppActive else {
             shouldBeRunning = false
             isStarting = false

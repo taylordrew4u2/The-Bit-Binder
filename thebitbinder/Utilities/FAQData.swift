@@ -133,7 +133,7 @@ enum FAQData {
         ]),
         FAQSectionModel(title: "Importing Jokes", icon: "square.and.arrow.down.fill", items: [
             FAQItem("What file types can I import?",
-                    "PDF, images (JPEG, PNG, HEIC), Word docs (.doc, .docx), and plain text files (.txt, .rtf)."),
+                    "PDF, plain text (.txt), RTF, HTML, CSV, and Google Docs links through GagGrabber or Import from Files. You can also scan handwritten jokes with Camera or import photos from your library."),
             FAQItem("How does the smart import work?",
                     "GagGrabber reads your file and intelligently splits it into individual jokes. It looks for separators like 'NEXT JOKE', '---', numbered lists, bullet points, and blank lines."),
             FAQItem("What's the Review Queue?",

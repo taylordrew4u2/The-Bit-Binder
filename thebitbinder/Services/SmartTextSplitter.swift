@@ -12,47 +12,143 @@ import Foundation
 /// multiple heuristics: blank-line separation, numbered lists,
 /// title detection, and content quality filtering.
 enum SmartTextSplitter {
-    
+
+    // MARK: - Confidence Levels
+
+    enum SplitConfidence: Comparable {
+        case low
+        case medium
+        case high
+    }
+
     // MARK: - Public API
-    
+
     /// Splits raw text into an array of cleaned joke-candidate strings.
-    /// Each returned string should represent one joke or bit.
     static func split(_ text: String) -> [String] {
-        // Step 1: Normalize line endings
+        splitWithConfidence(text).chunks
+    }
+
+    /// Splits raw text and reports how confident the splitter is.
+    /// `.high` = explicit structural markers (numbered, bullets, separators, one-per-line).
+    /// `.medium` = blank-line paragraphs.
+    /// `.low` = sentence patterns or single block fallback.
+    static func splitWithConfidence(_ text: String) -> (chunks: [String], confidence: SplitConfidence) {
         let normalized = text
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
-        
-        // Step 2: Try structured splitting (numbered lists, headers, etc.)
-        let structuredChunks = tryStructuredSplit(normalized)
-        if !structuredChunks.isEmpty && structuredChunks.count > 1 {
-            return structuredChunks.compactMap(cleanAndValidate)
+
+        // Step 1: Explicit separators (---, ===, NEXT JOKE, etc.)
+        let separatorChunks = trySeparatorSplit(normalized)
+        if separatorChunks.count > 1 {
+            let cleaned = separatorChunks.compactMap(cleanAndValidate)
+            if cleaned.count > 1 { return (cleaned, .high) }
         }
-        
-        // Step 3: Split by double-newlines (paragraph breaks)
+
+        // Step 2: Structured (numbered lists, bullets, titles)
+        let structuredChunks = tryStructuredSplit(normalized)
+        if structuredChunks.count > 1 {
+            let cleaned = structuredChunks.compactMap(cleanAndValidate)
+            if cleaned.count > 1 { return (cleaned, .high) }
+        }
+
+        // Step 3: One joke per line (each line ends with punctuation)
+        let lineChunks = tryLinePerJokeSplit(normalized)
+        if lineChunks.count > 1 {
+            let cleaned = lineChunks.compactMap(cleanAndValidate)
+            if cleaned.count > 1 { return (cleaned, .high) }
+        }
+
+        // Step 4: Blank-line paragraphs
         let paragraphChunks = splitByParagraphs(normalized)
         if paragraphChunks.count > 1 {
-            // Merge very short consecutive chunks that are likely part of the same joke
             let merged = mergeShortChunks(paragraphChunks)
-            return merged.compactMap(cleanAndValidate)
+            let cleaned = merged.compactMap(cleanAndValidate)
+            if cleaned.count > 1 { return (cleaned, .medium) }
         }
-        
-        // Step 4: If single large block, try to split by sentence patterns
+
+        // Step 5: Sentence patterns
         let sentenceChunks = trySentencePatternSplit(normalized)
         if sentenceChunks.count > 1 {
-            return sentenceChunks.compactMap(cleanAndValidate)
+            let cleaned = sentenceChunks.compactMap(cleanAndValidate)
+            if cleaned.count > 1 { return (cleaned, .low) }
         }
-        
-        // Step 5: Fallback — treat entire text as one chunk if it passes quality
+
+        // Step 6: Single chunk fallback
         if let single = cleanAndValidate(normalized) {
-            return [single]
+            return ([single], .low)
         }
-        
-        return []
+
+        return ([], .low)
     }
     
+    // MARK: - Separator Splitting
+
+    /// Detects explicit separators like ---, ===, ***, NEXT JOKE, etc.
+    private static func trySeparatorSplit(_ text: String) -> [String] {
+        let separatorPattern = #"^\s*[-–—=*]{3,}\s*$|^\s*(?:NEXT JOKE|NEW BIT|NEXT BIT|//)\s*$"#
+        let lines = text.components(separatedBy: "\n")
+
+        var separatorCount = 0
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty,
+               trimmed.range(of: separatorPattern, options: [.regularExpression, .caseInsensitive]) != nil {
+                separatorCount += 1
+            }
+        }
+
+        guard separatorCount >= 1 else { return [] }
+
+        var chunks: [String] = []
+        var current: [String] = []
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty,
+               trimmed.range(of: separatorPattern, options: [.regularExpression, .caseInsensitive]) != nil {
+                if !current.isEmpty {
+                    chunks.append(current.joined(separator: "\n"))
+                    current = []
+                }
+            } else {
+                current.append(line)
+            }
+        }
+        if !current.isEmpty {
+            chunks.append(current.joined(separator: "\n"))
+        }
+
+        return chunks.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    // MARK: - Line-Per-Joke Detection
+
+    /// Detects documents where each line is a separate joke (all lines end
+    /// with sentence-ending punctuation).
+    private static func tryLinePerJokeSplit(_ text: String) -> [String] {
+        let lines = text.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard lines.count >= 3 else { return [] }
+
+        var completeSentenceCount = 0
+        for line in lines {
+            guard let lastChar = line.last else { continue }
+            if lastChar == "." || lastChar == "!" || lastChar == "?" ||
+               lastChar == "\"" || lastChar == "\u{201D}" {
+                completeSentenceCount += 1
+            }
+        }
+
+        let ratio = Float(completeSentenceCount) / Float(lines.count)
+        guard ratio >= 0.6 else { return [] }
+        return lines
+    }
+
     // MARK: - Structured Splitting
-    
+
     /// Detects numbered lists (1. / 1) / #1) and splits on them
     private static func tryStructuredSplit(_ text: String) -> [String] {
         let lines = text.components(separatedBy: "\n")

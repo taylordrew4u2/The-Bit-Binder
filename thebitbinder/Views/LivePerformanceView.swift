@@ -16,6 +16,7 @@ struct LivePerformanceView: View {
     @Query private var jokes: [Joke]
     @Query private var roastJokes: [RoastJoke]
     @Query private var roastTargets: [RoastTarget]
+    @AppStorage("roastTextScale") private var roastTextScale = 1.0
     
     let setList: SetList
     
@@ -33,6 +34,8 @@ struct LivePerformanceView: View {
     @State private var showJokeList = false
     @State private var showBackupJokes = false
     @State private var showTargets = false
+
+    private let baseRoastFontSize: CGFloat = 28
     
     // MARK: - Safe Model Access
     
@@ -193,10 +196,14 @@ struct LivePerformanceView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             loadItemsSafely()
+            fontSize = baseRoastFontSize * roastTextScale
             UIApplication.shared.isIdleTimerDisabled = true
             screenBrightness = UIScreen.main.brightness
             UIScreen.main.brightness = 1.0
             startTimer()
+        }
+        .onChange(of: roastTextScale) { _, newValue in
+            fontSize = baseRoastFontSize * newValue
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
@@ -459,7 +466,9 @@ struct LivePerformanceView: View {
                     
                     HStack(spacing: 16) {
                         Button {
-                            fontSize = max(20, fontSize - 4)
+                            let newSize = max(20, fontSize - 4)
+                            fontSize = newSize
+                            roastTextScale = newSize / baseRoastFontSize
                         } label: {
                             Image(systemName: "minus.circle.fill")
                                 .font(.system(size: 32))
@@ -473,7 +482,9 @@ struct LivePerformanceView: View {
                             .frame(width: 40)
 
                         Button {
-                            fontSize = min(48, fontSize + 4)
+                            let newSize = min(48, fontSize + 4)
+                            fontSize = newSize
+                            roastTextScale = newSize / baseRoastFontSize
                         } label: {
                             Image(systemName: "plus.circle.fill")
                                 .font(.system(size: 32))
@@ -968,6 +979,30 @@ struct PerformanceItem: Identifiable {
     var hasStructure: Bool {
         !setup.isEmpty || !punchline.isEmpty
     }
+
+    var primaryDisplayText: String {
+        let trimmedSetup = setup.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSetup.isEmpty {
+            return trimmedSetup
+        }
+
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedContent.isEmpty ? "(Empty)" : trimmedContent
+    }
+
+    var previewDisplayText: String {
+        primaryDisplayText
+            .components(separatedBy: .newlines)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? primaryDisplayText
+    }
+
+    func truncatedPreview(_ limit: Int) -> String {
+        let preview = previewDisplayText
+        guard preview.count > limit else { return preview }
+        let endIndex = preview.index(preview.startIndex, offsetBy: limit)
+        return String(preview[..<endIndex]) + "..."
+    }
 }
 
 // MARK: - Finalize Set Sheet
@@ -1161,7 +1196,7 @@ struct JokeListRow: View {
                             }
                         }
                         
-                        Text(item.content.prefix(80) + (item.content.count > 80 ? "..." : ""))
+                        Text(item.truncatedPreview(80))
                             .font(.system(size: 14))
                             .foregroundColor(.white.opacity(0.9))
                             .lineLimit(isExpanded ? nil : 2)
@@ -1291,6 +1326,26 @@ struct BackupJokeRow: View {
     private var hasStructure: Bool {
         !setup.isEmpty || !punchline.isEmpty
     }
+
+    private var primaryDisplayText: String {
+        let trimmedSetup = setup.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSetup.isEmpty {
+            return trimmedSetup
+        }
+
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedContent.isEmpty ? "(Empty)" : trimmedContent
+    }
+
+    private var previewText: String {
+        let preview = primaryDisplayText
+            .components(separatedBy: .newlines)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? primaryDisplayText
+        guard preview.count > 100 else { return preview }
+        let endIndex = preview.index(preview.startIndex, offsetBy: 100)
+        return String(preview[..<endIndex]) + "..."
+    }
     
     var body: some View {
         Button {
@@ -1384,7 +1439,7 @@ struct BackupJokeRow: View {
                     .padding(.top, 8)
                 } else {
                     // Preview only
-                    Text(content.prefix(100) + (content.count > 100 ? "..." : ""))
+                    Text(previewText)
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(2)
@@ -1564,7 +1619,7 @@ struct OpeningRoastSection: View {
                             .foregroundColor(Color.bitbinderAccent)
                         
                         if let joke = openingJoke {
-                            Text(joke.content.prefix(50) + (joke.content.count > 50 ? "..." : ""))
+                            Text(joke.truncatedPreview(50))
                                 .font(.system(size: 13))
                                 .foregroundColor(.white.opacity(0.8))
                                 .lineLimit(1)
@@ -1678,7 +1733,7 @@ struct OpeningRoastDetailRow: View {
                         .foregroundColor(Color.bitbinderAccent)
                     
                     // Preview
-                    Text(joke.content.prefix(80) + (joke.content.count > 80 ? "..." : ""))
+                    Text(joke.truncatedPreview(80))
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.9))
                         .lineLimit(isExpanded ? nil : 2)
@@ -1737,7 +1792,7 @@ struct OpeningRoastDetailRow: View {
                         }
                     } else {
                         // Just full content
-                        Text(joke.content)
+                        Text(joke.primaryDisplayText)
                             .font(.system(size: fontSize))
                             .foregroundColor(.white)
                             .lineSpacing(6)
@@ -1812,7 +1867,7 @@ struct BackupRoastDetailRow: View {
                         .frame(width: 8, height: 8)
                     
                     // Preview
-                    Text(joke.content.prefix(70) + (joke.content.count > 70 ? "..." : ""))
+                    Text(joke.truncatedPreview(70))
                         .font(.system(size: 13))
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(isExpanded ? nil : 2)
@@ -1860,7 +1915,7 @@ struct BackupRoastDetailRow: View {
                         }
                     } else {
                         // Just full content
-                        Text(joke.content)
+                        Text(joke.primaryDisplayText)
                             .font(.system(size: fontSize - 2))
                             .foregroundColor(.white.opacity(0.9))
                             .lineSpacing(5)

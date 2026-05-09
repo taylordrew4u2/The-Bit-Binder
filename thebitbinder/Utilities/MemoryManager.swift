@@ -51,7 +51,7 @@ final class MemoryManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated {
+            Task { @MainActor [weak self] in
                 self?.handleMemoryWarning()
             }
         }
@@ -61,7 +61,7 @@ final class MemoryManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated {
+            Task { @MainActor [weak self] in
                 self?.handleBackgroundTransition()
             }
         }
@@ -71,7 +71,7 @@ final class MemoryManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated {
+            Task { @MainActor [weak self] in
                 self?.handleForegroundTransition()
             }
         }

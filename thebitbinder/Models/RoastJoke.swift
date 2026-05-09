@@ -92,6 +92,32 @@ final class RoastJoke: Identifiable {
         !setup.isEmpty || !punchline.isEmpty
     }
 
+    @Transient
+    var primaryDisplayText: String {
+        let trimmedSetup = setup.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSetup.isEmpty {
+            return trimmedSetup
+        }
+
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedContent.isEmpty ? "(Empty)" : trimmedContent
+    }
+
+    @Transient
+    var previewDisplayText: String {
+        primaryDisplayText
+            .components(separatedBy: .newlines)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? primaryDisplayText
+    }
+
+    func truncatedPreview(_ limit: Int) -> String {
+        let preview = previewDisplayText
+        guard preview.count > limit else { return preview }
+        let endIndex = preview.index(preview.startIndex, offsetBy: limit)
+        return String(preview[..<endIndex]) + "..."
+    }
+
     init(content: String, title: String = "", target: RoastTarget? = nil) {
         self.content = content
         self.title = title.isEmpty ? KeywordTitleGenerator.title(from: content) : title
@@ -113,24 +139,4 @@ final class RoastJoke: Identifiable {
         dateModified = Date()
     }
     
-    // MARK: - Performance Tracking
-    
-    /// Record a performance of this joke
-    func recordPerformance() {
-        performanceCount += 1
-        lastPerformedDate = Date()
-        isTested = true
-        dateModified = Date()
-    }
-    
-    /// Undo a performance (decrement count, min 0)
-    func undoPerformance() {
-        guard performanceCount > 0 else { return }
-        performanceCount -= 1
-        if performanceCount == 0 {
-            isTested = false
-            lastPerformedDate = nil
-        }
-        dateModified = Date()
-    }
 }

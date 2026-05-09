@@ -2,57 +2,10 @@
 //  HeatMeter.swift
 //  thebitbinder
 //
-//  Continuous heat bar for Roast Mode. Color scales with heat value:
-//  0-30 ashy grey, 30-60 amber, 60-85 orange, 85-100 ember+glow.
-//  Matches the Roast Mode v2 design spec.
+//  Continuous heat bar for Roast Mode.
 //
 
 import SwiftUI
-
-struct HeatMeter: View {
-    let value: Double
-
-    var segments: Int = 8
-    var segmentHeight: CGFloat = 10
-    var gap: CGFloat = 3
-    var glowWhenHot: Bool = true
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        let clamped = min(max(value, 0), 1)
-        let filledCount = Int(round(clamped * Double(segments)))
-        let isEmber = FirePalette.HeatTier.from(clamped * 100) == .ember
-
-        ZStack {
-            if isEmber && glowWhenHot && !reduceMotion {
-                Capsule()
-                    .fill(FirePalette.spark.opacity(0.35))
-                    .blur(radius: 14)
-                    .frame(height: segmentHeight * 2)
-                    .transition(.opacity)
-            }
-
-            HStack(spacing: gap) {
-                ForEach(0..<segments, id: \.self) { i in
-                    let t = Double(i) / Double(max(segments - 1, 1))
-                    let isFilled = i < filledCount
-                    RoundedRectangle(cornerRadius: segmentHeight / 2, style: .continuous)
-                        .fill(
-                            isFilled
-                              ? AnyShapeStyle(FirePalette.heat(t))
-                              : AnyShapeStyle(Color.primary.opacity(0.08))
-                        )
-                        .frame(height: segmentHeight)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.25).delay(Double(i) * 0.02), value: filledCount)
-                }
-            }
-        }
-        .accessibilityElement()
-        .accessibilityLabel("Heat")
-        .accessibilityValue("\(Int(clamped * 100)) percent")
-    }
-}
 
 /// Continuous heat bar matching the v2 design — a single track with a
 /// filled portion whose gradient shifts based on the heat value.
