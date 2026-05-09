@@ -124,7 +124,8 @@ A dedicated full-screen view for performing a finalized set list on stage.
 
 Capture live performances and practice sessions.
 
-- Record with pause/resume using AVAudioRecorder.
+- Record with pause/resume using AVAudioRecorder via a shared singleton service.
+- Recording persists across navigation — leave the page and come back without losing your recording.
 - Memory monitoring during recording.
 - Play back with standard audio controls.
 - Transcribe recordings using on-device speech recognition.
@@ -142,8 +143,9 @@ A dedicated workflow for insult comedy with its own visual identity.
 - **Visual takeover**: full-screen animation when toggling roast mode, fire-themed color palette (FirePalette), dynamic accent colors, and heat meter UI component.
 - **Roast Targets**: named profiles with notes, traits, photos (stored as image data), and all associated roast jokes.
 - **Roast Jokes**: structured with setup, punchline, performance notes, relatability score, killer flag, tested flag, performance count, opening roast designation, and tags.
+- **Filter chips**: All, Openers, and Backups filters inside each target to view all roasts, only opening roasts, or only backup roasts.
 - **Multiple sort options**: custom order, newest first, by performance count, by relatability, killers only.
-- **Roast sets**: build roast-specific set lists.
+- **Roast sets**: build roast-specific set lists, accessible from the overflow menu in Roast Mode.
 - **Talk-to-text roast capture**: dictate burns via speech recognition.
 - **BitBuddy roast personality**: when roast mode is active, BitBuddy responds with a sharper voice while retaining all normal capabilities.
 
@@ -319,7 +321,7 @@ Separate from BitBuddy chat. Token-gated (`AIExtractionToken`) to ensure extract
 
 | Service | Purpose |
 |---------|---------|
-| **AudioRecordingService** | AVAudioRecorder wrapper with pause/resume, timer, and memory monitoring |
+| **AudioRecordingService** | Shared singleton AVAudioRecorder wrapper with pause/resume, timer, and memory monitoring. Recording persists across view navigation. |
 | **AudioTranscriptionService** | Speech-to-text transcription of recorded audio |
 | **SpeechRecognitionManager** | Real-time speech recognition with auto-restart on iOS ~60s limit, consecutive empty-restart cap (10 max), interruption handling, route change observer, and fallback locale resolution |
 

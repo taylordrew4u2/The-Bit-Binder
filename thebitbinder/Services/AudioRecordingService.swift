@@ -13,12 +13,17 @@ import Combine
 /// are always mutated on the main thread.
 @MainActor
 class AudioRecordingService: NSObject, ObservableObject {
-    
+
+    static let shared = AudioRecordingService()
+
     @Published var isRecording = false
     @Published var isPaused = false
     @Published var recordingTime: TimeInterval = 0
     /// Published error message for views to display in an alert when audio session setup fails.
     @Published var audioSessionError: String?
+
+    /// Name of the file currently being recorded (for UI display when navigated away)
+    @Published var activeRecordingName: String = ""
     
     private var audioRecorder: AVAudioRecorder?
     private var recordingTimer: Timer?
@@ -39,10 +44,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     override init() {
         super.init()
         setupMemoryWarningObserver()
-        // Audio session setup may retry with delays; run off the main thread.
-        Task.detached { [weak self] in
-            await self?.setupAudioSession()
-        }
+        setupAudioSession()
     }
     
     deinit {
@@ -62,68 +64,75 @@ class AudioRecordingService: NSObject, ObservableObject {
     }
     
     @objc nonisolated private func handleMemoryWarning() {
-        if Thread.isMainThread {
-            MainActor.assumeIsolated {
-                if self.isRecording {
-                    print(" Memory warning during recording - consider stopping")
-                }
-            }
-        } else {
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if self.isRecording {
-                    print(" Memory warning during recording - consider stopping")
-                }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if self.isRecording {
+                print(" Memory warning during recording - consider stopping")
             }
         }
     }
     
-    nonisolated private func setupAudioSession() async {
-        // Check if another app is playing audio and warn
+    private func setupAudioSession() {
         let audioSession = AVAudioSession.sharedInstance()
         if audioSession.isOtherAudioPlaying {
             print(" [Audio] Another app is currently playing audio — session may conflict")
         }
+        do {
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [
+                    .defaultToSpeaker,
+                    .allowBluetoothA2DP,
+                    .allowAirPlay,
+                    .mixWithOthers
+                ]
+            )
+            audioSessionError = nil
+            print(" [Audio] Audio session category configured for recording")
+        } catch {
+            let errorMsg = "Could not configure audio category for recording: \(error.localizedDescription)"
+            print(" [Audio] \(errorMsg)")
+            audioSessionError = errorMsg
+        }
+    }
 
-        // Retry loop: attempt up to maxAudioSessionRetries times with retryDelay between attempts
+    @objc private func updateRecordingTimeFromTimer() {
+        guard let startTime = recordingStartTime else { return }
+        recordingTime = Date().timeIntervalSince(startTime) - pausedDuration
+    }
+
+    private func activateAudioSessionForRecording() -> Bool {
+        let audioSession = AVAudioSession.sharedInstance()
         var lastError: Error?
+
         for attempt in 1...maxAudioSessionRetries {
             do {
-                try audioSession.setCategory(
-                    .playAndRecord,
-                    mode: .default,
-                    options: [
-                        .defaultToSpeaker,
-                        .allowBluetoothA2DP,
-                        .allowAirPlay,
-                        .mixWithOthers
-                    ]
-                )
                 try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-                print(" [Audio] Audio session configured + activated for recording (attempt \(attempt))")
-                await MainActor.run { [weak self] in self?.audioSessionError = nil }
-                return // success
+                audioSessionError = nil
+                print(" [Audio] Audio session activated for recording (attempt \(attempt))")
+                return true
             } catch {
                 lastError = error
-                print(" [Audio] Audio session setup attempt \(attempt)/\(maxAudioSessionRetries) failed: \(error.localizedDescription)")
+                print(" [Audio] Audio session activation attempt \(attempt)/\(maxAudioSessionRetries) failed: \(error.localizedDescription)")
+                // Avoid blocking the main actor with retry sleeps during recording setup.
                 if attempt < maxAudioSessionRetries {
-                    try? await Task.sleep(nanoseconds: UInt64(retryDelay * 1_000_000_000))
+                    RunLoop.main.run(until: Date().addingTimeInterval(retryDelay))
                 }
             }
         }
 
-        // All retries exhausted
-        let errorMsg: String
         if audioSession.isOtherAudioPlaying {
-            errorMsg = "Could not configure audio — another app is using the speaker. Close other audio apps and try again."
+            audioSessionError = "Could not start recording — another app is using audio. Close it and try again."
         } else {
-            errorMsg = "Could not configure audio for recording: \(lastError?.localizedDescription ?? "unknown error"). Please restart the app."
+            audioSessionError = "Could not activate audio for recording: \(lastError?.localizedDescription ?? "unknown error")."
         }
-        print(" [Audio] Audio session setup failed after \(maxAudioSessionRetries) attempts: \(errorMsg)")
-        await MainActor.run { [weak self] in self?.audioSessionError = errorMsg }
+        return false
     }
 
     func startRecording(fileName: String) -> Bool {
+        guard activateAudioSessionForRecording() else { return false }
+
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let audioFileName = documentsPath.appendingPathComponent("\(fileName).m4a")
         
@@ -141,6 +150,7 @@ class AudioRecordingService: NSObject, ObservableObject {
             
             isRecording = true
             isPaused = false
+            activeRecordingName = fileName
             recordingStartTime = Date()
             recordingTime = 0
             pausedDuration = 0
@@ -150,12 +160,13 @@ class AudioRecordingService: NSObject, ObservableObject {
             recordingTimer?.invalidate()
 
             // Start timer to update recording time
-            recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                Task { @MainActor in
-                    guard let self = self, let startTime = self.recordingStartTime else { return }
-                    self.recordingTime = Date().timeIntervalSince(startTime) - self.pausedDuration
-                }
-            }
+            recordingTimer = Timer.scheduledTimer(
+                timeInterval: 0.1,
+                target: self,
+                selector: #selector(updateRecordingTimeFromTimer),
+                userInfo: nil,
+                repeats: true
+            )
             
             return true
         } catch {
@@ -186,12 +197,13 @@ class AudioRecordingService: NSObject, ObservableObject {
         isPaused = false
         
         // Restart timer
-        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self = self, let startTime = self.recordingStartTime else { return }
-                self.recordingTime = Date().timeIntervalSince(startTime) - self.pausedDuration
-            }
-        }
+        recordingTimer = Timer.scheduledTimer(
+            timeInterval: 0.1,
+            target: self,
+            selector: #selector(updateRecordingTimeFromTimer),
+            userInfo: nil,
+            repeats: true
+        )
     }
     
     func stopRecording() -> (url: URL?, duration: TimeInterval) {
@@ -214,10 +226,11 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         isRecording = false
         isPaused = false
+        activeRecordingName = ""
         recordingTime = 0
         recordingStartTime = nil
         pausedDuration = 0
-        
+
         print(" Stopped recording: \(url?.lastPathComponent ?? "unknown") duration: \(duration)s")
         
         return (url, duration)
@@ -237,6 +250,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         recordingTimer = nil
         isRecording = false
         isPaused = false
+        activeRecordingName = ""
         recordingTime = 0
         recordingStartTime = nil
         pausedDuration = 0
