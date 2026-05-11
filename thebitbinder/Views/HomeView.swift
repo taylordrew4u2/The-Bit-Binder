@@ -12,6 +12,34 @@ import UIKit
 
 // MARK: - HomeView
 
+enum HomeSection: String, CaseIterable, Hashable {
+    case dailyJournal = "Daily Journal"
+    case quickActions = "Quick Actions"
+    case stats = "At a Glance"
+    case recent = "Recent"
+    case more = "More"
+
+    var icon: String {
+        switch self {
+        case .dailyJournal: return "book.closed"
+        case .quickActions: return "bolt.fill"
+        case .stats: return "chart.bar.fill"
+        case .recent: return "clock.fill"
+        case .more: return "ellipsis.circle"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .dailyJournal: return "Today's journal status and entry shortcut"
+        case .quickActions: return "New joke, capture idea, and record set"
+        case .stats: return "Counts for jokes, hits, sets, and weekly work"
+        case .recent: return "Recently edited jokes"
+        case .more: return "Brainstorm and recording summaries"
+        }
+    }
+}
+
 struct HomeView: View {
     @Query(filter: #Predicate<Joke> { !$0.isTrashed }, sort: \Joke.dateModified, order: .reverse) private var allJokes: [Joke]
     @Query(filter: #Predicate<SetList> { !$0.isTrashed }) private var allSets: [SetList]
@@ -31,6 +59,7 @@ struct HomeView: View {
 
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("userName") private var userName = ""
+    @AppStorage("homeSelectedSections") private var selectedSectionsRaw = ""
 
     // Cached stats — rebuilt via .task(id:) when allJokes changes
     @State private var cachedHitsCount: Int = 0
@@ -63,6 +92,14 @@ struct HomeView: View {
     
     private var recentJokes: [Joke] { Array(allJokes.prefix(3)) }
 
+    private var selectedHomeSections: Set<HomeSection> {
+        guard !selectedSectionsRaw.isEmpty else {
+            return Set(HomeSection.allCases)
+        }
+        let sections = Set(selectedSectionsRaw.split(separator: ",").compactMap { HomeSection(rawValue: String($0)) })
+        return sections.isEmpty ? Set(HomeSection.allCases) : sections
+    }
+
     private var todayJournalEntry: DailyJournalEntry? {
         let key = DailyJournalEntry.todayKey
         return journalEntries.first { $0.dateKey == key }
@@ -93,110 +130,116 @@ struct HomeView: View {
                 .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
             }
 
-            // MARK: - Daily Journal
-            Section {
-                Button {
-                    haptic(.light)
-                    activeSheet = .journalEditor
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: todayJournalComplete ? "checkmark.circle.fill" : "book.closed")
-                            .foregroundColor(todayJournalComplete ? .accentColor : Color.bitbinderAccent)
-                            .frame(width: 22)
-                            .accessibilityLabel(todayJournalComplete ? "Journal complete" : "Journal incomplete")
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Daily Journal")
-                                .foregroundColor(.primary)
-                            Text(todayJournalComplete ? "Today is complete" : "Today is incomplete")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+            if selectedHomeSections.contains(.dailyJournal) {
+                // MARK: - Daily Journal
+                Section {
+                    Button {
+                        haptic(.light)
+                        activeSheet = .journalEditor
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: todayJournalComplete ? "checkmark.circle.fill" : "book.closed")
+                                .foregroundColor(todayJournalComplete ? .accentColor : Color.bitbinderAccent)
+                                .frame(width: 22)
+                                .accessibilityLabel(todayJournalComplete ? "Journal complete" : "Journal incomplete")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Daily Journal")
+                                    .foregroundColor(.primary)
+                                Text(todayJournalComplete ? "Today is complete" : "Today is incomplete")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(Color(UIColor.tertiaryLabel))
+                                .accessibilityHidden(true)
                         }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(Color(UIColor.tertiaryLabel))
-                            .accessibilityHidden(true)
                     }
-                }
-            } footer: {
-                if !todayJournalComplete {
-                    Text("A quick end-of-day note. One entry per day.")
-                }
-            }
-
-            // MARK: - Quick Actions
-            Section {
-                Button {
-                    haptic(.medium)
-                    activeSheet = .addJoke
-                } label: {
-                    Label {
-                        Text("New Joke")
-                    } icon: {
-                        Image(systemName: "square.and.pencil")
-                            .foregroundColor(.accentColor)
-                    }
-                }
-
-                Button {
-                    haptic(.light)
-                    activeSheet = .talkToText
-                } label: {
-                    Label {
-                        Text("Capture Idea")
-                    } icon: {
-                        Image(systemName: "mic.fill")
-                            .foregroundColor(Color.bitbinderAccent)
-                    }
-                }
-
-                Button {
-                    haptic(.light)
-                    activeSheet = .quickRecord
-                } label: {
-                    Label {
-                        Text("Record Set")
-                    } icon: {
-                        Image(systemName: "record.circle")
-                            .foregroundColor(Color.bitbinderAccent)
+                } footer: {
+                    if !todayJournalComplete {
+                        Text("A quick end-of-day note. One entry per day.")
                     }
                 }
             }
 
-            // MARK: - At a Glance Stats
-            Section("At a Glance") {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    StatCard(
-                        label: "Jokes",
-                        value: allJokes.count,
-                        icon: "text.quote",
-                        tint: .accentColor
-                    )
-                    StatCard(
-                        label: "Hits",
-                        value: hitsCount,
-                        icon: "star.fill",
-                        tint: Color.accentColor
-                    )
-                    StatCard(
-                        label: "Sets",
-                        value: allSets.count,
-                        icon: "list.bullet.rectangle.portrait",
-                        tint: Color.accentColor
-                    )
-                    StatCard(
-                        label: "This Week",
-                        value: thisWeekCount,
-                        icon: "flame.fill",
-                        tint: Color.accentColor
-                    )
+            if selectedHomeSections.contains(.quickActions) {
+                // MARK: - Quick Actions
+                Section {
+                    Button {
+                        haptic(.medium)
+                        activeSheet = .addJoke
+                    } label: {
+                        Label {
+                            Text("New Joke")
+                        } icon: {
+                            Image(systemName: "square.and.pencil")
+                                .foregroundColor(.accentColor)
+                        }
+                    }
+
+                    Button {
+                        haptic(.light)
+                        activeSheet = .talkToText
+                    } label: {
+                        Label {
+                            Text("Capture Idea")
+                        } icon: {
+                            Image(systemName: "mic.fill")
+                                .foregroundColor(Color.bitbinderAccent)
+                        }
+                    }
+
+                    Button {
+                        haptic(.light)
+                        activeSheet = .quickRecord
+                    } label: {
+                        Label {
+                            Text("Record Set")
+                        } icon: {
+                            Image(systemName: "record.circle")
+                                .foregroundColor(Color.bitbinderAccent)
+                        }
+                    }
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                .listRowBackground(Color.clear)
+            }
+
+            if selectedHomeSections.contains(.stats) {
+                // MARK: - At a Glance Stats
+                Section("At a Glance") {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        StatCard(
+                            label: "Jokes",
+                            value: allJokes.count,
+                            icon: "text.quote",
+                            tint: .accentColor
+                        )
+                        StatCard(
+                            label: "Hits",
+                            value: hitsCount,
+                            icon: "star.fill",
+                            tint: Color.accentColor
+                        )
+                        StatCard(
+                            label: "Sets",
+                            value: allSets.count,
+                            icon: "list.bullet.rectangle.portrait",
+                            tint: Color.accentColor
+                        )
+                        StatCard(
+                            label: "This Week",
+                            value: thisWeekCount,
+                            icon: "flame.fill",
+                            tint: Color.accentColor
+                        )
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+                }
             }
 
             // MARK: - Recent Activity
-            if !recentJokes.isEmpty {
+            if selectedHomeSections.contains(.recent) && !recentJokes.isEmpty {
                 Section("Recent") {
                     ForEach(recentJokes) { joke in
                         NavigationLink(value: joke) {
@@ -231,7 +274,7 @@ struct HomeView: View {
             }
             
             // MARK: - Ideas & Recordings Summary
-            if allIdeas.count > 0 || allRecordings.count > 0 {
+            if selectedHomeSections.contains(.more) && (allIdeas.count > 0 || allRecordings.count > 0) {
                 Section("More") {
                     if allIdeas.count > 0 {
                         NavigationLink {
@@ -351,12 +394,6 @@ private struct StatCard: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
     }
-}
-
-// MARK: - Navigation Notification
-
-extension Notification.Name {
-    static let navigateToScreen = Notification.Name("navigateToScreen")
 }
 
 // MARK: - Date Helper

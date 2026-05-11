@@ -172,6 +172,10 @@ enum AppScreen: String, CaseIterable {
         let selected = Set(raw.split(separator: ",").compactMap { AppScreen(rawValue: String($0)) })
         // Filter to ordered list, always include Settings at the end
         let ordered = tabBarOrder.filter { selected.contains($0) }
+        if roastMode {
+            let required = defaultRoastTabBarScreens.filter { !ordered.contains($0) }
+            return (required + ordered) + [.settings]
+        }
         return (ordered.isEmpty ? defaults : ordered) + [.settings]
     }
 
@@ -458,28 +462,28 @@ struct MainTabView: View {
     }
 
     private var roastModeRoot: some View {
-        NavigationStack {
-            JokesView()
-                .navigationTitle("")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Exit Roast Mode") {
-                            roastMode = false
+        TabView(selection: selectedTab) {
+            ForEach(visibleTabs, id: \.self) { screen in
+                NavigationStack {
+                    screenView(for: screen)
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Exit Roast Mode") {
+                                    roastMode = false
+                                }
+                            }
                         }
-                    }
-
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            showGagGrabber = true
-                        } label: {
-                            Image("GagGrabberGlyph")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 20, height: 20)
-                        }
-                    }
                 }
+                .tabItem {
+                    Label(
+                        screen.roastName,
+                        systemImage: selectedTab.wrappedValue == screen ? screen.roastSelectedIcon : screen.roastIcon
+                    )
+                }
+                .tag(screen)
+            }
         }
     }
     
