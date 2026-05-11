@@ -18,12 +18,14 @@ struct AppSetupView: View {
     @AppStorage("jokesViewMode") private var jokesViewMode: JokesViewMode = .grid
     @AppStorage("showFullContent") private var showFullContent = true
     @AppStorage("setupSelectedTabs") private var selectedTabsRaw: String = ""
+    @AppStorage("homeSelectedSections") private var selectedHomeSectionsRaw: String = ""
     @AppStorage("hasCompletedSetup") private var hasCompletedSetup = false
 
     // Local state
     @State private var currentPage = 0
     @State private var nameText = ""
     @State private var selectedTabs: Set<AppScreen> = []
+    @State private var selectedHomeSections: Set<HomeSection> = []
     @State private var iCloudSyncEnabled = false
 
     /// When true, presented as the first-launch onboarding. When false,
@@ -37,7 +39,7 @@ struct AppSetupView: View {
 
     private let defaultTabs: Set<AppScreen> = [.home, .jokes, .sets, .notebookSaver]
 
-    private var pageCount: Int { isFirstLaunch ? 6 : 5 }
+    private var pageCount: Int { isFirstLaunch ? 7 : 6 }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,14 +59,16 @@ struct AppSetupView: View {
                     privacyPage.tag(1)
                     namePage.tag(2)
                     tabsPage.tag(3)
-                    jokeViewPage.tag(4)
-                    readyPage.tag(5)
+                    homePage.tag(4)
+                    jokeViewPage.tag(5)
+                    readyPage.tag(6)
                 } else {
                     privacyPage.tag(0)
                     namePage.tag(1)
                     tabsPage.tag(2)
-                    jokeViewPage.tag(3)
-                    readyPage.tag(4)
+                    homePage.tag(3)
+                    jokeViewPage.tag(4)
+                    readyPage.tag(5)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -124,6 +128,7 @@ struct AppSetupView: View {
         .onAppear {
             nameText = userPreferences.userName == "there" ? "" : userPreferences.userName
             loadSelectedTabs()
+            loadSelectedHomeSections()
             iCloudSyncEnabled = syncService.isSyncEnabled
         }
     }
@@ -363,6 +368,41 @@ struct AppSetupView: View {
         }
     }
 
+    private var homePage: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                Spacer(minLength: 20)
+
+                Image(systemName: "house")
+                    .font(.system(size: 48))
+                    .foregroundColor(.accentColor)
+
+                Text("Choose Your Home Screen")
+                    .font(.title2.bold())
+
+                Text("Pick which sections show on Home.\nYour greeting always stays at the top.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+
+                VStack(spacing: 0) {
+                    ForEach(HomeSection.allCases, id: \.self) { section in
+                        homeSectionRow(for: section)
+                        if section != HomeSection.allCases.last {
+                            Divider().padding(.leading, 56)
+                        }
+                    }
+                }
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 20)
+
+                Spacer(minLength: 60)
+            }
+        }
+    }
+
     private var readyPage: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -388,6 +428,8 @@ struct AppSetupView: View {
                     summaryRow(icon: "icloud", label: "iCloud Sync", value: iCloudSyncEnabled ? "On" : "Off")
                     Divider().padding(.leading, 56)
                     summaryRow(icon: "dock.rectangle", label: "Tabs", value: "\(selectedTabs.count) selected")
+                    Divider().padding(.leading, 56)
+                    summaryRow(icon: "house", label: "Home", value: "\(selectedHomeSections.count) sections")
                     Divider().padding(.leading, 56)
                     summaryRow(icon: jokesViewMode.icon, label: "Joke View", value: jokesViewMode.rawValue)
                     Divider().padding(.leading, 56)
@@ -474,6 +516,46 @@ struct AppSetupView: View {
         .buttonStyle(.plain)
     }
 
+    private func homeSectionRow(for section: HomeSection) -> some View {
+        let isSelected = selectedHomeSections.contains(section)
+        return Button {
+            if isSelected {
+                if selectedHomeSections.count > 1 {
+                    selectedHomeSections.remove(section)
+                }
+            } else {
+                selectedHomeSections.insert(section)
+            }
+            saveSelectedHomeSections()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: section.icon)
+                    .font(.title3)
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(section.rawValue)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                    Text(section.detail)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : Color(UIColor.tertiaryLabel))
+                    .font(.title3)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private func summaryRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
@@ -548,13 +630,30 @@ struct AppSetupView: View {
         }
     }
 
+    private func loadSelectedHomeSections() {
+        if selectedHomeSectionsRaw.isEmpty {
+            selectedHomeSections = Set(HomeSection.allCases)
+        } else {
+            let raw = selectedHomeSectionsRaw.split(separator: ",").map(String.init)
+            selectedHomeSections = Set(raw.compactMap { HomeSection(rawValue: $0) })
+            if selectedHomeSections.isEmpty {
+                selectedHomeSections = Set(HomeSection.allCases)
+            }
+        }
+    }
+
     private func saveSelectedTabs() {
-        selectedTabsRaw = selectedTabs.map(\.rawValue).joined(separator: ",")
+        selectedTabsRaw = configurableTabs.filter { selectedTabs.contains($0) }.map(\.rawValue).joined(separator: ",")
+    }
+
+    private func saveSelectedHomeSections() {
+        selectedHomeSectionsRaw = HomeSection.allCases.filter { selectedHomeSections.contains($0) }.map(\.rawValue).joined(separator: ",")
     }
 
     private func finishSetup() {
         saveNameIfNeeded()
         saveSelectedTabs()
+        saveSelectedHomeSections()
         applyPrivacyPreferences()
         hasCompletedSetup = true
         dismiss()

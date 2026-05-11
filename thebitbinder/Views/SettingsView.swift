@@ -79,14 +79,10 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Toggle(isOn: $roastMode) {
                         HStack(spacing: 8) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(roastMode ? AnyShapeStyle(FirePalette.flame) : AnyShapeStyle(Color.accentColor.opacity(0.15)))
-                                    .frame(width: 32, height: 32)
-                                Image(systemName: "flame.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(roastMode ? .white : .accentColor)
-                            }
+                            Image(systemName: "flame.fill")
+                                .font(.body)
+                                .foregroundColor(roastMode ? FirePalette.core : .secondary)
+                                .frame(width: 24, height: 24)
                             Text("Roast Mode")
                                 .font(.body.weight(.medium))
                         }

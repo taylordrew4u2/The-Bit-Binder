@@ -173,9 +173,6 @@ final class SocraticGuideBackend: BitBuddyBackend {
         } else {
             searchResult = try await PrivateSearchService.search(message)
         }
-        if mode == .simpleFactual, let searchResult, !searchResult.isEmpty {
-            return searchResult
-        }
 
         let prompt = buildPrompt(
             message: message,
@@ -197,7 +194,8 @@ final class SocraticGuideBackend: BitBuddyBackend {
 
         let fallbackFact: String
         if let searchResult, !searchResult.isEmpty {
-            fallbackFact = searchResult
+            let firstSentence = searchResult.components(separatedBy: ". ").first ?? searchResult
+            fallbackFact = String(firstSentence.prefix(200))
         } else if isPersonalQuestion(normalizedQuery(message)) {
             fallbackFact = roastMode
                 ? "I'm BitBuddy — a writing tool, not a person. Send me material and I'll make it meaner."

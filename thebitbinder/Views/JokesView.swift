@@ -42,7 +42,6 @@ struct JokesView: View {
     @State private var showingAddRoastTarget = false
     @State private var roastTargetToDelete: RoastTarget?
     @State private var showingDeleteRoastAlert = false
-    @State private var showingRoastSets = false
     
     @AppStorage("jokesViewMode") private var viewMode: JokesViewMode = .list
     @AppStorage("roastViewMode") private var roastViewMode: JokesViewMode = .list
@@ -524,11 +523,6 @@ struct JokesView: View {
                 .sheet(item: $jokeToMove) { joke in
                     MoveJokeToFolderSheet(joke: joke, allFolders: folders)
                 }
-                .navigationDestination(isPresented: $showingRoastSets) {
-                    SetListsView()
-                        .navigationTitle("Roast Sets")
-                        .navigationBarTitleDisplayMode(.large)
-                }
                 .overlay { importOverlay }
                 // Rebuild filtered list whenever filter inputs change
                 .task(id: filterKey) {
@@ -931,7 +925,11 @@ struct JokesView: View {
 
                     Section("Performance") {
                         Button {
-                            showingRoastSets = true
+                            NotificationCenter.default.post(
+                                name: .navigateToScreen,
+                                object: nil,
+                                userInfo: ["screen": AppScreen.sets.rawValue]
+                            )
                         } label: {
                             Label("Roast Sets", systemImage: "play.rectangle")
                         }

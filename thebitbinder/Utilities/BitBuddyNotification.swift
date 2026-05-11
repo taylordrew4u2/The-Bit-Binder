@@ -35,6 +35,10 @@ extension Notification.Name {
     static let bitBuddyTriggerFileImport = Notification.Name("BitBuddyTriggerFileImport")
 
     // MARK: - Navigation Actions
+    /// Published when a root app tab should become active.
+    /// userInfo: "screen" (AppScreen.rawValue as String)
+    static let navigateToScreen = Notification.Name("navigateToScreen")
+
     /// Published when BitBuddy wants to navigate to a specific app section.
     /// userInfo: "section" (BitBuddySection.rawValue as String)
     static let bitBuddyNavigateToSection = Notification.Name("BitBuddyNavigateToSection")
