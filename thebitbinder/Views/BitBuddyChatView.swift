@@ -20,9 +20,7 @@ struct BitBuddyChatView: View {
     @StateObject private var bitBuddy = BitBuddyService.shared
     @AppStorage("roastModeEnabled") private var roastMode = false
     
-    @State private var messages: [ChatBubbleMessage] = []
     @State private var inputText = ""
-    @State private var conversationId = UUID().uuidString
     @State private var isTyping = false
     @State private var typingMessageId: UUID?
     @State private var displayedText = ""
@@ -49,10 +47,10 @@ struct BitBuddyChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        if messages.isEmpty {
+                        if bitBuddy.chatMessages.isEmpty {
                             emptyStateView
                         } else {
-                            ForEach(messages) { message in
+                            ForEach(bitBuddy.chatMessages) { message in
                                 ChatBubble(
                                     message: message,
                                     roastMode: roastMode,
@@ -77,7 +75,7 @@ struct BitBuddyChatView: View {
                     }
                     .padding()
                 }
-                .onChange(of: messages.count) {
+                .onChange(of: bitBuddy.chatMessages.count) {
                     scrollToBottom(proxy: proxy)
                 }
                 .onChange(of: isTyping) {
@@ -118,8 +116,7 @@ struct BitBuddyChatView: View {
                 Button {
                     activeResponseTask?.cancel()
                     activeResponseTask = nil
-                    messages.removeAll()
-                    conversationId = UUID().uuidString
+                    bitBuddy.resetVisibleConversation()
                     typingMessageId = nil
                     displayedText = ""
                     isTyping = false
@@ -128,7 +125,7 @@ struct BitBuddyChatView: View {
                     Image(systemName: "arrow.counterclockwise")
                 }
                 .foregroundColor(accentColor)
-                .disabled(messages.isEmpty)
+                .disabled(bitBuddy.chatMessages.isEmpty)
             }
         }
         .tint(accentColor)
@@ -154,7 +151,6 @@ struct BitBuddyChatView: View {
             typingMessageId = nil
             displayedText = ""
             isTyping = false
-            messages.removeAll()
             bitBuddy.cleanupAudioResources()
         }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyAddJoke)) { notification in
@@ -277,6 +273,7 @@ struct BitBuddyChatView: View {
             )
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 guard scenePhase == .active else { return }
+                dismissDrawer()
                 dismiss()
             }
         }
@@ -418,13 +415,12 @@ struct BitBuddyChatView: View {
     private func handleAppear() {
         bitBuddy.refreshBackend()
 
-        if messages.isEmpty {
+        if bitBuddy.chatMessages.isEmpty {
             let greeting = roastMode
                 ? "Roast Buddy here. Give me a target and I'll sharpen the burns."
                 : "What are we working on?"
-            let intro = ChatBubbleMessage(text: greeting, isUser: false, conversationId: conversationId)
             withAnimation(.spring(duration: 0.4, bounce: 0.15).delay(0.2)) {
-                messages.append(intro)
+                _ = bitBuddy.appendVisibleMessage(text: greeting, isUser: false)
             }
         }
 
@@ -439,7 +435,7 @@ struct BitBuddyChatView: View {
     }
     
     private func scrollToBottom(proxy: ScrollViewProxy) {
-        if let lastMessage = messages.last {
+        if let lastMessage = bitBuddy.chatMessages.last {
             withAnimation(.easeOut(duration: 0.2)) {
                 proxy.scrollTo(lastMessage.id, anchor: .bottom)
             }
@@ -459,9 +455,8 @@ struct BitBuddyChatView: View {
         // If a previous message was mid-typewriter, reveal its full text now
         typingMessageId = nil
         
-        let userMessage = ChatBubbleMessage(text: message, isUser: true, conversationId: conversationId)
         withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
-            messages.append(userMessage)
+            _ = bitBuddy.appendVisibleMessage(text: message, isUser: true)
         }
         inputText = ""
         withAnimation(.easeOut(duration: 0.25)) {
@@ -476,12 +471,9 @@ struct BitBuddyChatView: View {
                 guard !Task.isCancelled else { return }
                 
                 await MainActor.run {
-                    let aiMessage = ChatBubbleMessage(text: response, isUser: false, conversationId: conversationId)
+                    let aiMessage = bitBuddy.appendVisibleMessage(text: response, isUser: false)
                     withAnimation(.easeOut(duration: 0.2)) {
                         isTyping = false
-                    }
-                    withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
-                        messages.append(aiMessage)
                     }
                     typingMessageId = aiMessage.id
                     displayedText = ""
@@ -510,19 +502,41 @@ struct BitBuddyChatView: View {
                     withAnimation(.easeOut(duration: 0.2)) {
                         isTyping = false
                     }
-                    let errorMsg = ChatBubbleMessage(text: "Sorry, I encountered an error. Please try again.", isUser: false, conversationId: conversationId)
                     withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
-                        messages.append(errorMsg)
+                        _ = bitBuddy.appendVisibleMessage(text: userFacingErrorMessage(for: error), isUser: false)
                     }
                 }
             }
         }
     }
+
+    private func userFacingErrorMessage(for error: Error) -> String {
+        if let backendError = error as? BitBuddyBackendError {
+            switch backendError {
+            case .unavailable:
+                return "The selected BitBuddy model is unavailable. I can still help locally if you ask again."
+            case .generationFailed:
+                return "The model failed to generate a reply. Try a shorter prompt, or ask for a local action like creating a folder, set list, or note."
+            case .invalidStructuredResponse:
+                return "BitBuddy received a malformed action response. Try rephrasing with the exact item or text you want changed."
+            }
+        }
+
+        if let bitBuddyError = error as? BitBuddyError {
+            return bitBuddyError.localizedDescription
+        }
+
+        let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !description.isEmpty && description != "The operation couldn’t be completed." {
+            return "BitBuddy hit a problem: \(description)"
+        }
+
+        return "BitBuddy hit a problem before it could answer. Try rephrasing the request with the exact joke, note, or action you want."
+    }
     
     /// Appends a BitBuddy error message to the chat.
     private func appendErrorMessage(_ text: String) {
-        let msg = ChatBubbleMessage(text: text, isUser: false, conversationId: conversationId)
-        messages.append(msg)
+        bitBuddy.appendVisibleMessage(text: text, isUser: false)
     }
     
     // MARK: - Section → AppScreen Mapping

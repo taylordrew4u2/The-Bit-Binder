@@ -44,6 +44,19 @@ struct ConversationModeClassifier {
         "punchline", "punch up", "riff", "tagline"
     ]
 
+    private static let writingStrugglePatterns: [String] = [
+        "i'm stuck", "im stuck", "i am stuck", "i'm blocked", "im blocked",
+        "i can't write", "i cant write", "i cannot write", "can't write",
+        "cant write", "cannot write", "i'm struggling", "im struggling",
+        "i don't know what to do", "i dont know what to do",
+        "what should i do with this bit", "what do i do with this bit",
+        "how do i fix this punchline", "how can i fix this punchline",
+        "fix this punchline", "fix my punchline", "fix this bit",
+        "fix my bit", "make this funnier", "punch this up",
+        "punch up this", "help me with this bit", "help me with my bit",
+        "help me with this joke", "help me with my joke"
+    ]
+
     private static let acknowledgments: Set<String> = [
         "ok", "okay", "thanks", "thank you", "thx", "cool", "got it",
         "gotcha", "nice", "great", "perfect", "yep", "yeah", "yes",
@@ -51,9 +64,22 @@ struct ConversationModeClassifier {
         "lol", "lmao", "haha", "ha"
     ]
 
+    private static let explicitActionPhrases: [String] = [
+        "save ", "add ", "create ", "make ", "start ", "open ", "show ", "find ",
+        "search ", "delete ", "remove ", "rename ", "move ", "import ", "export ",
+        "sync ", "record ", "transcribe ", "turn on ", "turn off ", "toggle ",
+        "mark ", "tag ", "attach ", "play ", "present "
+    ]
+
+    private static let writingCommandPhrases: [String] = [
+        "analyze", "improve", "punch up", "rewrite", "shorten", "expand",
+        "generate", "write", "give me", "compare", "summarize", "suggest",
+        "brainstorm", "roast", "crowdwork"
+    ]
+
     static func classify(_ input: String) -> ConversationMode {
         let result = classifyWithoutRouting(input)
-        if result == .reflective {
+        if result == .reflective && shouldUseIntentRouting(input) {
             let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty && router.route(trimmed) != nil {
                 return .appAction
@@ -83,6 +109,10 @@ struct ConversationModeClassifier {
             return .reflective
         }
 
+        if isPersonalWritingStruggle(lower, tokens: normalizedTokens) {
+            return .reflective
+        }
+
         let currentDatePatterns = [
             "what year", "current year", "what date", "today's date",
             "todays date", "what day is it", "what day is today",
@@ -94,33 +124,80 @@ struct ConversationModeClassifier {
 
         let matchesLanguageTask = languageTaskPatterns.contains { lower.contains($0) }
         if matchesLanguageTask {
-            let hasCreativeModifier = creativeModifiers.contains { lower.contains($0) }
-            return hasCreativeModifier ? .creativeFactual : .simpleFactual
+            return hasComedyRelevance(lower) ? .creativeFactual : .simpleFactual
         }
 
         let matchesFactualPattern = factualPatterns.contains { pattern in
             lower.hasPrefix(pattern) || lower.contains(" \(pattern) ") || lower.contains(pattern)
         }
         if matchesFactualPattern {
-            let hasCreativeModifier = creativeModifiers.contains { lower.contains($0) }
-            return hasCreativeModifier ? .creativeFactual : .simpleFactual
+            return hasComedyRelevance(lower) ? .creativeFactual : .simpleFactual
         }
 
-        if lower.hasSuffix("?") {
-            let questionStarts = [
-                "who", "what", "when", "where", "why", "how", "is", "are",
-                "do", "does", "did", "can", "could", "should", "would"
-            ]
-            let firstWord = lower
-                .components(separatedBy: CharacterSet.alphanumerics.inverted)
-                .first(where: { !$0.isEmpty }) ?? ""
-
-            if questionStarts.contains(firstWord) {
-                let hasCreativeModifier = creativeModifiers.contains { lower.contains($0) }
-                return hasCreativeModifier ? .creativeFactual : .simpleFactual
-            }
+        if isGeneralQuestion(trimmed) {
+            return hasComedyRelevance(lower) ? .creativeFactual : .simpleFactual
         }
 
         return .reflective
+    }
+
+    static func shouldUseIntentRouting(_ input: String) -> Bool {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+
+        let lower = trimmed.lowercased()
+        let tokens = Set(
+            lower
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty }
+        )
+
+        if isPersonalWritingStruggle(lower, tokens: tokens) {
+            return false
+        }
+
+        if classifyWithoutRouting(trimmed) != .reflective {
+            return false
+        }
+
+        return hasExplicitActionCue(lower)
+    }
+
+    static func isGeneralQuestion(_ input: String) -> Bool {
+        let lower = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !lower.isEmpty else { return false }
+        if lower.hasSuffix("?") { return true }
+
+        let firstWord = lower
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .first(where: { !$0.isEmpty }) ?? ""
+
+        return ["who", "what", "where", "when", "why", "how"].contains(firstWord)
+    }
+
+    private static func hasComedyRelevance(_ lower: String) -> Bool {
+        creativeModifiers.contains { lower.contains($0) }
+    }
+
+    private static func hasExplicitActionCue(_ lower: String) -> Bool {
+        if explicitActionPhrases.contains(where: { lower.hasPrefix($0) || lower.contains(" \($0)") }) {
+            return true
+        }
+
+        return writingCommandPhrases.contains { lower.hasPrefix($0) || lower.contains(" \($0)") }
+    }
+
+    private static func isPersonalWritingStruggle(_ lower: String, tokens: Set<String>) -> Bool {
+        if writingStrugglePatterns.contains(where: { lower.contains($0) }) {
+            return true
+        }
+
+        let hasSelfReference = !reflectivePronouns.isDisjoint(with: tokens)
+        let writingTargets = ["joke", "bit", "punchline", "act", "set", "premise", "tag"]
+        let repairVerbs = ["fix", "rewrite", "improve", "work", "do", "change", "cut"]
+        let hasWritingTarget = writingTargets.contains { lower.contains($0) }
+        let hasRepairVerb = repairVerbs.contains { lower.contains($0) }
+
+        return hasSelfReference && hasWritingTarget && hasRepairVerb
     }
 }

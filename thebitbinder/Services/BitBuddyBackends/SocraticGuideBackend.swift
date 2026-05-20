@@ -156,6 +156,7 @@ final class SocraticGuideBackend: BitBuddyBackend {
             mode: mode,
             roastMode: roastMode
         ) {
+            Self.trace("factual direct local answer")
             return directAnswer
         }
 
@@ -164,15 +165,17 @@ final class SocraticGuideBackend: BitBuddyBackend {
             mode: mode,
             roastMode: roastMode
         ) {
+            Self.trace("factual local language answer")
             return localLanguageResponse
         }
 
-        let searchResult: String?
-        if isPersonalQuestion(normalizedQuery(message)) {
-            searchResult = nil
-        } else {
-            searchResult = try await PrivateSearchService.search(message)
+        if let comedyResponse = localComedyTheoryResponse(for: message, roastMode: roastMode) {
+            Self.trace("factual local comedy answer")
+            return comedyResponse
         }
+
+        let searchResult = try await PrivateSearchService.search(message)
+        Self.trace("private search \(searchResult == nil ? "miss" : "hit")")
 
         let prompt = buildPrompt(
             message: message,
@@ -189,6 +192,7 @@ final class SocraticGuideBackend: BitBuddyBackend {
             instructions: instructions,
             session: session
         ) {
+            Self.trace("llm formatted answer")
             return response
         }
 
@@ -216,6 +220,10 @@ final class SocraticGuideBackend: BitBuddyBackend {
         }
     }
 
+    private static func trace(_ message: String) {
+        print(" [BitBuddyTrace] SocraticGuide: \(message)")
+    }
+
     private func localDirectFactualResponse(
         for message: String,
         mode: ConversationMode,
@@ -237,17 +245,126 @@ final class SocraticGuideBackend: BitBuddyBackend {
             return roastMode ? "Blue. Usually. Even roast mode cannot make the sky commit to a darker bit." : "Blue."
         }
 
-        if normalized == "what is 2 plus 2"
-            || normalized == "what's 2 plus 2"
-            || normalized == "whats 2 plus 2"
-            || normalized == "what is 2+2"
-            || normalized == "what's 2+2"
-            || normalized == "whats 2+2" {
-            return "4."
+        if normalized == "what color is grass"
+            || normalized == "what colour is grass"
+            || normalized == "what color is the grass"
+            || normalized == "what colour is the grass" {
+            return "Green."
+        }
+
+        if normalized == "what color is snow"
+            || normalized == "what colour is snow"
+            || normalized == "what color is the snow"
+            || normalized == "what colour is the snow" {
+            return "White."
+        }
+
+        if normalized == "how many planets"
+            || normalized == "how many planets are there"
+            || normalized == "how many planets are in the solar system"
+            || normalized == "how many planets in our solar system" {
+            return "Eight planets in our solar system: Mercury through Neptune. Pluto got demoted, which honestly is useful comedy material."
+        }
+
+        if normalized == "where is africa"
+            || normalized == "where's africa"
+            || normalized == "wheres africa" {
+            return "Africa is the second-largest continent, located south of Europe and bordered by the Atlantic and Indian Oceans. Great setup material if you're working on travel bits."
+        }
+
+        if let mathAnswer = simpleMathAnswer(for: normalized) {
+            return mathAnswer
         }
 
         if let personalAnswer = personalQuestionResponse(for: normalized, roastMode: roastMode) {
             return personalAnswer
+        }
+
+        return nil
+    }
+
+    private func simpleMathAnswer(for normalized: String) -> String? {
+        let cleaned = normalized
+            .replacingOccurrences(of: "what's", with: "")
+            .replacingOccurrences(of: "whats", with: "")
+            .replacingOccurrences(of: "what is", with: "")
+            .replacingOccurrences(of: "what are", with: "")
+            .replacingOccurrences(of: "calculate", with: "")
+            .replacingOccurrences(of: "equals", with: "")
+            .replacingOccurrences(of: "equal", with: "")
+            .replacingOccurrences(of: "?", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let operations: [(markers: [String], symbol: String, apply: (Double, Double) -> Double?)] = [
+            (["+", " plus ", " added to "], "+", { $0 + $1 }),
+            (["-", " minus ", " subtract "], "-", { $0 - $1 }),
+            (["*", " x ", " times ", " multiplied by "], "*", { $0 * $1 }),
+            (["/", " divided by "], "/", { $1 == 0 ? nil : $0 / $1 })
+        ]
+
+        for operation in operations {
+            for marker in operation.markers {
+                guard let range = cleaned.range(of: marker) else { continue }
+                let left = cleaned[..<range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
+                let right = cleaned[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let leftValue = Double(left), let rightValue = Double(right),
+                      let result = operation.apply(leftValue, rightValue) else {
+                    continue
+                }
+
+                if result.rounded() == result {
+                    return "\(Int(result))."
+                }
+                return "\(result)."
+            }
+        }
+
+        return nil
+    }
+
+    private func localComedyTheoryResponse(for message: String, roastMode: Bool) -> String? {
+        let normalized = normalizedQuery(message)
+        let isComedyQuestion = normalized.contains("joke")
+            || normalized.contains("comedy")
+            || normalized.contains("funny")
+            || normalized.contains("humor")
+            || normalized.contains("punchline")
+            || normalized.contains("setup")
+            || normalized.contains("callback")
+            || normalized.contains("tag")
+            || normalized.contains("timing")
+            || normalized.contains("misdirection")
+            || normalized.contains("rule of three")
+        guard isComedyQuestion else { return nil }
+
+        if normalized.contains("punchline") {
+            return roastMode
+                ? "A good punchline is the shortest possible turn into the meanest true surprise. Cut setup, hide the angle, and end on the sharpest word."
+                : "A good punchline creates a clean surprise. The setup points the audience one way, then the punchline turns at the last useful moment and ends on the funniest word."
+        }
+
+        if normalized.contains("setup") {
+            return "A setup gives the audience just enough shared reality to understand the turn. If a word does not create context, expectation, rhythm, or misdirection, it is probably slowing the joke down."
+        }
+
+        if normalized.contains("callback") {
+            return "A callback gets a laugh by making an earlier idea pay off later. It works best when the audience remembers the first beat, but the return arrives in a new context."
+        }
+
+        if normalized.contains("timing") {
+            return "Timing is control of expectation. Slow down before the turn, leave a clean beat for the audience to catch up, then stop talking after the laugh trigger."
+        }
+
+        if normalized.contains("misdirection") || normalized.contains("surprise") {
+            return "Misdirection means the setup creates a believable expectation while quietly leaving room for a different interpretation. The punchline reveals that second meaning."
+        }
+
+        if normalized.contains("rule of three") {
+            return "Rule of three works because the first two items teach the audience a pattern, and the third breaks it. Keep the first two clear and short so the third can snap."
+        }
+
+        if normalized.contains("funny") || normalized.contains("humor") || normalized.contains("comedy") || normalized.contains("joke") {
+            return "Most jokes work through a gap: expectation versus reality, status versus truth, confidence versus failure, or polite language versus what someone actually means. Find the gap, then say it cleaner."
         }
 
         return nil
@@ -714,34 +831,50 @@ final class SocraticGuideBackend: BitBuddyBackend {
         session: BitBuddySessionSnapshot
     ) async throws -> String? {
         if AppleIntelligenceBitBuddyService.shared.isAvailable {
-            return try await AppleIntelligenceBitBuddyService.shared.generateResponse(
-                userPrompt: prompt,
-                systemInstructions: instructions
-            )
+            do {
+                return try await AppleIntelligenceBitBuddyService.shared.generateResponse(
+                    userPrompt: prompt,
+                    systemInstructions: instructions
+                )
+            } catch {
+                Self.trace("Apple Intelligence failed, trying next backend: \(error.localizedDescription)")
+            }
         }
 
         if MLXBitBuddyService.shared.isAvailable {
-            return try await MLXBitBuddyService.shared.generateResponse(
-                userPrompt: prompt,
-                conversationId: session.conversationId,
-                systemInstructions: instructions
-            )
+            do {
+                return try await MLXBitBuddyService.shared.generateResponse(
+                    userPrompt: prompt,
+                    conversationId: session.conversationId,
+                    systemInstructions: instructions
+                )
+            } catch {
+                Self.trace("MLX failed, trying next backend: \(error.localizedDescription)")
+            }
         }
 
         if HuggingFaceTransformersBitBuddyService.shared.isAvailable {
-            return try await HuggingFaceTransformersBitBuddyService.shared.generateResponse(
-                userPrompt: prompt,
-                session: session,
-                systemInstructions: instructions
-            )
+            do {
+                return try await HuggingFaceTransformersBitBuddyService.shared.generateResponse(
+                    userPrompt: prompt,
+                    session: session,
+                    systemInstructions: instructions
+                )
+            } catch {
+                Self.trace("Hugging Face failed, trying next backend: \(error.localizedDescription)")
+            }
         }
 
         if OpenAIBitBuddyService.shared.isAvailable {
-            return try await OpenAIBitBuddyService.shared.generateResponse(
-                userPrompt: prompt,
-                session: session,
-                systemInstructions: instructions
-            )
+            do {
+                return try await OpenAIBitBuddyService.shared.generateResponse(
+                    userPrompt: prompt,
+                    session: session,
+                    systemInstructions: instructions
+                )
+            } catch {
+                Self.trace("OpenAI failed, using local fallback: \(error.localizedDescription)")
+            }
         }
 
         return nil

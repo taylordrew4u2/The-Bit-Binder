@@ -119,38 +119,48 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // JOKES
         // ═══════════════════════════════════════════
         case "save_joke":
-            return " Got it, \(userName)! I'll save that joke to your collection. Head to Jokes to see it."
+            if routedContent(from: entities, message: message, prefixes: ["save this joke", "save joke", "add this joke", "add joke", "store this joke"]) != nil {
+                return " Got it, \(userName)! I saved that joke to your collection. Head to Jokes to see it."
+            }
+            return "Paste the joke text after the command, like: Save joke: my setup and punchline."
         case "save_joke_in_folder":
             let folder = entities["folder"] ?? "your folder"
-            return " Saved! I've filed this joke under \(folder). You can find it in the Jokes section."
+            if routedContent(from: entities, message: message, prefixes: ["save this joke", "save joke", "add this joke", "add joke", "store this joke"]) != nil {
+                return " Saved! I've filed this joke under \(folder). You can find it in the Jokes section."
+            }
+            return "Tell me the joke text too, like: Save joke: my setup and punchline under \(folder)."
         case "edit_joke":
             return " Opening the joke editor — make your changes and I'll keep the original safe in case you want to revert."
         case "rename_joke":
             let title = entities["title"] ?? entities["quoted_value"] ?? "the new title"
-            return " Renamed! This joke is now called \"\(title)\". You can find it under the new name in Jokes."
+            return "Open the joke in Jokes and I can help rename it to \"\(title)\" from there."
         case "delete_joke":
-            return " Joke moved to trash. You can restore it anytime from the Trash section if you change your mind."
+            return "I need the exact joke selected before deleting. Open it in Jokes, then use the delete action there."
         case "restore_deleted_joke":
-            return " Restored! That joke is back in your collection right where it belongs."
+            return "Open Trash in Jokes to restore the exact joke. I do not want to restore the wrong draft."
         case "mark_hit":
-            return " Marked as a Hit! This joke is now in your proven material. You've earned that star."
+            return "Open the exact joke in Jokes and mark it as a Hit there."
         case "unmark_hit":
-            return "Removed from The Hits. The joke is still saved — it just lost its star status."
+            return "Open the exact joke in Jokes and clear its Hit status there."
         case "add_tags":
             let tags = entities["value"] ?? entities["quoted_value"] ?? "tags"
-            return " Tags added! Labeled with \(tags). Use tags to filter your jokes later."
+            return "Open the exact joke in Jokes and add \(tags) as tags there."
         case "remove_tags":
-            return " Tags removed. This joke is now untagged — a blank canvas."
+            return "Open the exact joke in Jokes and remove the tags there."
         case "move_joke_folder":
             let folder = entities["folder"] ?? "the new folder"
-            return " Moved! This joke is now filed under \(folder)."
+            return "Open the exact joke in Jokes and move it to \(folder) there."
         case "create_folder":
-            let folder = entities["value"] ?? entities["quoted_value"] ?? "New Folder"
-            return " Folder \"\(folder)\" created! Start adding jokes to it."
+            let folder = entities["folder"] ?? entities["title"] ?? entities["value"] ?? entities["quoted_value"]
+                ?? routedName(from: message, prefixes: ["create folder", "make folder", "new folder", "add folder", "start folder"])
+            if let folder {
+                return " Folder \"\(folder)\" created! Start adding jokes to it."
+            }
+            return "What should I call the folder? Try: Create a folder named Openers."
         case "rename_folder":
-            return " Folder renamed! The new name is live across all your jokes."
+            return "Open the folder in Jokes and rename it there so I know exactly which folder you mean."
         case "delete_folder":
-            return " Folder deleted. Any jokes inside have been moved to unfiled."
+            return "Open the folder in Jokes and delete it there so I do not remove the wrong folder."
         case "search_jokes":
             let query = entities["value"] ?? "your search"
             return " Searching your jokes for \"\(query)\"... Head to the Jokes tab to see results."
@@ -174,7 +184,10 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // BRAINSTORM
         // ═══════════════════════════════════════════
         case "add_brainstorm_note":
-            return " Idea captured! It's pinned to your Brainstorm board as a sticky note. Come back to it whenever inspiration strikes."
+            if routedContent(from: entities, message: message, prefixes: ["add this to brainstorm", "add brainstorm note", "save this idea", "capture this thought"]) != nil {
+                return " Idea captured! It's pinned to your Brainstorm board as a sticky note."
+            }
+            return "Tell me the idea text too, like: Add brainstorm note: weird gym mirrors."
         case "voice_capture_idea":
             return " Voice capture ready! Tap the mic button on the Brainstorm page to start speaking your idea."
         case "edit_brainstorm_note":
@@ -193,8 +206,12 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         // SET LISTS
         // ═══════════════════════════════════════════
         case "create_set_list":
-            let name = entities["set_name"] ?? entities["quoted_value"] ?? "New Set"
-            return " Set list \"\(name)\" created! Start adding jokes to build your lineup."
+            let name = entities["set_name"] ?? entities["quoted_value"]
+                ?? routedName(from: message, prefixes: ["create set list", "create set", "make set list", "make set", "start set", "new set list"])
+            if let name {
+                return " Set list \"\(name)\" created! Start adding jokes to build your lineup."
+            }
+            return "What should I call the set list? Try: Create a set list named Tonight."
         case "rename_set_list":
             return " Set list renamed! The new title is live."
         case "delete_set_list":
@@ -344,7 +361,10 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         case "open_notebook":
             return "Notebook is your scratch pad for quick notes, stage observations, photos, and loose ideas. Open it from the tab bar when you want a place that does not have to be a finished joke yet."
         case "save_notebook_text":
-            return " Saved to your Notebook! Quick notes add up — review them weekly for hidden gems."
+            if routedContent(from: entities, message: message, prefixes: ["save notebook text", "save this note", "add notebook note"]) != nil {
+                return " Saved to your Notebook! Quick notes add up — review them weekly for hidden gems."
+            }
+            return "Tell me the note text too, like: Save notebook text: tag idea for the subway bit."
         case "attach_photo_to_notebook":
             return " Photo attached to your Notebook! Great for saving set lists from the stage, whiteboard ideas, or inspiration."
         case "search_notebook":
@@ -360,11 +380,18 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
                 ? "Roast Mode OFF. Back to your regularly scheduled comedy. "
                 : " ROAST MODE ACTIVATED. Everything's darker from here. Let's write some burns."
         case "create_roast_target":
-            let target = entities["target"] ?? entities["quoted_value"] ?? "your target"
-            return " Roast target \"\(target)\" created! Start adding burns and roast material under their profile."
+            let target = entities["target"] ?? entities["quoted_value"] ?? entities["value"]
+                ?? routedName(from: message, prefixes: ["create roast target", "make roast target", "new roast target", "add roast target"])
+            if let target {
+                return " Roast target \"\(target)\" created! Start adding burns and roast material under their profile."
+            }
+            return "Who is the roast target? Try: Create roast target named Finance Bro."
         case "add_roast_joke":
             let target = entities["target"] ?? "the target"
-            return " Burn filed under \(target)! The roast arsenal grows."
+            if routedContent(from: entities, message: message, prefixes: ["add roast joke", "save roast joke", "add this burn", "save this burn"]) != nil {
+                return " Burn filed under \(target)! The roast arsenal grows."
+            }
+            return "Send the burn text too, like: Add roast joke: he networks at funerals."
         case "search_roasts":
             return " Searching your roast material... Head to Roast Mode to see the results."
         case "create_roast_set":
@@ -1406,5 +1433,82 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             content = content.dropFirst().trimmingCharacters(in: .whitespaces)
         }
         return content
+    }
+
+    private func routedContent(
+        from entities: [String: String],
+        message: String,
+        prefixes: [String]
+    ) -> String? {
+        if let direct = firstNonEmpty(
+            entities["joke"],
+            entities["text"],
+            entities["quoted_value"],
+            entities["value"]
+        ) {
+            return cleanedContent(direct, folder: entities["folder"])
+        }
+
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        for prefix in prefixes {
+            if lower.hasPrefix(prefix) {
+                let index = trimmed.index(trimmed.startIndex, offsetBy: prefix.count)
+                let remainder = trimmed[index...]
+                    .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ":-")))
+                if !remainder.isEmpty {
+                    return cleanedContent(remainder, folder: entities["folder"])
+                }
+            }
+        }
+        return nil
+    }
+
+    private func cleanedContent(_ content: String, folder: String?) -> String {
+        guard let folder, !folder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return content
+        }
+
+        var cleaned = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedFolder = folder.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let lower = cleaned.lowercased()
+        let trailingMarkers = [
+            " under \(normalizedFolder)",
+            " in \(normalizedFolder)",
+            " into \(normalizedFolder)",
+            " to \(normalizedFolder)"
+        ]
+
+        for marker in trailingMarkers where lower.hasSuffix(marker) {
+            cleaned = String(cleaned.dropLast(marker.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            break
+        }
+        return cleaned
+    }
+
+    private func firstNonEmpty(_ values: String?...) -> String? {
+        for value in values {
+            let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+        return nil
+    }
+
+    private func routedName(from message: String, prefixes: [String]) -> String? {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        for prefix in prefixes {
+            if lower.hasPrefix(prefix) {
+                let index = trimmed.index(trimmed.startIndex, offsetBy: prefix.count)
+                let remainder = trimmed[index...]
+                    .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ":-")))
+                if !remainder.isEmpty {
+                    return remainder
+                }
+            }
+        }
+        return nil
     }
 }

@@ -380,7 +380,7 @@ struct MainTabView: View {
                     BitBuddyAvatar(roastMode: roastMode, size: bubbleSize, symbolSize: 22)
                         .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
                         .scaleEffect(isDragging ? 1.15 : 1.0)
-                        .opacity(bitBuddyPresenter.mode == .closed ? 1 : 0)
+                        .opacity(bitBuddyPresenter.mode == .closed && !bitBuddyDrawer.isOpen ? 1 : 0)
                         .contentShape(Circle().inset(by: -10))
                         .position(
                             x: min(max(bubbleSize / 2, posX + dragOffset.width), geo.size.width - bubbleSize / 2),
@@ -412,7 +412,7 @@ struct MainTabView: View {
                         )
                         .animation(.easeInOut(duration: 0.2), value: bitBuddyDrawer.isOpen)
                         .animation(.easeInOut(duration: 0.15), value: isDragging)
-                        .allowsHitTesting(bitBuddyPresenter.mode == .closed)
+                        .allowsHitTesting(bitBuddyPresenter.mode == .closed && !bitBuddyDrawer.isOpen)
                 }
                 .ignoresSafeArea()
             }
@@ -422,7 +422,10 @@ struct MainTabView: View {
         .onChange(of: bitBuddyPresenter.mode) { _, mode in
             // Keep the full-drawer controller in sync with the presenter so
             // existing call sites that open .full still route correctly.
-            bitBuddyDrawer.isOpen = (mode == .full)
+            if mode == .full {
+                bitBuddyDrawer.open()
+                bitBuddyPresenter.mode = .closed
+            }
         }
     }
 
