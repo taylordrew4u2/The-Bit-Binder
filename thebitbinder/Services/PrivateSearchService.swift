@@ -1,6 +1,30 @@
 import Foundation
 
 struct PrivateSearchService {
+    private actor SearchResultCache {
+        private let timeToLive: TimeInterval = 5 * 60
+        private var entries: [String: (result: String?, timestamp: Date)] = [:]
+
+        func cachedResult(for query: String) -> (found: Bool, result: String?) {
+            clearStaleEntries()
+            guard let entry = entries[query] else {
+                return (false, nil)
+            }
+            return (true, entry.result)
+        }
+
+        func store(_ result: String?, for query: String) {
+            entries[query] = (result, Date())
+        }
+
+        private func clearStaleEntries() {
+            let cutoff = Date().addingTimeInterval(-timeToLive)
+            entries = entries.filter { $0.value.timestamp >= cutoff }
+        }
+    }
+
+    private static let cache = SearchResultCache()
+
     private struct DuckDuckGoResponse: Decodable {
         let AbstractText: String
         let Definition: String
@@ -37,19 +61,28 @@ struct PrivateSearchService {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
+        let cached = await cache.cachedResult(for: trimmed)
+        if cached.found {
+            return cached.result
+        }
+
         if let duckDuckGo = await duckDuckGoAnswer(for: trimmed) {
+            await cache.store(duckDuckGo, for: trimmed)
             return duckDuckGo
         }
 
         if isTimeSensitive(trimmed),
            let currentDuckDuckGo = await duckDuckGoAnswer(for: "current \(trimmed)") {
+            await cache.store(currentDuckDuckGo, for: trimmed)
             return currentDuckDuckGo
         }
 
         if let wikipedia = await wikipediaAnswer(for: trimmed) {
+            await cache.store(wikipedia, for: trimmed)
             return wikipedia
         }
 
+        await cache.store(nil, for: trimmed)
         return nil
     }
 

@@ -32,6 +32,8 @@ final class BitBuddyService: NSObject, ObservableObject {
     /// Whether the backend is reachable. Always `true` for the local engine.
     @Published var isConnected: Bool
     @Published private(set) var backendName: String
+    @Published private(set) var chatMessages: [ChatBubbleMessage] = []
+    @Published private(set) var uiConversationId = UUID().uuidString
     /// Published so the UI can navigate to the section an intent targets.
     @Published var pendingNavigation: BitBuddySection? = nil
     /// Last structured response for action dispatch.
@@ -121,17 +123,22 @@ final class BitBuddyService: NSObject, ObservableObject {
     private func processMessage(_ message: String) async throws -> String {
         lastActions = []
         pendingNavigation = nil
+        Self.trace("received: \(message)")
 
         // Check if the user is confirming a previously suggested navigation
         let lowerMessage = message.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let confirmationPhrases = ["yes", "yeah", "yep", "sure", "ok", "okay", "take me there",
-                                   "go there", "let's go", "do it", "go ahead", "bring me there",
-                                   "navigate", "open it", "show me", "yes please", "yea"]
+        let confirmationWords: Set<String> = ["yes", "yeah", "yep", "sure", "ok", "okay", "yea", "yup"]
+        let explicitNavigationPhrases = ["take me there", "go there", "let's go", "do it", "go ahead",
+                                         "bring me there", "navigate", "open it", "show me", "yes please"]
         if let pendingSection = awaitingNavigationConfirmation,
-           confirmationPhrases.contains(where: { lowerMessage.contains($0) }) {
+           Self.isNavigationConfirmation(
+            lowerMessage,
+            confirmationWords: confirmationWords,
+            explicitPhrases: explicitNavigationPhrases
+           ) {
             awaitingNavigationConfirmation = nil
             pendingNavigation = pendingSection
-            let displayText = "Taking you there now! 👍"
+            let displayText = "Taking you there now."
             let activeConversationId = conversationId ?? UUID().uuidString
             conversationId = activeConversationId
             appendTurn(.init(role: .user, text: message), conversationId: activeConversationId)
@@ -150,6 +157,7 @@ final class BitBuddyService: NSObject, ObservableObject {
         )
 
         if let currentFact = CurrentFacts.answer(for: message) {
+            Self.trace("currentFact direct answer: \(currentFact)")
             appendTurn(.init(role: .assistant, text: currentFact), conversationId: activeConversationId)
             isConnected = true
             return currentFact
@@ -157,10 +165,15 @@ final class BitBuddyService: NSObject, ObservableObject {
 
         let roastMode = UserDefaults.standard.bool(forKey: "roastModeEnabled")
         let questionLike = Self.isQuestionLike(lowerMessage)
-        let routeResult = intentRouter.route(message)
-        let conversationMode: ConversationMode = routeResult != nil
-            ? .appAction
-            : ConversationModeClassifier.classifyWithoutRouting(message)
+        let unroutedMode = ConversationModeClassifier.classifyWithoutRouting(message)
+        let routeResult = ConversationModeClassifier.shouldUseIntentRouting(message)
+            ? intentRouter.route(message)
+            : nil
+        let conversationMode: ConversationMode = routeResult != nil ? .appAction : unroutedMode
+        let routeDescription = routeResult.map {
+            "\($0.intent.id) confidence=\(String(format: "%.2f", $0.confidence))"
+        } ?? "none"
+        Self.trace("mode=\(conversationMode), unrouted=\(unroutedMode), route=\(routeDescription)")
 
         if let route = routeResult {
             statusMessage = statusHint(for: route.intent.id)
@@ -185,6 +198,7 @@ final class BitBuddyService: NSObject, ObservableObject {
             statusMessage = statusMessage.isEmpty ? "Thinking…" : statusMessage
             switch conversationMode {
             case .reflective, .simpleFactual, .creativeFactual:
+                Self.trace("backend=socraticGuide")
                 rawResponse = try await socraticGuideBackend.respond(
                     message: message,
                     session: session,
@@ -192,6 +206,7 @@ final class BitBuddyService: NSObject, ObservableObject {
                     roastMode: roastMode
                 ) ?? ""
             case .appAction:
+                Self.trace("backend=\(backend.backendName)")
                 rawResponse = try await backend.send(
                     message: message,
                     session: session,
@@ -203,6 +218,7 @@ final class BitBuddyService: NSObject, ObservableObject {
             // any future structured-JSON backends). For the local
             // rule-based backend this is a no-op pass-through.
             let displayText = handleBitBuddyResponse(rawResponse)
+            Self.trace("response: \(Self.preview(displayText))")
             
             // Dispatch the structured action from the routed intent.
             // The local backend returns plain text (never JSON), so
@@ -215,16 +231,11 @@ final class BitBuddyService: NSObject, ObservableObject {
             // conversational response with no payload causes empty saves,
             // "missing joke text" errors, and bad UI loops.
             if let route = routeResult {
-                if !Self.dataMutatingActions.contains(route.intent.id) {
-                    var intentAction: [String: Any] = [
-                        "type": route.intent.id
-                    ]
-                    // Forward extracted entities so action handlers can use
-                    // names, folders, targets, etc. from the user's message.
-                    for (key, value) in route.extractedEntities {
-                        intentAction[key] = value
-                    }
+                if let intentAction = actionPayload(for: route, originalMessage: message),
+                   validateActionPayload(intentAction) {
                     executeBitBuddyAction(intentAction)
+                } else if Self.dataMutatingActions.contains(route.intent.id) {
+                    Self.trace("skipped mutating route without safe payload: \(route.intent.id)")
                 }
                 
                 // Store navigation target for confirmation — BitBuddy will ask
@@ -249,6 +260,15 @@ final class BitBuddyService: NSObject, ObservableObject {
         }
     }
 
+    private static func trace(_ message: String) {
+        print(" [BitBuddyTrace] \(message)")
+    }
+
+    private static func preview(_ text: String) -> String {
+        let singleLine = text.replacingOccurrences(of: "\n", with: " ")
+        return String(singleLine.prefix(180))
+    }
+
     private func statusHint(for conversationMode: ConversationMode) -> String {
         switch conversationMode {
         case .reflective:
@@ -268,6 +288,23 @@ final class BitBuddyService: NSObject, ObservableObject {
         ]
         return starters.contains { text.hasPrefix($0) }
     }
+
+    private static func isNavigationConfirmation(
+        _ text: String,
+        confirmationWords: Set<String>,
+        explicitPhrases: [String]
+    ) -> Bool {
+        if explicitPhrases.contains(where: { text == $0 || text.hasPrefix("\($0) ") }) {
+            return true
+        }
+
+        let tokens = text
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+
+        guard !tokens.isEmpty, tokens.count <= 3 else { return false }
+        return tokens.contains { confirmationWords.contains($0) }
+    }
     
     /// Start a new conversation.
     func startNewConversation() {
@@ -280,6 +317,14 @@ final class BitBuddyService: NSObject, ObservableObject {
         pendingNavigation = nil
         awaitingNavigationConfirmation = nil
         lastActions = []
+        focusedJoke = nil
+        pendingMessage = nil
+
+#if canImport(MLXLLM) && canImport(MLXLMCommon)
+        Task {
+            await MLXSharedRuntime.shared.resetChat()
+        }
+#endif
         
         // Evict oldest conversations if we're retaining too many
         while turnsByConversation.count > maxRetainedConversations {
@@ -290,6 +335,22 @@ final class BitBuddyService: NSObject, ObservableObject {
                 break
             }
         }
+    }
+
+    func resetVisibleConversation() {
+        chatMessages.removeAll()
+        uiConversationId = UUID().uuidString
+    }
+
+    @discardableResult
+    func appendVisibleMessage(text: String, isUser: Bool) -> ChatBubbleMessage {
+        let message = ChatBubbleMessage(
+            text: text,
+            isUser: isUser,
+            conversationId: uiConversationId
+        )
+        chatMessages.append(message)
+        return message
     }
     
     /// Clear the pending navigation (call after the UI has acted on it).
@@ -503,6 +564,166 @@ final class BitBuddyService: NSObject, ObservableObject {
         s = s.replacingOccurrences(of: "##", with: "")
         s = s.replacingOccurrences(of: "# ", with: "")
         return s
+    }
+
+    /// Builds a dispatchable action from a local routed intent.
+    /// Mutating commands only return an action when the router extracted enough
+    /// concrete text to safely create data. Ambiguous/destructive commands fall
+    /// back to navigation or explanation instead of silently changing data.
+    private func actionPayload(
+        for route: BitBuddyRouteResult,
+        originalMessage: String
+    ) -> [String: Any]? {
+        var action: [String: Any] = ["type": route.intent.id]
+        for (key, value) in route.extractedEntities {
+            action[key] = value
+        }
+
+        guard Self.dataMutatingActions.contains(route.intent.id) else {
+            return action
+        }
+
+        switch route.intent.id {
+        case "add_joke", "save_joke", "save_joke_in_folder":
+            guard let joke = extractedContent(
+                from: route,
+                originalMessage: originalMessage,
+                fallbackPrefixes: ["save this joke", "save joke", "add this joke", "add joke", "store this joke"]
+            ) else { return nil }
+            action["joke"] = joke
+            return action
+
+        case "add_brainstorm_note":
+            guard let text = extractedContent(
+                from: route,
+                originalMessage: originalMessage,
+                fallbackPrefixes: ["add this to brainstorm", "add brainstorm note", "save this idea", "capture this thought"]
+            ) else { return nil }
+            action["text"] = text
+            return action
+
+        case "create_set_list":
+            guard let name = firstNonEmpty(route.extractedEntities["set_name"], route.extractedEntities["quoted_value"], route.extractedEntities["value"])
+                ?? extractedName(originalMessage: originalMessage, prefixes: ["create set list", "create set", "make set list", "make set", "start set", "new set list"]) else {
+                return nil
+            }
+            action["name"] = name
+            return action
+
+        case "create_folder":
+            guard let name = firstNonEmpty(route.extractedEntities["folder"], route.extractedEntities["title"], route.extractedEntities["quoted_value"], route.extractedEntities["value"])
+                ?? extractedName(originalMessage: originalMessage, prefixes: ["create folder", "make folder", "new folder", "add folder", "start folder"]) else {
+                return nil
+            }
+            action["name"] = name
+            return action
+
+        case "create_roast_target":
+            guard let name = firstNonEmpty(route.extractedEntities["target"], route.extractedEntities["quoted_value"], route.extractedEntities["value"])
+                ?? extractedName(originalMessage: originalMessage, prefixes: ["create roast target", "make roast target", "new roast target", "add roast target"]) else {
+                return nil
+            }
+            action["name"] = name
+            return action
+
+        case "add_roast_joke":
+            guard let joke = extractedContent(
+                from: route,
+                originalMessage: originalMessage,
+                fallbackPrefixes: ["add roast joke", "save roast joke", "add this burn", "save this burn"]
+            ) else { return nil }
+            action["joke"] = joke
+            return action
+
+        case "save_notebook_text":
+            guard let text = extractedContent(
+                from: route,
+                originalMessage: originalMessage,
+                fallbackPrefixes: ["save notebook text", "save this note", "add notebook note"]
+            ) else { return nil }
+            action["text"] = text
+            return action
+
+        default:
+            return nil
+        }
+    }
+
+    private func extractedContent(
+        from route: BitBuddyRouteResult,
+        originalMessage: String,
+        fallbackPrefixes: [String]
+    ) -> String? {
+        if let direct = firstNonEmpty(
+            route.extractedEntities["joke"],
+            route.extractedEntities["text"],
+            route.extractedEntities["quoted_value"],
+            route.extractedEntities["value"]
+        ) {
+            return cleanedContent(direct, folder: route.extractedEntities["folder"])
+        }
+
+        let trimmed = originalMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        for prefix in fallbackPrefixes {
+            if lower.hasPrefix(prefix) {
+                let index = trimmed.index(trimmed.startIndex, offsetBy: prefix.count)
+                let remainder = trimmed[index...]
+                    .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ":-")))
+                if !remainder.isEmpty {
+                    return cleanedContent(remainder, folder: route.extractedEntities["folder"])
+                }
+            }
+        }
+        return nil
+    }
+
+    private func cleanedContent(_ content: String, folder: String?) -> String {
+        guard let folder, !folder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return content
+        }
+
+        var cleaned = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedFolder = folder.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let lower = cleaned.lowercased()
+        let trailingMarkers = [
+            " under \(normalizedFolder)",
+            " in \(normalizedFolder)",
+            " into \(normalizedFolder)",
+            " to \(normalizedFolder)"
+        ]
+
+        for marker in trailingMarkers where lower.hasSuffix(marker) {
+            cleaned = String(cleaned.dropLast(marker.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            break
+        }
+        return cleaned
+    }
+
+    private func extractedName(originalMessage: String, prefixes: [String]) -> String? {
+        let trimmed = originalMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        for prefix in prefixes {
+            if lower.hasPrefix(prefix) {
+                let index = trimmed.index(trimmed.startIndex, offsetBy: prefix.count)
+                let remainder = trimmed[index...]
+                    .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ":-")))
+                if !remainder.isEmpty {
+                    return remainder
+                }
+            }
+        }
+        return nil
+    }
+
+    private func firstNonEmpty(_ values: String?...) -> String? {
+        for value in values {
+            let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+        return nil
     }
 
     /// Validates that a data-mutating action payload contains the required fields.
@@ -791,6 +1012,7 @@ final class BitBuddyService: NSObject, ObservableObject {
     private func handleCreateFolderAction(_ action: [String: Any]) {
         let name = (action["folder"] as? String)
             ?? (action["name"] as? String)
+            ?? (action["title"] as? String)
             ?? (action["quoted_value"] as? String)
             ?? (action["value"] as? String)
         guard let folderName = name, !folderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -819,13 +1041,14 @@ final class BitBuddyService: NSObject, ObservableObject {
         }
         let notes = action["notes"] as? String
         print(" [BitBuddy] Publishing create_roast_target for UI persistence")
+        var userInfo: [String: Any] = ["name": targetName]
+        if let notes, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            userInfo["notes"] = notes
+        }
         NotificationCenter.default.post(
             name: .bitBuddyCreateRoastTarget,
             object: nil,
-            userInfo: [
-                "name": targetName,
-                "notes": notes as Any
-            ]
+            userInfo: userInfo
         )
     }
     
@@ -841,13 +1064,14 @@ final class BitBuddyService: NSObject, ObservableObject {
         }
         let target = action["target"] as? String
         print(" [BitBuddy] Publishing add_roast_joke for UI persistence")
+        var userInfo: [String: Any] = ["joke": content]
+        if let target, !target.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            userInfo["target"] = target
+        }
         NotificationCenter.default.post(
             name: .bitBuddyAddRoastJoke,
             object: nil,
-            userInfo: [
-                "joke": content,
-                "target": target as Any
-            ]
+            userInfo: userInfo
         )
     }
     
@@ -884,14 +1108,15 @@ final class BitBuddyService: NSObject, ObservableObject {
         let folder = action["folder"] as? String
         print(" [BitBuddy] Publishing add_joke for UI persistence")
         print(" [BitBuddy] Joke content: \(jokeText.prefix(50))...")
+        var userInfo: [String: Any] = ["jokeText": jokeText]
+        if let folder, !folder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            userInfo["folder"] = folder
+        }
 
         NotificationCenter.default.post(
             name: .bitBuddyAddJoke,
             object: nil,
-            userInfo: [
-                "jokeText": jokeText,
-                "folder": folder as Any
-            ]
+            userInfo: userInfo
         )
     }
     

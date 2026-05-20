@@ -81,10 +81,13 @@ struct BitBuddyIntent: Sendable, Identifiable {
     /// When `precomputed` is true, `text` is already lowercased.
     func matches(_ text: String, precomputed: Bool = false) -> Double {
         let lower = precomputed ? text : text.lowercased()
+        let inputTokens = Self.tokens(in: lower)
         var score: Double = 0
 
         for keyword in keywords {
-            if lower.contains(keyword) { score += 1.0 }
+            if Self.matchesKeyword(keyword, in: lower, inputTokens: inputTokens) {
+                score += 1.0
+            }
         }
 
         // Skip expensive example matching if no keywords hit
@@ -93,14 +96,40 @@ struct BitBuddyIntent: Sendable, Identifiable {
         for example in examplePatterns {
             let exLower = example.lowercased()
             if lower == exLower { score += 10.0; continue }
-            if lower.contains(exLower) || exLower.contains(lower) { score += 3.0; continue }
-            let exTokens = Set(exLower.split(separator: " ").map(String.init))
-            let inTokens = Set(lower.split(separator: " ").map(String.init))
-            let overlap = Double(exTokens.intersection(inTokens).count) / Double(max(exTokens.count, 1))
+            if lower.contains(exLower) { score += 3.0; continue }
+            if inputTokens.count >= 3, exLower.contains(lower) { score += 3.0; continue }
+            let exTokens = Self.tokens(in: exLower)
+            let overlap = Double(exTokens.intersection(inputTokens).count) / Double(max(exTokens.count, 1))
             if overlap > 0.5 { score += overlap * 2.0 }
         }
 
         return score
+    }
+
+    private static func matchesKeyword(_ keyword: String, in lower: String, inputTokens: Set<String>) -> Bool {
+        let normalizedKeyword = keyword.lowercased()
+        if normalizedKeyword.contains(" ") {
+            return lower.contains(normalizedKeyword)
+        }
+
+        if inputTokens.contains(normalizedKeyword) {
+            return true
+        }
+
+        if normalizedKeyword.count > 3 {
+            return inputTokens.contains("\(normalizedKeyword)s")
+                || inputTokens.contains("\(normalizedKeyword)es")
+        }
+
+        return false
+    }
+
+    private static func tokens(in text: String) -> Set<String> {
+        Set(
+            text.components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .map { $0.lowercased() }
+                .filter { !$0.isEmpty }
+        )
     }
 }
 
