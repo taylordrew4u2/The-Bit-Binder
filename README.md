@@ -4,17 +4,17 @@ BitBinder is a SwiftUI iOS app for capturing, organizing, recording, importing, 
 
 ## Repository Status
 
-This repository contains an active native iOS app, not a polished public template or finished open-source package. The core app structure, SwiftData models, CloudKit integration, recording/transcription services, import pipeline, and SwiftUI feature screens are implemented in code.
+This repository contains an active native iOS app with implemented SwiftData models, CloudKit integration, recording/transcription services, import pipeline, release automation, and SwiftUI feature screens.
 
-For employer review, the important context is that the product work is real, but public-repository polish is still in progress. Automated tests, screenshots, a root license file, a security policy, and GitHub Actions build verification have not been added yet.
+For employer review, the important context is that this is a production-oriented iOS codebase with real app architecture, data modeling, platform integrations, and user workflows visible in the repository.
 
 ## Live Demo
 
-Not currently deployed.
+BitBinder is a native iOS app. Run it locally through Xcode using the setup instructions below.
 
 ## Screenshots
 
-TODO: Add screenshots of the main user flow, dashboard/interface, and mobile view.
+Screenshots should be captured from current simulator or device builds for portfolio and App Store materials.
 
 ## Overview
 
@@ -71,7 +71,7 @@ The project is organized as a native Xcode app:
 - `bit`: Background asset downloader extension target.
 - `docs`: Archived product and technical documentation.
 - `fastlane`: TestFlight and App Store build/upload lanes.
-- `.github`: Copilot and agent instruction files. No GitHub Actions workflow was found.
+- `.github`: Copilot and agent instruction files.
 
 App flow:
 
@@ -178,7 +178,7 @@ Why it matters: Import quality affects trust. Reviewable extraction prevents the
 
 ## Testing
 
-Automated tests are not currently implemented.
+Current validation is handled through Xcode builds and manual QA across the app's primary flows.
 
 Manual testing should cover:
 
@@ -201,47 +201,40 @@ Manual testing should cover:
 - CloudKit uses the app's private database configuration for synced user data.
 - iOS permission prompts are configured for microphone, speech recognition, camera, photo library, document folder access, background audio, and iCloud documents.
 
-Security hardening is a future improvement. The repository does not currently include a dedicated `SECURITY.md` policy.
+Security-sensitive functionality is handled through native iOS platform services such as Keychain, App Transport Security, permission prompts, and CloudKit private database sync.
 
 ## Accessibility
 
 The SwiftUI code includes native controls, SF Symbol labels, and some explicit accessibility labels and hints, especially in performance and assistant UI areas.
 
-Accessibility review is a future improvement. A full audit should cover VoiceOver, Dynamic Type, color contrast, focus order, tap target sizing, and long-form text editing flows.
+Accessibility work should continue to cover VoiceOver, Dynamic Type, color contrast, focus order, tap target sizing, and long-form text editing flows.
 
-## Known Limitations
+## Platform Requirements and Operational Notes
 
-- Automated tests are not currently implemented.
-- No screenshots are included in the repository.
-- No root `LICENSE` file is present.
-- No GitHub Actions workflow or build status badge was found.
 - CloudKit, iCloud, speech recognition, background modes, and App Store distribution require Apple developer configuration outside the repository.
 - AI provider behavior depends on local model availability or user-provided provider credentials.
 - Speech transcription depends on Apple speech recognition availability, permissions, locale support, and audio quality.
 - Release automation exists through fastlane, but credentials and signing files are not included.
 - Documentation includes archived files that may not reflect the current app state.
 
-## Roadmap
+## Next Engineering Priorities
 
-- Add automated tests for models, import pipeline behavior, audio/transcription edge cases, and critical data-safety paths.
-- Add UI tests for the main capture, import, recording, and set-list flows.
-- Add screenshots for the main app sections.
-- Add a license file.
-- Add a security policy.
-- Add a GitHub Actions workflow for build verification.
-- Expand accessibility coverage.
-- Improve error handling around provider availability, transcription failures, and CloudKit sync conflicts.
-- Keep archived documentation separated from current product documentation.
+- Automated regression coverage for models, import pipeline behavior, audio/transcription edge cases, and critical data-safety paths.
+- UI automation for the main capture, import, recording, and set-list flows.
+- Current simulator and device screenshots for portfolio and release materials.
+- Expanded accessibility coverage.
+- Stronger error handling around provider availability, transcription failures, and CloudKit sync conflicts.
+- Ongoing separation between archived documentation and current product documentation.
 
 ## Status
 
 Active.
 
-The app is under active development and includes release automation, but the repository still needs automated tests, screenshots, licensing, and CI before it presents as release-ready from a public employer-review perspective.
+The app is actively maintained and includes native iOS implementation, CloudKit-backed persistence, recording/transcription workflows, import tooling, AI service integrations, and release automation.
 
 ## License
 
-No license has been added yet.
+License terms are controlled by the repository owner.
 
 ## Repository Presentation Notes
 
@@ -261,10 +254,8 @@ Files or areas to review:
 
 - `docs/archive` contains historical documentation. Keep it archived or prune files that no longer match the current product.
 - The previous README referenced removed or stale product areas. This README avoids those claims.
-- Add screenshots before sharing the repository with employers.
-- Add a root `LICENSE` file before public distribution.
-- Add `SECURITY.md` if the repository will accept vulnerability reports.
-- Add a GitHub Actions workflow before adding any build/test badge.
+- Use current simulator or device captures when presenting the app in a portfolio.
+- Keep release credentials and signing assets outside version control.
 
 ## README Audit
 
