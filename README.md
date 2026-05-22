@@ -2,6 +2,12 @@
 
 BitBinder is a SwiftUI iOS app for capturing, organizing, recording, importing, and refining stand-up comedy material.
 
+## Repository Status
+
+This repository contains an active native iOS app, not a polished public template or finished open-source package. The core app structure, SwiftData models, CloudKit integration, recording/transcription services, import pipeline, and SwiftUI feature screens are implemented in code.
+
+For employer review, the important context is that the product work is real, but public-repository polish is still in progress. Automated tests, screenshots, a root license file, a security policy, and GitHub Actions build verification have not been added yet.
+
 ## Live Demo
 
 Not currently deployed.
