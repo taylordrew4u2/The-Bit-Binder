@@ -4,17 +4,27 @@ BitBinder is a SwiftUI iOS app for capturing, organizing, recording, importing, 
 
 ## Repository Status
 
-This repository contains an active native iOS app with implemented SwiftData models, CloudKit integration, recording/transcription services, import pipeline, release automation, and SwiftUI feature screens.
+BitBinder is available on the iOS App Store. This repository contains the native iOS codebase behind the app, including implemented SwiftData models, CloudKit integration, recording/transcription services, import pipeline, release automation, and SwiftUI feature screens.
 
-For employer review, the important context is that this is a production-oriented iOS codebase with real app architecture, data modeling, platform integrations, and user workflows visible in the repository.
+For employer review, the important context is that this is a production-oriented iOS codebase with real app architecture, data modeling, platform integrations, release tooling, and end-to-end user workflows visible in the repository.
 
-## Live Demo
+## App Store
 
-BitBinder is a native iOS app. Run it locally through Xcode using the setup instructions below.
+BitBinder is distributed as a native iOS app through Apple's App Store. This repository documents and exposes the implementation behind the shipped app.
 
 ## Screenshots
 
 Screenshots should be captured from current simulator or device builds for portfolio and App Store materials.
+
+## Engineering Highlights
+
+- Shipped native iOS app architecture using SwiftUI, SwiftData, CloudKit, AVFoundation, Speech, Vision/VisionKit, PDFKit, and BackgroundTasks.
+- Built a persistent comedy-writing data model covering jokes, folders, set lists, recordings, brainstorm ideas, roast targets, roast jokes, notebook photos, import batches, and chat messages.
+- Implemented audio recording and transcription workflows that preserve recordings across navigation and resolve sandbox file paths safely.
+- Built an import pipeline that routes files by type, extracts text from PDFs/images/audio, normalizes content, creates review queues, and persists approved jokes.
+- Integrated CloudKit sync, iCloud key-value preferences, migration, validation, backup, diagnostics, and data-safety utilities.
+- Structured AI functionality behind service/provider boundaries for local fallback, OpenAI-backed behavior, MLX, Transformers, and app-specific intent routing.
+- Configured App Store/TestFlight release automation through fastlane.
 
 ## Overview
 
@@ -53,7 +63,7 @@ BitBinder combines capture, organization, import, recording, transcription, and 
 - Database: SwiftData with CloudKit private database support.
 - Authentication: No external user-account authentication is required. `AuthService` keeps the app authenticated locally and stores a generated user identifier through iCloud key-value storage.
 - Styling: SwiftUI views with custom design utilities, reusable components, color helpers, fire/roast palettes, and native SF Symbols.
-- Hosting/deployment: Not currently deployed as a web app. `fastlane` lanes exist for TestFlight and App Store upload.
+- Hosting/deployment: Native iOS App Store distribution with `fastlane` lanes for TestFlight and App Store upload.
 - APIs/libraries: AVFoundation, Speech, Vision/VisionKit, PDFKit, CloudKit, BackgroundTasks, UserNotifications, Security/Keychain, CoreTransferable, UniformTypeIdentifiers, MLXLLM, and Hugging Face Transformers.
 - Language/framework: Swift, SwiftUI, SwiftData, ExtensionKit-style background asset downloader target.
 - Package dependencies: `mlx-swift-lm` and `swift-transformers` are referenced by the Xcode project. Swift Package checkouts also include related transitive packages such as MLX Swift, yyjson, Swift Crypto, Swift Collections, Swift ASN.1, Swift Numerics, Swift Jinja, and OpenAI-related packages.
