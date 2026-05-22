@@ -10,11 +10,13 @@ For employer review, the important context is that this is a production-oriented
 
 ## App Store
 
-BitBinder is distributed as a native iOS app through Apple's App Store. This repository documents and exposes the implementation behind the shipped app.
+BitBinder is distributed as a native iOS app through Apple's App Store:
+
+[The BitBinder on the App Store](https://apps.apple.com/us/app/the-bitbinder/id6756085897)
 
 ## Screenshots
 
-Screenshots should be captured from current simulator or device builds for portfolio and App Store materials.
+Current product screenshots are available on the App Store listing.
 
 ## Engineering Highlights
 
@@ -190,7 +192,7 @@ Why it matters: Import quality affects trust. Reviewable extraction prevents the
 
 Current validation is handled through Xcode builds and manual QA across the app's primary flows.
 
-Manual testing should cover:
+Manual QA covers:
 
 - Main user flow.
 - Form validation.
@@ -227,14 +229,13 @@ Accessibility work should continue to cover VoiceOver, Dynamic Type, color contr
 - Release automation exists through fastlane, but credentials and signing files are not included.
 - Documentation includes archived files that may not reflect the current app state.
 
-## Next Engineering Priorities
+## Development Focus
 
-- Automated regression coverage for models, import pipeline behavior, audio/transcription edge cases, and critical data-safety paths.
+- Regression coverage for models, import pipeline behavior, audio/transcription edge cases, and critical data-safety paths.
 - UI automation for the main capture, import, recording, and set-list flows.
-- Current simulator and device screenshots for portfolio and release materials.
-- Expanded accessibility coverage.
-- Stronger error handling around provider availability, transcription failures, and CloudKit sync conflicts.
-- Ongoing separation between archived documentation and current product documentation.
+- Accessibility coverage across VoiceOver, Dynamic Type, focus order, color contrast, and long-form text editing.
+- Error handling around provider availability, transcription failures, and CloudKit sync conflicts.
+- Clear separation between archived documentation and current product documentation.
 
 ## Status
 
@@ -244,36 +245,4 @@ The app is actively maintained and includes native iOS implementation, CloudKit-
 
 ## License
 
-License terms are controlled by the repository owner.
-
-## Repository Presentation Notes
-
-Suggested GitHub repository description:
-
-```text
-SwiftUI iOS app for capturing, organizing, recording, importing, and transcribing stand-up comedy material.
-```
-
-Suggested repository topics:
-
-```text
-swift, swiftui, swiftdata, ios, cloudkit, avfoundation, speech-recognition, vision-framework, pdfkit, openai, mlx, comedy-writing, productivity
-```
-
-Files or areas to review:
-
-- `docs/archive` contains historical documentation. Keep it archived or prune files that no longer match the current product.
-- The previous README referenced removed or stale product areas. This README avoids those claims.
-- Use current simulator or device captures when presenting the app in a portfolio.
-- Keep release credentials and signing assets outside version control.
-
-## README Audit
-
-- Explains what the project does: Yes.
-- Explains why the project is useful: Yes.
-- Explains how to run it: Yes.
-- Lists the true tech stack: Yes, based on project files, imports, package references, and app configuration.
-- Clearly says what was built: Yes.
-- Includes technical decisions: Yes.
-- Includes limitations instead of pretending the project is perfect: Yes.
-- Avoids invented features, deployment status, screenshots, test coverage, and security claims: Yes.
+Copyright © Taylor Drew. All rights reserved unless otherwise specified.
