@@ -194,6 +194,7 @@ final class DataMigrationService: ObservableObject {
             Recording.self,
             SetList.self,
             NotebookPhotoRecord.self,
+            NotebookFolder.self,
             RoastTarget.self,
             RoastJoke.self,
             BrainstormIdea.self,
@@ -236,5 +237,4 @@ enum MigrationResult {
         }
     }
 }
-
 

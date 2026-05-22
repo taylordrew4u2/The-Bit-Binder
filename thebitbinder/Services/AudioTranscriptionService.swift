@@ -7,7 +7,7 @@
 
 import Foundation
 import Speech
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// Result of transcribing an audio file
 struct AudioTranscriptionResult {
@@ -28,6 +28,7 @@ enum AudioTranscriptionError: LocalizedError {
     case authorizationNotDetermined
     case fileNotFound
     case unsupportedFormat
+    case audioExportFailed(String)
     case transcriptionFailed(String)
     case noSpeechDetected
     
@@ -41,6 +42,8 @@ enum AudioTranscriptionError: LocalizedError {
             return "The audio file could not be found."
         case .unsupportedFormat:
             return "The audio format is not supported."
+        case .audioExportFailed(let message):
+            return "Could not prepare audio for transcription: \(message)"
         case .transcriptionFailed(let message):
             return "Transcription failed: \(message)"
         case .noSpeechDetected:
@@ -55,6 +58,8 @@ class AudioTranscriptionService {
     
     /// Supported audio file extensions
     static let supportedExtensions: Set<String> = ["m4a", "wav", "mp3", "aac", "caf", "aiff", "aif"]
+    private static let directTranscriptionLimit: TimeInterval = 55
+    private static let chunkDuration: TimeInterval = 45
     
     private var speechRecognizer: SFSpeechRecognizer?
 
@@ -131,10 +136,61 @@ class AudioTranscriptionService {
             throw AudioTranscriptionError.unsupportedFormat
         }
         
-        // Get audio duration
-        let duration = try? await getAudioDuration(url: url)
+        let transcriptionURL = try prepareTranscriptionInput(from: url)
+        defer {
+            if transcriptionURL != url {
+                try? FileManager.default.removeItem(at: transcriptionURL)
+            }
+        }
+
+        let duration = try? await getAudioDuration(url: transcriptionURL)
+        let output: RecognitionOutput
+        if let duration, duration > Self.directTranscriptionLimit {
+            output = try await transcribeInChunks(audioURL: transcriptionURL, duration: duration, recognizer: recognizer)
+        } else {
+            output = try await transcribeSingleFile(audioURL: transcriptionURL, recognizer: recognizer)
+        }
         
-        // Create recognition request
+        let transcription = output.transcription
+        guard !transcription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AudioTranscriptionError.noSpeechDetected
+        }
+        
+        return AudioTranscriptionResult(
+            transcription: transcription,
+            confidence: output.confidence,
+            originalFilename: url.lastPathComponent,
+            importDate: Date(),
+            duration: duration
+        )
+    }
+
+    private struct RecognitionOutput {
+        let transcription: String
+        let confidence: Float
+    }
+
+    private func prepareTranscriptionInput(from url: URL) throws -> URL {
+        let ext = url.pathExtension.lowercased()
+        let temporaryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bitbinder_transcription_input_\(UUID().uuidString)")
+            .appendingPathExtension(ext.isEmpty ? "m4a" : ext)
+
+        do {
+            if FileManager.default.fileExists(atPath: temporaryURL.path) {
+                try FileManager.default.removeItem(at: temporaryURL)
+            }
+            try FileManager.default.copyItem(at: url, to: temporaryURL)
+            return temporaryURL
+        } catch {
+            throw AudioTranscriptionError.audioExportFailed("Could not create a stable transcription copy: \(error.localizedDescription)")
+        }
+    }
+
+    private func transcribeSingleFile(
+        audioURL url: URL,
+        recognizer: SFSpeechRecognizer
+    ) async throws -> RecognitionOutput {
         let request = SFSpeechURLRecognitionRequest(url: url)
         request.shouldReportPartialResults = true
         if #available(iOS 16, *) {
@@ -169,7 +225,10 @@ class AudioTranscriptionService {
                     continuation.resume(throwing: AudioTranscriptionError.transcriptionFailed("Transcription timed out"))
                 }
             }
-            DispatchQueue.global().asyncAfter(deadline: .now() + SpeechReliability.fileTranscriptionTimeout, execute: timeoutWork)
+            DispatchQueue.global().asyncAfter(
+                deadline: .now() + SpeechReliability.fileTranscriptionTimeout,
+                execute: timeoutWork
+            )
             
             task = recognizer.recognitionTask(with: request) { result, error in
                 guard_lock.lock()
@@ -205,23 +264,110 @@ class AudioTranscriptionService {
         }
         
         let transcription = result.bestTranscription.formattedString
-        
-        // Check if we got any text
         guard !transcription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AudioTranscriptionError.noSpeechDetected
         }
         
-        // Calculate average confidence
         let segments = result.bestTranscription.segments
         let avgConfidence: Float = segments.isEmpty ? 0.5 : segments.reduce(0) { $0 + $1.confidence } / Float(segments.count)
         
-        return AudioTranscriptionResult(
+        return RecognitionOutput(
             transcription: transcription,
-            confidence: avgConfidence,
-            originalFilename: url.lastPathComponent,
-            importDate: Date(),
-            duration: duration
+            confidence: avgConfidence
         )
+    }
+
+    private func transcribeInChunks(
+        audioURL url: URL,
+        duration: TimeInterval,
+        recognizer: SFSpeechRecognizer
+    ) async throws -> RecognitionOutput {
+        let asset = AVURLAsset(url: url)
+        var chunkURLs: [URL] = []
+        defer {
+            for chunkURL in chunkURLs {
+                try? FileManager.default.removeItem(at: chunkURL)
+            }
+        }
+
+        var outputs: [RecognitionOutput] = []
+        var start: TimeInterval = 0
+        var chunkIndex = 0
+
+        while start < duration {
+            let length = min(Self.chunkDuration, duration - start)
+            let chunkURL = try await exportChunk(
+                asset: asset,
+                originalURL: url,
+                start: start,
+                duration: length,
+                index: chunkIndex
+            )
+            chunkURLs.append(chunkURL)
+
+            do {
+                let output = try await transcribeSingleFile(audioURL: chunkURL, recognizer: recognizer)
+                outputs.append(output)
+            } catch AudioTranscriptionError.noSpeechDetected {
+                // A silent section should not fail the whole recording.
+            }
+
+            start += Self.chunkDuration
+            chunkIndex += 1
+        }
+
+        guard !outputs.isEmpty else {
+            throw AudioTranscriptionError.noSpeechDetected
+        }
+
+        let transcription = outputs
+            .map(\.transcription)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        let confidence = outputs.reduce(Float(0)) { $0 + $1.confidence } / Float(outputs.count)
+        return RecognitionOutput(transcription: transcription, confidence: confidence)
+    }
+
+    private func exportChunk(
+        asset: AVURLAsset,
+        originalURL: URL,
+        start: TimeInterval,
+        duration: TimeInterval,
+        index: Int
+    ) async throws -> URL {
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bitbinder_transcription_\(UUID().uuidString)_\(index).m4a")
+
+        guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+            throw AudioTranscriptionError.audioExportFailed("Audio export is not available for \(originalURL.lastPathComponent).")
+        }
+
+        exporter.outputURL = outputURL
+        exporter.outputFileType = .m4a
+        exporter.timeRange = CMTimeRange(
+            start: CMTime(seconds: start, preferredTimescale: 600),
+            duration: CMTime(seconds: duration, preferredTimescale: 600)
+        )
+
+        nonisolated(unsafe) let unsafeExporter = exporter
+        return try await withCheckedThrowingContinuation { continuation in
+            unsafeExporter.exportAsynchronously {
+                switch unsafeExporter.status {
+                case .completed:
+                    continuation.resume(returning: outputURL)
+                case .failed, .cancelled:
+                    let message = unsafeExporter.error?.localizedDescription ?? "Unknown export error"
+                    try? FileManager.default.removeItem(at: outputURL)
+                    continuation.resume(throwing: AudioTranscriptionError.audioExportFailed(message))
+                default:
+                    let message = unsafeExporter.error?.localizedDescription ?? "Audio export ended unexpectedly"
+                    try? FileManager.default.removeItem(at: outputURL)
+                    continuation.resume(throwing: AudioTranscriptionError.audioExportFailed(message))
+                }
+            }
+        }
     }
     
     /// Get audio file duration

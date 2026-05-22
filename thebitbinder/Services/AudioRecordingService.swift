@@ -31,6 +31,8 @@ class AudioRecordingService: NSObject, ObservableObject {
     private var pausedDuration: TimeInterval = 0
     private var pauseStartTime: Date?
     private var lastRecordingURL: URL?
+    private var wasInterrupted = false
+    private var wasPausedBeforeInterruption = false
     
     /// Maximum number of retry attempts for audio session configuration
     private let maxAudioSessionRetries = 3
@@ -44,6 +46,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     override init() {
         super.init()
         setupMemoryWarningObserver()
+        setupAudioSessionObservers()
         setupAudioSession()
     }
     
@@ -62,12 +65,72 @@ class AudioRecordingService: NSObject, ObservableObject {
             object: nil
         )
     }
+
+    private func setupAudioSessionObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioInterruption),
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRouteChange),
+            name: AVAudioSession.routeChangeNotification,
+            object: nil
+        )
+    }
     
     @objc nonisolated private func handleMemoryWarning() {
         Task { @MainActor [weak self] in
             guard let self else { return }
             if self.isRecording {
                 print(" Memory warning during recording - consider stopping")
+            }
+        }
+    }
+
+    @objc nonisolated private func handleAudioInterruption(_ notification: Notification) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let info = notification.userInfo,
+                  let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+
+            switch type {
+            case .began:
+                guard self.isRecording else { return }
+                self.wasInterrupted = true
+                self.wasPausedBeforeInterruption = self.isPaused
+                if !self.isPaused {
+                    self.pauseRecording()
+                }
+                self.audioSessionError = "Recording paused because audio was interrupted. It will resume automatically if iOS allows it."
+            case .ended:
+                guard self.wasInterrupted else { return }
+                self.wasInterrupted = false
+                let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                guard self.isRecording, !self.wasPausedBeforeInterruption, options.contains(.shouldResume) else { return }
+                self.resumeRecording()
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    @objc nonisolated private func handleRouteChange(_ notification: Notification) {
+        Task { @MainActor [weak self] in
+            guard let self, self.isRecording else { return }
+            guard let info = notification.userInfo,
+                  let reasonValue = info[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
+
+            switch reason {
+            case .oldDeviceUnavailable, .newDeviceAvailable, .routeConfigurationChange:
+                self.audioSessionError = nil
+            default:
+                break
             }
         }
     }
@@ -83,6 +146,7 @@ class AudioRecordingService: NSObject, ObservableObject {
                 mode: .default,
                 options: [
                     .defaultToSpeaker,
+                    .allowBluetoothHFP,
                     .allowBluetoothA2DP,
                     .allowAirPlay,
                     .mixWithOthers
@@ -98,8 +162,18 @@ class AudioRecordingService: NSObject, ObservableObject {
     }
 
     @objc private func updateRecordingTimeFromTimer() {
-        guard let startTime = recordingStartTime else { return }
-        recordingTime = Date().timeIntervalSince(startTime) - pausedDuration
+        recordingTime = currentElapsedRecordingTime()
+    }
+
+    private func currentElapsedRecordingTime() -> TimeInterval {
+        guard let startTime = recordingStartTime else { return recordingTime }
+        let activePausedDuration: TimeInterval
+        if let pauseStart = pauseStartTime {
+            activePausedDuration = pausedDuration + Date().timeIntervalSince(pauseStart)
+        } else {
+            activePausedDuration = pausedDuration
+        }
+        return max(0, Date().timeIntervalSince(startTime) - activePausedDuration)
     }
 
     private func activateAudioSessionForRecording() -> Bool {
@@ -131,10 +205,21 @@ class AudioRecordingService: NSObject, ObservableObject {
     }
 
     func startRecording(fileName: String) -> Bool {
+        guard !isRecording else {
+            audioSessionError = "A recording is already in progress."
+            return false
+        }
+        guard lastRecordingURL == nil else {
+            audioSessionError = "Save or discard the stopped recording before starting a new one."
+            return false
+        }
+
+        setupAudioSession()
         guard activateAudioSessionForRecording() else { return false }
 
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let audioFileName = documentsPath.appendingPathComponent("\(fileName).m4a")
+        let safeFileName = sanitizedFileName(fileName)
+        let audioFileName = uniqueRecordingURL(in: documentsPath, baseName: safeFileName)
         
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
@@ -146,14 +231,22 @@ class AudioRecordingService: NSObject, ObservableObject {
         do {
             audioRecorder = try AVAudioRecorder(url: audioFileName, settings: settings)
             audioRecorder?.delegate = self
-            audioRecorder?.record()
+            audioRecorder?.prepareToRecord()
+            guard audioRecorder?.record() == true else {
+                audioRecorder = nil
+                audioSessionError = "Could not start recording. Check microphone access and try again."
+                return false
+            }
             
             isRecording = true
             isPaused = false
-            activeRecordingName = fileName
+            activeRecordingName = safeFileName
             recordingStartTime = Date()
             recordingTime = 0
             pausedDuration = 0
+            pauseStartTime = nil
+            wasInterrupted = false
+            wasPausedBeforeInterruption = false
             
             // Invalidate any leftover timer before creating a new one to prevent
             // a leaked repeating timer if startRecording is called twice.
@@ -171,6 +264,7 @@ class AudioRecordingService: NSObject, ObservableObject {
             return true
         } catch {
             print("Failed to start recording: \(error)")
+            audioSessionError = "Failed to start recording: \(error.localizedDescription)"
             return false
         }
     }
@@ -178,6 +272,7 @@ class AudioRecordingService: NSObject, ObservableObject {
     func pauseRecording() {
         guard isRecording && !isPaused else { return }
         audioRecorder?.pause()
+        recordingTime = currentElapsedRecordingTime()
         isPaused = true
         pauseStartTime = Date()
         recordingTimer?.invalidate()
@@ -186,14 +281,18 @@ class AudioRecordingService: NSObject, ObservableObject {
     
     func resumeRecording() {
         guard isRecording && isPaused else { return }
+        guard activateAudioSessionForRecording() else { return }
         
-        // Accumulate the time spent paused
+        guard audioRecorder?.record() == true else {
+            audioSessionError = "Could not resume recording. Try stopping and saving what was captured."
+            return
+        }
+
+        // Accumulate the time spent paused only after recording actually resumes.
         if let pauseStart = pauseStartTime {
             pausedDuration += Date().timeIntervalSince(pauseStart)
         }
         pauseStartTime = nil
-        
-        audioRecorder?.record()
         isPaused = false
         
         // Restart timer
@@ -215,9 +314,10 @@ class AudioRecordingService: NSObject, ObservableObject {
             pauseStartTime = nil
         }
         
-        let duration = recordingTime
+        let duration = currentElapsedRecordingTime()
         
         audioRecorder?.stop()
+        audioRecorder = nil
         recordingTimer?.invalidate()
         recordingTimer = nil
         
@@ -230,6 +330,9 @@ class AudioRecordingService: NSObject, ObservableObject {
         recordingTime = 0
         recordingStartTime = nil
         pausedDuration = 0
+        pauseStartTime = nil
+        wasInterrupted = false
+        wasPausedBeforeInterruption = false
 
         print(" Stopped recording: \(url?.lastPathComponent ?? "unknown") duration: \(duration)s")
         
@@ -237,12 +340,19 @@ class AudioRecordingService: NSObject, ObservableObject {
     }
     
     func cancelRecording() {
-        if let url = audioRecorder?.url {
-            audioRecorder?.stop()
+        let url = audioRecorder?.url ?? lastRecordingURL
+        audioRecorder?.stop()
+        if let url {
             try? FileManager.default.removeItem(at: url)
         }
         
         cleanup()
+    }
+
+    func clearFinishedRecording() {
+        audioRecorder = nil
+        lastRecordingURL = nil
+        audioSessionError = nil
     }
     
     private func cleanup() {
@@ -255,8 +365,42 @@ class AudioRecordingService: NSObject, ObservableObject {
         recordingStartTime = nil
         pausedDuration = 0
         pauseStartTime = nil
+        wasInterrupted = false
+        wasPausedBeforeInterruption = false
         audioRecorder = nil
         lastRecordingURL = nil
+    }
+
+    private func sanitizedFileName(_ name: String) -> String {
+        let invalidCharacters = CharacterSet(charactersIn: "/\\:*?\"<>|")
+            .union(.newlines)
+            .union(.controlCharacters)
+        var sanitized = name.components(separatedBy: invalidCharacters).joined(separator: "_")
+        sanitized = sanitized.trimmingCharacters(in: .whitespacesAndNewlines)
+        while sanitized.contains("__") {
+            sanitized = sanitized.replacingOccurrences(of: "__", with: "_")
+        }
+        if sanitized.isEmpty {
+            sanitized = "Recording_\(UUID().uuidString.prefix(8))"
+        }
+        return sanitized
+    }
+
+    private func uniqueRecordingURL(in directory: URL, baseName: String) -> URL {
+        var candidate = directory.appendingPathComponent("\(baseName).m4a")
+        guard FileManager.default.fileExists(atPath: candidate.path) else {
+            return candidate
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        let timestamp = formatter.string(from: Date())
+        candidate = directory.appendingPathComponent("\(baseName)_\(timestamp).m4a")
+        guard FileManager.default.fileExists(atPath: candidate.path) else {
+            return candidate
+        }
+
+        return directory.appendingPathComponent("\(baseName)_\(UUID().uuidString.prefix(8)).m4a")
     }
 }
 

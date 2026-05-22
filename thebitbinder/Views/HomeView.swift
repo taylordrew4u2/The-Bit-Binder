@@ -13,7 +13,6 @@ import UIKit
 // MARK: - HomeView
 
 enum HomeSection: String, CaseIterable, Hashable {
-    case dailyJournal = "Daily Journal"
     case quickActions = "Quick Actions"
     case stats = "At a Glance"
     case recent = "Recent"
@@ -21,7 +20,6 @@ enum HomeSection: String, CaseIterable, Hashable {
 
     var icon: String {
         switch self {
-        case .dailyJournal: return "book.closed"
         case .quickActions: return "bolt.fill"
         case .stats: return "chart.bar.fill"
         case .recent: return "clock.fill"
@@ -31,7 +29,6 @@ enum HomeSection: String, CaseIterable, Hashable {
 
     var detail: String {
         switch self {
-        case .dailyJournal: return "Today's journal status and entry shortcut"
         case .quickActions: return "New joke, capture idea, and record set"
         case .stats: return "Counts for jokes, hits, sets, and weekly work"
         case .recent: return "Recently edited jokes"
@@ -45,14 +42,13 @@ struct HomeView: View {
     @Query(filter: #Predicate<SetList> { !$0.isTrashed }) private var allSets: [SetList]
     @Query(filter: #Predicate<BrainstormIdea> { !$0.isTrashed }) private var allIdeas: [BrainstormIdea]
     @Query(filter: #Predicate<Recording> { !$0.isTrashed }) private var allRecordings: [Recording]
-    @Query(sort: \DailyJournalEntry.date, order: .reverse) private var journalEntries: [DailyJournalEntry]
 
     @Environment(\.modelContext) private var modelContext
 
     /// Unified sheet state — only one sheet can present at a time in SwiftUI,
     /// so an optional enum prevents conflicting `isPresented` booleans.
     private enum ActiveSheet: Identifiable {
-        case addJoke, talkToText, quickRecord, journalEditor
+        case addJoke, talkToText, quickRecord
         var id: Int { hashValue }
     }
     @State private var activeSheet: ActiveSheet?
@@ -100,13 +96,6 @@ struct HomeView: View {
         return sections.isEmpty ? Set(HomeSection.allCases) : sections
     }
 
-    private var todayJournalEntry: DailyJournalEntry? {
-        let key = DailyJournalEntry.todayKey
-        return journalEntries.first { $0.dateKey == key }
-    }
-
-    private var todayJournalComplete: Bool { todayJournalEntry?.isComplete ?? false }
-
     var body: some View {
         List {
             // MARK: - Greeting Header
@@ -128,39 +117,6 @@ struct HomeView: View {
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
-            }
-
-            if selectedHomeSections.contains(.dailyJournal) {
-                // MARK: - Daily Journal
-                Section {
-                    Button {
-                        haptic(.light)
-                        activeSheet = .journalEditor
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: todayJournalComplete ? "checkmark.circle.fill" : "book.closed")
-                                .foregroundColor(todayJournalComplete ? .accentColor : Color.bitbinderAccent)
-                                .frame(width: 22)
-                                .accessibilityLabel(todayJournalComplete ? "Journal complete" : "Journal incomplete")
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Daily Journal")
-                                    .foregroundColor(.primary)
-                                Text(todayJournalComplete ? "Today is complete" : "Today is incomplete")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(Color(UIColor.tertiaryLabel))
-                                .accessibilityHidden(true)
-                        }
-                    }
-                } footer: {
-                    if !todayJournalComplete {
-                        Text("A quick end-of-day note. One entry per day.")
-                    }
-                }
             }
 
             if selectedHomeSections.contains(.quickActions) {
@@ -332,13 +288,6 @@ struct HomeView: View {
                 TalkToTextView(selectedFolder: nil as JokeFolder?, saveToBrainstorm: true)
             case .quickRecord:
                 StandaloneRecordingView()
-            case .journalEditor:
-                NavigationStack {
-                    JournalEntryEditorView(
-                        entry: DailyJournalStore.entryForToday(in: modelContext),
-                        isBackfill: false
-                    )
-                }
             }
         }
         .task(id: statsKey) {
@@ -427,6 +376,6 @@ extension Date {
     }
     .modelContainer(for: [
         Joke.self, SetList.self, BrainstormIdea.self,
-        Recording.self, ImportBatch.self, DailyJournalEntry.self
+        Recording.self, ImportBatch.self
     ], inMemory: true)
 }

@@ -190,6 +190,7 @@ struct AudioImportView: View {
         
         for url in urls {
             currentFilename = url.lastPathComponent
+            let didAccessSecurityScopedResource = url.startAccessingSecurityScopedResource()
             
             do {
                 let result = try await transcriptionService.transcribe(audioURL: url)
@@ -219,7 +220,10 @@ struct AudioImportView: View {
                 processingCurrent += 1
             }
             
-            try? FileManager.default.removeItem(at: url)
+            if didAccessSecurityScopedResource {
+                url.stopAccessingSecurityScopedResource()
+            }
+            removeImportedCopyIfNeeded(url)
         }
         
         do {
@@ -230,6 +234,17 @@ struct AudioImportView: View {
         
         isProcessing = false
         showingResults = true
+    }
+
+    private func removeImportedCopyIfNeeded(_ url: URL) {
+        let temporaryDirectory = FileManager.default.temporaryDirectory.standardizedFileURL.path
+        let candidatePath = url.standardizedFileURL.path
+
+        guard candidatePath.hasPrefix(temporaryDirectory) else {
+            return
+        }
+
+        try? FileManager.default.removeItem(at: url)
     }
 }
 

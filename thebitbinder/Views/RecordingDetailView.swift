@@ -250,6 +250,7 @@ struct RecordingDetailView: View {
         
         isTranscribing = true
         transcriptionError = nil
+        audioPlayer.stop()
         
         Task {
             do {

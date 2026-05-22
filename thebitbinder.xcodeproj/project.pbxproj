@@ -7,10 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		BA22E5EC2F732DFC00B9A423 /* Algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = BA22E5EB2F732DFC00B9A423 /* Algorithms */; };
 		BAD6B2CE2F6F753E00A09B53 /* bit.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = BAD6B2C62F6F753E00A09B53 /* bit.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		BAD6B5562F6FCBB600A09B53 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = BAD6B5552F6FCBB600A09B53 /* GoogleGenerativeAI */; };
-		BAD6B5912F716B2400A09B53 /* OpenAI in Frameworks */ = {isa = PBXBuildFile; productRef = BAD6B5902F716B2400A09B53 /* OpenAI */; };
 		BAFA10012F99000100A1B2C3 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = BAFA10022F99000100A1B2C3 /* MLXLLM */; };
 		BAFA10032F99000100A1B2C3 /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = BAFA10042F99000100A1B2C3 /* Transformers */; };
 /* End PBXBuildFile section */
@@ -94,11 +91,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BA22E5EC2F732DFC00B9A423 /* Algorithms in Frameworks */,
 				BAFA10012F99000100A1B2C3 /* MLXLLM in Frameworks */,
 				BAFA10032F99000100A1B2C3 /* Transformers in Frameworks */,
-				BAD6B5912F716B2400A09B53 /* OpenAI in Frameworks */,
-				BAD6B5562F6FCBB600A09B53 /* GoogleGenerativeAI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -153,9 +147,6 @@
 			);
 			name = thebitbinder;
 			packageProductDependencies = (
-				BAD6B5552F6FCBB600A09B53 /* GoogleGenerativeAI */,
-				BAD6B5902F716B2400A09B53 /* OpenAI */,
-				BA22E5EB2F732DFC00B9A423 /* Algorithms */,
 				BAFA10022F99000100A1B2C3 /* MLXLLM */,
 				BAFA10042F99000100A1B2C3 /* Transformers */,
 			);
@@ -210,9 +201,6 @@
 			mainGroup = BAB3D0482EDF80F5007295C1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				BAD6B5542F6FCBB600A09B53 /* XCRemoteSwiftPackageReference "generative-ai-swift" */,
-				BAD6B58F2F716B2400A09B53 /* XCRemoteSwiftPackageReference "OpenAI" */,
-				BA22E5EA2F732DFC00B9A423 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
 				BAFA10052F99000100A1B2C3 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				BAFA10062F99000100A1B2C3 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 			);
@@ -311,7 +299,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 11.4;
+				MARKETING_VERSION = 11.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "The-BitBinder.thebitbinder";
@@ -366,7 +354,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 11.4;
+				MARKETING_VERSION = 11.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "The-BitBinder.thebitbinder";
@@ -518,7 +506,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 11.4;
+				MARKETING_VERSION = 11.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder.bit";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -551,7 +539,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 11.4;
+				MARKETING_VERSION = 11.5;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder.bit";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -600,30 +588,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		BA22E5EA2F732DFC00B9A423 /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-algorithms.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.2.1;
-			};
-		};
-		BAD6B5542F6FCBB600A09B53 /* XCRemoteSwiftPackageReference "generative-ai-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/google/generative-ai-swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.5.0;
-			};
-		};
-		BAD6B58F2F716B2400A09B53 /* XCRemoteSwiftPackageReference "OpenAI" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/MacPaw/OpenAI.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.4.7;
-			};
-		};
 		BAFA10052F99000100A1B2C3 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
@@ -643,21 +607,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		BA22E5EB2F732DFC00B9A423 /* Algorithms */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BA22E5EA2F732DFC00B9A423 /* XCRemoteSwiftPackageReference "swift-algorithms" */;
-			productName = Algorithms;
-		};
-		BAD6B5552F6FCBB600A09B53 /* GoogleGenerativeAI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BAD6B5542F6FCBB600A09B53 /* XCRemoteSwiftPackageReference "generative-ai-swift" */;
-			productName = GoogleGenerativeAI;
-		};
-		BAD6B5902F716B2400A09B53 /* OpenAI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = BAD6B58F2F716B2400A09B53 /* XCRemoteSwiftPackageReference "OpenAI" */;
-			productName = OpenAI;
-		};
 		BAFA10022F99000100A1B2C3 /* MLXLLM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = BAFA10052F99000100A1B2C3 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;

@@ -16,7 +16,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
     static let shared = SchemaDeploymentService()
     
     private let container: CKContainer
-    private let schemaVersion = "2.5.0"  // Increment when schema changes - Added SetList finalization & RoastJoke structure fields
+    private let schemaVersion = "2.6.0"  // Increment when schema changes - Includes NotebookFolder in schema verification
     private let ensuredSchemaVersionKey = "CloudKitSchemaEnsuredVersion"
 
     /// All CloudKit record types managed by this schema
@@ -29,6 +29,7 @@ final class SchemaDeploymentService: @unchecked Sendable {
         "CD_RoastJoke",
         "CD_BrainstormIdea",
         "CD_NotebookPhotoRecord",
+        "CD_NotebookFolder",
         "CD_ImportBatch",
         "CD_ImportedJokeMetadata",
         "CD_UnresolvedImportFragment",
@@ -169,6 +170,12 @@ final class SchemaDeploymentService: @unchecked Sendable {
         CD_NotebookPhotoRecord:
           - CD_id [Q], CD_notes
           - CD_imageData (BYTES), CD_dateAdded [Q,S]
+          - CD_folder (REFERENCE) [Q]
+          - CD_isDeleted [Q], CD_deletedDate
+
+        CD_NotebookFolder:
+          - CD_id [Q], CD_name [Q]
+          - CD_dateCreated [Q,S], CD_sortOrder [S]
           - CD_isDeleted [Q], CD_deletedDate
         
         CD_ImportBatch:
@@ -273,6 +280,10 @@ final class SchemaDeploymentService: @unchecked Sendable {
             var photoDescriptor = FetchDescriptor<NotebookPhotoRecord>()
             photoDescriptor.fetchLimit = 1
             let _: [NotebookPhotoRecord] = try context.fetch(photoDescriptor)
+
+            var notebookFolderDescriptor = FetchDescriptor<NotebookFolder>()
+            notebookFolderDescriptor.fetchLimit = 1
+            let _: [NotebookFolder] = try context.fetch(notebookFolderDescriptor)
             
             var batchDescriptor = FetchDescriptor<ImportBatch>()
             batchDescriptor.fetchLimit = 1

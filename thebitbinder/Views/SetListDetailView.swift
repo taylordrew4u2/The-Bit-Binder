@@ -32,6 +32,7 @@ struct SetListDetailView: View {
     @ObservedObject private var audioService = AudioRecordingService.shared
     @State private var recordingName = ""
     @State private var lastRecordingURL: URL?
+    @State private var lastRecordingDuration: TimeInterval = 0
     @State private var showingSaveAlert = false
     @State private var showRecordingSaveError = false
     @State private var recordingSaveErrorMessage = ""
@@ -269,7 +270,7 @@ struct SetListDetailView: View {
         .alert("Save Recording", isPresented: $showingSaveAlert) {
             TextField("Recording name", text: $recordingName)
             Button("Save") { saveRecording() }
-            Button("Cancel", role: .cancel) {}
+            Button("Discard", role: .destructive) { discardStoppedRecording() }
         } message: {
             Text("Enter a name for your recording")
         }
@@ -286,7 +287,11 @@ struct SetListDetailView: View {
     
     private func startRecording() {
         let name = recordingName.isEmpty ? setList.name : recordingName
-        _ = audioService.startRecording(fileName: name)
+        let started = audioService.startRecording(fileName: name)
+        if !started {
+            recordingSaveErrorMessage = audioService.audioSessionError ?? "Could not start recording. Please try again."
+            showRecordingSaveError = true
+        }
     }
     
     private func pauseResumeRecording() {
@@ -300,6 +305,7 @@ struct SetListDetailView: View {
     private func stopRecording() {
         let result = audioService.stopRecording()
         lastRecordingURL = result.url
+        lastRecordingDuration = result.duration
         showingSaveAlert = true
     }
     
@@ -312,7 +318,7 @@ struct SetListDetailView: View {
         let recording = Recording(
             title: recordingName.isEmpty ? "Recording \(Date())" : recordingName,
             fileURL: fileURL.lastPathComponent,
-            duration: audioService.recordingTime
+            duration: lastRecordingDuration
         )
         modelContext.insert(recording)
 
@@ -321,7 +327,9 @@ struct SetListDetailView: View {
             #if DEBUG
             print("Recording saved successfully: \(recording.title)")
             #endif
+            audioService.clearFinishedRecording()
             lastRecordingURL = nil
+            lastRecordingDuration = 0
         } catch {
             #if DEBUG
             print(" Failed to save recording: \(error)")
@@ -329,6 +337,12 @@ struct SetListDetailView: View {
             recordingSaveErrorMessage = "Could not save recording: \(error.localizedDescription)"
             showRecordingSaveError = true
         }
+    }
+
+    private func discardStoppedRecording() {
+        audioService.cancelRecording()
+        lastRecordingURL = nil
+        lastRecordingDuration = 0
     }
     
     private func moveJokes(from source: IndexSet, to destination: Int) {

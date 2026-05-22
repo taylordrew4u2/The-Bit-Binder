@@ -440,8 +440,16 @@ final class BitBuddyService: NSObject, ObservableObject {
     }
     
     func startRecording() throws {
+        guard audioRecorder == nil else {
+            throw BitBuddyError.audioRecordingFailed("A BitBuddy recording is already in progress.")
+        }
+
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+        try session.setCategory(
+            .playAndRecord,
+            mode: .default,
+            options: [.defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP]
+        )
         try session.setActive(true)
         
         let settings: [String: Any] = [
@@ -452,16 +460,22 @@ final class BitBuddyService: NSObject, ObservableObject {
         ]
         
         let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent("bitbuddy_recording.m4a")
+        let fileURL = tempDir.appendingPathComponent("bitbuddy_recording_\(UUID().uuidString.prefix(8)).m4a")
         recordedAudioURL = fileURL
         
         audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
         audioRecorder?.delegate = self
-        audioRecorder?.record()
+        audioRecorder?.prepareToRecord()
+        guard audioRecorder?.record() == true else {
+            audioRecorder = nil
+            recordedAudioURL = nil
+            throw BitBuddyError.audioRecordingFailed("Could not start recording. Check microphone access and try again.")
+        }
     }
     
     func stopRecording() -> URL? {
         audioRecorder?.stop()
+        audioRecorder = nil
         let url = recordedAudioURL
         recordedAudioURL = nil
         return url
@@ -1270,6 +1284,7 @@ enum BitBuddyError: LocalizedError {
     case apiError(statusCode: Int, message: String)
     case parseError
     case notConnected
+    case audioRecordingFailed(String)
     
     var errorDescription: String? {
         switch self {
@@ -1281,6 +1296,8 @@ enum BitBuddyError: LocalizedError {
             return "BitBuddy couldn't understand that request"
         case .notConnected:
             return "BitBuddy isn't available right now"
+        case .audioRecordingFailed(let message):
+            return message
         }
     }
 }

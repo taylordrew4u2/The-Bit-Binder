@@ -193,7 +193,7 @@ final class SpeechRecognitionManager: NSObject, ObservableObject, SFSpeechRecogn
             try audioSession.setCategory(
                 .playAndRecord,
                 mode: .measurement,
-                options: [.defaultToSpeaker, .duckOthers, .allowBluetoothA2DP]
+                options: [.defaultToSpeaker, .duckOthers, .allowBluetoothHFP, .allowBluetoothA2DP]
             )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {

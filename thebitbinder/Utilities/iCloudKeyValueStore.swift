@@ -28,10 +28,6 @@ enum SyncedKeys {
     static let dailyNotifStartMinute = "dailyNotifStartMinute"
     static let dailyNotifEndMinute = "dailyNotifEndMinute"
 
-    // Daily Journal reminder
-    static let journalReminderEnabled = "journalReminderEnabled"
-    static let journalReminderMinute = "journalReminderMinute"
-
     // Auth
     static let userId = "userId"
     static let lastSyncDate = "lastSyncDate"
@@ -51,8 +47,6 @@ enum SyncedKeys {
         dailyNotificationsEnabled,
         dailyNotifStartMinute,
         dailyNotifEndMinute,
-        journalReminderEnabled,
-        journalReminderMinute,
         userId,
     ]
 }
