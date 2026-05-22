@@ -57,7 +57,6 @@ struct StandaloneRecordingView: View {
                 Button("Discard", role: .destructive) {
                     discardRecording()
                 }
-                Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Enter a name for your recording")
             }
@@ -299,6 +298,9 @@ struct StandaloneRecordingView: View {
             timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
                 recordingDuration += 1
             }
+        } else {
+            saveErrorMessage = audioService.audioSessionError ?? "Could not start recording. Please try again."
+            showingSaveError = true
         }
     }
     
@@ -357,6 +359,7 @@ struct StandaloneRecordingView: View {
         // Save context explicitly with error handling
         do {
             try modelContext.save()
+            audioService.clearFinishedRecording()
             haptic(.success)
             dismiss()
         } catch {

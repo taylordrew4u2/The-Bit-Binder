@@ -34,7 +34,7 @@ struct AppSetupView: View {
 
     // All configurable tabs (excluding Settings — always shown)
     private let configurableTabs: [AppScreen] = [
-        .home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver, .journal
+        .home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver
     ]
 
     private let defaultTabs: Set<AppScreen> = [.home, .jokes, .sets, .notebookSaver]
@@ -607,7 +607,6 @@ struct AppSetupView: View {
         case .sets:          return "Set lists for performances"
         case .recordings:    return "Audio recordings and transcriptions"
         case .notebookSaver: return "Photos and scanned notes"
-        case .journal:       return "End-of-day journal, one entry per day"
         case .settings:      return ""
         }
     }

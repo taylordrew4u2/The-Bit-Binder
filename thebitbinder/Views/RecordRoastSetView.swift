@@ -12,14 +12,12 @@ import AVFoundation
 struct RecordRoastSetView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var audioService = AudioRecordingService.shared
     
     let target: RoastTarget
     
-    @State private var isRecording = false
-    @State private var recordingTime: TimeInterval = 0
-    @State private var recordingTimer: Timer?
-    @State private var audioRecorder: AVAudioRecorder?
     @State private var recordingURL: URL?
+    @State private var stoppedRecordingDuration: TimeInterval = 0
     @State private var errorMessage: String?
     @State private var showDiscardAlert = false
     @State private var showSaveError = false
@@ -33,8 +31,9 @@ struct RecordRoastSetView: View {
     }
     
     var formattedTime: String {
-        let minutes = Int(recordingTime) / 60
-        let seconds = Int(recordingTime) % 60
+        let displayTime = audioService.isRecording ? audioService.recordingTime : stoppedRecordingDuration
+        let minutes = Int(displayTime) / 60
+        let seconds = Int(displayTime) % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
     
@@ -45,25 +44,25 @@ struct RecordRoastSetView: View {
                 VStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(isRecording ? Color.recording.opacity(DS.Opacity.light) : accentColor.opacity(0.1))
+                            .fill(audioService.isRecording ? Color.recording.opacity(DS.Opacity.light) : accentColor.opacity(0.1))
                             .frame(width: 100, height: 100)
-                            .scaleEffect(isRecording ? 1.1 : 1.0)
-                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isRecording)
+                            .scaleEffect(audioService.isRecording ? 1.1 : 1.0)
+                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
                         
-                        Image(systemName: isRecording ? "record.circle.fill" : "record.circle")
+                        Image(systemName: audioService.isRecording ? "record.circle.fill" : "record.circle")
                             .font(.system(size: 40))
-                            .foregroundColor(isRecording ? .recording : accentColor)
-                            .symbolEffect(.variableColor, isActive: isRecording)
+                            .foregroundColor(audioService.isRecording ? .recording : accentColor)
+                            .symbolEffect(.variableColor, isActive: audioService.isRecording)
                     }
                     
-                    Text(isRecording ? "Recording..." : "Ready")
+                    Text(audioService.isRecording ? "Recording..." : "Ready")
                          .font(.title3)
                          .fontWeight(.semibold)
                     
                     // Time display
                      Text(formattedTime)
                          .font(.system(size: 36, weight: .bold, design: .monospaced))
-                         .foregroundColor(isRecording ? .recording : accentColor)
+                         .foregroundColor(audioService.isRecording ? .recording : accentColor)
                          .padding()
                          .background(Color(UIColor.secondarySystemBackground))
                          .cornerRadius(12)
@@ -96,26 +95,26 @@ struct RecordRoastSetView: View {
                 // Controls
                 VStack(spacing: 16) {
                     Button {
-                        if isRecording {
+                        if audioService.isRecording {
                             stopRecording()
                         } else {
                             startRecording()
                         }
                     } label: {
                         HStack(spacing: 10) {
-                            Image(systemName: isRecording ? "stop.fill" : "record.circle.fill")
+                            Image(systemName: audioService.isRecording ? "stop.fill" : "record.circle.fill")
                                 .font(.system(size: 20))
-                            Text(isRecording ? "Stop Recording" : "Start Recording")
+                            Text(audioService.isRecording ? "Stop Recording" : "Start Recording")
                                 .fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
                          .padding(.vertical, 16)
-                         .background(isRecording ? Color.recording : accentColor)
+                         .background(audioService.isRecording ? Color.recording : accentColor)
                          .foregroundColor(.white)
                          .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     
-                    if recordingURL != nil && !isRecording {
+                    if recordingURL != nil && !audioService.isRecording {
                         Button {
                             saveRecording()
                         } label: {
@@ -140,7 +139,7 @@ struct RecordRoastSetView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
-                        if isRecording || recordingURL != nil {
+                        if audioService.isRecording || recordingURL != nil {
                             showDiscardAlert = true
                         } else {
                             dismiss()
@@ -150,8 +149,9 @@ struct RecordRoastSetView: View {
             }
             .alert("Discard Recording?", isPresented: $showDiscardAlert) {
                 Button("Discard", role: .destructive) {
-                    stopRecording()
-                    // Clean up temp file
+                    if audioService.isRecording {
+                        audioService.cancelRecording()
+                    }
                     if let url = recordingURL {
                         try? FileManager.default.removeItem(at: url)
                     }
@@ -166,16 +166,11 @@ struct RecordRoastSetView: View {
             } message: {
                 Text(saveErrorMessage)
             }
-            .onDisappear {
-                if isRecording {
-                    stopRecording()
-                }
-            }
         }
     }
     
     private func saveRecording() {
-        guard let tempURL = recordingURL else {
+        guard let fileURL = recordingURL else {
             saveErrorMessage = "No recording file found."
             showSaveError = true
             return
@@ -188,21 +183,8 @@ struct RecordRoastSetView: View {
             return
         }
         
-        // Move from temp to documents for persistence
-        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let destinationURL = documentsDir.appendingPathComponent(tempURL.lastPathComponent)
-        
-        do {
-            // Remove any existing file at destination
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
-            }
-            try FileManager.default.moveItem(at: tempURL, to: destinationURL)
-        } catch {
-            #if DEBUG
-            print(" [RecordRoastSetView] Failed to move recording file: \(error)")
-            #endif
-            saveErrorMessage = "Could not save recording file: \(error.localizedDescription)"
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            saveErrorMessage = "Recording file was not created. Please try again."
             showSaveError = true
             return
         }
@@ -210,16 +192,19 @@ struct RecordRoastSetView: View {
         // Create a Recording model
         let recording = Recording(
             title: "Roast Set – \(safeTargetName)",
-            fileURL: destinationURL.lastPathComponent,
-            duration: recordingTime
+            fileURL: fileURL.lastPathComponent,
+            duration: stoppedRecordingDuration
         )
         modelContext.insert(recording)
         
         do {
             try modelContext.save()
             #if DEBUG
-            print(" [RecordRoastSetView] Recording saved for '\(target.name)' (duration: \(recordingTime)s)")
+            print(" [RecordRoastSetView] Recording saved for '\(target.name)' (duration: \(stoppedRecordingDuration)s)")
             #endif
+            audioService.clearFinishedRecording()
+            recordingURL = nil
+            stoppedRecordingDuration = 0
             dismiss()
         } catch {
             #if DEBUG
@@ -252,74 +237,22 @@ struct RecordRoastSetView: View {
             }
             
             await MainActor.run {
-                guard setupAudioSession() else { return }
-                
-                // Slugify target id to ensure a valid filename component
-                let safeID = sanitizedFilenameComponent(from: target.id.uuidString)
-                let filename = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("roast_set_\(safeID).m4a")
-                
-                let settings: [String: Any] = [
-                    AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                    AVSampleRateKey: 44100,
-                    AVNumberOfChannelsKey: 1,
-                    AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-                ]
-                
-                do {
-                    audioRecorder = try AVAudioRecorder(url: filename, settings: settings)
-                    audioRecorder?.record()
-                    
-                    recordingURL = filename
-                    recordingTime = 0
-                    isRecording = true
+                let started = audioService.startRecording(fileName: "Roast Set - \(safeTargetName)")
+                if started {
+                    recordingURL = nil
+                    stoppedRecordingDuration = 0
                     errorMessage = nil
-                    
-                    // Start timer — capture audioRecorder weakly to check if still recording
-                    // Note: In SwiftUI structs, we can't use weak self, but the closure
-                    // captures the @State binding which is safe because Timer is invalidated in stopRecording
-                    let recorder = audioRecorder
-                    recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak recorder] _ in
-                        guard recorder?.isRecording == true else { return }
-                        recordingTime += 0.1
-                    }
-                } catch {
-                    errorMessage = "Failed to start recording: \(error.localizedDescription)"
+                } else {
+                    errorMessage = audioService.audioSessionError ?? "Failed to start recording. Check microphone access and try again."
                 }
             }
         }
     }
     
     private func stopRecording() {
-        audioRecorder?.stop()
-        audioRecorder = nil
-        isRecording = false
-        recordingTimer?.invalidate()
-        recordingTimer = nil
-    }
-    
-    /// Returns `true` when the audio session is ready; sets `errorMessage` and
-    /// returns `false` on failure so the caller can bail out.
-    @discardableResult
-    private func setupAudioSession() -> Bool {
-        let audioSession = AVAudioSession.sharedInstance()
-        do {
-            try audioSession.setCategory(.record, mode: .default, options: [])
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-            return true
-        } catch {
-            errorMessage = "Audio session setup failed: \(error.localizedDescription)"
-            return false
-        }
-    }
-    
-    /// Strips any characters that are unsafe for use in a filename.
-    private func sanitizedFilenameComponent(from value: String) -> String {
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
-        return value.unicodeScalars
-            .filter { allowed.contains($0) }
-            .map { String($0) }
-            .joined()
+        let result = audioService.stopRecording()
+        recordingURL = result.url
+        stoppedRecordingDuration = result.duration
     }
 }
 

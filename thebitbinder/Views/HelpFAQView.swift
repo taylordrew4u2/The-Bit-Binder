@@ -40,7 +40,7 @@ struct HelpFAQView: View {
                 HStack {
                     Spacer()
                     VStack(spacing: 4) {
-                        Text("BitBinder v10.4")
+                        Text("BitBinder v11.5")
                             .font(.caption.weight(.semibold))
                             .foregroundColor(.secondary)
                         Text("Shut up and write some jokes.")

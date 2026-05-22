@@ -31,7 +31,6 @@ struct thebitbinderApp: App {
             ImportedJokeMetadata.self,
             UnresolvedImportFragment.self,
             ChatMessage.self,
-            DailyJournalEntry.self,
         ])
 
         // One store file. All fallbacks use this same URL — never switch to a
@@ -283,7 +282,6 @@ struct thebitbinderApp: App {
             print(" [AppLifecycle] Foreground save skipped")
 
             NotificationManager.shared.scheduleIfNeeded()
-            JournalReminderManager.shared.scheduleIfNeeded()
 
         case .inactive:
             print(" [AppLifecycle] App became inactive")

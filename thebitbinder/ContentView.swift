@@ -125,7 +125,6 @@ enum AppScreen: String, CaseIterable {
     case sets = "Sets"
     case recordings = "Recordings"
     case notebookSaver = "Photo Notebook"
-    case journal = "Journal"
     case settings = "Settings"
 
     /// Maps the active tab to BitBuddy's section enum so the chatbot knows
@@ -140,7 +139,6 @@ enum AppScreen: String, CaseIterable {
         case .sets:          return .setLists
         case .recordings:    return .recordings
         case .notebookSaver: return .notebook
-        case .journal:       return nil
         case .settings:      return .settings
         }
     }
@@ -161,7 +159,7 @@ enum AppScreen: String, CaseIterable {
     /// Ordered list of all screens that can appear in the tab bar.
     /// Used to maintain a stable ordering regardless of selection order.
     static var tabBarOrder: [AppScreen] {
-        [.home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver, .journal]
+        [.home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver]
     }
 
     /// Returns the user's custom tab selection (plus Settings, always appended).
@@ -187,7 +185,6 @@ enum AppScreen: String, CaseIterable {
         case .sets:          return "list.bullet.rectangle.portrait"
         case .recordings:    return "waveform"
         case .notebookSaver: return "photo.on.rectangle"
-        case .journal:       return "book.closed"
         case .settings:      return "gearshape"
         }
     }
@@ -200,7 +197,6 @@ enum AppScreen: String, CaseIterable {
         case .sets:          return "list.bullet.rectangle.portrait.fill"
         case .recordings:    return "waveform"
         case .notebookSaver: return "photo.on.rectangle.fill"
-        case .journal:       return "book.closed.fill"
         case .settings:      return "gearshape.fill"
         }
     }
@@ -213,7 +209,6 @@ enum AppScreen: String, CaseIterable {
         case .sets:          return "Roast Sets"
         case .recordings:    return "Recordings"
         case .notebookSaver: return "Photo Notebook"
-        case .journal:       return "Journal"
         case .settings:      return "Settings"
         }
     }
@@ -249,6 +244,7 @@ enum AppScreen: String, CaseIterable {
 // MARK: - Main Tab View (Standard iOS TabView)
 
 struct MainTabView: View {
+    @Environment(\.modelContext) private var modelContext
     // Persist the selected tab across app launches
     @AppStorage("selectedTabRawValue") private var selectedTabRaw: String = AppScreen.home.rawValue
     @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore: Bool = false
@@ -259,6 +255,7 @@ struct MainTabView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var userPreferences: UserPreferences
+    @ObservedObject private var audioService = AudioRecordingService.shared
 
     // BitBuddy side drawer — replaces the old .sheet so users can chat
     // alongside whatever they're working on.
@@ -270,6 +267,12 @@ struct MainTabView: View {
     @AppStorage("bitBuddyY") private var bitBuddyY: Double = -1
     @State private var dragOffset: CGSize = .zero
     @State private var isDragging = false
+    @State private var showingGlobalRecordingSave = false
+    @State private var globalRecordingName = ""
+    @State private var globalRecordingURL: URL?
+    @State private var globalRecordingDuration: TimeInterval = 0
+    @State private var globalRecordingError: String?
+    @State private var showingGlobalRecordingError = false
 
     // Computed binding for the selected tab
     private var selectedTab: Binding<AppScreen> {
@@ -417,6 +420,29 @@ struct MainTabView: View {
                 .ignoresSafeArea()
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if audioService.isRecording {
+                GlobalRecordingIndicator {
+                    stopGlobalRecording()
+                }
+                .padding(.top, 12)
+                .padding(.trailing, 16)
+                .transition(.scale.combined(with: .opacity))
+                .accessibilityLabel("Stop and save recording")
+            }
+        }
+        .alert("Save Recording", isPresented: $showingGlobalRecordingSave) {
+            TextField("Recording name", text: $globalRecordingName)
+            Button("Save") { saveGlobalRecording() }
+            Button("Discard", role: .destructive) { discardGlobalRecording() }
+        } message: {
+            Text("Save or discard the recording you just stopped.")
+        }
+        .alert("Recording Error", isPresented: $showingGlobalRecordingError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(globalRecordingError ?? "The recording could not be saved.")
+        }
         .bitBuddyDrawer(controller: bitBuddyDrawer, roastMode: roastMode)
         .bitBuddyCompactWindow(presenter: bitBuddyPresenter, roastMode: roastMode)
         .onChange(of: bitBuddyPresenter.mode) { _, mode in
@@ -427,6 +453,66 @@ struct MainTabView: View {
                 bitBuddyPresenter.mode = .closed
             }
         }
+    }
+
+    private func stopGlobalRecording() {
+        globalRecordingName = audioService.activeRecordingName.isEmpty
+            ? "Recording \(Date().formatted(date: .abbreviated, time: .shortened))"
+            : audioService.activeRecordingName
+        let result = audioService.stopRecording()
+        globalRecordingURL = result.url
+        globalRecordingDuration = result.duration
+        showingGlobalRecordingSave = true
+        haptic(.medium)
+    }
+
+    private func saveGlobalRecording() {
+        guard let fileURL = globalRecordingURL else {
+            showGlobalRecordingError("Recording file not found. Please try again.")
+            return
+        }
+
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            showGlobalRecordingError("Recording file was not created. Please try again.")
+            return
+        }
+
+        let title = globalRecordingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Recording \(Date().formatted(date: .abbreviated, time: .shortened))"
+            : globalRecordingName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let recording = Recording(
+            title: title,
+            fileURL: fileURL.lastPathComponent,
+            duration: globalRecordingDuration
+        )
+        modelContext.insert(recording)
+
+        do {
+            try modelContext.save()
+            audioService.clearFinishedRecording()
+            clearGlobalRecordingDraft()
+            haptic(.success)
+        } catch {
+            modelContext.delete(recording)
+            showGlobalRecordingError("Could not save recording: \(error.localizedDescription)")
+        }
+    }
+
+    private func discardGlobalRecording() {
+        audioService.cancelRecording()
+        clearGlobalRecordingDraft()
+    }
+
+    private func clearGlobalRecordingDraft() {
+        globalRecordingURL = nil
+        globalRecordingDuration = 0
+        globalRecordingName = ""
+    }
+
+    private func showGlobalRecordingError(_ message: String) {
+        globalRecordingError = message
+        showingGlobalRecordingError = true
     }
 
     private var standardTabRoot: some View {
@@ -505,10 +591,45 @@ struct MainTabView: View {
             RecordingsView()
         case .notebookSaver:
             NotebookView()
-        case .journal:
-            JournalHomeView()
         case .settings:
             SettingsView()
+        }
+    }
+}
+
+struct GlobalRecordingIndicator: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPulsing = false
+
+    let stopAction: () -> Void
+
+    var body: some View {
+        Button(action: stopAction) {
+            ZStack {
+                Circle()
+                    .fill(Color.recording.opacity(0.22))
+                    .frame(width: 56, height: 56)
+                    .scaleEffect(isPulsing && !reduceMotion ? 1.25 : 1.0)
+                    .opacity(isPulsing && !reduceMotion ? 0.35 : 0.8)
+
+                Circle()
+                    .fill(Color.recording)
+                    .frame(width: 42, height: 42)
+                    .shadow(color: Color.recording.opacity(0.45), radius: 10, x: 0, y: 4)
+
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 64, height: 64)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                isPulsing = true
+            }
         }
     }
 }

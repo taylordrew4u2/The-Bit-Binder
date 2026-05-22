@@ -770,7 +770,7 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
         // 3. Configure the audio session.
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
+            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             #if DEBUG
@@ -781,7 +781,7 @@ final class SpeechRecognizer: NSObject, ObservableObject, SFSpeechRecognizerDele
             DispatchQueue.main.asyncAfter(deadline: .now() + SpeechReliability.audioSessionRetryDelay) { [weak self] in
                 guard let self, self.shouldBeRunning, self.isAppActive else { return }
                 do {
-                    try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
+                    try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker, .allowBluetoothHFP, .allowBluetoothA2DP])
                     try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
                     self.continueStartingSession(speechRecognizer: speechRecognizer)
                 } catch {
