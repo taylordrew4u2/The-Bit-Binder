@@ -9,6 +9,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import UIKit
 
 struct RoastTargetDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -36,6 +37,9 @@ struct RoastTargetDetailView: View {
     @State private var showingExportSheet = false
     @State private var exportedFileURL: URL?
     @State private var showingFontSlider = false
+    @State private var newTraitText = ""
+    @State private var selectedScratchpadText = ""
+    @State private var scratchpadSaveTask: Task<Void, Never>?
     
     // Filter state
     @State private var filterMode: RoastFilterMode = .all
@@ -45,6 +49,12 @@ struct RoastTargetDetailView: View {
     private var roastSupportFontSize: CGFloat { max(12, 14 * roastTextScale) }
     private var displayMode: RoastTargetDisplayMode {
         RoastTargetDisplayMode(rawValue: roastTargetDisplayModeRaw) ?? .cards
+    }
+    private var canAddTrait: Bool {
+        !newTraitText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    private var canPromoteSelection: Bool {
+        !selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private struct RoastDisplayGroup: Identifiable {
@@ -190,11 +200,7 @@ struct RoastTargetDetailView: View {
 
             Divider().opacity(0.3)
 
-            if displayGroups.isEmpty {
-                emptyState
-            } else {
-                jokesList
-            }
+            targetWorkspaceAndRoasts
         }
         .background(FirePalette.bg.ignoresSafeArea())
         .navigationTitle("")
@@ -234,6 +240,16 @@ struct RoastTargetDetailView: View {
         }
         .navigationDestination(isPresented: $showingRoastTrash) {
             RoastJokeTrashView(target: target)
+        }
+        .onChange(of: target.notes) { _, _ in
+            scheduleScratchpadSave()
+        }
+        .onDisappear {
+            scratchpadSaveTask?.cancel()
+            if target.isValid {
+                target.dateModified = Date()
+                saveContext("target scratchpad")
+            }
         }
     }
     
@@ -467,48 +483,218 @@ struct RoastTargetDetailView: View {
         .padding(DS.Spacing.lg)
     }
     
-    private var jokesList: some View {
+    private var targetWorkspaceAndRoasts: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                if displayMode == .preview {
-                    previewModeView
+                targetWorkspaceSection
+
+                if displayGroups.isEmpty {
+                    emptyState
                 } else {
-                    ForEach(displayGroups) { group in
-                        roastGroupView(group)
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                removal: .scale(scale: 0.5).combined(with: .opacity).combined(with: .move(edge: .trailing))
-                            ))
-                    }
-                }
-                
-                if displayMode == .cards {
-                    Button {
-                        showingAddRoast = true
-                    } label: {
-                        HStack(spacing: DS.Spacing.sm + 2) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous)
-                                    .fill(accentColor.opacity(DS.Opacity.light))
-                                    .frame(width: 42, height: 42)
-                                Image(systemName: "plus")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundColor(accentColor)
-                            }
-                            
-                            Text("Add another roast")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundColor(accentColor)
-                            
-                            Spacer()
+                    if displayMode == .preview {
+                        previewModeView
+                    } else {
+                        ForEach(displayGroups) { group in
+                            roastGroupView(group)
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                    removal: .scale(scale: 0.5).combined(with: .opacity).combined(with: .move(edge: .trailing))
+                                ))
                         }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, DS.Spacing.lg)
                     }
-                    .buttonStyle(.plain)
+
+                    if displayMode == .cards {
+                        Button {
+                            showingAddRoast = true
+                        } label: {
+                            HStack(spacing: DS.Spacing.sm + 2) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous)
+                                        .fill(accentColor.opacity(DS.Opacity.light))
+                                        .frame(width: 42, height: 42)
+                                    Image(systemName: "plus")
+                                        .font(.title3.weight(.semibold))
+                                        .foregroundColor(accentColor)
+                                }
+
+                                Text("Add another roast")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundColor(accentColor)
+
+                                Spacer()
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, DS.Spacing.lg)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             .padding(.vertical, 8)
+        }
+    }
+
+    private var targetWorkspaceSection: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.md) {
+            thingsIKnowSection
+            roastScratchpadSection
+        }
+        .padding(.horizontal, DS.Spacing.lg)
+        .padding(.bottom, DS.Spacing.sm)
+    }
+
+    private var thingsIKnowSection: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.md) {
+            workspaceHeader(
+                title: "Things I Know",
+                subtitle: "Facts, quirks, habits, history, look, job, contradictions, anything roastable.",
+                icon: "list.bullet.clipboard"
+            )
+
+            if target.traits.isEmpty {
+                Text("Add bullet points about \(safeTargetName).")
+                    .font(.subheadline)
+                    .foregroundColor(FirePalette.sub)
+            } else {
+                VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+                    ForEach(Array(target.traits.enumerated()), id: \.offset) { index, trait in
+                        if index < target.traits.count {
+                            HStack(alignment: .top, spacing: DS.Spacing.sm) {
+                                Text("•")
+                                    .font(.headline.weight(.bold))
+                                    .foregroundColor(accentColor)
+                                    .padding(.top, 1)
+
+                                TextField("What do you know?", text: Binding(
+                                    get: { index < target.traits.count ? target.traits[index] : trait },
+                                    set: { newValue in
+                                        guard index < target.traits.count else { return }
+                                        target.traits[index] = newValue
+                                        persistTargetFacts()
+                                    }
+                                ), axis: .vertical)
+                                .font(.subheadline)
+                                .foregroundColor(FirePalette.text)
+
+                                Button {
+                                    removeTrait(at: index)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(FirePalette.sub)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(DS.Spacing.sm)
+                            .background(Color.white.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous))
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: DS.Spacing.sm) {
+                TextField("Add a bullet point", text: $newTraitText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .foregroundColor(FirePalette.text)
+                    .padding(DS.Spacing.md)
+                    .background(Color.white.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous))
+
+                Button {
+                    addTraitFromInput()
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(canAddTrait ? accentColor : FirePalette.sub)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canAddTrait)
+            }
+        }
+        .padding(DS.Spacing.lg)
+        .background(FirePalette.card)
+        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous)
+                .strokeBorder(FirePalette.edge, lineWidth: 0.5)
+        )
+    }
+
+    private var roastScratchpadSection: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.md) {
+            workspaceHeader(
+                title: "Roast Notepad",
+                subtitle: "Flesh out loose ideas here. Highlight a line or phrase, then promote it to a roast.",
+                icon: "square.and.pencil"
+            )
+
+            SelectableRoastNotepad(
+                text: $target.notes,
+                selectedText: $selectedScratchpadText,
+                placeholder: "Start writing premises, angles, alternate punchlines, tags, or rough roast ideas..."
+            )
+            .frame(minHeight: 180)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous)
+                    .strokeBorder(FirePalette.edge, lineWidth: 0.5)
+            )
+
+            HStack(spacing: DS.Spacing.sm) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No text selected" : "Selected text ready")
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(FirePalette.sub)
+                    if !selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text(selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines))
+                            .font(.caption)
+                            .lineLimit(2)
+                            .foregroundColor(FirePalette.text.opacity(0.8))
+                    }
+                }
+
+                Spacer()
+
+                Button {
+                    promoteSelectedScratchpadText()
+                } label: {
+                    Label("Promote to Roast", systemImage: "flame.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, DS.Spacing.md)
+                        .padding(.vertical, 10)
+                        .background(canPromoteSelection ? AnyShapeStyle(FirePalette.emberCTA) : AnyShapeStyle(Color.white.opacity(0.06)))
+                        .foregroundColor(canPromoteSelection ? .white : FirePalette.sub)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canPromoteSelection)
+            }
+        }
+        .padding(DS.Spacing.lg)
+        .background(FirePalette.card)
+        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous)
+                .strokeBorder(FirePalette.edge, lineWidth: 0.5)
+        )
+    }
+
+    private func workspaceHeader(title: String, subtitle: String, icon: String) -> some View {
+        HStack(alignment: .top, spacing: DS.Spacing.sm) {
+            Image(systemName: icon)
+                .font(.headline)
+                .foregroundColor(accentColor)
+                .frame(width: 26)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.headline.bold())
+                    .foregroundColor(FirePalette.text)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(FirePalette.sub)
+            }
         }
     }
 
@@ -886,6 +1072,50 @@ struct RoastTargetDetailView: View {
         return index + 1
     }
 
+    private func addTraitFromInput() {
+        let trimmed = newTraitText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        target.traits.append(trimmed)
+        newTraitText = ""
+        persistTargetFacts()
+        haptic(.light)
+    }
+
+    private func removeTrait(at index: Int) {
+        guard target.traits.indices.contains(index) else { return }
+        target.traits.remove(at: index)
+        persistTargetFacts()
+        haptic(.light)
+    }
+
+    private func persistTargetFacts() {
+        target.dateModified = Date()
+        saveContext("target facts")
+    }
+
+    private func promoteSelectedScratchpadText() {
+        let selected = selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !selected.isEmpty, target.isValid else { return }
+
+        let joke = RoastJoke(content: selected, target: target)
+        joke.displayOrder = jokesForTarget.count
+        modelContext.insert(joke)
+        target.dateModified = Date()
+        selectedScratchpadText = ""
+        saveContext("promote scratchpad text")
+        haptic(.success)
+    }
+
+    private func scheduleScratchpadSave() {
+        scratchpadSaveTask?.cancel()
+        scratchpadSaveTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 650_000_000)
+            guard !Task.isCancelled, target.isValid else { return }
+            target.dateModified = Date()
+            saveContext("target scratchpad")
+        }
+    }
+
     private func saveContext(_ action: String) {
         do {
             try modelContext.save()
@@ -898,6 +1128,88 @@ struct RoastTargetDetailView: View {
 }
 
 // MARK: - Supporting Views
+
+struct SelectableRoastNotepad: View {
+    @Binding var text: String
+    @Binding var selectedText: String
+    let placeholder: String
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(placeholder)
+                    .font(.body)
+                    .foregroundColor(FirePalette.sub.opacity(0.75))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .allowsHitTesting(false)
+            }
+
+            SelectableRoastTextView(text: $text, selectedText: $selectedText)
+                .padding(6)
+        }
+    }
+}
+
+private struct SelectableRoastTextView: UIViewRepresentable {
+    @Binding var text: String
+    @Binding var selectedText: String
+
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.delegate = context.coordinator
+        textView.backgroundColor = .clear
+        textView.textColor = UIColor(FirePalette.text)
+        textView.tintColor = UIColor(FirePalette.core)
+        textView.font = UIFont.preferredFont(forTextStyle: .body)
+        textView.adjustsFontForContentSizeCategory = true
+        textView.isScrollEnabled = true
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.textContainerInset = UIEdgeInsets(top: 8, left: 4, bottom: 8, right: 4)
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return textView
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        if uiView.text != text {
+            uiView.text = text
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, selectedText: $selectedText)
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        @Binding var text: String
+        @Binding var selectedText: String
+
+        init(text: Binding<String>, selectedText: Binding<String>) {
+            _text = text
+            _selectedText = selectedText
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            text = textView.text
+            updateSelection(from: textView)
+        }
+
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            updateSelection(from: textView)
+        }
+
+        private func updateSelection(from textView: UITextView) {
+            let range = textView.selectedRange
+            guard range.length > 0,
+                  let textRange = Range(range, in: textView.text) else {
+                selectedText = ""
+                return
+            }
+            selectedText = String(textView.text[textRange])
+        }
+    }
+}
 
 // MARK: - Draggable Roast Card
 
