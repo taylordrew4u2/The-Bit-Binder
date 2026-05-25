@@ -1192,18 +1192,20 @@ private struct SelectableRoastTextView: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             text = textView.text
-            updateSelection(from: textView)
+            updateSelection(from: textView, clearWhenEmpty: true)
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
-            updateSelection(from: textView)
+            updateSelection(from: textView, clearWhenEmpty: false)
         }
 
-        private func updateSelection(from textView: UITextView) {
+        private func updateSelection(from textView: UITextView, clearWhenEmpty: Bool) {
             let range = textView.selectedRange
             guard range.length > 0,
                   let textRange = Range(range, in: textView.text) else {
-                selectedText = ""
+                if clearWhenEmpty {
+                    selectedText = ""
+                }
                 return
             }
             selectedText = String(textView.text[textRange])
