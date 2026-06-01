@@ -35,6 +35,13 @@ thebitbinder-eckpwvqsvkpfeseqgsmnxnbnrulh/
 # SPM
 .build/
 
+# Xcode SPM working state (package mirrors, checkouts, resolved state).
+# The dependency lock lives in the .xcworkspace Package.resolved, which is tracked.
+.swiftpm/
+
+# Local AI/dev tooling state (Serena, etc.)
+.serena/
+
 # Secrets – never commit real API keys
 Secrets.plist
 *-Secrets.plist
