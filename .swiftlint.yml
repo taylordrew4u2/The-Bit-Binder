@@ -1,0 +1,48 @@
+# SwiftLint configuration for BitBinder.
+#
+# This is a pragmatic style gate: it surfaces genuine code smells as warnings
+# (visible as PR annotations) without failing CI on intentional patterns in a
+# large, shipping app. Rules that would otherwise error on deliberate
+# conventions are softened to warnings or disabled, with the rationale noted.
+
+included:
+  - thebitbinder
+  - bit
+
+excluded:
+  - .swiftpm
+  - .build
+
+disabled_rules:
+  - todo                 # Tracked deliberately in code; not a CI failure.
+  - trailing_whitespace  # Cosmetic; handled by editor settings.
+  - line_length          # Long SwiftUI modifier chains are idiomatic here.
+  - type_name            # Intentional iCloud-prefixed types (iCloudSyncService,
+                         # iCloudKeyValueStore, …) and short design tokens (DS).
+  - identifier_name      # Some Codable models mirror external JSON keys
+                         # (AbstractText, RelatedTopics, …) and must keep casing.
+
+# Keep these as warnings rather than hard errors.
+force_cast: warning
+force_try: warning
+
+# Surface long/complex code as warnings, but don't block CI on legacy methods.
+large_tuple:
+  warning: 2
+  error: 50
+
+cyclomatic_complexity:
+  warning: 25
+  error: 200
+
+function_body_length:
+  warning: 120
+  error: 1000
+
+file_length:
+  warning: 2500
+  error: 4000
+
+type_body_length:
+  warning: 1500
+  error: 2500
