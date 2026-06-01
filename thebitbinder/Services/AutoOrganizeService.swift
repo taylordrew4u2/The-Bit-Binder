@@ -159,12 +159,22 @@ class AutoOrganizeService {
 
         // 2. Try MLX on-device model (requires HuggingFace download)
 #if canImport(MLXLLM) && canImport(MLXLMCommon)
-        do {
-            return try await mlxCategorize(content: content, existingFolders: existingFolders, mode: mode)
-        } catch {
+        let memoryPressureHigh = await MainActor.run {
+            MemoryManager.shared.isMemoryPressureHigh()
+        }
+
+        if memoryPressureHigh {
             #if DEBUG
-            print("[AutoOrganize] MLX failed, falling back to keywords: \(error.localizedDescription)")
+            print("[AutoOrganize] Skipping MLX categorization due to memory pressure")
             #endif
+        } else {
+            do {
+                return try await mlxCategorize(content: content, existingFolders: existingFolders, mode: mode)
+            } catch {
+                #if DEBUG
+                print("[AutoOrganize] MLX failed, falling back to keywords: \(error.localizedDescription)")
+                #endif
+            }
         }
 #endif
 

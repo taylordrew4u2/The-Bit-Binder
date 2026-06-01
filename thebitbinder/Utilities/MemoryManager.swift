@@ -103,7 +103,11 @@ final class MemoryManager {
         //    many turns, and is not user-critical data.
         BitBuddyService.shared.startNewConversation()
 
-        // 4. Restore a small in-memory cache budget on the next runloop tick.
+        // 4. Release optional local AI model containers. These are the largest
+        //    resident allocations in the app and can be reloaded on demand.
+        releaseLocalAIModels()
+
+        // 5. Restore a small in-memory cache budget on the next runloop tick.
         DispatchQueue.main.async { [weak self] in
             URLCache.shared.memoryCapacity = MemoryManager.postFlushURLCacheBytes
             self?.reportMemoryUsage()
@@ -124,6 +128,9 @@ final class MemoryManager {
         
         // Release BitBuddy conversation history
         BitBuddyService.shared.startNewConversation()
+
+        // Release resident local models while backgrounded.
+        releaseLocalAIModels()
     }
     
     /// Called when app enters foreground
@@ -180,6 +187,20 @@ final class MemoryManager {
             print(" [MemoryManager] Memory pressure high before expensive operation — preemptive cleanup")
             reduceMemoryUsage()
         }
+    }
+
+    private func releaseLocalAIModels() {
+#if canImport(MLXLLM) && canImport(MLXLMCommon)
+        Task {
+            await MLXSharedRuntime.shared.releaseMemory()
+        }
+#endif
+
+#if canImport(Models) && canImport(Tokenizers) && canImport(Generation) && canImport(CoreML)
+        Task {
+            await HuggingFaceTransformersBitBuddyService.shared.releaseMemory()
+        }
+#endif
     }
     
     /// Removes all files from the app's temporary directory.
