@@ -89,6 +89,8 @@ App flow:
 
 User captures or imports material -> services normalize, transcribe, extract, categorize, or validate the content -> SwiftData models persist the result locally and sync through CloudKit when available -> SwiftUI views update the joke library, brainstorm board, recordings list, set lists, notebook, import review queue, or BitBuddy interface.
 
+For an engineering deep-dive into the layering, AI-backend abstractions, and import pipeline, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Build and contribution conventions live in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## How to Run Locally
 
 Requirements:

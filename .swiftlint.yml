@@ -1,0 +1,47 @@
+# SwiftLint configuration for BitBinder.
+#
+# The intent here is a pragmatic style gate: surface genuine code smells as
+# warnings without failing CI on the long-form SwiftUI views that are typical
+# of a feature-rich app. Rules that are normally "error" severity are softened
+# to "warning" so a non-strict lint run annotates the diff without blocking.
+
+included:
+  - thebitbinder
+  - bit
+
+excluded:
+  - .swiftpm
+  - .build
+
+# Keep these as warnings rather than hard errors.
+force_cast: warning
+force_try: warning
+
+disabled_rules:
+  - todo                 # Tracked deliberately in code; not a CI failure.
+  - trailing_whitespace  # Cosmetic; handled by editor settings.
+  - line_length          # Long SwiftUI modifier chains are idiomatic here.
+
+# Allow the larger feature views/services without flagging length.
+file_length:
+  warning: 2500
+  error: 4000
+
+type_body_length:
+  warning: 1500
+  error: 2500
+
+function_body_length:
+  warning: 120
+  error: 250
+
+cyclomatic_complexity:
+  warning: 25
+  error: 40
+
+identifier_name:
+  min_length: 1          # Single-letter loop/closure params are fine.
+  excluded:
+    - id
+    - x
+    - y
