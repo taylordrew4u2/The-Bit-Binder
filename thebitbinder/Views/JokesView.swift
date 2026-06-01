@@ -103,42 +103,16 @@ struct JokesView: View {
     @State private var searchText = ""
     @State private var exportedPDFURL: URL?
     @State private var selectedPhotos: [PhotosPickerItem] = []
-    // TODO: Consider grouping the 16+ import-related @State vars below into a
-    // single `ImportState` struct to reduce view-body invalidation surface.
-    // Deferred because the binding plumbing through JokesSheetsModifier and
-    // JokesAlertsModifier makes the refactor non-trivial.
-    @State private var isProcessingImages = false
-    @State private var processingCurrent: Int = 0
-    @State private var processingTotal: Int = 0
-    @State private var importSummary: (added: Int, skipped: Int) = (0, 0)
-    @State private var showingImportSummary = false
+    // Import pipeline transient state, grouped into one value type to keep the
+    // view body's binding/invalidation surface small. See JokesImportState.
+    @State private var importState = JokesImportState()
+
     @State private var folderPendingDeletion: JokeFolder?
     @State private var showingDeleteFolderAlert = false
     @State private var showingMoveJokesSheet = false
     @State private var showingAudioImport = false
     @State private var showingTalkToText = false
     @State private var showingGagGrabber = false
-    
-    @State private var reviewCandidates: [JokeImportCandidate] = []
-    @State private var showingReviewSheet = false
-    @State private var possibleDuplicates: [String] = []
-    @State private var unresolvedImportFragments: [UnresolvedImportFragment] = []
-    
-    // Live import progress
-    @State private var importStatusMessage = ""
-    @State private var importedJokeNames: [String] = []
-    @State private var importFileCount = 0
-    @State private var importFileIndex = 0
-    
-    // Smart import review
-    @State private var smartImportResult: ImportPipelineResult?
-    @State private var importError: Error? = nil
-    @State private var showingImportError = false
-
-    // Pre-flight extraction-hints sheet. `pendingDocumentImport` is set when
-    // the user picks files via the document picker; presenting the sheet
-    // gathers structured hints before the pipeline runs.
-    @State private var pendingDocumentImport: PendingDocumentImport?
     
     // Batch select/delete mode
     @State private var isSelectMode = false
@@ -440,13 +414,13 @@ struct JokesView: View {
                     showingFilePicker: $showingFilePicker,
                     showingAddRoastTarget: $showingAddRoastTarget,
                     showingMoveJokesSheet: $showingMoveJokesSheet,
-                    showingReviewSheet: $showingReviewSheet,
+                    showingReviewSheet: $importState.showingReviewSheet,
                     selectedFolder: selectedFolder,
                     folders: folders,
                     folderPendingDeletion: $folderPendingDeletion,
-                    reviewCandidates: reviewCandidates,
-                    possibleDuplicates: possibleDuplicates,
-                    unresolvedFragments: unresolvedImportFragments,
+                    reviewCandidates: importState.reviewCandidates,
+                    possibleDuplicates: importState.possibleDuplicates,
+                    unresolvedFragments: importState.unresolvedImportFragments,
                     processScannedImages: processScannedImages,
                     processDocuments: processDocuments,
                     moveJokes: moveJokes,
@@ -469,16 +443,16 @@ struct JokesView: View {
                     )
                     .presentationDetents([.medium, .large])
                 }
-                .fullScreenCover(item: $smartImportResult) { result in
+                .fullScreenCover(item: $importState.smartImportResult) { result in
                     SmartImportReviewView(
                         importResult: result,
                         selectedFolder: selectedFolder,
                         onComplete: {
-                            smartImportResult = nil
+                            importState.smartImportResult = nil
                         }
                     )
                 }
-                .sheet(item: $pendingDocumentImport) { pending in
+                .sheet(item: $importState.pendingDocumentImport) { pending in
                     ExtractionHintsPreflightSheet(
                         fileNameSummary: pending.summary,
                         onContinue: { hints in
@@ -489,25 +463,25 @@ struct JokesView: View {
                         }
                     )
                 }
-                .alert("Import Couldn't Complete", isPresented: $showingImportError) {
+                .alert("Import Couldn't Complete", isPresented: $importState.showingImportError) {
                     Button("OK", role: .cancel) { }
                 } message: {
-                    if let aiError = importError as? AIExtractionFailedError {
+                    if let aiError = importState.importError as? AIExtractionFailedError {
                         Text("GagGrabber couldn't extract jokes from your file.\n\nReason: \(aiError.reason)\n\nWhat to try:\n• Make sure your file has clear line breaks between jokes.\n• Try a different file format (PDF, TXT, RTF).\n• Check your internet connection.\n\nDetails:\n\(aiError.detailedDescription)")
-                    } else if let stringError = importError as? ImportErrorMessage {
+                    } else if let stringError = importState.importError as? ImportErrorMessage {
                         Text(stringError.message)
                     } else {
-                        Text("\(importError?.localizedDescription ?? "Unknown error")\n\nTip: PDFs with selectable text and clear line breaks between jokes give the best results.")
+                        Text("\(importState.importError?.localizedDescription ?? "Unknown error")\n\nTip: PDFs with selectable text and clear line breaks between jokes give the best results.")
                     }
                 }
                 .modifier(JokesAlertsModifier(
                     showingExportAlert: $showingExportAlert,
-                    showingImportSummary: $showingImportSummary,
+                    showingImportSummary: $importState.showingImportSummary,
                     showingDeleteFolderAlert: $showingDeleteFolderAlert,
                     showingDeleteRoastAlert: $showingDeleteRoastAlert,
                     showingMoveJokesSheet: $showingMoveJokesSheet,
                     exportedPDFURL: exportedPDFURL,
-                    importSummary: importSummary,
+                    importSummary: importState.importSummary,
                     folderPendingDeletion: $folderPendingDeletion,
                     roastTargetToDelete: $roastTargetToDelete,
                     jokes: jokes,
@@ -1039,15 +1013,15 @@ struct JokesView: View {
 
     @ViewBuilder
     private var importOverlay: some View {
-        if isProcessingImages {
+        if importState.isProcessingImages {
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
             ImportProgressCard(
-                importFileCount: importFileCount,
-                importFileIndex: importFileIndex,
-                importStatusMessage: importStatusMessage,
-                importedJokeNames: importedJokeNames
+                importFileCount: importState.importFileCount,
+                importFileIndex: importState.importFileIndex,
+                importStatusMessage: importState.importStatusMessage,
+                importedJokeNames: importState.importedJokeNames
             )
         }
     }
@@ -1148,11 +1122,11 @@ struct JokesView: View {
     }
     
     private func processScannedImages(_ images: [UIImage]) {
-        isProcessingImages = true
-        importedJokeNames = []
-        importStatusMessage = "Analyzing \(images.count) scanned page\(images.count == 1 ? "" : "s")..."
-        importFileCount = images.count
-        importFileIndex = 0
+        importState.isProcessingImages = true
+        importState.importedJokeNames = []
+        importState.importStatusMessage = "Analyzing \(images.count) scanned page\(images.count == 1 ? "" : "s")..."
+        importState.importFileCount = images.count
+        importState.importFileIndex = 0
 
         Task {
             var combinedAutoSaved:  [ImportedJoke] = []
@@ -1163,8 +1137,8 @@ struct JokesView: View {
 
             for (idx, image) in images.enumerated() {
                 await MainActor.run {
-                    importFileIndex = idx + 1
-                    importStatusMessage = "Reading text from scan \(importFileIndex) of \(images.count)..."
+                    importState.importFileIndex = idx + 1
+                    importState.importStatusMessage = "Reading text from scan \(importState.importFileIndex) of \(images.count)..."
                 }
 
                 // Process each image inside an autoreleasepool so the temp file
@@ -1182,7 +1156,7 @@ struct JokesView: View {
                     try jpegData.write(to: tmpURL)
                     defer { try? FileManager.default.removeItem(at: tmpURL) }
 
-                    await MainActor.run { importStatusMessage = "GagGrabber extracting jokes from scan \(importFileIndex) of \(images.count)..." }
+                    await MainActor.run { importState.importStatusMessage = "GagGrabber extracting jokes from scan \(importState.importFileIndex) of \(images.count)..." }
 
                     // Scanner path doesn't present the preflight (the user is
                     // scanning arbitrary pages, not a file they already know
@@ -1196,7 +1170,7 @@ struct JokesView: View {
 
                     await MainActor.run {
                         let found = result.autoSavedJokes.count + result.reviewQueueJokes.count
-                        importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in scan \(importFileIndex)!"
+                        importState.importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in scan \(importState.importFileIndex)!"
                     }
                 } catch {
                     print(" SCANNER: Pipeline failed for image \(idx + 1): \(error)")
@@ -1226,38 +1200,38 @@ struct JokesView: View {
             )
 
             await MainActor.run {
-                isProcessingImages = false
-                importStatusMessage = ""
-                importedJokeNames = []
-                importFileCount = 0
-                importFileIndex = 0
+                importState.isProcessingImages = false
+                importState.importStatusMessage = ""
+                importState.importedJokeNames = []
+                importState.importFileCount = 0
+                importState.importFileIndex = 0
 
                 let total = combinedAutoSaved.count + combinedReview.count
                 if total > 0 {
-                    self.smartImportResult = combinedResult
+                    self.importState.smartImportResult = combinedResult
                     // Surface partial-failure info even when some files succeeded
                     if !failedMessages.isEmpty {
-                        self.importError = ImportErrorMessage(message: "Some scans failed:\n" + failedMessages.joined(separator: "\n"))
-                        self.showingImportError = true
+                        self.importState.importError = ImportErrorMessage(message: "Some scans failed:\n" + failedMessages.joined(separator: "\n"))
+                        self.importState.showingImportError = true
                     }
                 } else if !failedMessages.isEmpty {
                     // Every file failed — show the collected errors
-                    self.importError = ImportErrorMessage(message: failedMessages.joined(separator: "\n"))
-                    self.showingImportError = true
+                    self.importState.importError = ImportErrorMessage(message: failedMessages.joined(separator: "\n"))
+                    self.importState.showingImportError = true
                 } else {
-                    self.importSummary = (0, 0)
-                    self.showingImportSummary = true
+                    self.importState.importSummary = (0, 0)
+                    self.importState.showingImportSummary = true
                 }
             }
         }
     }
     
     private func processSelectedPhotos(_ items: [PhotosPickerItem]) async {
-        isProcessingImages = true
-        importedJokeNames = []
-        importStatusMessage = "Analyzing \(items.count) photo\(items.count == 1 ? "" : "s")..."
-        importFileCount = items.count
-        importFileIndex = 0
+        importState.isProcessingImages = true
+        importState.importedJokeNames = []
+        importState.importStatusMessage = "Analyzing \(items.count) photo\(items.count == 1 ? "" : "s")..."
+        importState.importFileCount = items.count
+        importState.importFileIndex = 0
 
         var combinedAutoSaved:  [ImportedJoke] = []
         var combinedReview:     [ImportedJoke] = []
@@ -1267,8 +1241,8 @@ struct JokesView: View {
 
         for (idx, item) in items.enumerated() {
             await MainActor.run {
-                importFileIndex = idx + 1
-                importStatusMessage = "Reading text from photo \(importFileIndex) of \(importFileCount)..."
+                importState.importFileIndex = idx + 1
+                importState.importStatusMessage = "Reading text from photo \(importState.importFileIndex) of \(importState.importFileCount)..."
             }
 
             guard let data = try? await item.loadTransferable(type: Data.self),
@@ -1284,7 +1258,7 @@ struct JokesView: View {
                 try pngData.write(to: tmpURL)
                 defer { try? FileManager.default.removeItem(at: tmpURL) }
 
-                await MainActor.run { importStatusMessage = "GagGrabber extracting jokes from photo \(importFileIndex) of \(importFileCount)..." }
+                await MainActor.run { importState.importStatusMessage = "GagGrabber extracting jokes from photo \(importState.importFileIndex) of \(importState.importFileCount)..." }
 
                 // Photo-library path mirrors the scanner — no preflight
                 // (arbitrary photos, unpredictable content) but still
@@ -1297,7 +1271,7 @@ struct JokesView: View {
 
                 await MainActor.run {
                     let found = result.autoSavedJokes.count + result.reviewQueueJokes.count
-                    importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in photo \(importFileIndex)!"
+                    importState.importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in photo \(importState.importFileIndex)!"
                 }
             } catch {
                 print(" PHOTOS: Pipeline failed for photo \(idx + 1): \(error)")
@@ -1328,27 +1302,27 @@ struct JokesView: View {
 
         await MainActor.run {
             selectedPhotos = []
-            isProcessingImages = false
-            importStatusMessage = ""
-            importedJokeNames = []
-            importFileCount = 0
-            importFileIndex = 0
+            importState.isProcessingImages = false
+            importState.importStatusMessage = ""
+            importState.importedJokeNames = []
+            importState.importFileCount = 0
+            importState.importFileIndex = 0
 
             let total = combinedAutoSaved.count + combinedReview.count
             if total > 0 {
-                self.smartImportResult = combinedResult
+                self.importState.smartImportResult = combinedResult
                 // Surface partial-failure info even when some photos succeeded
                 if !failedMessages.isEmpty {
-                    self.importError = ImportErrorMessage(message: "Some photos failed:\n" + failedMessages.joined(separator: "\n"))
-                    self.showingImportError = true
+                    self.importState.importError = ImportErrorMessage(message: "Some photos failed:\n" + failedMessages.joined(separator: "\n"))
+                    self.importState.showingImportError = true
                 }
             } else if !failedMessages.isEmpty {
                 // Every photo failed — show the collected errors
-                self.importError = ImportErrorMessage(message: failedMessages.joined(separator: "\n"))
-                self.showingImportError = true
+                self.importState.importError = ImportErrorMessage(message: failedMessages.joined(separator: "\n"))
+                self.importState.showingImportError = true
             } else {
-                self.importSummary = (0, 0)
-                self.showingImportSummary = true
+                self.importState.importSummary = (0, 0)
+                self.importState.showingImportSummary = true
             }
         }
     }
@@ -1358,16 +1332,16 @@ struct JokesView: View {
     /// actual work once the user continues or skips.
     private func processDocuments(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
-        pendingDocumentImport = PendingDocumentImport(urls: urls)
+        importState.pendingDocumentImport = PendingDocumentImport(urls: urls)
     }
 
     private func runDocumentImport(urls: [URL], hints: ExtractionHints) {
         print(" SMART IMPORT START: \(urls.count) files selected")
-        isProcessingImages = true
-        importedJokeNames = []
-        importStatusMessage = "Analyzing \(urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files")..."
-        importFileCount = urls.count
-        importFileIndex = 0
+        importState.isProcessingImages = true
+        importState.importedJokeNames = []
+        importState.importStatusMessage = "Analyzing \(urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files")..."
+        importState.importFileCount = urls.count
+        importState.importFileIndex = 0
 
         Task {
             // For multi-file imports, we combine results from all files
@@ -1380,8 +1354,8 @@ struct JokesView: View {
             
             for url in urls {
                 await MainActor.run {
-                    importFileIndex += 1
-                    importStatusMessage = "GagGrabber scanning \(url.lastPathComponent)..."
+                    importState.importFileIndex += 1
+                    importState.importStatusMessage = "GagGrabber scanning \(url.lastPathComponent)..."
                 }
                 
                 do {
@@ -1394,7 +1368,7 @@ struct JokesView: View {
                     
                     await MainActor.run {
                         let found = result.autoSavedJokes.count + result.reviewQueueJokes.count
-                        importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in \(url.lastPathComponent)!"
+                        importState.importStatusMessage = "Found \(found) joke\(found == 1 ? "" : "s") in \(url.lastPathComponent)!"
                     }
                 } catch {
                     print(" IMPORT: AI extraction failed for \(url.lastPathComponent): \(error)")
@@ -1433,29 +1407,29 @@ struct JokesView: View {
             )
             
             await MainActor.run {
-                self.isProcessingImages = false
-                self.importStatusMessage = ""
-                self.importedJokeNames = []
-                self.importFileCount = 0
-                self.importFileIndex = 0
+                self.importState.isProcessingImages = false
+                self.importState.importStatusMessage = ""
+                self.importState.importedJokeNames = []
+                self.importState.importFileCount = 0
+                self.importState.importFileIndex = 0
                 
                 let totalJokes = combinedAutoSaved.count + combinedReview.count
                 if totalJokes > 0 {
                     // Show the Smart Import Review for all AI-reviewed fragments
-                    self.smartImportResult = combinedResult
+                    self.importState.smartImportResult = combinedResult
                     // Surface partial-failure info even when some files succeeded
                     if !failedMessages.isEmpty {
-                        self.importError = ImportErrorMessage(message: "Some files failed:\n" + failedMessages.joined(separator: "\n"))
-                        self.showingImportError = true
+                        self.importState.importError = ImportErrorMessage(message: "Some files failed:\n" + failedMessages.joined(separator: "\n"))
+                        self.importState.showingImportError = true
                     }
                 } else if !failedMessages.isEmpty {
                     // AI failed on every file — show the collected errors
-                    self.importError = ImportErrorMessage(message: failedMessages.joined(separator: "\n"))
-                    self.showingImportError = true
+                    self.importState.importError = ImportErrorMessage(message: failedMessages.joined(separator: "\n"))
+                    self.importState.showingImportError = true
                 } else {
                     // AI ran but found nothing at all
-                    self.importSummary = (0, 0)
-                    self.showingImportSummary = true
+                    self.importState.importSummary = (0, 0)
+                    self.importState.showingImportSummary = true
                 }
             }
         }
@@ -1689,8 +1663,8 @@ struct JokesView: View {
             } catch {
                 print(" [JokesView] Failed to save imported voice memos: \(error)")
             }
-            importSummary = (importedCount, 0)
-            showingImportSummary = true
+            importState.importSummary = (importedCount, 0)
+            importState.showingImportSummary = true
             print(" [VoiceMemo] Imported \(importedCount) voice memos")
         }
     }
@@ -1702,248 +1676,5 @@ private extension JokesView {
         if title.contains(lower) { return true }
         let content = joke.content.lowercased()
         return content.contains(lower)
-    }
-}
-
-// MARK: - Roast Mode v2 Components
-
-/// Cold state — shown when there are zero roast subjects.
-struct RoastColdStateView: View {
-    let onAddTarget: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "text.quote")
-                        .font(.system(size: 10))
-                        .foregroundColor(ColdPalette.grey)
-                    Text("ROAST MODE · IDLE")
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundColor(ColdPalette.grey)
-                        .tracking(1.4)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.white.opacity(0.04))
-                .clipShape(Capsule())
-                .overlay(Capsule().strokeBorder(ColdPalette.edge, lineWidth: 0.5))
-
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-
-            Spacer()
-
-            VStack(spacing: 20) {
-                // Unlit match
-                Image(systemName: "line.diagonal")
-                    .font(.system(size: 60, weight: .thin))
-                    .foregroundColor(ColdPalette.grey.opacity(0.7))
-                    .rotationEffect(.degrees(-20))
-                    .overlay(alignment: .top) {
-                        Circle()
-                            .fill(ColdPalette.grey)
-                            .frame(width: 16, height: 16)
-                            .offset(y: -10)
-                    }
-                    .frame(width: 140, height: 140)
-                    .accessibilityHidden(true)
-
-                VStack(spacing: 10) {
-                    Text("Nothing to burn yet.")
-                        .font(.system(size: 26, weight: .heavy))
-                        .foregroundColor(ColdPalette.text)
-                        .tracking(-0.5)
-
-                    Text("Add a subject and keep every note organized privately in your roast library.")
-                        .font(.system(size: 15))
-                        .foregroundColor(ColdPalette.sub)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(4)
-                        .frame(maxWidth: 280)
-                }
-
-                EmberCTAButton(title: "Light the first match", action: onAddTarget)
-                    .padding(.top, 6)
-
-                VStack(spacing: 2) {
-                    Button {} label: {
-                        Text("or import from Contacts")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(ColdPalette.sub)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                    }
-                    .disabled(true)
-                    Text("coming soon")
-                        .font(.system(size: 10))
-                        .foregroundColor(ColdPalette.sub.opacity(0.7))
-                        .tracking(0.3)
-                }
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ColdPalette.bg.ignoresSafeArea())
-    }
-}
-
-/// Roast target list header.
-struct RoastHomeHeader: View {
-    let subjectCount: Int
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Roast Targets")
-                .font(.title2.weight(.semibold))
-                .foregroundColor(FirePalette.text)
-
-            Spacer()
-
-            Text("\(subjectCount)")
-                .font(.subheadline.weight(.medium))
-                .foregroundColor(FirePalette.sub)
-                .monospacedDigit()
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 10)
-    }
-}
-
-/// Roast Mode pill badge.
-struct RoastModeBadge: View {
-    var small: Bool = false
-    var lit: Bool = true
-
-    var body: some View {
-        HStack(spacing: small ? 6 : 8) {
-            Image(systemName: "text.quote")
-                .font(.system(size: small ? 10 : 14))
-            Text("ROAST MODE")
-                .font(.system(size: small ? 10 : 12, weight: .heavy))
-                .tracking(1.4)
-        }
-        .foregroundColor(lit ? .white : ColdPalette.grey)
-        .padding(.horizontal, small ? 12 : 18)
-        .padding(.vertical, small ? 6 : 10)
-        .background(
-            lit
-                ? AnyShapeStyle(FirePalette.emberCTA)
-                : AnyShapeStyle(Color.white.opacity(0.04))
-        )
-        .clipShape(Capsule())
-        .shadow(
-            color: lit ? FirePalette.core.opacity(0.4) : .clear,
-            radius: lit ? 12 : 0, y: 4
-        )
-        .overlay(
-            lit ? nil : Capsule().strokeBorder(ColdPalette.edge, lineWidth: 0.5)
-        )
-    }
-}
-
-/// Subject card.
-struct RoastSubjectCard: View {
-    let target: RoastTarget
-
-    private var safeName: String { target.isValid ? target.name : "" }
-    private var safeNotes: String { target.isValid ? target.notes : "" }
-    private var safeBits: Int { target.isValid ? target.jokeCount : 0 }
-
-    private var initials: String {
-        safeName.split(separator: " ")
-            .prefix(2)
-            .compactMap { $0.first.map(String.init) }
-            .joined()
-    }
-
-    private var avatarGradient: LinearGradient {
-        LinearGradient(
-            colors: [FirePalette.core.opacity(0.9), FirePalette.core.opacity(0.55)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var a11ySummary: String {
-        var s = safeName
-        if !safeNotes.isEmpty { s += ", \(safeNotes)" }
-        s += ". \(safeBits) bit\(safeBits == 1 ? "" : "s")."
-        return s
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            if let photoData = target.photoData, let img = UIImage(data: photoData) {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 44, height: 44)
-                    .clipShape(Circle())
-            } else {
-                ZStack {
-                    Circle()
-                        .fill(avatarGradient)
-                    Text(initials)
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: 44, height: 44)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(safeName)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(FirePalette.text)
-
-                if !safeNotes.isEmpty {
-                    Text(safeNotes)
-                        .font(.system(size: 13))
-                        .foregroundColor(FirePalette.sub)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer(minLength: 0)
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(safeBits)")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(FirePalette.text)
-                    .monospacedDigit()
-                Text(safeBits == 1 ? "bit" : "bits")
-                    .font(.system(size: 12))
-                    .foregroundColor(FirePalette.sub)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundColor(FirePalette.sub.opacity(0.7))
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [FirePalette.card, FirePalette.card],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(FirePalette.edge, lineWidth: 0.5)
-        )
-        .padding(.horizontal, 16)
-        .padding(.vertical, 3)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(a11ySummary)
-        .accessibilityAddTraits(.isButton)
     }
 }
