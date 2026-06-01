@@ -30,9 +30,8 @@ final class MLXBitBuddyService: BitBuddyBackend {
     var supportsStreaming: Bool { false }
 
     func preload() async {
-#if canImport(MLXLLM) && canImport(MLXLMCommon)
-        _ = try? await MLXSharedRuntime.shared.prepareModelIfNeeded()
-#endif
+        // Keep MLX lazy-loaded. The Qwen model is one of the largest resident
+        // allocations in the app, so it should load only for an explicit request.
     }
 
     func send(

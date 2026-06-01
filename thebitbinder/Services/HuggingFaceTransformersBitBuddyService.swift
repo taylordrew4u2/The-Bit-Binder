@@ -43,9 +43,14 @@ final class HuggingFaceTransformersBitBuddyService: BitBuddyBackend {
     var supportsStreaming: Bool { false }
 
     func preload() async {
+        // Keep this backend lazy-loaded. Loading a Core ML language model
+        // proactively can push the app into memory pressure on launch.
+    }
+
+    func releaseMemory() async {
 #if canImport(Models) && canImport(Tokenizers) && canImport(Generation) && canImport(CoreML)
         if #available(iOS 18.0, *) {
-            _ = try? await HFTransformersRuntime.shared.prepareModelIfNeeded()
+            await HFTransformersRuntime.shared.releaseMemory()
         }
 #endif
     }
@@ -214,6 +219,11 @@ private actor HFTransformersRuntime {
         config.topP = 0.9
 
         return try await model.generate(config: config, prompt: prompt)
+    }
+
+    func releaseMemory() {
+        model = nil
+        tokenizer = nil
     }
 
     private func compiledModelURL(from path: String) throws -> URL {

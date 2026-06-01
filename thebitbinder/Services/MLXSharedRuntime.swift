@@ -123,6 +123,16 @@ actor MLXSharedRuntime {
         activeConversationId = nil
     }
 
+    /// Releases the resident model container and chat state when the app is
+    /// under memory pressure. The next explicit MLX request can load again.
+    func releaseMemory() {
+        chatSession?.clear()
+        chatSession = nil
+        activeConversationId = nil
+        container = nil
+        isModelLoaded = false
+    }
+
     // MARK: - Single-shot (used by AutoOrganize)
 
     func generateSingleShot(
