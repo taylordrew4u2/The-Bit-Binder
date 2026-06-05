@@ -38,15 +38,25 @@ struct SetListDetailView: View {
     @State private var recordingSaveErrorMessage = ""
     
     var setListJokes: [Joke] {
-        setList.jokeIDs.compactMap { jokeID in
-            jokes.first { $0.id == jokeID }
+        var seen = Set<UUID>()
+        var result: [Joke] = []
+        for jokeID in setList.jokeIDs where seen.insert(jokeID).inserted {
+            if let match = jokes.first(where: { $0.id == jokeID }) {
+                result.append(match)
+            }
         }
+        return result
     }
-    
+
     var setListRoastJokes: [RoastJoke] {
-        setList.roastJokeIDs.compactMap { roastID in
-            roastJokes.first { $0.id == roastID }
+        var seen = Set<UUID>()
+        var result: [RoastJoke] = []
+        for roastID in setList.roastJokeIDs where seen.insert(roastID).inserted {
+            if let match = roastJokes.first(where: { $0.id == roastID }) {
+                result.append(match)
+            }
         }
+        return result
     }
     
     var body: some View {

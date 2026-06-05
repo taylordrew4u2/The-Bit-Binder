@@ -201,7 +201,6 @@ final class DataMigrationService: ObservableObject {
             ImportBatch.self,
             ImportedJokeMetadata.self,
             UnresolvedImportFragment.self,
-            ChatMessage.self,
         ])
         
         // Include entity names AND their property names so adding/removing

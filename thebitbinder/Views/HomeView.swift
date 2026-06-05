@@ -86,7 +86,15 @@ struct HomeView: View {
     /// Invalidation key for stats — changes when joke count changes.
     private var statsKey: Int { allJokes.count }
     
-    private var recentJokes: [Joke] { Array(allJokes.prefix(3)) }
+    private var recentJokes: [Joke] {
+        var seen = Set<UUID>()
+        var result: [Joke] = []
+        for joke in allJokes where seen.insert(joke.id).inserted {
+            result.append(joke)
+            if result.count == 3 { break }
+        }
+        return result
+    }
 
     private var selectedHomeSections: Set<HomeSection> {
         guard !selectedSectionsRaw.isEmpty else {

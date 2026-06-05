@@ -40,6 +40,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CKSharingSupported</key>
+	<true/>
 	<key>CloudKitSchemaConfiguration</key>
 	<dict>
 		<key>PublicKeyAlgorithm</key>
