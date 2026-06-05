@@ -35,6 +35,20 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         // Register background tasks — must happen before app finishes launching
         registerBackgroundTasks()
+
+        // Eagerly bring up the new CloudKit-backed Core Data stack in the
+        // background so that incoming CKShare invitations (which may arrive
+        // immediately on cold launch via `userDidAcceptCloudKitShareWith`)
+        // have a `.shared` persistent store ready to receive their records.
+        // This does NOT touch the SwiftData stack and stays additive —
+        // failure here only affects sharing, not the existing app.
+        Task { @MainActor in
+            do {
+                try await PersistenceController.shared.loadStoresAsync()
+            } catch {
+                print(" [CloudKit] PersistenceController loadStoresAsync failed: \(error.localizedDescription)")
+            }
+        }
         
         // Initialize iCloud Drive ubiquity container — this registers BitBinder
         // in Settings  iCloud  iCloud Drive so users can see it and toggle sync.
@@ -133,6 +147,20 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
     }
     
+    // MARK: - CloudKit Share Acceptance
+
+    /// Invoked when the user taps a `CKShare` invitation URL (e.g. from
+    /// Messages or Mail) and iOS routes them into the app. UIKit still
+    /// calls this on app-delegate-only apps that don't define a UIScene
+    /// configuration. We hand the metadata to `SharingService` which routes
+    /// the records into the `.shared` persistent store.
+    func application(_ application: UIApplication,
+                     userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
+        Task { @MainActor in
+            await SharingService.shared.acceptShare(metadata: metadata)
+        }
+    }
+
     /// UIKit may invoke this delegate callback outside a Swift concurrency
     /// isolation domain. Hop explicitly to MainActor before touching
     /// `@MainActor` singletons to avoid runtime `unsafeForcedSync` warnings.

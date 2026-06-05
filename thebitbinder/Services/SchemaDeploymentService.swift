@@ -297,9 +297,9 @@ final class SchemaDeploymentService: @unchecked Sendable {
             fragmentDescriptor.fetchLimit = 1
             let _: [UnresolvedImportFragment] = try context.fetch(fragmentDescriptor)
             
-            var chatDescriptor = FetchDescriptor<ChatMessage>()
-            chatDescriptor.fetchLimit = 1
-            let _: [ChatMessage] = try context.fetch(chatDescriptor)
+            // ChatMessage moved to the Core Data + CloudKit schema in Phase
+            // 4 wave 1; no longer fetched via SwiftData.
+
             
             defaults.set(schemaVersion, forKey: ensuredSchemaVersionKey)
             print(" [Schema] Schema sync triggered for all \(recordTypes.count) record types")

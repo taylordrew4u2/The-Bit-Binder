@@ -78,7 +78,10 @@ final class DataValidationService: ObservableObject {
         result.brainstormIdeasCount = await countActiveBrainstormIdeas(context: context)
         result.notebookPhotoRecordsCount = await countActiveNotebookPhotos(context: context)
         result.importBatchesCount = await countEntities(of: ImportBatch.self, context: context)
-        result.chatMessagesCount = await countEntities(of: ChatMessage.self, context: context)
+        // ChatMessage was migrated to Core Data in Phase 4 wave 1; the
+        // SwiftData stack no longer tracks it. Existing field on the result
+        // type stays at 0.
+        result.chatMessagesCount = 0
         
         // Deep scans fault full entities and relationships, so keep them for
         // explicit validation/repair flows rather than every launch.

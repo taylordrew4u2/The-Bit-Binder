@@ -30,7 +30,6 @@ struct thebitbinderApp: App {
             ImportBatch.self,
             ImportedJokeMetadata.self,
             UnresolvedImportFragment.self,
-            ChatMessage.self,
         ])
 
         // One store file. All fallbacks use this same URL — never switch to a

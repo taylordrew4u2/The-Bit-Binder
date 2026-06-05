@@ -136,7 +136,21 @@ struct SettingsView: View {
                         syncStatusBadge
                     }
                 }
-                
+
+                NavigationLink {
+                    ShareLibraryView()
+                } label: {
+                    HStack {
+                        Label("Share Library", systemImage: "person.2.crop.square.stack")
+                        Spacer()
+                        if let summary = ShareLibraryView.currentStatusSummary() {
+                            Text(summary)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 NavigationLink {
                     DataSafetyView()
                 } label: {
