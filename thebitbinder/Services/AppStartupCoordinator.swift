@@ -144,6 +144,13 @@ final class AppStartupCoordinator: ObservableObject {
         await Task.yield()
         guard shouldContinueForegroundStartup() else { return }
 
+        // CloudKit + SwiftData→CoreData migration can leave behind twin rows
+        // sharing a UUID. ForEach over duplicates breaks LazyVGrid layout and
+        // can crash SwiftUI's diffing. Sweep them out before anything queries.
+        await purgeDuplicateIDs(context: context)
+        await Task.yield()
+        guard shouldContinueForegroundStartup() else { return }
+
         // Launch-time validation stays lightweight to avoid faulting large
         // portions of the store before the app is interactive.
         statusText = "Validating your library..."
@@ -344,6 +351,111 @@ final class AppStartupCoordinator: ObservableObject {
         } else {
             print(" [AutoPurge] No expired trash items found")
         }
+    }
+
+    // MARK: - Duplicate ID Purge
+
+    /// Scans each model type for rows that share a UUID `id` (created by
+    /// CloudKit merge races or interrupted SwiftData→CoreData migrations)
+    /// and deletes all but the most-recently-modified copy of each.
+    /// `@Attribute(.unique)` is incompatible with CloudKit so this can't be
+    /// enforced at the schema level — periodic cleanup is the only fix.
+    private func purgeDuplicateIDs(context: ModelContext) async {
+        var totalDeleted = 0
+
+        totalDeleted += dedupeByID(
+            try? context.fetch(FetchDescriptor<Joke>()),
+            sortBy: { $0.dateModified },
+            context: context
+        )
+        await Task.yield()
+
+        totalDeleted += dedupeByID(
+            try? context.fetch(FetchDescriptor<JokeFolder>()),
+            sortBy: { $0.dateCreated },
+            context: context
+        )
+        await Task.yield()
+
+        totalDeleted += dedupeByID(
+            try? context.fetch(FetchDescriptor<SetList>()),
+            sortBy: { $0.dateModified },
+            context: context
+        )
+        await Task.yield()
+
+        totalDeleted += dedupeByID(
+            try? context.fetch(FetchDescriptor<RoastTarget>()),
+            sortBy: { $0.dateModified },
+            context: context
+        )
+        await Task.yield()
+
+        totalDeleted += dedupeByID(
+            try? context.fetch(FetchDescriptor<RoastJoke>()),
+            sortBy: { $0.dateModified },
+            context: context
+        )
+        await Task.yield()
+
+        totalDeleted += dedupeByID(
+            try? context.fetch(FetchDescriptor<BrainstormIdea>()),
+            sortBy: { $0.dateCreated },
+            context: context
+        )
+        await Task.yield()
+
+        totalDeleted += dedupeByID(
+            try? context.fetch(FetchDescriptor<NotebookFolder>()),
+            sortBy: { $0.dateCreated },
+            context: context
+        )
+        await Task.yield()
+
+        totalDeleted += dedupeByID(
+            try? context.fetch(FetchDescriptor<NotebookPhotoRecord>()),
+            sortBy: { $0.dateAdded },
+            context: context
+        )
+        await Task.yield()
+
+        totalDeleted += dedupeByID(
+            try? context.fetch(FetchDescriptor<Recording>()),
+            sortBy: { $0.dateCreated },
+            context: context
+        )
+
+        if totalDeleted > 0 {
+            do {
+                try context.save()
+                print(" [DupePurge] Removed \(totalDeleted) duplicate-UUID row(s)")
+                DataOperationLogger.shared.logSuccess("Removed \(totalDeleted) duplicate-UUID row(s)")
+            } catch {
+                print(" [DupePurge] Failed to save after dedupe: \(error)")
+            }
+        } else {
+            print(" [DupePurge] No duplicate-UUID rows found")
+        }
+    }
+
+    /// Groups rows by `id`, keeps the one with the latest sort key, deletes
+    /// the rest. Returns the count of rows deleted.
+    private func dedupeByID<T: PersistentModel & Identifiable>(
+        _ rows: [T]?,
+        sortBy keyDate: (T) -> Date,
+        context: ModelContext
+    ) -> Int where T.ID == UUID {
+        guard let rows, !rows.isEmpty else { return 0 }
+        let grouped = Dictionary(grouping: rows, by: \.id)
+        var deleted = 0
+        for (_, group) in grouped where group.count > 1 {
+            let sorted = group.sorted { keyDate($0) > keyDate($1) }
+            for stale in sorted.dropFirst() {
+                context.delete(stale)
+                deleted += 1
+            }
+        }
+        return deleted
     }
 
 }

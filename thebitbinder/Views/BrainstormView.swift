@@ -61,6 +61,9 @@ struct BrainstormView: View {
     @State private var persistenceError: String?
     @State private var showingErrorAlert = false
     @State private var dragOffsets: [UUID: CGSize] = [:]
+    /// Tracks which idea is currently being dragged so the pickup haptic
+    /// only fires once per drag instead of on every `onChanged` event.
+    @State private var draggingIdeaID: UUID?
     
     // Pinch-to-zoom
     private var effectiveGridScale: CGFloat {
@@ -406,11 +409,15 @@ struct BrainstormView: View {
                 DragGesture()
                     .onChanged { value in
                         guard !isSelectMode else { return }
+                        if draggingIdeaID != idea.id {
+                            draggingIdeaID = idea.id
+                        }
                         dragOffsets[idea.id] = value.translation
                     }
                     .onEnded { value in
                         guard !isSelectMode else { return }
                         dragOffsets[idea.id] = nil
+                        draggingIdeaID = nil
                         let nextPoint = CGPoint(
                             x: noteCenter.x + value.translation.width,
                             y: noteCenter.y + value.translation.height
@@ -418,6 +425,19 @@ struct BrainstormView: View {
                         updateBoardPosition(for: idea, point: nextPoint, layout: layout)
                     }
             )
+            // System-managed haptics — non-blocking, fire on state-change
+            // events rather than inside the gesture handler so they can't
+            // stutter the drag.
+            .sensoryFeedback(.impact(weight: .medium), trigger: draggingIdeaID == idea.id) { old, new in
+                // Pickup haptic only fires when this note becomes the active
+                // drag (false → true). Avoids re-firing on every state change.
+                !old && new
+            }
+            .sensoryFeedback(.impact(weight: .light), trigger: dragOffsets[idea.id]) { old, new in
+                // Drop haptic only when the offset transitions from non-nil
+                // (mid-drag) to nil (drag ended).
+                old != nil && new == nil
+            }
             .contextMenu {
                 Button {
                     promoteToJoke(idea)
