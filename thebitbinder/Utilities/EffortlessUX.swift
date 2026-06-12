@@ -170,6 +170,7 @@ struct EffortlessAnimation {
 // MARK: - Auto-Save Manager
 
 /// Automatic saving with debouncing - never lose work
+@MainActor
 final class AutoSaveManager: ObservableObject {
     static let shared = AutoSaveManager()
     

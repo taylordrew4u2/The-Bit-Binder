@@ -18,7 +18,25 @@ struct JokeCardView: View {
     
     private var isHit: Bool { joke.isHit }
     private var isOpenMic: Bool { joke.isOpenMic }
-    
+
+    /// Title fallback chain: explicit title → keyword-generated → first line
+    /// of content trimmed to ~60 chars → "Untitled". Without the last two
+    /// rungs, content that is all stop-words renders as a blank square.
+    private var resolvedTitle: String {
+        let explicit = joke.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !explicit.isEmpty { return explicit }
+        let generated = KeywordTitleGenerator.displayTitle(from: joke.content)
+        if !generated.isEmpty { return generated }
+        let firstLine = joke.content
+            .components(separatedBy: .newlines)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !firstLine.isEmpty {
+            return firstLine.count > 60 ? String(firstLine.prefix(60)) + "…" : firstLine
+        }
+        return "Untitled"
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             // Hit / Open Mic accent strip
@@ -30,7 +48,7 @@ struct JokeCardView: View {
             VStack(alignment: .leading, spacing: 8) {
                 // Header: Title + Hit / Open Mic indicator
                 HStack(alignment: .top, spacing: 6) {
-                    Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
+                    Text(resolvedTitle)
                         .font(.headline)
                         .foregroundColor(.primary)
                         .lineLimit(2)
@@ -80,9 +98,8 @@ struct JokeCardView: View {
             .padding(.trailing, 12)
             .padding(.vertical, 12)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

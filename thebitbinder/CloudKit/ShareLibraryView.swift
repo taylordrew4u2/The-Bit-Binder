@@ -28,6 +28,7 @@ struct ShareLibraryView: View {
     @State private var didCopyLink = false
     @State private var incomingShares: [IncomingShareEntry] = []
     @State private var welcomeBannerOwner: String?
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var shareSheetPayload: ShareSheetPayload?
 
@@ -94,15 +95,19 @@ struct ShareLibraryView: View {
             }
 
             // Always render incoming shares (libraries others shared with you),
-            // regardless of whether you've shared your own. The user asked for
-            // invites to be visible from the Shared Libraries surface.
-            if !incomingShares.isEmpty {
-                incomingSection
-            }
+            // regardless of whether you've shared your own. Empty state lets
+            // the user confirm no one has invited them yet.
+            incomingSection
         }
         .navigationTitle("Share Library")
         .navigationBarTitleDisplayMode(.inline)
         .task { await refreshStatus() }
+        .refreshable { await refreshStatus() }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Task { await refreshStatus() }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange)) { _ in
             Task { await refreshStatus() }
         }
@@ -115,14 +120,16 @@ struct ShareLibraryView: View {
                 withAnimation { welcomeBannerOwner = nil }
             }
         }
-        .sheet(item: $shareSheetPayload) { payload in
+        .sheet(item: $shareSheetPayload, onDismiss: {
+            // Fires whether the user invited, stopped sharing, or swiped to
+            // dismiss. Without this, refreshStatus never runs after the share
+            // sheet closes and the UI shows stale participant counts.
+            Task { await refreshStatus() }
+        }) { payload in
             CloudSharingControllerView(
                 share: payload.share,
                 container: payload.container
-            ) {
-                shareSheetPayload = nil
-                Task { await refreshStatus() }
-            }
+            )
             .ignoresSafeArea()
         }
         .confirmationDialog(
@@ -194,18 +201,33 @@ struct ShareLibraryView: View {
         }
 
         if !pending.isEmpty {
-            Section("Pending Invites") {
-                ForEach(Array(pending.enumerated()), id: \.offset) { _, participant in
+            Section {
+                ForEach(pending, id: \.participantKey) { participant in
                     SimpleParticipantRow(participant: participant)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                Task { await revoke(participant) }
+                            } label: {
+                                Label("Revoke", systemImage: "trash")
+                            }
+                        }
                 }
+            } header: {
+                Text("Pending Invites")
+            } footer: {
+                Text("Swipe a pending invite to revoke it.")
             }
         }
 
         if joined.isEmpty && pending.isEmpty {
             Section("Shared With") {
-                Text("Just you. Tap Invite More to add someone.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Just you so far.")
+                        .font(.callout.weight(.semibold))
+                    Text("Send the invite link to anyone — they'll appear here after they tap it and open the library on their device.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
 
@@ -240,26 +262,42 @@ struct ShareLibraryView: View {
             } label: {
                 Label("Stop Sharing", systemImage: "person.crop.circle.badge.xmark")
             }
+        } footer: {
+            Text("Anyone with the link can join — paste it into Messages, email, or anywhere.")
         }
     }
 
     @ViewBuilder
     private var incomingSection: some View {
         Section("Libraries Shared With You") {
-            ForEach(incomingShares) { entry in
-                NavigationLink {
-                    WorkspaceDetailView(workspaceID: entry.workspaceID, scope: "Shared")
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "person.crop.square.filled.and.at.rectangle")
-                            .foregroundStyle(.purple)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(entry.ownerDisplayName)
-                                .font(.body)
-                            if let email = entry.ownerEmail, email != entry.ownerDisplayName {
-                                Text(email)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+            if incomingShares.isEmpty {
+                HStack(spacing: 10) {
+                    Image(systemName: "tray")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("No one has invited you yet")
+                            .font(.callout)
+                        Text("When someone shares their library, they'll appear here.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                ForEach(incomingShares) { entry in
+                    NavigationLink {
+                        WorkspaceDetailView(workspaceID: entry.workspaceID, scope: "Shared")
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "person.crop.square.filled.and.at.rectangle")
+                                .foregroundStyle(.purple)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Invited by \(entry.ownerDisplayName)")
+                                    .font(.body)
+                                if let email = entry.ownerEmail, email != entry.ownerDisplayName {
+                                    Text(email)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
@@ -306,9 +344,21 @@ struct ShareLibraryView: View {
         do {
             let shareMap = try persistence.container.fetchShares(matching: [workspace.objectID])
             if let existing = shareMap[workspace.objectID] {
+                // Render local cache immediately so the UI doesn't blank out
+                // while we round-trip to CloudKit. Server fetch then refines
+                // participant acceptance status which the local cache lags on.
                 share = existing
                 participants = existing.participants.filter { $0.role != .owner }
                 phase = .shared
+
+                if let fresh = await sharing.fetchLatestShare(existing) {
+                    // Auto-upgrade legacy private-only shares so plain link
+                    // sharing works without forcing the user to stop and
+                    // re-share. No-op if already public-readWrite.
+                    await sharing.ensurePublicReadWrite(fresh)
+                    share = fresh
+                    participants = fresh.participants.filter { $0.role != .owner }
+                }
             } else {
                 phase = .notShared
             }
@@ -414,6 +464,18 @@ struct ShareLibraryView: View {
         await refreshStatus()
     }
 
+    private func revoke(_ participant: CKShare.Participant) async {
+        guard let share else { return }
+        do {
+            try await sharing.revokeParticipant(participant, from: share)
+            await refreshStatus()
+        } catch {
+            // SharingService already classified + logged. Refresh so the row
+            // doesn't appear deleted if the save actually failed.
+            await refreshStatus()
+        }
+    }
+
     // MARK: - Helper for Settings badge
 
     /// Friendly status snippet for the Settings row badge.
@@ -459,6 +521,19 @@ struct ShareLibraryView: View {
         request.fetchLimit = 1
         request.affectedStores = [sharedStore]
         return (try? persistence.container.viewContext.fetch(request).first) != nil
+    }
+}
+
+// MARK: - Stable identity for ForEach rows
+
+private extension CKShare.Participant {
+    /// Stable key for SwiftUI ForEach. Prefers the iCloud record name,
+    /// falls back to invited email/phone, then to ObjectIdentifier.
+    var participantKey: String {
+        if let recordName = userIdentity.userRecordID?.recordName { return recordName }
+        if let email = userIdentity.lookupInfo?.emailAddress { return "email:\(email)" }
+        if let phone = userIdentity.lookupInfo?.phoneNumber { return "phone:\(phone)" }
+        return "obj:\(ObjectIdentifier(self).hashValue)"
     }
 }
 

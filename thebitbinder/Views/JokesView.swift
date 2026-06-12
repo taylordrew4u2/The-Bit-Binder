@@ -385,10 +385,18 @@ struct JokesView: View {
             filtered = base.filter { matchesSearch($0, lower: lower) }
         }
 
+        // Drop entries that are completely empty (no title, no content). These
+        // can appear as ghost rows from interrupted imports or CloudKit merge
+        // races and render as visually blank squares in the grid.
+        let nonEmpty = filtered.filter { joke in
+            !(joke.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              && joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+
         if showRecentlyAdded {
-            cachedFilteredJokes = filtered.sorted { $0.dateCreated > $1.dateCreated }
+            cachedFilteredJokes = nonEmpty.sorted { $0.dateCreated > $1.dateCreated }
         } else {
-            cachedFilteredJokes = filtered
+            cachedFilteredJokes = nonEmpty
         }
     }
     

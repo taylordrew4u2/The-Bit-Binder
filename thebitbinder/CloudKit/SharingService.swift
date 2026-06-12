@@ -56,9 +56,23 @@ final class SharingService: NSObject, ObservableObject {
         for rootObject: NSManagedObject
     ) async throws -> (CKShare, CKContainer) {
         // If an existing share is already on disk, return it directly without
-        // any CloudKit round-trip.
+        // any CloudKit round-trip — but first make sure it's "anyone with the
+        // link" (publicPermission = .readWrite). Older shares created before
+        // that default existed are still locked to "only invited people",
+        // which causes "Item Unavailable" when recipients tap the link.
         let ckContainer = CKContainer(identifier: PersistenceController.cloudKitContainerIdentifier)
         if let existing = try existingShare(for: rootObject) {
+            if existing.publicPermission != .readWrite {
+                existing.publicPermission = .readWrite
+                _ = try? await ckContainer.privateCloudDatabase.modifyRecords(
+                    saving: [existing],
+                    deleting: [],
+                    savePolicy: .ifServerRecordUnchanged
+                )
+                DataOperationLogger.shared.logSuccess(
+                    "Upgraded existing share to public read+write (\(existing.recordID.recordName))"
+                )
+            }
             return (existing, ckContainer)
         }
 
@@ -199,7 +213,7 @@ final class SharingService: NSObject, ObservableObject {
 
     /// Returns a friendly display name for a CloudKit user identity.
     /// Falls back gracefully: full name → email → phone → "Library owner".
-    static func displayName(for identity: CKUserIdentity) -> String {
+    nonisolated static func displayName(for identity: CKUserIdentity) -> String {
         if let first = identity.nameComponents?.givenName,
            let last = identity.nameComponents?.familyName {
             return "\(first) \(last)"
@@ -207,6 +221,57 @@ final class SharingService: NSObject, ObservableObject {
         if let email = identity.lookupInfo?.emailAddress { return email }
         if let phone = identity.lookupInfo?.phoneNumber { return phone }
         return "Library owner"
+    }
+
+    // MARK: - Server-side share refresh
+
+    /// Pulls the latest `CKShare` record from CloudKit so participant
+    /// acceptance status reflects server-side truth instead of the local
+    /// cache. `fetchShares(matching:)` on the persistence container only
+    /// returns the locally-cached share, which doesn't refresh until
+    /// CoreData merges a remote push — that can lag significantly behind
+    /// an actual accept. Calling this after `fetchShares` gives the UI
+    /// up-to-date pending/joined counts.
+    ///
+    /// Tries the private database first (where the owner's share lives)
+    /// and falls back to the shared database (participant's view). We
+    /// can't rely on `isOwner(of:)` to pick the database — a freshly-
+    /// loaded cached share may have a nil `currentUserParticipant`, in
+    /// which case the owner check returns false and we'd query the wrong
+    /// database, triggering a permission-failure error.
+    func fetchLatestShare(_ share: CKShare) async -> CKShare? {
+        let ckContainer = CKContainer(identifier: PersistenceController.cloudKitContainerIdentifier)
+        if let fresh = try? await ckContainer.privateCloudDatabase.record(for: share.recordID) as? CKShare {
+            return fresh
+        }
+        if let fresh = try? await ckContainer.sharedCloudDatabase.record(for: share.recordID) as? CKShare {
+            return fresh
+        }
+        return nil
+    }
+
+    // MARK: - Public-link upgrade
+
+    /// Ensures an existing share is set to "anyone with the link, read+write"
+    /// so recipients can accept via plain URL without being explicitly
+    /// invited by iCloud account. No-op for non-owners or shares that are
+    /// already public-readWrite. Returns the (possibly mutated) share.
+    @discardableResult
+    func ensurePublicReadWrite(_ share: CKShare) async -> CKShare {
+        guard isOwner(of: share), share.publicPermission != .readWrite else {
+            return share
+        }
+        share.publicPermission = .readWrite
+        let ckContainer = CKContainer(identifier: PersistenceController.cloudKitContainerIdentifier)
+        _ = try? await ckContainer.privateCloudDatabase.modifyRecords(
+            saving: [share],
+            deleting: [],
+            savePolicy: .ifServerRecordUnchanged
+        )
+        DataOperationLogger.shared.logSuccess(
+            "Auto-upgraded share to public read+write (\(share.recordID.recordName))"
+        )
+        return share
     }
 
     // MARK: - Stop sharing / leave share
@@ -249,6 +314,38 @@ final class SharingService: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Revoke pending invite
+
+    /// Removes a participant from a share the local user owns. Use for
+    /// revoking a pending invite before the invitee accepts, or for
+    /// kicking an already-joined participant. No-op for non-owners.
+    func revokeParticipant(_ participant: CKShare.Participant, from share: CKShare) async throws {
+        guard isOwner(of: share) else { return }
+        share.removeParticipant(participant)
+        let ckContainer = CKContainer(identifier: PersistenceController.cloudKitContainerIdentifier)
+        do {
+            let (saveResults, _) = try await ckContainer.privateCloudDatabase.modifyRecords(
+                saving: [share],
+                deleting: [],
+                savePolicy: .ifServerRecordUnchanged
+            )
+            if case .failure(let err) = saveResults[share.recordID] {
+                throw err
+            }
+            DataOperationLogger.shared.logSuccess(
+                "Revoked participant from share \(share.recordID.recordName)"
+            )
+        } catch {
+            self.lastError = CloudErrorClassifier.classify(error)
+            DataOperationLogger.shared.logError(
+                error,
+                operation: "SharingService.revokeParticipant",
+                context: "share=\(share.recordID.recordName)"
+            )
+            throw error
+        }
+    }
+
     /// Participant-side: removes the current user from the share so they
     /// lose access. The share remains for the owner and other participants.
     /// Uses `purgeObjectsAndRecordsInZone` to detach the local copy.
@@ -283,9 +380,12 @@ struct CloudSharingControllerView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UICloudSharingController {
         let controller = UICloudSharingController(share: share, container: container)
-        // Everyone you invite gets the same level of access — read + write.
-        // Removing the read-only / public-read options keeps the picker simple.
-        controller.availablePermissions = [.allowPrivate, .allowReadWrite]
+        // Allow BOTH "only invited people" and "anyone with the link" modes.
+        // Without `.allowPublic`, plain link-sharing fails with "your account
+        // doesn't have permission" unless the owner explicitly added that
+        // specific iCloud account via the contact picker. Everyone who joins
+        // gets read+write — no permission picker complexity.
+        controller.availablePermissions = [.allowPrivate, .allowPublic, .allowReadWrite]
         controller.delegate = context.coordinator
         return controller
     }
