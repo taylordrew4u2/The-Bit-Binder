@@ -608,22 +608,6 @@ final class SocraticGuideBackend: BitBuddyBackend {
         }
     }
 
-    private func formatLanguageFallback(
-        _ base: String,
-        mode: ConversationMode,
-        roastMode: Bool
-    ) -> String {
-        switch mode {
-        case .creativeFactual:
-            if roastMode {
-                return "\(base) That's irritating, but not as irritating as a weak tag."
-            }
-            return "\(base) Try a nearby phrasing and I can take another swing."
-        case .simpleFactual, .reflective, .appAction:
-            return base
-        }
-    }
-
     private func normalizedQuery(_ message: String) -> String {
         message
             .trimmingCharacters(in: .whitespacesAndNewlines)

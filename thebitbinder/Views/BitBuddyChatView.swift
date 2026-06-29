@@ -534,11 +534,6 @@ struct BitBuddyChatView: View {
         return "BitBuddy hit a problem before it could answer. Try rephrasing the request with the exact joke, note, or action you want."
     }
     
-    /// Appends a BitBuddy error message to the chat.
-    private func appendErrorMessage(_ text: String) {
-        bitBuddy.appendVisibleMessage(text: text, isUser: false)
-    }
-    
     // MARK: - Section → AppScreen Mapping
     
     /// Maps a BitBuddySection to the corresponding AppScreen for navigation.

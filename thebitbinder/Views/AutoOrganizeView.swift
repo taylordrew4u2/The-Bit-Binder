@@ -722,32 +722,6 @@ struct AutoOrganizeView: View {
         return matches.sorted { $0.confidence > $1.confidence }
     }
     
-    /// Analyze a joke and pick from user-provided folders using local heuristics.
-    private func analyzeJokeWithFolders(_ jokeText: String, folders: [String]) async throws -> JokeAnalysis {
-        let baseAnalysis = try await categorizationService.analyzeJoke(jokeText)
-        let normalizedJoke = jokeText.lowercased()
-        
-        let scoredFolders: [(String, Int)] = folders.map { folder in
-            let folderLower = folder.lowercased()
-            let folderTokens = Set(folderLower.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
-            let jokeTokens = Set(normalizedJoke.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init))
-            let overlap = folderTokens.intersection(jokeTokens).count
-            let categoryMatch = folderLower == baseAnalysis.category.lowercased() ? 5 : 0
-            let tagMatch = baseAnalysis.tags.filter { folderLower.contains($0.lowercased()) }.count * 2
-            return (folder, overlap + categoryMatch + tagMatch)
-        }
-        
-        let bestFolder = scoredFolders.max(by: { $0.1 < $1.1 })?.0 ?? folders.first ?? baseAnalysis.category
-        
-        return JokeAnalysis(
-            category: bestFolder,
-            tags: baseAnalysis.tags,
-            difficulty: baseAnalysis.difficulty,
-            humorRating: baseAnalysis.humorRating
-        )
-    }
-    
-    
     private func assignJokeToFolder(_ joke: Joke, category: String) {
         #if DEBUG
         print(" [AutoOrganize] Assigning joke '\(joke.title.prefix(20))' to folder '\(category)'")
