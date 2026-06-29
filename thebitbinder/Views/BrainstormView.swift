@@ -50,6 +50,7 @@ struct BrainstormView: View {
     // confirmation alert before anything is actually removed. Prevents
     // accidental data loss from a fat-fingered context-menu tap.
     @State private var ideaToDelete: BrainstormIdea?
+    @State private var showingDeleteConfirmation = false
     @State private var showingBatchDeleteConfirmation = false
     
     // Programmatic navigation — avoids NavigationLink gesture conflicts with MagnifyGesture
@@ -156,29 +157,26 @@ struct BrainstormView: View {
         } message: {
             Text(persistenceError ?? "An unknown error occurred")
         }
-        // Single-idea delete confirmation. Bound to `ideaToDelete` being
-        // non-nil so we don't need a separate @State Bool.
-        .alert("Delete This Thought?", isPresented: Binding(
-            get: { ideaToDelete != nil },
-            set: { if !$0 { ideaToDelete = nil } }
-        )) {
+        // Single-idea delete confirmation. Driven by a dedicated Bool flag
+        // (paired with `ideaToDelete` via `presenting:`) rather than a
+        // computed binding — a plain @State Bool presents far more reliably,
+        // especially when the delete is triggered from a context menu.
+        .alert("Delete This Thought?", isPresented: $showingDeleteConfirmation, presenting: ideaToDelete) { idea in
             Button("Cancel", role: .cancel) { ideaToDelete = nil }
             Button("Delete", role: .destructive) {
-                if let idea = ideaToDelete {
-                    withAnimation {
-                        idea.moveToTrash()
-                    }
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        print(" [BrainstormView] Failed to save after soft-delete: \(error)")
-                        persistenceError = "Could not delete thought: \(error.localizedDescription)"
-                        showingErrorAlert = true
-                    }
-                    ideaToDelete = nil
+                withAnimation {
+                    idea.moveToTrash()
                 }
+                do {
+                    try modelContext.save()
+                } catch {
+                    print(" [BrainstormView] Failed to save after soft-delete: \(error)")
+                    persistenceError = "Could not delete thought: \(error.localizedDescription)"
+                    showingErrorAlert = true
+                }
+                ideaToDelete = nil
             }
-        } message: {
+        } message: { _ in
             Text("This thought will be moved to the Trash. You can restore it from there.")
         }
         // Batch-delete confirmation. Title adapts to count for grammar.
@@ -341,7 +339,7 @@ struct BrainstormView: View {
                         .buttonStyle(.plain)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
-                                ideaToDelete = idea
+                                requestDelete(idea)
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -362,7 +360,7 @@ struct BrainstormView: View {
                             }
                             Divider()
                             Button(role: .destructive) {
-                                ideaToDelete = idea
+                                requestDelete(idea, deferred: true)
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -405,8 +403,13 @@ struct BrainstormView: View {
                     selectedIdea = idea
                 }
             }
-            .simultaneousGesture(
-                DragGesture()
+            // High-priority (not simultaneous) so the pan wins over the
+            // card's `.contextMenu` long-press interaction. With a simultaneous
+            // gesture the context-menu recognizer frequently swallows the pan,
+            // which made notes feel "stuck" and impossible to move. A minimum
+            // distance keeps plain taps (open) and long-presses (menu) working.
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 12)
                     .onChanged { value in
                         guard !isSelectMode else { return }
                         if draggingIdeaID != idea.id {
@@ -446,7 +449,7 @@ struct BrainstormView: View {
                 }
                 Divider()
                 Button(role: .destructive) {
-                    ideaToDelete = idea
+                    requestDelete(idea, deferred: true)
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
@@ -612,6 +615,25 @@ struct BrainstormView: View {
         ShareHelper.shareText(text)
     }
     
+    /// Stages an idea for the delete-confirmation alert.
+    ///
+    /// When invoked from a `.contextMenu` action the menu is still dismissing,
+    /// and presenting an alert in the same runloop tick races with that
+    /// dismissal — the alert silently never appears, so the thought looks like
+    /// it "won't delete." Deferring to the next runloop lets the menu finish
+    /// closing first so the confirmation reliably shows.
+    private func requestDelete(_ idea: BrainstormIdea, deferred: Bool = false) {
+        let present = {
+            ideaToDelete = idea
+            showingDeleteConfirmation = true
+        }
+        if deferred {
+            DispatchQueue.main.async(execute: present)
+        } else {
+            present()
+        }
+    }
+
     private func toggleIdeaSelection(_ idea: BrainstormIdea) {
         if selectedIdeaIDs.contains(idea.id) {
             selectedIdeaIDs.remove(idea.id)
