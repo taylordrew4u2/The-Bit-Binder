@@ -627,11 +627,7 @@ struct BrainstormView: View {
             ideaToDelete = idea
             showingDeleteConfirmation = true
         }
-        if deferred {
-            DispatchQueue.main.async(execute: present)
-        } else {
-            present()
-        }
+        deferred ? DispatchQueue.main.async(execute: present) : present()
     }
 
     private func toggleIdeaSelection(_ idea: BrainstormIdea) {
