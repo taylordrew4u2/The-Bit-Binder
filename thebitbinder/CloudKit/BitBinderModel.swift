@@ -37,10 +37,10 @@ enum BitBinderEntity: String, CaseIterable, Identifiable {
     case chatMessage = "ChatMessage"
 
     var managedObjectClassName: String {
-        // NSManagedObject subclasses live in the same module under names like
-        // WorkspaceMO, JokeMO, etc. Using the bundle's module name keeps
-        // NSEntityDescription happy when it resolves classes at runtime.
-        "thebitbinder.\(rawValue)MO"
+        // The Core Data bridge uses generic NSManagedObject instances. Keep
+        // the model class name aligned with that so stores can load even
+        // though there are no generated WorkspaceMO/JokeMO subclasses.
+        NSStringFromClass(NSManagedObject.self)
     }
 }
 
