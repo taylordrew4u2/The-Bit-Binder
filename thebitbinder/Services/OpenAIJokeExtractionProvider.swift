@@ -3,6 +3,7 @@ import Foundation
 final class OpenAIJokeExtractionProvider: AIJokeExtractionProvider {
 
     let providerType: AIProviderType = .openAI
+    private static let completionsEndpoint = "https://api.openai.com/v1/chat/completions"
 
     private var apiKey: String {
         OpenAIKeychainStore.shared.apiKey
@@ -69,7 +70,11 @@ final class OpenAIJokeExtractionProvider: AIJokeExtractionProvider {
             "temperature": 0.2
         ]
 
-        var request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        guard let url = URL(string: Self.completionsEndpoint) else {
+            throw AIProviderError.runFailed(.openAI, "Invalid API endpoint")
+        }
+
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

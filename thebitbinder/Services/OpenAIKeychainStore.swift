@@ -23,7 +23,15 @@ struct OpenAIKeychainStore {
             if trimmed.isEmpty {
                 delete()
             } else {
-                save(trimmed)
+                do {
+                    try save(trimmed)
+                } catch {
+                    DataOperationLogger.shared.logError(
+                        error,
+                        operation: "OpenAIKeychainStore.save",
+                        context: "Could not persist OpenAI API key"
+                    )
+                }
             }
         }
     }
@@ -43,12 +51,21 @@ struct OpenAIKeychainStore {
             return ""
         }
 
-        save(legacyValue)
+        do {
+            try save(legacyValue)
+        } catch {
+            DataOperationLogger.shared.logError(
+                error,
+                operation: "OpenAIKeychainStore.migrateLegacyValueIfNeeded",
+                context: "Could not migrate legacy OpenAI API key"
+            )
+            return ""
+        }
         clearLegacyDefaultsValue()
         return legacyValue
     }
 
-    private func save(_ value: String) {
+    private func save(_ value: String) throws {
         let data = Data(value.utf8)
         let query = baseQuery()
         let attributes: [String: Any] = [
@@ -60,7 +77,12 @@ struct OpenAIKeychainStore {
             var newItem = query
             newItem[kSecValueData as String] = data
             newItem[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            SecItemAdd(newItem as CFDictionary, nil)
+            let addStatus = SecItemAdd(newItem as CFDictionary, nil)
+            guard addStatus == errSecSuccess else {
+                throw KeychainError.unhandledStatus(addStatus)
+            }
+        } else if updateStatus != errSecSuccess {
+            throw KeychainError.unhandledStatus(updateStatus)
         }
     }
 
@@ -90,5 +112,16 @@ struct OpenAIKeychainStore {
 
     private func clearLegacyDefaultsValue() {
         UserDefaults.standard.removeObject(forKey: legacyDefaultsKey)
+    }
+
+    private enum KeychainError: LocalizedError {
+        case unhandledStatus(OSStatus)
+
+        var errorDescription: String? {
+            switch self {
+            case .unhandledStatus(let status):
+                return "Keychain operation failed with status \(status)."
+            }
+        }
     }
 }
