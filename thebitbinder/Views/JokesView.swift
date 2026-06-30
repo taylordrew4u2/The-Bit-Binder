@@ -889,7 +889,7 @@ struct JokesView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .accessibilityLabel("More Actions")
+                        .accessibilityLabel("Roast export options")
                 }
             }
         } else {
@@ -984,7 +984,7 @@ struct JokesView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                        .accessibilityLabel("More Actions")
+                        .accessibilityLabel("Joke library options")
                 }
             }
         }

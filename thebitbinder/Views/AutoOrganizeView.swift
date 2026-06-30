@@ -178,7 +178,7 @@ struct AutoOrganizeView: View {
             .alert("Organization Complete", isPresented: $showOrganizationSummary) {
                 Button("Done") { }
             } message: {
-                Text(" Organized: \(organizationStats.organized) jokes\n Folder assignments: \(organizationStats.suggested)")
+                Text("Organized: \(organizationStats.organized) jokes\nFolder assignments: \(organizationStats.suggested)")
             }
             .confirmationDialog(
                 "Reorganize All Jokes",
