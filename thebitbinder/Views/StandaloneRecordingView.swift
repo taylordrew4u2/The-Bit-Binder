@@ -12,6 +12,7 @@ import AVFoundation
 struct StandaloneRecordingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     @ObservedObject private var audioService = AudioRecordingService.shared
     @State private var recordingName = ""
@@ -163,8 +164,8 @@ struct StandaloneRecordingView: View {
                         Circle()
                             .fill(Color.recording)
                             .frame(width: 12, height: 12)
-                            .opacity(0.8)
-                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
+                            .opacity(reduceMotion ? 1.0 : 0.8)
+                            .animation(reduceMotion ? nil : .easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
 
                         Text("Recording")
                             .font(.headline)
@@ -193,8 +194,8 @@ struct StandaloneRecordingView: View {
                     Circle()
                         .fill(Color.recording.opacity(DS.Opacity.medium))
                         .frame(width: 180, height: 180)
-                        .scaleEffect(audioService.isPaused ? 1.0 : 1.1)
-                        .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: audioService.isPaused)
+                        .scaleEffect(reduceMotion || audioService.isPaused ? 1.0 : 1.04)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: audioService.isPaused)
                 }
                 
                 Image(systemName: audioService.isRecording ? "waveform" : "mic.fill")

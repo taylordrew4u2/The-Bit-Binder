@@ -86,11 +86,11 @@ struct DSShadow: ViewModifier {
     func body(content: Content) -> some View {
         switch level {
         case .light:
-            content.shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+            content.shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 1)
         case .medium:
-            content.shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+            content.shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
         case .heavy:
-            content.shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 6)
+            content.shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
         }
     }
 }

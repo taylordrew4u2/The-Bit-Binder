@@ -15,6 +15,7 @@ struct BitBuddyChatView: View {
     @Environment(\.dismissBitBuddyDrawer) private var dismissDrawer
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject var userPreferences: UserPreferences
     @Query(sort: \Joke.dateCreated, order: .reverse) private var jokes: [Joke]
     @StateObject private var bitBuddy = BitBuddyService.shared
@@ -660,6 +661,8 @@ struct RoundedCorner: Shape {
 // MARK: - Typing Indicator
 
 struct TypingIndicator: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let roastMode: Bool
     var statusMessage: String = ""
     @State private var dotOffset: [CGFloat] = [0, 0, 0]
@@ -700,6 +703,7 @@ struct TypingIndicator: View {
             )
             .animation(.easeInOut(duration: 0.3), value: statusMessage)
             .onAppear {
+                guard !reduceMotion else { return }
                 for i in 0..<3 {
                     withAnimation(
                         .easeInOut(duration: 0.4)
@@ -852,12 +856,14 @@ struct RoastBuddyGlyph: View {
 // MARK: - Blinking Cursor Modifier
 
 struct BlinkingModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var visible = true
     
     func body(content: Content) -> some View {
         content
-            .opacity(visible ? 1 : 0)
+            .opacity(visible || reduceMotion ? 1 : 0)
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
                     visible = false
                 }
