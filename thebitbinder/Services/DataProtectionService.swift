@@ -278,8 +278,13 @@ final class DataProtectionService: ObservableObject {
         
         do {
             try fileManager.createDirectory(at: appFilesURL, withIntermediateDirectories: true)
-            
-            // Look for app-specific files (recordings, photos, etc.)
+
+            let appSupportBackupURL = appFilesURL.appending(path: "ApplicationSupport", directoryHint: .isDirectory)
+            let documentsBackupURL = appFilesURL.appending(path: "Documents", directoryHint: .isDirectory)
+            try fileManager.createDirectory(at: appSupportBackupURL, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: documentsBackupURL, withIntermediateDirectories: true)
+
+            // Look for app-specific files in Application Support.
             let appSupportContents = try fileManager.contentsOfDirectory(at: URL.applicationSupportDirectory, includingPropertiesForKeys: nil)
             
             for fileURL in appSupportContents {
@@ -295,7 +300,21 @@ final class DataProtectionService: ObservableObject {
                     continue
                 }
                 
-                let destURL = appFilesURL.appending(path: fileURL.lastPathComponent)
+                let destURL = appSupportBackupURL.appending(path: fileURL.lastPathComponent)
+                try fileManager.copyItem(at: fileURL, to: destURL)
+            }
+
+            // Recordings are stored in Documents; back them up with their bare
+            // filenames so Recording.resolvedURL still finds them after restore.
+            let documentsURL = try fileManager.url(
+                for: .documentDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            let documentContents = try fileManager.contentsOfDirectory(at: documentsURL, includingPropertiesForKeys: nil)
+            for fileURL in documentContents {
+                let destURL = documentsBackupURL.appending(path: fileURL.lastPathComponent)
                 try fileManager.copyItem(at: fileURL, to: destURL)
             }
             
@@ -788,11 +807,37 @@ final class DataProtectionService: ObservableObject {
     }
     
     private func restoreAppFiles(from sourceURL: URL) throws {
+        let appSupportSource = sourceURL.appending(path: "ApplicationSupport", directoryHint: .isDirectory)
+        let documentsSource = sourceURL.appending(path: "Documents", directoryHint: .isDirectory)
+
+        if fileManager.fileExists(atPath: appSupportSource.path) ||
+            fileManager.fileExists(atPath: documentsSource.path) {
+            if fileManager.fileExists(atPath: appSupportSource.path) {
+                try restoreFiles(from: appSupportSource, to: URL.applicationSupportDirectory)
+            }
+            if fileManager.fileExists(atPath: documentsSource.path) {
+                let documentsURL = try fileManager.url(
+                    for: .documentDirectory,
+                    in: .userDomainMask,
+                    appropriateFor: nil,
+                    create: true
+                )
+                try restoreFiles(from: documentsSource, to: documentsURL)
+            }
+            return
+        }
+
+        // Backward compatibility for older backups that stored AppFiles
+        // directly under Application Support.
+        try restoreFiles(from: sourceURL, to: URL.applicationSupportDirectory)
+    }
+
+    private func restoreFiles(from sourceURL: URL, to destinationDirectory: URL) throws {
         let contents = try fileManager.contentsOfDirectory(at: sourceURL, includingPropertiesForKeys: nil)
-        
+
         for fileURL in contents {
-            let destURL = URL.applicationSupportDirectory.appending(path: fileURL.lastPathComponent)
-            
+            let destURL = destinationDirectory.appending(path: fileURL.lastPathComponent)
+
             // Remove existing file/directory
             do {
                 try fileManager.removeItem(at: destURL)

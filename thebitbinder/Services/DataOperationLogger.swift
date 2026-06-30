@@ -18,6 +18,7 @@ final class DataOperationLogger {
     private let logFileURL: URL
     private let maxLogFileSize: Int = 10 * 1024 * 1024 // 10MB
     private let maxLogFiles = 5
+    private let logQueue = DispatchQueue(label: "com.thebitbinder.data-operation-logger")
     
     init() {
         // Create log file in Application Support
@@ -80,7 +81,7 @@ final class DataOperationLogger {
     }
     
     private func writeToLogFile(_ logLine: String) {
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        logQueue.async { [weak self] in
             guard let self = self else { return }
             
             do {
@@ -115,24 +116,25 @@ final class DataOperationLogger {
     
     private func rotateLogFile() {
         do {
-            // Move current log to rotated log
-            let rotatedURL = logFileURL.appendingPathExtension("1")
-            
             // Remove oldest rotated logs
-            for i in stride(from: maxLogFiles, through: 2, by: -1) {
+            let oldestURL = logFileURL.appendingPathExtension("\(maxLogFiles)")
+            if FileManager.default.fileExists(atPath: oldestURL.path) {
+                try FileManager.default.removeItem(at: oldestURL)
+            }
+
+            // Shift .1 -> .2, .2 -> .3, etc. before moving current -> .1.
+            // Moving highest first avoids overwriting newer rotated logs.
+            for i in stride(from: maxLogFiles - 1, through: 1, by: -1) {
                 let oldURL = logFileURL.appendingPathExtension("\(i)")
                 let newURL = logFileURL.appendingPathExtension("\(i + 1)")
-                
+
                 if FileManager.default.fileExists(atPath: oldURL.path) {
-                    if i == maxLogFiles {
-                        try FileManager.default.removeItem(at: oldURL)
-                    } else {
-                        try FileManager.default.moveItem(at: oldURL, to: newURL)
-                    }
+                    try FileManager.default.moveItem(at: oldURL, to: newURL)
                 }
             }
             
             // Move current to .1
+            let rotatedURL = logFileURL.appendingPathExtension("1")
             if FileManager.default.fileExists(atPath: logFileURL.path) {
                 try FileManager.default.moveItem(at: logFileURL, to: rotatedURL)
             }

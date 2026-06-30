@@ -42,7 +42,8 @@ final class DataMigrationService: ObservableObject {
         print(" [DataMigration] Creating pre-migration backup...")
         await dataProtection.createBackup(
             named: "PreMigration_v\(lastMigrationVersion)_to_v\(currentMigrationVersion)_\(ISO8601DateFormatter().string(from: Date()))",
-            reason: .preDataOperation
+            reason: .preDataOperation,
+            bypassCooldown: true
         )
         
         // Step 2: Validate data integrity before migration
@@ -236,4 +237,3 @@ enum MigrationResult {
         }
     }
 }
-
