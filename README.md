@@ -25,6 +25,7 @@ Current product screenshots are available on the App Store listing.
 - Implemented audio recording and transcription workflows that preserve recordings across navigation and resolve sandbox file paths safely.
 - Built an import pipeline that routes files by type, extracts text from PDFs/images/audio, normalizes content, creates review queues, and persists approved jokes.
 - Integrated CloudKit sync, iCloud key-value preferences, migration, validation, backup, diagnostics, and data-safety utilities.
+- Added cross-iCloud library sharing on top of CloudKit shared workspaces, backed by a SwiftData-to-Core Data migration path and dedicated collaborator views.
 - Structured AI functionality behind service/provider boundaries for local fallback, OpenAI-backed behavior, MLX, Transformers, and app-specific intent routing.
 - Configured App Store/TestFlight release automation through fastlane.
 
@@ -55,6 +56,7 @@ BitBinder combines capture, organization, import, recording, transcription, and 
 - Import pipeline for text, PDFs, OCR, images, scanned documents, audio transcription, review queues, unresolved fragments, and import batch history.
 - BitBuddy assistant services with local fallback, OpenAI-backed service, MLX-backed service, Hugging Face Transformers integration, and app-specific intent routing.
 - Auto-organization, duplicate detection, categorization metadata, private search, and PDF export services.
+- Cross-iCloud library sharing through CloudKit shared workspaces, with collaborator-facing views for adding and managing jokes, brainstorm ideas, set lists, roast targets, and roast jokes.
 - SwiftData persistence with CloudKit sync support, iCloud key-value preferences, data validation, migration, backups, diagnostics, and CloudKit reset utilities.
 - Background task registration for refresh/sync and a background asset downloader extension target.
 
@@ -62,7 +64,7 @@ BitBinder combines capture, organization, import, recording, transcription, and 
 
 - Frontend: SwiftUI
 - Backend: No standalone backend in this repository; the app uses Apple platform services and optional AI provider APIs.
-- Database: SwiftData with CloudKit private database support.
+- Database: SwiftData with CloudKit private database support, plus a Core Data bridge that backs CloudKit shared workspaces for cross-iCloud library sharing.
 - Authentication: No external user-account authentication is required. `AuthService` keeps the app authenticated locally and stores a generated user identifier through iCloud key-value storage.
 - Styling: SwiftUI views with custom design utilities, reusable components, color helpers, fire/roast palettes, and native SF Symbols.
 - Hosting/deployment: Native iOS App Store distribution with `fastlane` lanes for TestFlight and App Store upload.
@@ -78,6 +80,7 @@ The project is organized as a native Xcode app:
 - `thebitbinder/Views`: SwiftUI screens and reusable view components for jokes, brainstorm, recordings, set lists, roast mode, notebook, imports, settings, data safety, and BitBuddy UI.
 - `thebitbinder/Services`: App services for recording, transcription, speech recognition, imports, AI joke extraction, BitBuddy backends, CloudKit sync, validation, migration, backup, duplicate detection, PDF/OCR/text extraction, and user preferences.
 - `thebitbinder/Services/BitBuddyBackends`: Specialized BitBuddy backend implementations.
+- `thebitbinder/CloudKit`: Cross-iCloud library sharing, including the sharing service, shared-workspace views, a CloudKit error classifier, a persistence controller, and a SwiftData-to-Core Data migrator that backs collaborative sharing.
 - `thebitbinder/Utilities`: Shared UI components, design tokens, logging, speech helpers, title generation, memory monitoring, iCloud key-value storage, and other app helpers.
 - `thebitbinder/Assets.xcassets`: App icons, colors, and asset catalog resources.
 - `bit`: Background asset downloader extension target.
@@ -102,8 +105,8 @@ Requirements:
 Setup:
 
 ```bash
-git clone git@github.com:taylordrew4u2/ITSBITNERYBIT.git
-cd ITSBITNERYBIT
+git clone git@github.com:taylordrew4u2/The-Bit-Binder.git
+cd The-Bit-Binder
 open thebitbinder.xcodeproj
 ```
 
@@ -145,6 +148,7 @@ Optional provider credentials are handled inside the app where implemented. For 
 - Built a native SwiftUI app structure for a multi-section comedy-writing workflow.
 - Implemented SwiftData models for jokes, folders, set lists, recordings, brainstorm ideas, notebook photos, import history, roast targets, and roast jokes.
 - Connected CloudKit-backed persistence, iCloud key-value preferences, data validation, migration, backup, and recovery utilities.
+- Built cross-iCloud library sharing using CloudKit shared workspaces and a SwiftData-to-Core Data bridge, with collaborator views for editing shared jokes, brainstorm ideas, set lists, and roast material.
 - Built recording and transcription flows using AVFoundation and Apple Speech, including imported-audio transcription.
 - Added import services for text extraction, PDF parsing, OCR, audio transcription, review queues, and import batch tracking.
 - Implemented BitBuddy assistant service layers with local fallback, OpenAI, MLX, and Transformers-backed paths.
