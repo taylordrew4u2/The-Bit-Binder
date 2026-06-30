@@ -231,9 +231,10 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 44100.0,
-            AVNumberOfChannelsKey: 2,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            AVSampleRateKey: 22_050.0,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: 32_000,
+            AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue
         ]
         
         do {

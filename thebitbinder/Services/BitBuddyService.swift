@@ -454,9 +454,10 @@ final class BitBuddyService: NSObject, ObservableObject {
         
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 44100,
+            AVSampleRateKey: 22_050,
             AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            AVEncoderBitRateKey: 32_000,
+            AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue
         ]
         
         let tempDir = FileManager.default.temporaryDirectory
