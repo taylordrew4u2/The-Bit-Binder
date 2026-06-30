@@ -256,7 +256,7 @@
 				CODE_SIGN_ENTITLEMENTS = thebitbinder/thebitbinder.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = R44WG942GS;
 				ENABLE_APP_SANDBOX = YES;
@@ -286,10 +286,10 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 11.5;
+				MARKETING_VERSION = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "The-BitBinder.thebitbinder";
@@ -311,7 +311,7 @@
 				CODE_SIGN_ENTITLEMENTS = thebitbinder/thebitbinder.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = R44WG942GS;
 				ENABLE_APP_SANDBOX = YES;
@@ -341,10 +341,10 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 11.5;
+				MARKETING_VERSION = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "The-BitBinder.thebitbinder";
@@ -484,19 +484,19 @@
 				CODE_SIGN_ENTITLEMENTS = bit/bit.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = R44WG942GS;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = bit/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = bit;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 11.5;
+				MARKETING_VERSION = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder.bit";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -517,19 +517,19 @@
 				CODE_SIGN_ENTITLEMENTS = bit/bit.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = R44WG942GS;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = bit/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = bit;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 11.5;
+				MARKETING_VERSION = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder.bit";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

@@ -39,36 +39,47 @@ struct AppSetupView: View {
 
     private let defaultTabs: Set<AppScreen> = [.home, .jokes, .sets, .notebookSaver]
 
-    private var pageCount: Int { isFirstLaunch ? 7 : 6 }
+    // First launch keeps only the essential steps; tabs/home/layout default
+    // to sensible values and stay editable later in Settings.
+    private var pageCount: Int { isFirstLaunch ? 4 : 6 }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Progress dots
-            HStack(spacing: 8) {
-                ForEach(0..<pageCount, id: \.self) { index in
-                    Circle()
-                        .fill(index == currentPage ? Color.accentColor : Color.secondary.opacity(0.3))
-                        .frame(width: 8, height: 8)
+            // Progress dots, with an optional Skip on first launch
+            ZStack {
+                HStack(spacing: 8) {
+                    ForEach(0..<pageCount, id: \.self) { index in
+                        Circle()
+                            .fill(index == currentPage ? Color.accentColor : Color.secondary.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                    }
+                }
+
+                if isFirstLaunch && currentPage < pageCount - 1 {
+                    HStack {
+                        Spacer()
+                        Button("Skip") { finishSetup() }
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding(.trailing, 20)
+                    }
                 }
             }
             .padding(.top, 16)
 
             TabView(selection: $currentPage) {
                 if isFirstLaunch {
-                    welcomePage.tag(0)
-                    privacyPage.tag(1)
-                    namePage.tag(2)
-                    tabsPage.tag(3)
-                    homePage.tag(4)
-                    jokeViewPage.tag(5)
-                    readyPage.tag(6)
+                    welcomePage.readableWidth().tag(0)
+                    privacyPage.readableWidth().tag(1)
+                    namePage.readableWidth().tag(2)
+                    readyPage.readableWidth().tag(3)
                 } else {
-                    privacyPage.tag(0)
-                    namePage.tag(1)
-                    tabsPage.tag(2)
-                    homePage.tag(3)
-                    jokeViewPage.tag(4)
-                    readyPage.tag(5)
+                    privacyPage.readableWidth().tag(0)
+                    namePage.readableWidth().tag(1)
+                    tabsPage.readableWidth().tag(2)
+                    homePage.readableWidth().tag(3)
+                    jokeViewPage.readableWidth().tag(4)
+                    readyPage.readableWidth().tag(5)
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -123,6 +134,7 @@ struct AppSetupView: View {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
+            .readableWidth()
         }
         .interactiveDismissDisabled(isFirstLaunch)
         .onAppear {

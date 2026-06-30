@@ -21,8 +21,8 @@ private enum NotebookFilter: Equatable, Hashable {
 }
 
 struct NotebookView: View {
-    private static let notebookImageMaxLongEdge: CGFloat = 1200
-    private static let notebookJPEGQuality: CGFloat = 0.68
+    nonisolated private static let notebookImageMaxLongEdge: CGFloat = 1200
+    nonisolated private static let notebookJPEGQuality: CGFloat = 0.68
 
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<NotebookPhotoRecord> { !$0.isTrashed }, sort: \NotebookPhotoRecord.sortOrder) private var allPhotos: [NotebookPhotoRecord]
@@ -216,6 +216,7 @@ struct NotebookView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
                         .padding(.bottom, 20)
+                        .readableWidth()
                     }
                 }
             }
