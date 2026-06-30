@@ -72,6 +72,7 @@ final class AppStartupCoordinator: ObservableObject {
         
         // Ensure memory headroom before running expensive validation/migration
         MemoryManager.shared.ensureMemoryHeadroom()
+        cleanupStaleTemporaryFiles()
         
         // ── Post-restore confirmation ─────────────────────────────────────
         // If the user restored from a backup and the app restarted, confirm
@@ -226,6 +227,39 @@ final class AppStartupCoordinator: ObservableObject {
             return false
         }
         return true
+    }
+
+    private func cleanupStaleTemporaryFiles() {
+        let fileManager = FileManager.default
+        let temporaryDirectory = fileManager.temporaryDirectory
+        let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+        let managedPrefixes = [
+            "bitbinder_transcription_",
+            "bitbinder_transcription_input_",
+            "bitbuddy_recording_"
+        ]
+
+        guard let files = try? fileManager.contentsOfDirectory(
+            at: temporaryDirectory,
+            includingPropertiesForKeys: [.contentModificationDateKey]
+        ) else { return }
+
+        var removedCount = 0
+        for file in files where managedPrefixes.contains(where: { file.lastPathComponent.hasPrefix($0) }) {
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            guard modified < cutoff else { continue }
+
+            do {
+                try fileManager.removeItem(at: file)
+                removedCount += 1
+            } catch {
+                print(" [AppStartup] Could not remove stale temp file '\(file.lastPathComponent)': \(error)")
+            }
+        }
+
+        if removedCount > 0 {
+            print(" [AppStartup] Removed \(removedCount) stale temporary file(s)")
+        }
     }
     
     // MARK: - Trash Auto-Purge

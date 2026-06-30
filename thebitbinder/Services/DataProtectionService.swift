@@ -16,7 +16,8 @@ final class DataProtectionService: ObservableObject {
     
     private let fileManager = FileManager.default
     private let backupDirectory: URL
-    private let maxBackups = 10 // Keep maximum 10 backups
+    private let maxBackups = 6
+    private let maxTotalBackupBytes: Int64 = 750 * 1024 * 1024
     
     /// Prevents concurrent backup operations from running simultaneously.
     private var isBackupInProgress = false
@@ -355,12 +356,20 @@ final class DataProtectionService: ObservableObject {
                     return date1 > date2
                 }
             
-            // Remove excess backups
-            if backups.count > maxBackups {
-                let backupsToDelete = Array(backups.dropFirst(maxBackups))
-                for backup in backupsToDelete {
+            var retained: [(url: URL, size: Int64)] = []
+            var totalBytes: Int64 = 0
+
+            for backup in backups {
+                let size = calculateDirectorySize(backup)
+                let shouldKeep = retained.count < maxBackups &&
+                    (retained.isEmpty || totalBytes + size <= maxTotalBackupBytes)
+
+                if shouldKeep {
+                    retained.append((backup, size))
+                    totalBytes += size
+                } else {
                     try fileManager.removeItem(at: backup)
-                    print(" [DataProtection] Cleaned up old backup: \(backup.lastPathComponent)")
+                    print(" [DataProtection] Cleaned up backup to save storage: \(backup.lastPathComponent)")
                 }
             }
         } catch {

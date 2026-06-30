@@ -21,6 +21,9 @@ private enum NotebookFilter: Equatable, Hashable {
 }
 
 struct NotebookView: View {
+    private static let notebookImageMaxLongEdge: CGFloat = 1200
+    private static let notebookJPEGQuality: CGFloat = 0.68
+
     @Environment(\.modelContext) private var modelContext
     @Query(filter: #Predicate<NotebookPhotoRecord> { !$0.isTrashed }, sort: \NotebookPhotoRecord.sortOrder) private var allPhotos: [NotebookPhotoRecord]
     @Query(filter: #Predicate<NotebookFolder> { !$0.isTrashed }, sort: \NotebookFolder.sortOrder) private var folders: [NotebookFolder]
@@ -593,11 +596,11 @@ struct NotebookView: View {
         do {
             guard let rawData = try await item.loadTransferable(type: Data.self) else { return }
 
-            // Downscale to max 1500 px long edge then compress.
+            // Store notebook images at reading-friendly resolution instead of
+            // preserving camera-sized originals in SwiftData external storage.
             guard let jpegData: Data = autoreleasepool(invoking: {
                 guard let uiImage = UIImage(data: rawData) else { return nil }
-                let scaled = NotebookView.downscaleForStorage(uiImage, maxLongEdge: 1500)
-                return scaled.jpegData(compressionQuality: 0.8)
+                return NotebookView.storageJPEGData(from: uiImage)
             }) else { return }
 
             let newPhoto = NotebookPhotoRecord(notes: "", imageData: jpegData)
@@ -622,8 +625,7 @@ struct NotebookView: View {
     
     private func saveCameraImage(_ image: UIImage) async {
         guard let jpegData: Data = autoreleasepool(invoking: {
-            let scaled = NotebookView.downscaleForStorage(image, maxLongEdge: 1500)
-            return scaled.jpegData(compressionQuality: 0.8)
+            NotebookView.storageJPEGData(from: image)
         }) else { return }
 
         let newPhoto = NotebookPhotoRecord(notes: "", imageData: jpegData)
@@ -657,6 +659,11 @@ struct NotebookView: View {
         return UIGraphicsImageRenderer(size: newSize, format: format).image { _ in
             image.draw(in: CGRect(origin: .zero, size: newSize))
         }
+    }
+
+    private static func storageJPEGData(from image: UIImage) -> Data? {
+        let scaled = downscaleForStorage(image, maxLongEdge: notebookImageMaxLongEdge)
+        return scaled.jpegData(compressionQuality: notebookJPEGQuality)
     }
     
     // MARK: - PDF Import
@@ -726,7 +733,7 @@ struct NotebookView: View {
                 let mediaBox = page.bounds(for: .mediaBox)
                 guard mediaBox.width > 0, mediaBox.height > 0 else { return nil }
                 
-                let maxDimension: CGFloat = 1500
+                let maxDimension = NotebookView.notebookImageMaxLongEdge
                 let scale = min(maxDimension / mediaBox.width, maxDimension / mediaBox.height, 2.0)
                 let scaledSize = CGSize(
                     width: (mediaBox.width * scale).rounded(),
@@ -751,7 +758,7 @@ struct NotebookView: View {
                     cg.restoreGState()
                 }
                 
-                return image.jpegData(compressionQuality: 0.85)
+                return image.jpegData(compressionQuality: NotebookView.notebookJPEGQuality)
             }
         }.value
     }
