@@ -48,7 +48,7 @@ final class LineNormalizer {
                 boundingBox: line.boundingBox,
                 confidence: line.confidence,
                 estimatedFontSize: line.estimatedFontSize,
-                indentationLevel: calculateCleanedIndentationLevel(cleanedText),
+                indentationLevel: line.indentationLevel,
                 yPosition: line.yPosition,
                 method: line.method
             )
@@ -97,19 +97,6 @@ final class LineNormalizer {
         return text.last.map { terminals.contains($0) } ?? false
     }
     
-    private func calculateCleanedIndentationLevel(_ text: String) -> Int {
-        // Recalculate indentation after cleaning
-        var leadingSpaces = 0
-        for char in text {
-            if char == " " {
-                leadingSpaces += 1
-            } else {
-                break
-            }
-        }
-        return leadingSpaces / 4
-    }
-    
     // MARK: - Noise Detection
     
     private func isNoise(_ text: String) -> Bool {
@@ -130,15 +117,26 @@ final class LineNormalizer {
     }
     
     private func isPageElement(_ text: String) -> Bool {
-        let lowercased = text.lowercased()
-        
-        // Common page elements to filter out
-        let pageElements = [
-            "page", "continued", "end", "start", "header", "footer",
-            "copyright", "", "all rights reserved", "confidential"
-        ]
-        
-        return pageElements.contains { lowercased.contains($0) }
+        let lowercased = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if lowercased == "end" || lowercased == "start" || lowercased == "continued" {
+            return true
+        }
+
+        if lowercased.hasPrefix("continued ") || lowercased.hasPrefix("header ") || lowercased.hasPrefix("footer ") {
+            return true
+        }
+
+        if lowercased.contains("copyright") ||
+            lowercased.contains("all rights reserved") ||
+            lowercased == "confidential" {
+            return true
+        }
+
+        return lowercased.range(
+            of: #"^(page\s*)?\d{1,4}$|^page\s+\d{1,4}\s*(of\s+\d{1,4})?$"#,
+            options: .regularExpression
+        ) != nil
     }
     
     private func isRepeatedCharacters(_ text: String) -> Bool {
@@ -229,7 +227,7 @@ final class LineNormalizer {
         let text = line.normalizedText.lowercased()
         
         // Common footer patterns
-        if text.contains("page") || text.contains("copyright") || text.contains("") {
+        if text.contains("page") || text.contains("copyright") {
             return true
         }
         

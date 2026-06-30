@@ -28,7 +28,6 @@ struct RoastTargetDetailView: View {
     @State private var editingJoke: RoastJoke?
     @State private var showingEditTarget = false
     @State private var showingTalkToText = false
-    @State private var showingRecordingSheet = false
     @State private var showingDeleteTargetAlert = false
     @State private var searchText = ""
     @State private var persistenceError: String?
@@ -232,9 +231,6 @@ struct RoastTargetDetailView: View {
         .sheet(isPresented: $showingTalkToText) {
             TalkToTextRoastView(target: target)
         }
-        .sheet(isPresented: $showingRecordingSheet) {
-            RecordRoastSetView(target: target)
-        }
         .sheet(isPresented: $showingExportSheet) {
             RoastExportSheet(target: target, exportedURL: $exportedFileURL)
         }
@@ -291,33 +287,33 @@ struct RoastTargetDetailView: View {
     private var targetHeaderCard: some View {
         let heat = min(100, target.jokeCount * 4)
         return ZStack(alignment: .topTrailing) {
-            if heat >= 60 {
-                Circle()
-                    .fill(RadialGradient(
-                        colors: [FirePalette.core.opacity(DS.Opacity.medium), .clear],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 100
-                    ))
-                    .frame(width: 200, height: 200)
-                    .blur(radius: 20)
-                    .offset(x: 40, y: -30)
-            }
-
             VStack(spacing: isHeaderCollapsed ? DS.Spacing.sm : DS.Spacing.md) {
                 HStack(alignment: .center, spacing: DS.Spacing.md) {
                     if isHeaderCollapsed {
+                        RoastSubjectAvatar(
+                            photoData: target.photoData,
+                            fallbackInitial: String(safeTargetName.prefix(1).uppercased()),
+                            accentColor: accentColor,
+                            size: 44
+                        )
+
                         VStack(alignment: .leading, spacing: 6) {
                             Text(safeTargetName)
                                 .font(.headline.bold())
                                 .foregroundColor(FirePalette.text)
 
-                            HeatBar(heat: heat)
-                                .frame(width: 140)
+                            HStack(spacing: DS.Spacing.sm) {
+                                HeatBar(heat: heat)
+                                    .frame(width: 120)
 
-                            Text("\(target.jokeCount) roast\(target.jokeCount == 1 ? "" : "s")")
-                                .font(.caption.weight(.medium))
-                                .foregroundColor(FirePalette.sub)
+                                Text("\(target.jokeCount)")
+                                    .font(.caption.monospacedDigit().weight(.semibold))
+                                    .foregroundColor(accentColor)
+
+                                Text("roast\(target.jokeCount == 1 ? "" : "s")")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundColor(FirePalette.sub)
+                            }
                         }
 
                         Spacer()
@@ -547,12 +543,12 @@ struct RoastTargetDetailView: View {
         VStack(alignment: .leading, spacing: DS.Spacing.md) {
             workspaceHeader(
                 title: "Things I Know",
-                subtitle: "Facts, quirks, habits, history, look, job, contradictions, anything roastable.",
+                detail: target.traits.isEmpty ? "No details yet" : "\(target.traits.count) detail\(target.traits.count == 1 ? "" : "s")",
                 icon: "list.bullet.clipboard"
             )
 
             if target.traits.isEmpty {
-                Text("Add bullet points about \(safeTargetName).")
+                Text("No details saved for \(safeTargetName).")
                     .font(.subheadline)
                     .foregroundColor(FirePalette.sub)
             } else {
@@ -583,10 +579,11 @@ struct RoastTargetDetailView: View {
                                         .foregroundColor(FirePalette.sub)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("Remove detail")
                             }
                             .padding(DS.Spacing.sm)
                             .background(Color.white.opacity(0.04))
-                            .clipShape(RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
                         }
                     }
                 }
@@ -598,7 +595,9 @@ struct RoastTargetDetailView: View {
                     .foregroundColor(FirePalette.text)
                     .padding(DS.Spacing.md)
                     .background(Color.white.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
+                    .submitLabel(.done)
+                    .onSubmit(addTraitFromInput)
 
                 Button {
                     addTraitFromInput()
@@ -609,13 +608,14 @@ struct RoastTargetDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!canAddTrait)
+                .accessibilityLabel("Add detail")
             }
         }
         .padding(DS.Spacing.lg)
         .background(FirePalette.card)
-        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous)
                 .strokeBorder(FirePalette.edge, lineWidth: 0.5)
         )
     }
@@ -624,7 +624,7 @@ struct RoastTargetDetailView: View {
         VStack(alignment: .leading, spacing: DS.Spacing.md) {
             workspaceHeader(
                 title: "Roast Notepad",
-                subtitle: "Flesh out loose ideas here. Highlight a line or phrase, then promote it to a roast.",
+                detail: target.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Empty" : "Drafting",
                 icon: "square.and.pencil"
             )
 
@@ -635,9 +635,9 @@ struct RoastTargetDetailView: View {
             )
             .frame(minHeight: 180)
             .background(Color.white.opacity(0.04))
-            .clipShape(RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous)
                     .strokeBorder(FirePalette.edge, lineWidth: 0.5)
             )
 
@@ -673,28 +673,33 @@ struct RoastTargetDetailView: View {
         }
         .padding(DS.Spacing.lg)
         .background(FirePalette.card)
-        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous)
                 .strokeBorder(FirePalette.edge, lineWidth: 0.5)
         )
     }
 
-    private func workspaceHeader(title: String, subtitle: String, icon: String) -> some View {
-        HStack(alignment: .top, spacing: DS.Spacing.sm) {
+    private func workspaceHeader(title: String, detail: String, icon: String) -> some View {
+        HStack(alignment: .center, spacing: DS.Spacing.sm) {
             Image(systemName: icon)
                 .font(.headline)
                 .foregroundColor(accentColor)
                 .frame(width: 26)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.headline.bold())
-                    .foregroundColor(FirePalette.text)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(FirePalette.sub)
-            }
+            Text(title)
+                .font(.headline.bold())
+                .foregroundColor(FirePalette.text)
+
+            Spacer()
+
+            Text(detail)
+                .font(.caption.weight(.medium))
+                .foregroundColor(FirePalette.sub)
+                .padding(.horizontal, DS.Spacing.sm)
+                .padding(.vertical, 4)
+                .background(accentColor.opacity(0.1))
+                .clipShape(Capsule())
         }
     }
 
@@ -753,7 +758,6 @@ struct RoastTargetDetailView: View {
                 RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous)
                     .strokeBorder(FirePalette.edge, lineWidth: 0.5)
             )
-            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 3)
             .padding(.horizontal, 16)
         } else {
             // Standalone roast — no group wrapper, no label
@@ -907,6 +911,7 @@ struct RoastTargetDetailView: View {
             } label: {
                 Image(systemName: "pencil")
             }
+            .accessibilityLabel("Edit target")
         }
         
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -915,6 +920,7 @@ struct RoastTargetDetailView: View {
             } label: {
                 Image(systemName: "plus")
             }
+            .accessibilityLabel("Add roast")
         }
         
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -953,9 +959,6 @@ struct RoastTargetDetailView: View {
                     Button(action: { showingTalkToText = true }) {
                         Label("Talk-to-Text", systemImage: "mic.badge.plus")
                     }
-                    Button(action: { showingRecordingSheet = true }) {
-                        Label("Record Set", systemImage: "record.circle")
-                    }
                 }
                 
                 Divider()
@@ -976,6 +979,7 @@ struct RoastTargetDetailView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
+            .accessibilityLabel("Target options")
         }
     }
     
@@ -1249,7 +1253,6 @@ struct DraggableRoastCard: View {
                     } else {
                         RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
                             .fill(Color(FirePalette.card))
-                            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
                     }
                 }
             )
@@ -1505,8 +1508,7 @@ struct EditRoastJokeView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Mark as Opening Roast")
                                             .font(.subheadline.weight(.medium))
-                                        let count = joke.target?.openingRoastCount ?? 3
-                                        Text(joke.isOpeningRoast ? "\(openerLabel(for: joke)) for this target" : "One of \(count) main roast\(count == 1 ? "" : "s") for this target")
+                                        Text(joke.isOpeningRoast ? "\(openerLabel(for: joke)) for this target" : "Use this as a headline roast for this target")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     }
@@ -1664,8 +1666,15 @@ struct EditRoastTargetView: View {
     @State private var photoImage: UIImage?
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
+    @FocusState private var focusedField: Field?
 
     private var accentColor: Color { FirePalette.core }
+
+    private enum Field: Hashable {
+        case name
+        case notes
+        case detail(Int)
+    }
 
     var body: some View {
         NavigationStack {
@@ -1684,30 +1693,24 @@ struct EditRoastTargetView: View {
                         Spacer()
                     }
                     .listRowBackground(Color.clear)
+                    .accessibilityLabel("Change target photo")
                 }
 
                 Section("Name") {
                     TextField("Name", text: $target.name)
                         .font(.headline)
+                        .focused($focusedField, equals: .name)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .notes }
                 }
 
                 Section("Notes (optional)") {
                     TextField("e.g. friend, coworker, celebrity...", text: $target.notes)
+                        .focused($focusedField, equals: .notes)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .detail(0) }
                 }
                 
-                Section {
-                    Picker("Main Roasts", selection: $target.openingRoastCount) {
-                        ForEach(1...10, id: \.self) { count in
-                            Text("\(count)").tag(count)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                } header: {
-                    Text("Performance Settings")
-                } footer: {
-                    Text("Number of main opening roasts to prepare for this target during live performance.")
-                }
-
                 Section {
                     ForEach(Array(target.traits.enumerated()), id: \.offset) { index, _ in
                         if index < target.traits.count {
@@ -1720,6 +1723,8 @@ struct EditRoastTargetView: View {
                                         }
                                     }
                                 ))
+                                .focused($focusedField, equals: .detail(index))
+                                .submitLabel(.done)
                                 if target.traits.count > 1 {
                                     Button {
                                         if index < target.traits.count {
@@ -1730,6 +1735,7 @@ struct EditRoastTargetView: View {
                                             .foregroundColor(Color.destructive.opacity(DS.Opacity.heavy))
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityLabel("Remove detail")
                                 }
                             }
                         }
@@ -1746,7 +1752,8 @@ struct EditRoastTargetView: View {
                     Text("Bullet points — habits, quirks, job, looks, anything roastable.")
                 }
             }
-            .navigationTitle("")
+            .roastFormTheme()
+            .navigationTitle("Edit Target")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1780,6 +1787,7 @@ struct EditRoastTargetView: View {
                 await loadSelectedPhoto()
             }
             .onAppear {
+                focusedField = .name
                 if let photoData = target.photoData {
                     photoImage = UIImage(data: photoData)
                 }

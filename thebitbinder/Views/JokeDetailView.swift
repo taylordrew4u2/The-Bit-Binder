@@ -30,12 +30,14 @@ struct JokeDetailView: View {
     @State private var folders: [JokeFolder] = []
     @State private var setLists: [SetList] = []
 
-    @StateObject private var autoSave = AutoSaveManager.shared
+    @ObservedObject private var autoSave = AutoSaveManager.shared
     @StateObject private var speechManager = SpeechRecognitionManager()
     @State private var isRecording = false
     @State private var showingPermissionAlert = false
     @State private var saveError: String?
     @State private var showingSaveError = false
+    @State private var recordingError: String?
+    @State private var showingRecordingError = false
 
     @FocusState private var focusedField: Field?
 
@@ -52,22 +54,131 @@ struct JokeDetailView: View {
         return "\(f.count) folders"
     }
 
-    private var wordCount: Int {
-        joke.content.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
+    private var isFiled: Bool {
+        !(joke.folders ?? []).isEmpty
     }
 
-    private var saveStatusText: String {
-        if autoSave.isSaving { return "Saving\u{2026}" }
-        if let last = autoSave.lastSaveTime,
-           Date().timeIntervalSince(last) < 10 {
-            return "Saved just now"
-        }
-        return "Saved"
+    private var wordCount: Int {
+        joke.content.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
     }
 
     // MARK: - Body
 
     var body: some View {
+        lifecycleConfiguredEditor
+    }
+
+    private var styledEditor: some View {
+        editorRoot
+            .animation(EffortlessAnimation.smooth, value: focusedField == nil)
+            .animation(EffortlessAnimation.smooth, value: isRecording)
+            .background(Color(UIColor.systemBackground))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { toolbarContent }
+            .tint(roastMode ? FirePalette.core : .accentColor)
+    }
+
+    private var alertConfiguredEditor: some View {
+        styledEditor
+            .alert(joke.isTrashed ? "Restore Joke" : "Move to Trash",
+                   isPresented: $showingDeleteAlert) {
+                deleteAlertButtons
+            } message: {
+                Text(joke.isTrashed
+                     ? "Restore this joke from Trash?"
+                     : "Are you sure? You can restore it from Trash later.")
+            }
+            .alert("Save Failed", isPresented: $showingSaveError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "Your changes might not be saved. Try editing again.")
+            }
+            .alert("Recording Problem", isPresented: $showingRecordingError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(recordingError ?? "Couldn't transcribe your audio. Try again.")
+            }
+            .alert("Microphone Access Needed", isPresented: $showingPermissionAlert) {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("BitBinder needs microphone and speech recognition access to transcribe your voice. Enable them in Settings.")
+            }
+    }
+
+    private var sheetConfiguredEditor: some View {
+        alertConfiguredEditor
+            .sheet(isPresented: $showingFolderPicker) {
+                MultiFolderPickerView(
+                    selectedFolders: Binding(
+                        get: { joke.folders ?? [] },
+                        set: { joke.folders = $0; scheduleAutoSave() }
+                    ),
+                    allFolders: folders
+                )
+            }
+            .sheet(isPresented: $showingSetListPicker) {
+                SetListPickerForJoke(joke: joke, allSetLists: setLists)
+            }
+            .sheet(isPresented: $showingNotes) {
+                NotesSheet(joke: joke, autoSave: { scheduleAutoSave() })
+            }
+            .sheet(isPresented: $showingTags) {
+                TagsSheet(joke: joke, autoSave: { scheduleAutoSave() })
+            }
+    }
+
+    private var lifecycleConfiguredEditor: some View {
+        sheetConfiguredEditor
+            .onChange(of: speechManager.isRecording) { oldValue, newValue in
+                if oldValue && !newValue && isRecording {
+                    stopRecordingAndAppend()
+                }
+            }
+            .onChange(of: speechManager.error) { _, newValue in
+                if let msg = newValue {
+                    recordingError = msg
+                    showingRecordingError = true
+                    speechManager.error = nil
+                    withAnimation { isRecording = false }
+                }
+            }
+            .onChange(of: showingFolderPicker) { _, isOpen in
+                if isOpen {
+                    var descriptor = FetchDescriptor<JokeFolder>(
+                        predicate: #Predicate { !$0.isTrashed }
+                    )
+                    descriptor.sortBy = [SortDescriptor(\JokeFolder.name)]
+                    folders = (try? modelContext.fetch(descriptor)) ?? []
+                }
+            }
+            .onChange(of: showingSetListPicker) { _, isOpen in
+                if isOpen {
+                    var descriptor = FetchDescriptor<SetList>(
+                        predicate: #Predicate { !$0.isTrashed }
+                    )
+                    descriptor.sortBy = [SortDescriptor(\SetList.name)]
+                    setLists = (try? modelContext.fetch(descriptor)) ?? []
+                }
+            }
+            .onChange(of: joke.content) { _, _ in scheduleAutoSave() }
+            .onChange(of: joke.title) { _, _ in scheduleAutoSave() }
+            .onChange(of: joke.notes) { _, _ in scheduleAutoSave() }
+            .onAppear(perform: handleAppear)
+            .onDisappear(perform: handleDisappear)
+            // .onDisappear does NOT fire when the app is backgrounded while this
+            // screen is still on top, so flush a save on any non-active phase to
+            // avoid losing edits made just before the user swipes the app away.
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { saveJokeNow() }
+            }
+    }
+
+    private var editorRoot: some View {
         ZStack(alignment: .bottom) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -109,89 +220,6 @@ struct JokeDetailView: View {
                 }
             }
         }
-        .animation(EffortlessAnimation.smooth, value: focusedField == nil)
-        .animation(EffortlessAnimation.smooth, value: isRecording)
-        .background(Color(UIColor.systemBackground))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { toolbarContent }
-        .tint(roastMode ? FirePalette.core : .accentColor)
-        .alert(joke.isTrashed ? "Restore Joke" : "Move to Trash",
-               isPresented: $showingDeleteAlert) {
-            deleteAlertButtons
-        } message: {
-            Text(joke.isTrashed
-                 ? "Restore this joke from Trash?"
-                 : "Are you sure? You can restore it from Trash later.")
-        }
-        .alert("Save Failed", isPresented: $showingSaveError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(saveError ?? "Your changes might not be saved. Try editing again.")
-        }
-        .alert("Microphone Access Needed", isPresented: $showingPermissionAlert) {
-            Button("Open Settings") {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("BitBinder needs microphone and speech recognition access to transcribe your voice. Enable them in Settings.")
-        }
-        .onChange(of: speechManager.isRecording) { oldValue, newValue in
-            if oldValue && !newValue && isRecording {
-                stopRecordingAndAppend()
-            }
-        }
-        .onChange(of: speechManager.error) { _, newValue in
-            if let msg = newValue {
-                saveError = msg
-                showingSaveError = true
-                speechManager.error = nil
-                withAnimation { isRecording = false }
-            }
-        }
-        .sheet(isPresented: $showingFolderPicker) {
-            MultiFolderPickerView(
-                selectedFolders: Binding(
-                    get: { joke.folders ?? [] },
-                    set: { joke.folders = $0 }
-                ),
-                allFolders: folders
-            )
-        }
-        .sheet(isPresented: $showingSetListPicker) {
-            SetListPickerForJoke(joke: joke, allSetLists: setLists)
-        }
-        .sheet(isPresented: $showingNotes) {
-            NotesSheet(joke: joke, autoSave: { scheduleAutoSave() })
-        }
-        .sheet(isPresented: $showingTags) {
-            TagsSheet(joke: joke, autoSave: { scheduleAutoSave() })
-        }
-        .onChange(of: showingFolderPicker) { _, isOpen in
-            if isOpen {
-                var descriptor = FetchDescriptor<JokeFolder>(
-                    predicate: #Predicate { !$0.isTrashed }
-                )
-                descriptor.sortBy = [SortDescriptor(\JokeFolder.name)]
-                folders = (try? modelContext.fetch(descriptor)) ?? []
-            }
-        }
-        .onChange(of: showingSetListPicker) { _, isOpen in
-            if isOpen {
-                var descriptor = FetchDescriptor<SetList>(
-                    predicate: #Predicate { !$0.isTrashed }
-                )
-                descriptor.sortBy = [SortDescriptor(\SetList.name)]
-                setLists = (try? modelContext.fetch(descriptor)) ?? []
-            }
-        }
-        .onChange(of: joke.content) { _, _ in scheduleAutoSave() }
-        .onChange(of: joke.title) { _, _ in scheduleAutoSave() }
-        .onChange(of: joke.notes) { _, _ in scheduleAutoSave() }
-        .onAppear(perform: handleAppear)
-        .onDisappear(perform: handleDisappear)
     }
 
     // MARK: - Meta Strip
@@ -202,9 +230,6 @@ struct JokeDetailView: View {
             Text(" \u{00B7} ")
                 .foregroundStyle(.tertiary)
             Text(joke.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
-            Text(" \u{00B7} ")
-                .foregroundStyle(.tertiary)
-            Text(saveStatusText)
 
             Spacer()
 
@@ -213,17 +238,19 @@ struct JokeDetailView: View {
                 showingFolderPicker = true
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "folder")
+                    Image(systemName: isFiled ? "folder.fill" : "folder")
                         .font(.system(size: 10))
                     Text(folderChipLabel)
                 }
                 .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
+                .foregroundColor(isFiled ? .bitbinderAccent : .secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color(UIColor.tertiarySystemBackground))
+                        .fill(isFiled
+                              ? Color.bitbinderAccent.opacity(0.12)
+                              : Color(UIColor.tertiarySystemBackground))
                 )
             }
             .buttonStyle(.plain)
@@ -254,7 +281,6 @@ struct JokeDetailView: View {
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color(UIColor.placeholderText))
                     .padding(.top, 8)
-                    .padding(.leading, 5)
                     .allowsHitTesting(false)
             }
 
@@ -264,6 +290,10 @@ struct JokeDetailView: View {
                 .frame(minHeight: 200)
                 .focused($focusedField, equals: .content)
                 .scrollContentBackground(.hidden)
+                // TextEditor's UITextView adds a 5pt lineFragmentPadding on
+                // each side; cancel it so the bit text left-aligns with the
+                // title field above (which has no such inset).
+                .padding(.horizontal, -5)
                 .contextMenu {
                     Button { insertBeat("\u{2022} ") } label: {
                         Label("Bullet", systemImage: "list.bullet")
@@ -302,13 +332,8 @@ struct JokeDetailView: View {
 
     private var actionBar: some View {
         HStack(spacing: 4) {
-            actionButton(icon: "pencil", label: "Edit") {
-                focusedField = .content
-                haptic(.light)
-            }
-
-            if userPreferences.bitBuddyEnabled {
-                actionButton(icon: "sparkles", label: "Punch up") {
+            if userPreferences.bitBuddyEnabled && !roastMode {
+                actionButton(icon: "sparkle", label: "Punch up") {
                     openBitBuddyPunchUp()
                     haptic(.medium)
                 }
@@ -317,7 +342,8 @@ struct JokeDetailView: View {
             actionButton(
                 icon: isRecording ? "stop.circle.fill" : "mic",
                 label: isRecording ? "Stop" : "Record",
-                tint: isRecording ? .red : nil
+                tint: isRecording ? .red : nil,
+                active: isRecording
             ) {
                 toggleRecording()
             }
@@ -325,10 +351,9 @@ struct JokeDetailView: View {
         }
         .padding(8)
         .background(
-            .regularMaterial,
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(UIColor.secondarySystemBackground))
         )
-        .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
         .padding(.horizontal, 12)
         .padding(.bottom, 28)
     }
@@ -337,6 +362,7 @@ struct JokeDetailView: View {
         icon: String,
         label: String,
         tint: Color? = nil,
+        active: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -349,6 +375,10 @@ struct JokeDetailView: View {
             .foregroundColor(tint ?? .secondary)
             .frame(maxWidth: .infinity)
             .frame(height: 40)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill((tint ?? .accentColor).opacity(active ? 0.14 : 0))
+            )
         }
         .buttonStyle(.plain)
     }
@@ -356,6 +386,8 @@ struct JokeDetailView: View {
     // MARK: - BitBuddy Punch Up
 
     private func openBitBuddyPunchUp() {
+        guard !roastMode else { return }
+
         let service = BitBuddyService.shared
         service.focusedJoke = BitBuddyJokeSummary(
             id: joke.id,
@@ -401,8 +433,8 @@ struct JokeDetailView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(
-            .regularMaterial,
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(UIColor.secondarySystemBackground))
         )
         .padding(.horizontal, 12)
     }
@@ -477,6 +509,10 @@ struct JokeDetailView: View {
 
     private func scheduleAutoSave() {
         autoSave.scheduleSave { [self] in
+            // The debounced closure can fire ~1.5s late — after the joke was
+            // trashed/removed and detached from its context. Bail rather than
+            // mutate a deleted model.
+            guard joke.modelContext != nil else { return }
             joke.dateModified = Date()
             joke.updateWordCount()
             do {
@@ -490,6 +526,7 @@ struct JokeDetailView: View {
     }
 
     private func saveJokeNow() {
+        guard joke.modelContext != nil else { return }
         if joke.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            !joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             joke.title = KeywordTitleGenerator.title(from: joke.content)
@@ -541,57 +578,57 @@ struct JokeDetailView: View {
                         Label("Add to Set", systemImage: "list.bullet")
                     }
 
-                    Divider()
-
-                    Button {
-                        withAnimation { joke.isHit.toggle(); joke.dateModified = Date() }
-                        HapticEngine.shared.starToggle(joke.isHit)
-                        do { try modelContext.save() } catch {
-                            saveError = "Couldn't save: \(error.localizedDescription)"
-                            showingSaveError = true
-                        }
-                    } label: {
-                        Label(
-                            joke.isHit ? "Remove Hit" : "Mark as Hit",
-                            systemImage: joke.isHit
-                                ? (roastMode ? "flame.fill" : "star.fill")
-                                : (roastMode ? "flame" : "star")
-                        )
-                    }
-
-                    Button {
-                        withAnimation { joke.isOpenMic.toggle(); joke.dateModified = Date() }
-                        haptic(.medium)
-                        do { try modelContext.save() } catch {
-                            saveError = "Couldn't save: \(error.localizedDescription)"
-                            showingSaveError = true
-                        }
-                    } label: {
-                        Label(
-                            joke.isOpenMic ? "Remove Open Mic" : "Open Mic Ready",
-                            systemImage: joke.isOpenMic ? "mic.fill" : "mic"
-                        )
-                    }
-
-                    Divider()
-
-                    if joke.isTrashed {
+                    Section {
                         Button {
-                            HapticEngine.shared.success()
-                            joke.restoreFromTrash()
+                            withAnimation { joke.isHit.toggle(); joke.dateModified = Date() }
+                            HapticEngine.shared.starToggle(joke.isHit)
                             do { try modelContext.save() } catch {
-                                print(" [JokeDetailView] Failed to save after restore: \(error)")
+                                saveError = "Couldn't save: \(error.localizedDescription)"
+                                showingSaveError = true
                             }
-                            dismiss()
                         } label: {
-                            Label("Restore", systemImage: "arrow.uturn.backward.circle")
+                            Label(
+                                joke.isHit ? "Remove Hit" : "Mark as Hit",
+                                systemImage: joke.isHit
+                                    ? (roastMode ? "flame.fill" : "star.fill")
+                                    : (roastMode ? "flame" : "star")
+                            )
                         }
-                    } else {
-                        Button(role: .destructive) {
-                            HapticEngine.shared.warning()
-                            showingDeleteAlert = true
+
+                        Button {
+                            withAnimation { joke.isOpenMic.toggle(); joke.dateModified = Date() }
+                            haptic(.medium)
+                            do { try modelContext.save() } catch {
+                                saveError = "Couldn't save: \(error.localizedDescription)"
+                                showingSaveError = true
+                            }
                         } label: {
-                            Label("Move to Trash", systemImage: "trash")
+                            Label(
+                                joke.isOpenMic ? "Remove Open Mic" : "Open Mic Ready",
+                                systemImage: joke.isOpenMic ? "mic.fill" : "mic"
+                            )
+                        }
+                    }
+
+                    Section {
+                        if joke.isTrashed {
+                            Button {
+                                HapticEngine.shared.success()
+                                joke.restoreFromTrash()
+                                do { try modelContext.save() } catch {
+                                    print(" [JokeDetailView] Failed to save after restore: \(error)")
+                                }
+                                dismiss()
+                            } label: {
+                                Label("Restore", systemImage: "arrow.uturn.backward.circle")
+                            }
+                        } else {
+                            Button(role: .destructive) {
+                                HapticEngine.shared.warning()
+                                showingDeleteAlert = true
+                            } label: {
+                                Label("Move to Trash", systemImage: "trash")
+                            }
                         }
                     }
                 } label: {
@@ -603,6 +640,8 @@ struct JokeDetailView: View {
 
         ToolbarItem(placement: .keyboard) {
             HStack {
+                // Subtle, transient save feedback — only visible while editing.
+                SaveStatusIndicator(roastMode: roastMode)
                 Spacer()
                 Button("Done") {
                     focusedField = nil
@@ -872,6 +911,7 @@ private struct NotesSheet: View {
                 }
             }
         }
+        .roastModeTint()
     }
 }
 
@@ -913,12 +953,12 @@ private struct TagsSheet: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(.bitbinderAccent)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color.accentColor.opacity(0.1))
+                                    .fill(Color.bitbinderAccent.opacity(0.1))
                             )
                         }
                     }
@@ -946,7 +986,7 @@ private struct TagsSheet: View {
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 28))
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(.bitbinderAccent)
                     }
                     .disabled(newTagText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
@@ -963,6 +1003,7 @@ private struct TagsSheet: View {
             }
             .onAppear { isNewTagFocused = true }
         }
+        .roastModeTint()
     }
 
     private func commitTag() {

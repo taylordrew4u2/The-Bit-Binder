@@ -94,8 +94,8 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
     private func applyRoastVoice(_ response: String, intentId: String) -> String {
         let alreadyRoasty: Set<String> = [
             "roast_line_generation", "toggle_roast_mode", "create_roast_target",
-            "add_roast_joke", "search_roasts", "create_roast_set",
-            "present_roast_set", "attach_photo_to_target",
+            "add_roast_joke", "search_roasts",
+            "attach_photo_to_target",
             "analyze_joke", "improve_joke", "generate_premise", "generate_joke",
             "shorten_joke", "expand_joke", "crowdwork_help",
             "explain_comedy_theory", "rewrite_in_my_style",
@@ -213,7 +213,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             }
             return "What should I call the set list? Try: Create a set list named Tonight."
         case "rename_set_list":
-            return " Set list renamed! The new title is live."
+            return " Set list renamed. The new title is saved."
         case "delete_set_list":
             return " Set list deleted. Those jokes are still saved individually — just the list is gone."
         case "add_joke_to_set":
@@ -223,15 +223,13 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         case "reorder_set":
             return " Set reordered! Your lineup is updated. Remember: strong opener, build in the middle, killer closer."
         case "estimate_set_time":
-            return " Rule of thumb: most comics average about 1–2 minutes per joke on stage. A tight 5-minute set is usually 3–5 jokes, a 10-minute set is 5–8. Open your set list to see the exact joke count and do the math!"
+            return " Rule of thumb: most comics average about 1–2 minutes per joke. A tight 5-minute set is usually 3–5 jokes, a 10-minute set is 5–8. Open your set list to see the exact joke count and target length."
         case "shuffle_set":
             return " Set shuffled! Sometimes a random order reveals pairings you'd never have thought of. Try reading it through."
         case "suggest_set_opener":
             return " For an opener, pick something accessible — a relatable observation or a quick-hit joke that doesn't need context. Your most crowd-friendly material goes first."
         case "suggest_set_closer":
             return " Close with your strongest material — the joke with the biggest reaction. Callbacks work great as closers too. Leave them wanting more."
-        case "present_set":
-            return " Entering performance mode! Your set list is ready to go — swipe through joke by joke on stage."
         case "find_set_list":
             return " Searching your set lists... Head to the Set Lists tab to see the match."
             
@@ -256,7 +254,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         case "clip_recording":
             return " Clip tool ready! Select the start and end points in the Recordings tab to extract just the good part."
         case "attach_recording_to_set":
-            return " Recording attached to the set list! Now you can compare what you wrote to what you actually said on stage."
+            return " Recording attached to the set list! Now you can compare the planned order with what you actually said."
         case "review_set_from_recording":
             return " Reviewing your set recording... I'll look for strong moments, improv additions, and spots where the energy dipped."
             
@@ -394,10 +392,6 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             return "Send the burn text too, like: Add roast joke: he networks at funerals."
         case "search_roasts":
             return " Searching your roast material... Head to Roast Mode to see the results."
-        case "create_roast_set":
-            return " Roast set created! Add your sharpest burns and order them for maximum damage."
-        case "present_roast_set":
-            return " Roast presentation mode ready! Swipe through your burns on stage. Destroy with precision."
         case "attach_photo_to_target":
             return " Photo attached to the roast target! Now you'll never forget that face."
             
@@ -522,8 +516,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
              **Roast Mode** transforms BitBinder into a roast battle prep tool.
             • Create targets with names and photos.
             • Write and organize burns under each target.
-            • Build roast set lists for battle night.
-            • Present mode shows one burn at a time on stage.
+            • Keep every roast workflow inside the Roasts tab until you exit Roast Mode.
             """
         }
         if lower.contains("hits") || lower.contains("hit") {
@@ -540,7 +533,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             • Create named sets for different venues or time slots.
             • Drag to reorder jokes in your lineup.
             • Estimate total runtime.
-            • Present mode shows one joke at a time on stage.
+            • Record run-throughs and review the audio.
             """
         }
         if lower.contains("bitbuddy") || lower.contains("commands") {
@@ -574,10 +567,10 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
         if lower.contains("recording") {
             return """
              **Recordings** let you capture and review your sets.
-            • Record audio of your performances.
+            • Record audio of your run-throughs.
             • Transcribe recordings to searchable text.
             • Clip and trim the best moments.
-            • Attach recordings to set lists for post-show review.
+            • Attach recordings to set lists for review.
             """
         }
         if lower.contains("notebook") {
@@ -1017,7 +1010,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
          **Writing Help**: analyze, improve, punch up, generate premises, crowdwork
          **Comedy Knowledge**: joke structure, techniques, what makes things funny
          **Notebook**: save notes, attach photos, search
-         **Roast Mode**: targets, burns, roast sets, battle prep
+         **Roast Mode**: targets, burns, battle prep
          **Import**: PDF/image import, review queue
          **Sync**: iCloud status, manual sync, toggle
          **Settings**: export, clear cache
@@ -1078,7 +1071,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             You're in **Roast Mode**, \(userName). I can:
             • Add a target — "add my brother as a target"
             • Build burns — "give me 5 jokes about his car"
-            • Pull together a roast set
+            • Tighten or shorten a burn
             Who's on the chopping block?
             """
         case .importFlow:
@@ -1137,11 +1130,11 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             """
         case .setLists:
             return """
-            Set Lists, \(userName). I can build a roast set or a regular one:
-            • "Build a roast set for Mike's birthday"
+            Set Lists, \(userName). I can help with regular sets:
+            • "Create a set for tonight"
             • Reorder, shuffle, estimate runtime
-            • "Add my sharpest burns to this set"
-            Who's getting destroyed tonight?
+            • Add jokes to a set
+            What are you building?
             """
         case .recordings:
             return """
@@ -1159,7 +1152,7 @@ final class LocalFallbackBitBuddyService: BitBuddyBackend {
             This is home base, \(userName). Give me a target and tell me how savage.
             • "Add a target" — name someone
             • "Write burns about ___"
-            • "Build a roast set"
+            • "Shorten this burn"
             Let's cook.
             """
         case .importFlow:

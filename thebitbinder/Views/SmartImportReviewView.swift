@@ -489,7 +489,6 @@ struct SmartImportReviewView: View {
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(roastMode ? Color(UIColor.tertiarySystemBackground) : Color(UIColor.secondarySystemBackground))
-                .shadow(radius: abs(dragOffset.width) > 30 ? 12 : 6, y: 4)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -723,7 +722,6 @@ struct SmartImportReviewView: View {
         .background(
             RoundedRectangle(cornerRadius: CGFloat(16), style: .continuous)
                 .fill(Color(UIColor.secondarySystemBackground))
-                .shadow(color: .black.opacity(0.08), radius: 8, y: -3)
         )
         .padding(.horizontal, 16)
     }
@@ -775,15 +773,7 @@ struct SmartImportReviewView: View {
                 // Icon
                 ZStack {
                     Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.bitbinderAccent.opacity(0.15),
-                                    Color.bitbinderAccent.opacity(0.03)
-                                ],
-                                center: .center, startRadius: 20, endRadius: 60
-                            )
-                        )
+                        .fill(Color.bitbinderAccent.opacity(0.1))
                         .frame(width: 110, height: 110)
                     
                     Image("GagGrabberGlyph")
@@ -1310,6 +1300,7 @@ struct SmartImportReviewView: View {
         var insertedJokes: [Joke] = []
         var insertedIdeas: [BrainstormIdea] = []
         var skippedDuplicates = 0
+        var seenImportedJokes = Set<String>()
 
         // Batch duplicate check — one DB fetch for all approved jokes instead of one per joke.
         let batchItems: [(id: UUID, content: String, title: String?)] = results.approvedJokes.map {
@@ -1323,10 +1314,19 @@ struct SmartImportReviewView: View {
 
         // Insert approved jokes (with final duplicate safety check)
         for importedJoke in results.approvedJokes {
+            let normalizedContent = importedJoke.body.normalizedForDuplication()
+            if !normalizedContent.isEmpty, seenImportedJokes.contains(normalizedContent) {
+                skippedDuplicates += 1
+                continue
+            }
+
             // Skip near-exact matches automatically at save time
             if let match = duplicateMatches[importedJoke.id], match.similarity >= 0.95 {
                 skippedDuplicates += 1
                 continue
+            }
+            if !normalizedContent.isEmpty {
+                seenImportedJokes.insert(normalizedContent)
             }
 
             let joke = Joke(content: importedJoke.body, title: importedJoke.title ?? "")
@@ -1362,7 +1362,7 @@ struct SmartImportReviewView: View {
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                 
                 savedCount = insertedJokes.count
-                brainstormCount = results.brainstormItems.count
+                brainstormCount = insertedIdeas.count
                 skippedDuplicateCount = skippedDuplicates
                 showingSaveConfirmation = true
                 

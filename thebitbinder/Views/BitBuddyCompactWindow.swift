@@ -157,7 +157,7 @@ struct BitBuddyCompactWindow: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(roastMode ? FirePalette.core.opacity(0.27) : Color.primary.opacity(0.08), lineWidth: 0.5)
         )
-        .shadow(color: roastMode ? FirePalette.core.opacity(0.2) : .black.opacity(0.22), radius: 22, x: 0, y: 12)
+        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
         .environment(\.dismissBitBuddyDrawer) {
             presenter.close()
         }
@@ -202,13 +202,8 @@ struct BitBuddyCompactWindow: View {
         .padding(.horizontal, 14)
         .frame(height: headerHeight)
         .background(
-            // Subtle accent tint on the header so the window feels tied to
-            // the puck it came from.
-            LinearGradient(
-                colors: [accent.opacity(0.10), accent.opacity(0.02)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            // Subtle flat accent tint so the header feels tied to the puck.
+            accent.opacity(0.06)
         )
     }
 

@@ -239,7 +239,7 @@ enum SmartTextSplitter {
             .filter { !$0.isEmpty }
     }
     
-    private static func splitWithRegex(_ text: String, pattern: String) -> [String] {
+    private static func splitWithRegex(_ text: String, pattern: String, preserveMatchInNextChunk: Bool = false) -> [String] {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
             return [text]
         }
@@ -260,7 +260,7 @@ enum SmartTextSplitter {
                 let chunk = nsText.substring(with: NSRange(location: start, length: end - start))
                 chunks.append(chunk)
             }
-            lastEnd = match.range.location + match.range.length
+            lastEnd = preserveMatchInNextChunk ? match.range.location : match.range.location + match.range.length
         }
         
         // Remaining text after last match
@@ -293,7 +293,7 @@ enum SmartTextSplitter {
         
         // Find best pattern that splits into reasonable chunks
         for pattern in jokeStarters {
-            let chunks = splitWithRegex(text, pattern: pattern)
+            let chunks = splitWithRegex(text, pattern: pattern, preserveMatchInNextChunk: true)
             if chunks.count > 1 && chunks.count <= 20 {
                 return chunks
             }

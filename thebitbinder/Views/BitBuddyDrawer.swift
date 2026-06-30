@@ -90,7 +90,6 @@ struct BitBuddyDrawerOverlay: View {
                                 .frame(width: 0.5)
                                 .ignoresSafeArea(edges: .vertical)
                         }
-                        .shadow(color: .black.opacity(0.18), radius: 24, x: -6, y: 0)
                         .offset(x: max(0, dragOffset))
                         .gesture(
                             DragGesture(minimumDistance: 12)

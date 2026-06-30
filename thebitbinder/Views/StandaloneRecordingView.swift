@@ -137,7 +137,7 @@ struct StandaloneRecordingView: View {
             Text("Microphone Access Required")
                 .font(.headline)
             
-            Text("BitBinder needs microphone access to record your performances and ideas.")
+            Text("BitBinder needs microphone access to record your sets and ideas.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)

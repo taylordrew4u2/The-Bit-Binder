@@ -35,8 +35,8 @@ struct SetListsView: View {
             if filteredSetLists.isEmpty && searchText.isEmpty {
                 BitBinderEmptyState(
                     icon: "list.bullet.rectangle.portrait",
-                    title: roastMode ? "No Roast Sets Yet" : "No Sets Yet",
-                    subtitle: "Create a set to organize jokes for your performances",
+                    title: "No Sets Yet",
+                    subtitle: "Create a set to organize jokes, notes, and run-through recordings.",
                     actionTitle: "Create Set",
                     action: { showingCreateSetList = true },
                     roastMode: roastMode
@@ -60,7 +60,7 @@ struct SetListsView: View {
                 .listStyle(.insetGrouped)
             }
         }
-        .searchable(text: $searchText, prompt: roastMode ? "Search roast sets" : "Search sets")
+        .searchable(text: $searchText, prompt: "Search sets")
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -75,7 +75,7 @@ struct SetListsView: View {
                     Button {
                         showingRecording = true
                     } label: {
-                        Label("Record Performance", systemImage: "record.circle")
+                        Label("Record Set", systemImage: "record.circle")
                     }
                     
                     Section {
@@ -168,15 +168,19 @@ struct SetListRowView: View {
                     Text(setList.name)
                         .font(.body)
                         .foregroundColor(.primary)
-                    
-                    if setList.isFinalized {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption2)
-                            .foregroundColor(Color.accentColor)
-                    }
                 }
 
-                Text("\(jokeCount) \(roastMode ? "roasts" : "jokes")")
+                HStack(spacing: 8) {
+                    Text("\(jokeCount) \(roastMode ? "roasts" : "jokes")")
+                    if setList.estimatedMinutes > 0 {
+                        Text("•")
+                        Text("\(setList.estimatedMinutes) min")
+                    }
+                    if !setList.venueName.isEmpty {
+                        Text("•")
+                        Text(setList.venueName)
+                    }
+                }
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

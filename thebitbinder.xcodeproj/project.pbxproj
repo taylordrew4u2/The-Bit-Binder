@@ -42,14 +42,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		BA7961152F7EF76F00D1E24A /* Exceptions for "bit" folder in "thebitbinder" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				BackgroundDownloadHandler.swift,
-				Info.plist,
-			);
-			target = BAB3D0512EDF80F5007295C1 /* thebitbinder */;
-		};
 		BA7961162F7EF76F00D1E24A /* Exceptions for "bit" folder in "bit" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -70,7 +62,6 @@
 		BA7961132F7EF76E00D1E24A /* bit */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				BA7961152F7EF76F00D1E24A /* Exceptions for "bit" folder in "thebitbinder" target */,
 				BA7961162F7EF76F00D1E24A /* Exceptions for "bit" folder in "bit" target */,
 			);
 			path = bit;
@@ -142,7 +133,6 @@
 				BAD6B2CD2F6F753E00A09B53 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				BA7961132F7EF76E00D1E24A /* bit */,
 				BAB3D0542EDF80F5007295C1 /* thebitbinder */,
 			);
 			name = thebitbinder;

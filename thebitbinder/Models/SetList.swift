@@ -24,21 +24,21 @@ final class SetList: Identifiable {
     var isTrashed: Bool = false
     var deletedDate: Date?
     
-    // MARK: - Finalization for Live Performance
-    
-    /// When true, the set is locked for live performance - no editing, clean view
+    // MARK: - Legacy Set Planning
+
+    /// Legacy flag retained for existing data compatibility.
     var isFinalized: Bool = false
     
-    /// Date when this set was finalized for performance
+    /// Legacy date retained for existing data compatibility.
     var finalizedDate: Date?
     
-    /// Estimated runtime in minutes (set during finalization)
+    /// Estimated runtime in minutes.
     var estimatedMinutes: Int = 0
     
-    /// Venue/event name for this performance
+    /// Venue/event name for this set.
     var venueName: String = ""
     
-    /// Performance date/time (optional - for planning)
+    /// Optional set date/time.
     var performanceDate: Date?
 
     // Store UUIDs as a comma-separated string to avoid SwiftData Array<UUID> issues
@@ -113,9 +113,9 @@ final class SetList: Identifiable {
         dateModified = Date()
     }
     
-    // MARK: - Finalization Helpers
+    // MARK: - Legacy Planning Helpers
     
-    /// Finalize the set for live performance. Locks editing and prepares clean view.
+    /// Retained for old call sites and existing data migrations.
     func finalize(estimatedMinutes: Int = 0, venueName: String = "", performanceDate: Date? = nil) {
         isFinalized = true
         finalizedDate = Date()
@@ -125,7 +125,7 @@ final class SetList: Identifiable {
         dateModified = Date()
     }
     
-    /// Unfinalize to allow editing again
+    /// Clears the legacy finalized flag.
     func unfinalize() {
         isFinalized = false
         finalizedDate = nil

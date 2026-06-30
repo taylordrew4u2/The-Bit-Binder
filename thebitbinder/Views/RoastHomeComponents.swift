@@ -97,23 +97,43 @@ struct RoastColdStateView: View {
 /// Roast target list header.
 struct RoastHomeHeader: View {
     let subjectCount: Int
+    let onAddTarget: () -> Void
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Roast Targets")
-                .font(.title2.weight(.semibold))
-                .foregroundColor(FirePalette.text)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Roasts")
+                        .font(.title2.weight(.semibold))
+                        .foregroundColor(FirePalette.text)
 
-            Spacer()
+                    Text("\(subjectCount) target\(subjectCount == 1 ? "" : "s")")
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(FirePalette.sub)
+                        .monospacedDigit()
+                }
 
-            Text("\(subjectCount)")
-                .font(.subheadline.weight(.medium))
+                Spacer()
+
+                Button(action: onAddTarget) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 42, height: 42)
+                        .background(FirePalette.emberCTA)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("Add roast target")
+            }
+
+            Text("Targets, openers, and backup burns stay here until you exit Roast Mode.")
+                .font(.footnote)
                 .foregroundColor(FirePalette.sub)
-                .monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 20)
         .padding(.top, 18)
-        .padding(.bottom, 10)
+        .padding(.bottom, 14)
     }
 }
 
@@ -139,10 +159,6 @@ struct RoastModeBadge: View {
                 : AnyShapeStyle(Color.white.opacity(0.04))
         )
         .clipShape(Capsule())
-        .shadow(
-            color: lit ? FirePalette.core.opacity(0.4) : .clear,
-            radius: lit ? 12 : 0, y: 4
-        )
         .overlay(
             lit ? nil : Capsule().strokeBorder(ColdPalette.edge, lineWidth: 0.5)
         )
@@ -164,18 +180,10 @@ struct RoastSubjectCard: View {
             .joined()
     }
 
-    private var avatarGradient: LinearGradient {
-        LinearGradient(
-            colors: [FirePalette.core.opacity(0.9), FirePalette.core.opacity(0.55)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
     private var a11ySummary: String {
         var s = safeName
         if !safeNotes.isEmpty { s += ", \(safeNotes)" }
-        s += ". \(safeBits) bit\(safeBits == 1 ? "" : "s")."
+        s += ". \(safeBits) burn\(safeBits == 1 ? "" : "s")."
         return s
     }
 
@@ -190,7 +198,7 @@ struct RoastSubjectCard: View {
             } else {
                 ZStack {
                     Circle()
-                        .fill(avatarGradient)
+                        .fill(FirePalette.core)
                     Text(initials)
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(.white)
@@ -218,7 +226,7 @@ struct RoastSubjectCard: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(FirePalette.text)
                     .monospacedDigit()
-                Text(safeBits == 1 ? "bit" : "bits")
+                Text(safeBits == 1 ? "burn" : "burns")
                     .font(.system(size: 12))
                     .foregroundColor(FirePalette.sub)
             }
@@ -229,18 +237,12 @@ struct RoastSubjectCard: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [FirePalette.card, FirePalette.card],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(FirePalette.card)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(FirePalette.edge, lineWidth: 0.5)
         )
         .padding(.horizontal, 16)

@@ -204,6 +204,14 @@ class AudioRecordingService: NSObject, ObservableObject {
         return false
     }
 
+    private func deactivateAudioSessionAfterRecording() {
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print(" [Audio] Could not deactivate audio session: \(error.localizedDescription)")
+        }
+    }
+
     func startRecording(fileName: String) -> Bool {
         guard !isRecording else {
             audioSessionError = "A recording is already in progress."
@@ -233,7 +241,12 @@ class AudioRecordingService: NSObject, ObservableObject {
             audioRecorder?.delegate = self
             audioRecorder?.prepareToRecord()
             guard audioRecorder?.record() == true else {
+                let failedURL = audioRecorder?.url
                 audioRecorder = nil
+                if let failedURL {
+                    try? FileManager.default.removeItem(at: failedURL)
+                }
+                deactivateAudioSessionAfterRecording()
                 audioSessionError = "Could not start recording. Check microphone access and try again."
                 return false
             }
@@ -264,6 +277,7 @@ class AudioRecordingService: NSObject, ObservableObject {
             return true
         } catch {
             print("Failed to start recording: \(error)")
+            deactivateAudioSessionAfterRecording()
             audioSessionError = "Failed to start recording: \(error.localizedDescription)"
             return false
         }
@@ -318,6 +332,7 @@ class AudioRecordingService: NSObject, ObservableObject {
         
         audioRecorder?.stop()
         audioRecorder = nil
+        deactivateAudioSessionAfterRecording()
         recordingTimer?.invalidate()
         recordingTimer = nil
         
@@ -347,12 +362,14 @@ class AudioRecordingService: NSObject, ObservableObject {
         }
         
         cleanup()
+        deactivateAudioSessionAfterRecording()
     }
 
     func clearFinishedRecording() {
         audioRecorder = nil
         lastRecordingURL = nil
         audioSessionError = nil
+        deactivateAudioSessionAfterRecording()
     }
     
     private func cleanup() {

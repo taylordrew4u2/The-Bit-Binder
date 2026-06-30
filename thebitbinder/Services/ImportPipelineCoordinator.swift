@@ -453,8 +453,15 @@ final class ImportPipelineCoordinator {
                 chunks.append(chunk)
             }
 
-            // Advance past the split point, skipping leading whitespace
-            let nextStart = remaining.index(after: splitIdx)
+            // Advance past the newline when the boundary landed on one. When
+            // there is no newline in the region, continue exactly at splitIdx
+            // so a long unbroken document does not silently lose a character.
+            let nextStart: String.Index
+            if splitIdx < remaining.endIndex, remaining[splitIdx] == "\n" {
+                nextStart = remaining.index(after: splitIdx)
+            } else {
+                nextStart = splitIdx
+            }
             if nextStart >= remaining.endIndex { break }
             remaining = remaining[nextStart...]
         }
