@@ -195,8 +195,8 @@ struct SmartImportReviewView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button(" Approve All Remaining") { viewModel.approveAll() }
-                        Button(" Reject All Remaining") { viewModel.rejectAll() }
+                        Button("Approve All Remaining") { viewModel.approveAll() }
+                        Button("Reject All Remaining") { viewModel.rejectAll() }
                         Divider()
                         Button("Save & Finish") {
                             Task {
@@ -206,6 +206,7 @@ struct SmartImportReviewView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
+                    .accessibilityLabel("Import review options")
                 }
             }
             .sheet(isPresented: $showingEditSheet) {
@@ -652,6 +653,7 @@ struct SmartImportReviewView: View {
                 }
             }
             .frame(maxWidth: .infinity)
+            .accessibilityLabel("Skip current import item")
             .buttonStyle(.plain)
             
             // Send to Brainstorm
@@ -1233,6 +1235,7 @@ struct SmartImportReviewView: View {
                                                     .font(.system(size: 12))
                                                     .foregroundColor(.secondary)
                                             }
+                                            .accessibilityLabel("Remove tag \(tag)")
                                         }
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 5)

@@ -1604,6 +1604,7 @@ struct EditRoastJokeView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)
                     }
+                    .accessibilityLabel("Close")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {

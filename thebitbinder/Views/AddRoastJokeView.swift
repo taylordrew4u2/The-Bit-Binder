@@ -172,6 +172,7 @@ struct AddRoastJokeView: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(FirePalette.sub)
                     }
+                    .accessibilityLabel("Close")
                 }
                 
                 ToolbarItem(placement: .keyboard) {

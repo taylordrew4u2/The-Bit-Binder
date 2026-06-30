@@ -635,6 +635,7 @@ struct JokeDetailView: View {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 17))
                 }
+                .accessibilityLabel("Joke actions")
             }
         }
 
@@ -834,6 +835,7 @@ struct MultiFolderPickerView: View {
                                     Image(systemName: "xmark.circle.fill")
                                         .foregroundColor(.red.opacity(0.7))
                                 }
+                                .accessibilityLabel("Remove \(folder.name)")
                             }
                         }
                     }
@@ -952,6 +954,7 @@ private struct TagsSheet: View {
                                         .font(.system(size: 14))
                                         .foregroundStyle(.secondary)
                                 }
+                                .accessibilityLabel("Remove tag \(tag)")
                             }
                             .foregroundColor(.bitbinderAccent)
                             .padding(.horizontal, 12)
