@@ -70,20 +70,9 @@ struct BrainstormView: View {
     private var effectiveGridScale: CGFloat {
         min(max(CGFloat(brainstormGridScale) * pinchMagnification, 0.5), 2.0)
     }
-    
-    private var pinchGesture: some Gesture {
-        MagnifyGesture()
-            .updating($pinchMagnification) { value, state, _ in
-                state = value.magnification
-            }
-            .onEnded { value in
-                brainstormGridScale = Double(min(max(CGFloat(brainstormGridScale) * value.magnification, 0.5), 2.0))
-            }
-    }
 
     private var layoutMode: LayoutMode {
-        get { LayoutMode(rawValue: brainstormLayoutMode) ?? .board }
-        set { brainstormLayoutMode = newValue.rawValue }
+        LayoutMode(rawValue: brainstormLayoutMode) ?? .board
     }
 
     private var batchDeleteAlertTitle: String {

@@ -47,16 +47,11 @@ struct JokesView: View {
     @AppStorage("roastViewMode") private var roastViewMode: JokesViewMode = .list
     @AppStorage("showFullContent") private var showFullContent = true
     @AppStorage("jokesGridScale") private var jokesGridScale: Double = 1.0
-    @AppStorage("roastGridScale") private var roastGridScale: Double = 1.0
     @GestureState private var jokesPinchMagnification: CGFloat = 1.0
-    @GestureState private var roastPinchMagnification: CGFloat = 1.0
 
     // Pinch-to-zoom
     private var effectiveJokesScale: CGFloat {
         min(max(CGFloat(jokesGridScale) * jokesPinchMagnification, 0.5), 2.0)
-    }
-    private var effectiveRoastScale: CGFloat {
-        min(max(CGFloat(roastGridScale) * roastPinchMagnification, 0.5), 2.0)
     }
     private var jokesPinchGesture: some Gesture {
         MagnifyGesture()
@@ -68,24 +63,10 @@ struct JokesView: View {
                 jokesGridScale = Double(min(max(newScale, 0.5), 2.0))
             }
     }
-    private var roastPinchGesture: some Gesture {
-        MagnifyGesture()
-            .updating($roastPinchMagnification) { value, state, _ in
-                state = value.magnification
-            }
-            .onEnded { value in
-                let newScale = CGFloat(roastGridScale) * value.magnification
-                roastGridScale = Double(min(max(newScale, 0.5), 2.0))
-            }
-    }
 
     // Grid columns derived from scale
     private var jokesColumns: [GridItem] {
         let count = max(2, Int(4 / effectiveJokesScale))
-        return Array(repeating: GridItem(.flexible(), spacing: 0), count: count)
-    }
-    private var roastColumns: [GridItem] {
-        let count = max(2, Int(4 / effectiveRoastScale))
         return Array(repeating: GridItem(.flexible(), spacing: 0), count: count)
     }
     
