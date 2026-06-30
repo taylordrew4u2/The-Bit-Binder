@@ -620,7 +620,7 @@ struct HybridGagGrabberSheet: View {
                 if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
                     text = utf8
                 } else {
-                    text = try String(contentsOf: url)
+                    text = try String(contentsOf: url, encoding: .isoLatin1)
                 }
             }
 

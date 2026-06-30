@@ -333,7 +333,7 @@ final class ImportPipelineCoordinator {
         var text: String
 
         if url.pathExtension.lowercased() == "txt" {
-            text = try String(contentsOf: url)
+            text = try String(contentsOf: url, encoding: .utf8)
         } else {
             let attributedString = try NSAttributedString(url: url, options: [:], documentAttributes: nil)
             text = attributedString.string
