@@ -371,6 +371,7 @@ struct BrainstormView: View {
                 }
             }
             .listStyle(.plain)
+            .readableWidth()
 
             if isSelectMode {
                 brainstormBatchActionBar

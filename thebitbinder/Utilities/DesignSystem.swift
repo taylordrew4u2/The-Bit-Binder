@@ -61,6 +61,38 @@ enum DS {
         static let scrim: Double = 0.4
         static let heavy: Double = 0.65
     }
+
+    /// Max width for primary content columns on regular-width (iPad) layouts.
+    static let readableWidth: CGFloat = 728
+}
+
+// MARK: - Readable Width (iPad)
+
+/// Constrains content to a centered readable column on iPad (regular width).
+/// On iPhone (compact width) it is a no-op so layouts are unchanged. Apply this
+/// to the foreground content layer — never above a full-bleed `.background(...)`,
+/// or the background would be clipped to the column instead of filling the screen.
+private struct ReadableWidthModifier: ViewModifier {
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    var maxWidth: CGFloat = DS.readableWidth
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if hSizeClass == .regular {
+            content
+                .frame(maxWidth: maxWidth)
+                .frame(maxWidth: .infinity)   // center within the wide canvas
+        } else {
+            content                            // iPhone: unchanged
+        }
+    }
+}
+
+extension View {
+    /// Constrains content to a centered readable column on iPad; no-op on iPhone.
+    func readableWidth(_ maxWidth: CGFloat = DS.readableWidth) -> some View {
+        modifier(ReadableWidthModifier(maxWidth: maxWidth))
+    }
 }
 
 // MARK: - Semantic Colors

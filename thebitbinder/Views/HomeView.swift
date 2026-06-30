@@ -278,6 +278,8 @@ struct HomeView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .readableWidth()
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationDestination(for: Joke.self) { joke in
             JokeDetailView(joke: joke)
         }

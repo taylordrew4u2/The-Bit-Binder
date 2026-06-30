@@ -49,6 +49,8 @@ struct RecordingsView: View {
                     .onDelete(perform: deleteRecordings)
                 }
                 .listStyle(.insetGrouped)
+                .readableWidth()
+                .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             }
         }
         .searchable(text: $searchText, prompt: "Search recordings")

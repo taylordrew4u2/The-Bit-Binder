@@ -229,6 +229,8 @@ struct SettingsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .readableWidth()
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .onChange(of: nameFieldFocused) { _, focused in
             if !focused && isEditingName {
                 saveName()
