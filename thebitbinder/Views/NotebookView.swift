@@ -293,6 +293,7 @@ struct NotebookView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Add notebook item")
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -332,6 +333,7 @@ struct NotebookView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("Notebook options")
             }
         }
         .navigationDestination(isPresented: $showingTrash) {

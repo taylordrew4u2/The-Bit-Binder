@@ -1219,26 +1219,73 @@ struct Wrap<Content: View>: View {
     }
     
     var body: some View {
-        var width: CGFloat = .zero
-        var height: CGFloat = .zero
-        
-        return ZStack(alignment: .topLeading) {
+        FlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
             ForEach(items, id: \.self) { item in
                 content(item)
-                    .alignmentGuide(.leading) { dimension in
-                        if abs(width - dimension.width) > UIScreen.main.bounds.width - 32 {
-                            width = 0
-                            height -= dimension.height
-                        }
-                        let result = width
-                        width -= dimension.width
-                        return result
-                    }
-                    .alignmentGuide(.top) { _ in
-                        let result = height
-                        return result
-                    }
             }
+        }
+    }
+}
+
+private struct FlowLayout: Layout {
+    let horizontalSpacing: CGFloat
+    let verticalSpacing: CGFloat
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var currentRowSize = CGSize.zero
+        var totalSize = CGSize.zero
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            let needsNewRow = currentRowSize.width > 0 &&
+                currentRowSize.width + horizontalSpacing + size.width > maxWidth
+
+            if needsNewRow {
+                totalSize.width = max(totalSize.width, currentRowSize.width)
+                totalSize.height += currentRowSize.height + verticalSpacing
+                currentRowSize = size
+            } else {
+                currentRowSize.width += currentRowSize.width > 0 ? horizontalSpacing + size.width : size.width
+                currentRowSize.height = max(currentRowSize.height, size.height)
+            }
+        }
+
+        totalSize.width = max(totalSize.width, currentRowSize.width)
+        totalSize.height += currentRowSize.height
+        return totalSize
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        var origin = bounds.origin
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            let needsNewRow = origin.x > bounds.minX &&
+                origin.x + size.width > bounds.maxX
+
+            if needsNewRow {
+                origin.x = bounds.minX
+                origin.y += rowHeight + verticalSpacing
+                rowHeight = 0
+            }
+
+            subview.place(
+                at: origin,
+                proposal: ProposedViewSize(width: size.width, height: size.height)
+            )
+            origin.x += size.width + horizontalSpacing
+            rowHeight = max(rowHeight, size.height)
         }
     }
 }

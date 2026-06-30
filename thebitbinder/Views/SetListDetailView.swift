@@ -143,6 +143,7 @@ struct SetListDetailView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("Set list actions")
             }
         }
         .environment(\.editMode, .constant(isEditing ? .active : .inactive))

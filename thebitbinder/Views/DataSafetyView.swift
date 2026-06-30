@@ -321,7 +321,7 @@ struct DataSafetyView: View {
             Text("Mail is not configured on this device. Please set up a mail account in Settings, or use the Share option instead.")
         }
         .alert(
-            validationResult?.isHealthy == true ? "All Good ✅" : "Validation Complete",
+            validationResult?.isHealthy == true ? "All Good" : "Validation Complete",
             isPresented: $showValidationAlert
         ) {
             Button("OK") { }
@@ -330,7 +330,7 @@ struct DataSafetyView: View {
                 if result.isHealthy {
                     Text("Your data looks healthy — \(result.totalEntities) items checked, no issues found.")
                 } else if result.significantDataLoss {
-                    Text("⚠️ Significant data loss detected. \(result.issues.joined(separator: " "))")
+                    Text("Significant data loss detected. \(result.issues.joined(separator: " "))")
                 } else {
                     Text("Found \(result.issues.count) issue(s): \(result.issues.joined(separator: ", "))")
                 }
