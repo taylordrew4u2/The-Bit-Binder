@@ -187,6 +187,8 @@ private struct StepProgressPills: View {
 /// "how to" numbered flow → pro tip. Scrollable so tall content still fits on
 /// small devices.
 private struct TourStepView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let step: TourStep
     let accent: Color
     let roastMode: Bool
@@ -258,22 +260,11 @@ private struct TourStepView: View {
         .onAppear(perform: animateIn)
     }
 
-    /// Animated hero icon. In roast mode the icon sits on a radial flame glow
-    /// so the first thing the user sees feels like fire. In standard mode the
-    /// icon sits on a soft tint-colored disc.
+    /// Quiet hero icon for the current tour step.
     private var heroIcon: some View {
         ZStack {
-            if roastMode {
-                // Fire glow backdrop
-                Circle()
-                    .fill(FirePalette.glowRadial)
-                    .frame(width: 180, height: 180)
-                    .blur(radius: 4)
-                    .opacity(0.9)
-            }
-
             Circle()
-                .fill(accent.opacity(roastMode ? 0.18 : 0.12))
+                .fill(accent.opacity(roastMode ? 0.14 : 0.1))
                 .frame(width: 110, height: 110)
 
             Image(systemName: step.icon)
@@ -292,6 +283,11 @@ private struct TourStepView: View {
     private func animateIn() {
         iconScale = 0.6
         iconOpacity = 0.0
+        guard !reduceMotion else {
+            iconScale = 1.0
+            iconOpacity = 1.0
+            return
+        }
         withAnimation(.spring(response: 0.55, dampingFraction: 0.6)) {
             iconScale = 1.0
             iconOpacity = 1.0

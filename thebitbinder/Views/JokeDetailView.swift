@@ -1070,12 +1070,13 @@ private struct FlowLayout: Layout {
 // MARK: - Pulse Animation
 
 private struct PulseEffect: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isPulsing = false
 
     func body(content: Content) -> some View {
         content
-            .opacity(isPulsing ? 0.3 : 1)
-            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
-            .onAppear { isPulsing = true }
+            .opacity(isPulsing && !reduceMotion ? 0.3 : 1)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isPulsing)
+            .onAppear { if !reduceMotion { isPulsing = true } }
     }
 }

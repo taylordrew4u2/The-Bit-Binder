@@ -13,6 +13,7 @@ struct TalkToTextRoastView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     let target: RoastTarget
     
@@ -54,13 +55,13 @@ struct TalkToTextRoastView: View {
                          Circle()
                              .fill(isRecording ? Color.recording.opacity(DS.Opacity.light) : accentColor.opacity(0.1))
                              .frame(width: 100, height: 100)
-                             .scaleEffect(isRecording ? 1.1 : 1.0)
-                             .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isRecording)
+                             .scaleEffect(isRecording && !reduceMotion ? 1.04 : 1.0)
+                             .animation(reduceMotion ? nil : .easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isRecording)
                          
                          Image(systemName: isRecording ? "waveform" : "mic.fill")
                              .font(.largeTitle)
                              .foregroundColor(isRecording ? .recording : accentColor)
-                             .symbolEffect(.variableColor, isActive: isRecording)
+                             .symbolEffect(.variableColor, isActive: isRecording && !reduceMotion)
                      }
                      
                      Text(isRecording ? "Listening..." : "Ready")

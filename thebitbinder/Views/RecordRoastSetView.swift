@@ -12,6 +12,7 @@ import AVFoundation
 struct RecordRoastSetView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var audioService = AudioRecordingService.shared
     
     let target: RoastTarget
@@ -46,13 +47,13 @@ struct RecordRoastSetView: View {
                         Circle()
                             .fill(audioService.isRecording ? Color.recording.opacity(DS.Opacity.light) : accentColor.opacity(0.1))
                             .frame(width: 100, height: 100)
-                            .scaleEffect(audioService.isRecording ? 1.1 : 1.0)
-                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
+                            .scaleEffect(audioService.isRecording && !reduceMotion ? 1.04 : 1.0)
+                            .animation(reduceMotion ? nil : .easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
                         
                         Image(systemName: audioService.isRecording ? "record.circle.fill" : "record.circle")
                             .font(.system(size: 40))
                             .foregroundColor(audioService.isRecording ? .recording : accentColor)
-                            .symbolEffect(.variableColor, isActive: audioService.isRecording)
+                            .symbolEffect(.variableColor, isActive: audioService.isRecording && !reduceMotion)
                     }
                     
                     Text(audioService.isRecording ? "Recording..." : "Ready")
