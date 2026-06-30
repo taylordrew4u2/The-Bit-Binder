@@ -27,7 +27,6 @@ struct GagGrabberFace: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: size, height: size)
                 .scaleEffect(bounce)
-                .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
 
             overlay
         }

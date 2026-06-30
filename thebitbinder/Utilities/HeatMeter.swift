@@ -42,14 +42,6 @@ struct HeatBar: View {
             }
         }()
 
-        let glowShadow: Color = {
-            switch tier {
-            case .ash, .warm: return .clear
-            case .hot:        return FirePalette.core.opacity(0.33)
-            case .ember:      return FirePalette.core.opacity(0.67)
-            }
-        }()
-
         let numColor: Color = {
             switch tier {
             case .ash:        return ColdPalette.grey
@@ -68,7 +60,6 @@ struct HeatBar: View {
                     Capsule()
                         .fill(fill)
                         .frame(width: trackWidth * pct)
-                        .shadow(color: glowShadow, radius: (tier == .hot || tier == .ember) ? 6 : 0)
                 }
             }
             .frame(height: 4)

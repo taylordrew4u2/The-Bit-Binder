@@ -55,7 +55,6 @@ enum BitBuddyIntentCategory: String, Codable, Sendable {
     case convert
     case analysis
     case generation
-    case present
     case playback
     case transcription
     case review
@@ -608,7 +607,7 @@ final class BitBuddyIntentRouter: Sendable {
                 examplePatterns: [
                     "create a new set list", "make a set list for tonight",
                     "start a set called", "build me a new set list",
-                    "create a performance set", "make a set for the club spot",
+                    "create a planned set", "make a set for the club spot",
                     "start a list for open mic material", "new set list"
                 ]
             ),
@@ -630,7 +629,7 @@ final class BitBuddyIntentRouter: Sendable {
                 keywords: ["delete set", "remove set", "trash set", "erase set"],
                 examplePatterns: [
                     "delete this set list", "remove this set",
-                    "trash the set called", "get rid of this performance list",
+                    "trash the set called", "get rid of this set list",
                     "delete my open mic set", "remove this set from the app"
                 ]
             ),
@@ -718,18 +717,6 @@ final class BitBuddyIntentRouter: Sendable {
                 ]
             ),
             BitBuddyIntent(
-                id: "present_set",
-                section: .setLists, category: .present,
-                description: "Enter presentation mode for a set list.",
-                keywords: ["present", "performance mode", "presenter view", "stage version"],
-                examplePatterns: [
-                    "present this set", "open performance mode",
-                    "show this set in presenter view", "give me the stage version",
-                    "start presenting this set", "open the set for performance",
-                    "go into set presentation mode", "present the lineup"
-                ]
-            ),
-            BitBuddyIntent(
                 id: "find_set_list",
                 section: .setLists, category: .search,
                 description: "Find set lists by name or content.",
@@ -754,7 +741,7 @@ final class BitBuddyIntentRouter: Sendable {
                 examplePatterns: [
                     "start recording", "record my set", "begin a new recording",
                     "open the recorder", "start an audio file for this set",
-                    "hit record", "record this performance", "begin recording now"
+                    "hit record", "record this run-through", "begin recording now"
                 ]
             ),
             BitBuddyIntent(
@@ -1174,30 +1161,6 @@ final class BitBuddyIntentRouter: Sendable {
                     "show burns for", "look up roast lines about",
                     "search roasts for", "find all my roasts on",
                     "pull up roast material about", "search roast targets and jokes"
-                ]
-            ),
-            BitBuddyIntent(
-                id: "create_roast_set",
-                section: .roastMode, category: .capture,
-                description: "Create a roast set list.",
-                keywords: ["roast set", "burn set", "roast lineup", "roast performance"],
-                examplePatterns: [
-                    "create a roast set", "make a roast set for battle night",
-                    "start a roast lineup", "build me a roast set list",
-                    "create a set of burns for", "make a roast performance set",
-                    "new roast set", "start a burn set"
-                ]
-            ),
-            BitBuddyIntent(
-                id: "present_roast_set",
-                section: .roastMode, category: .present,
-                description: "Open presenter view for a roast set.",
-                keywords: ["present roast", "roast presentation", "roast performance", "roast stage"],
-                examplePatterns: [
-                    "present this roast set", "open the roast presentation view",
-                    "show this burn set in performance mode", "present my roasts",
-                    "start roast presenter mode", "open the stage version of this roast set",
-                    "go into roast performance view", "present the burns"
                 ]
             ),
             BitBuddyIntent(

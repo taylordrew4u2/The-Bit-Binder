@@ -118,8 +118,6 @@ struct ShowMeAroundView: View {
                         )
                         .foregroundColor(.white)
                         .clipShape(Capsule())
-                        .shadow(color: (roastMode ? FirePalette.core : .accentColor).opacity(0.35),
-                                radius: 8, x: 0, y: 3)
                     }
                 } else {
                     Button {
@@ -144,8 +142,6 @@ struct ShowMeAroundView: View {
                         )
                         .foregroundColor(.white)
                         .clipShape(Capsule())
-                        .shadow(color: (roastMode ? FirePalette.core : .accentColor).opacity(0.35),
-                                radius: 8, x: 0, y: 3)
                     }
                 }
             }
@@ -502,8 +498,7 @@ private struct PreviewMockView: View {
     private var photoPageMock: some View {
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(LinearGradient(colors: [Color(.systemGray4), Color(.systemGray5)],
-                                     startPoint: .top, endPoint: .bottom))
+                .fill(Color(.systemGray5))
                 .frame(width: 70, height: 90)
                 .overlay(
                     Image(systemName: "doc.text.image")
@@ -783,7 +778,7 @@ struct TourStep {
                 "When you're done, tap Get Started to begin writing"
             ],
             preview: .confetti,
-            proTip: "Tap the BitBuddy avatar to slide open the chat pane from any screen."
+            proTip: "In standard mode, tap the BitBuddy avatar to slide open the chat pane."
         ),
         TourStep(
             title: "Home",
@@ -835,7 +830,7 @@ struct TourStep {
                 "Drag jokes in from your library",
                 "Reorder with a long-press drag",
                 "Per-joke time estimates total up automatically",
-                "Use Live Performance mode to present on stage"
+                "Record run-throughs to review timing and delivery"
             ],
             howTo: [
                 "In the Sets tab, tap + to create a new set",
@@ -890,7 +885,7 @@ struct TourStep {
             icon: "waveform",
             color: .red,
             features: [
-                "One-tap audio recording from any screen",
+                "One-tap audio recording from standard app screens",
                 "Auto-transcription runs on-device",
                 "GagGrabber pulls individual jokes out of transcribed audio",
                 "Tag recordings by venue and date",
@@ -913,7 +908,7 @@ struct TourStep {
                 "Analyze any joke — structure, timing, and punchline feedback",
                 "Generate fresh premises and punchlines on demand",
                 "Create sets, folders, and brainstorm cards from chat",
-                "Navigate to any screen by asking",
+                "Navigate around standard mode by asking",
                 "Adapts tone to match your voice over time"
             ],
             howTo: [
@@ -971,9 +966,8 @@ struct TourStep {
             color: FirePalette.core,
             features: [
                 "Write and organize roast jokes by target",
-                "Build roast set lists for battle night",
-                "Record and dissect your roast sets",
-                "BitBuddy swaps into roast-partner mode for savage material"
+                "Keep targets, burns, openers, and backups in one place",
+                "Stay focused on the Roasts tab until you exit Roast Mode"
             ],
             howTo: [
                 "Swipe left or tap Next to keep going",
@@ -981,7 +975,7 @@ struct TourStep {
                 "When you're ready, Let's Roast closes the tour"
             ],
             preview: .confetti,
-            proTip: "You can switch back to standard mode anytime in Settings → Roast Mode."
+            proTip: "Use Exit Roast Mode in the Roasts toolbar when you want the rest of the app back."
         ),
         TourStep(
             title: "Roast Targets",
@@ -1000,64 +994,7 @@ struct TourStep {
                 "Tap Add Joke and start stacking burns"
             ],
             preview: .flameTarget,
-            proTip: "Ask BitBuddy to generate roast lines — just name the target and the traits."
-        ),
-        TourStep(
-            title: "Roast Sets",
-            subtitle: "Your battle lineup, sequenced for maximum damage.",
-            icon: "list.bullet.rectangle.portrait.fill",
-            color: FirePalette.bright,
-            features: [
-                "Build sets specifically for roast battles",
-                "Drag burns in from any target",
-                "Per-line timing totals so you fit the format",
-                "Live Performance mode for on-stage delivery"
-            ],
-            howTo: [
-                "In Roast Sets, tap + to create a set",
-                "Pick a target, then add jokes from its list",
-                "Long-press to reorder — save the hardest hit for last"
-            ],
-            preview: .setListRow,
-            proTip: "Prepare multiple sets for different opponents and switch on the fly."
-        ),
-        TourStep(
-            title: "Roast Recordings",
-            subtitle: "Audio is the roast's best coach — hear every beat back.",
-            icon: "waveform",
-            color: FirePalette.ember,
-            features: [
-                "Record a full roast set with one tap",
-                "Auto-transcription pulls every line out",
-                "GagGrabber extracts individual burns into the Roasts tab",
-                "Tag by opponent and event"
-            ],
-            howTo: [
-                "Open the Recordings tab, tap record",
-                "Do the set — the waveform shows you're live",
-                "Stop, then run GagGrabber Extract to turn it into searchable burns"
-            ],
-            preview: .waveform,
-            proTip: "Listen back for audience silence — that's where the next rewrite lives."
-        ),
-        TourStep(
-            title: "BitBuddy — Roast Partner",
-            subtitle: "BitBuddy's in roast mode too, tuned for sharper, meaner, funnier.",
-            icon: "flame.fill",
-            color: FirePalette.core,
-            features: [
-                "Fresh roast lines for any target on demand",
-                "Sharpens existing burns — tightens the setup, punches up the turn",
-                "Creates roast targets and jokes from chat",
-                "Auto-tunes tone: light ribbing vs. take-no-prisoners"
-            ],
-            howTo: [
-                "Tap the BitBuddy avatar to slide open the chat pane",
-                "Say \"Give me roast lines for a finance bro\"",
-                "Tap any reply to save it as a new burn"
-            ],
-            preview: .chatBubble,
-            proTip: "Start with the traits — \"tall, vegan, CrossFit\" — and the burns write themselves."
+            proTip: "Use traits like tall, vegan, or CrossFit so each burn has a clear angle."
         ),
         TourStep(
             title: "Ready to Roast 🔥",
@@ -1066,9 +1003,9 @@ struct TourStep {
             color: FirePalette.bright,
             features: [
                 "Start with Roasts to write your first burn",
-                "Build a battle set for your next showdown",
-                "Use BitBuddy for rapid-fire inspiration",
-                "Revisit this tour anytime from Settings"
+                "Organize every target from the Roasts tab",
+                "Use Exit Roast Mode when you need the rest of the app",
+                "Revisit this tour after switching back to standard mode"
             ],
             howTo: [],
             preview: .confetti,

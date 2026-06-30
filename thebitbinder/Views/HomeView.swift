@@ -108,63 +108,53 @@ struct HomeView: View {
         List {
             // MARK: - Greeting Header
             Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(greetingName)
-                        .font(.title3.weight(.semibold))
-                        .foregroundColor(.primary)
-                    
-                    if allJokes.isEmpty {
-                        Text("Let's get your first joke on paper")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text(motivationalSubtitle)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                HomeHeader(
+                    title: greetingName,
+                    subtitle: allJokes.isEmpty ? "Let's get your first joke on paper" : motivationalSubtitle,
+                    jokeCount: allJokes.count,
+                    hitCount: hitsCount,
+                    thisWeekCount: thisWeekCount
+                )
                 .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
+                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 10, trailing: 16))
             }
 
             if selectedHomeSections.contains(.quickActions) {
                 // MARK: - Quick Actions
                 Section {
-                    Button {
-                        haptic(.medium)
-                        activeSheet = .addJoke
-                    } label: {
-                        Label {
-                            Text("New Joke")
-                        } icon: {
-                            Image(systemName: "square.and.pencil")
-                                .foregroundColor(.accentColor)
+                    HStack(spacing: 10) {
+                        QuickActionTile(
+                            title: "New Joke",
+                            subtitle: "Write",
+                            icon: "square.and.pencil",
+                            prominence: .primary
+                        ) {
+                            haptic(.medium)
+                            activeSheet = .addJoke
                         }
-                    }
 
-                    Button {
-                        haptic(.light)
-                        activeSheet = .talkToText
-                    } label: {
-                        Label {
-                            Text("Capture Idea")
-                        } icon: {
-                            Image(systemName: "mic.fill")
-                                .foregroundColor(Color.bitbinderAccent)
+                        QuickActionTile(
+                            title: "Capture",
+                            subtitle: "Idea",
+                            icon: "mic.fill",
+                            prominence: .secondary
+                        ) {
+                            haptic(.light)
+                            activeSheet = .talkToText
                         }
-                    }
 
-                    Button {
-                        haptic(.light)
-                        activeSheet = .quickRecord
-                    } label: {
-                        Label {
-                            Text("Record Set")
-                        } icon: {
-                            Image(systemName: "record.circle")
-                                .foregroundColor(Color.bitbinderAccent)
+                        QuickActionTile(
+                            title: "Record",
+                            subtitle: "Set",
+                            icon: "record.circle",
+                            prominence: .secondary
+                        ) {
+                            haptic(.light)
+                            activeSheet = .quickRecord
                         }
                     }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
                 }
             }
 
@@ -211,7 +201,7 @@ struct HomeView: View {
                                 // Hit indicator
                                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                                     .fill(joke.isHit ? Color.bitbinderAccent : Color(UIColor.separator))
-                                    .frame(width: 3, height: 32)
+                                    .frame(width: 4, height: 36)
                                 
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(joke.title.isEmpty ? String(joke.content.prefix(50)) : joke.title)
@@ -231,7 +221,10 @@ struct HomeView: View {
                                         }
                                     }
                                 }
+
+                                Spacer(minLength: 8)
                             }
+                            .padding(.vertical, 2)
                         }
                     }
                 }
@@ -317,6 +310,156 @@ struct HomeView: View {
 
 }
 
+// MARK: - Home Header
+
+private struct HomeHeader: View {
+    let title: String
+    let subtitle: String
+    let jokeCount: Int
+    let hitCount: Int
+    let thisWeekCount: Int
+
+    private var progressLabel: String {
+        if thisWeekCount > 0 {
+            return "\(thisWeekCount) this week"
+        }
+        if hitCount > 0 {
+            return "\(hitCount) hit\(hitCount == 1 ? "" : "s")"
+        }
+        return "\(jokeCount) saved"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 12)
+
+                Image(systemName: "text.quote")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Color.bitbinderAccent)
+                    .frame(width: 42, height: 42)
+                    .background(Color.bitbinderAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .accessibilityHidden(true)
+            }
+
+            HStack(spacing: 8) {
+                HomeMetricPill(text: progressLabel, icon: thisWeekCount > 0 ? "flame.fill" : "star.fill")
+
+                if jokeCount == 0 {
+                    HomeMetricPill(text: "Start fresh", icon: "sparkles")
+                } else {
+                    HomeMetricPill(text: "\(jokeCount) joke\(jokeCount == 1 ? "" : "s")", icon: "rectangle.stack.fill")
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(UIColor.secondarySystemGroupedBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.bitbinderAccent.opacity(0.12), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct HomeMetricPill: View {
+    let text: String
+    let icon: String
+
+    var body: some View {
+        Label(text, systemImage: icon)
+            .font(.caption.weight(.medium))
+            .foregroundColor(Color.bitbinderAccent)
+            .lineLimit(1)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(Color.bitbinderAccent.opacity(0.10), in: Capsule())
+    }
+}
+
+// MARK: - Quick Action Tile
+
+private struct QuickActionTile: View {
+    enum Prominence {
+        case primary
+        case secondary
+    }
+
+    let title: String
+    let subtitle: String
+    let icon: String
+    let prominence: Prominence
+    let action: () -> Void
+
+    private var foregroundColor: Color {
+        prominence == .primary ? .white : Color.bitbinderAccent
+    }
+
+    private var backgroundStyle: AnyShapeStyle {
+        switch prominence {
+        case .primary:
+            return AnyShapeStyle(Color.bitbinderAccent)
+        case .secondary:
+            return AnyShapeStyle(Color(UIColor.secondarySystemGroupedBackground))
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: icon)
+                    .font(.headline.weight(.semibold))
+                    .frame(width: 30, height: 30)
+                    .foregroundStyle(foregroundColor)
+                    .background(
+                        (prominence == .primary ? Color.white.opacity(0.18) : Color.bitbinderAccent.opacity(0.12)),
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+
+                    Text(subtitle)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .opacity(prominence == .primary ? 0.86 : 0.72)
+                }
+            }
+            .foregroundColor(foregroundColor)
+            .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+            .padding(12)
+            .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.bitbinderAccent.opacity(prominence == .primary ? 0 : 0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title) \(subtitle)")
+    }
+}
+
 // MARK: - Stat Card
 
 private struct StatCard: View {
@@ -329,8 +472,10 @@ private struct StatCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: icon)
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(.bold))
                     .foregroundColor(tint)
+                    .frame(width: 24, height: 24)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .accessibilityHidden(true)
                 Spacer()
             }
@@ -347,7 +492,11 @@ private struct StatCard: View {
         }
         .padding(12)
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color(UIColor.separator).opacity(0.35), lineWidth: 0.5)
+        )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
     }

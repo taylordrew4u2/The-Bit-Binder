@@ -354,17 +354,32 @@ struct BrainstormDetailView: View {
     // MARK: - Promote Section
 
     private var promoteSection: some View {
-        Button {
-            HapticEngine.shared.press()
-            showPromoteOptions = true
-        } label: {
-            Label("Promote to Joke", systemImage: "arrow.up.doc.fill")
-                .frame(maxWidth: .infinity)
+        let isEmpty = idea.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return VStack(spacing: 10) {
+            Button {
+                HapticEngine.shared.press()
+                showPromoteOptions = true
+            } label: {
+                Label("Promote to Joke", systemImage: "arrow.up.doc.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.bitbinderAccent)
+            .controlSize(.large)
+            .disabled(isEmpty)
+
+            Button {
+                HapticEngine.shared.press()
+                promoteToJoke(folder: nil, openMic: true)
+            } label: {
+                Label("Send to Open Mic", systemImage: "mic.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(.purple)
+            .controlSize(.large)
+            .disabled(isEmpty)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(Color.bitbinderAccent)
-        .controlSize(.large)
-        .disabled(idea.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     // MARK: - Actions Bar
@@ -478,13 +493,14 @@ struct BrainstormDetailView: View {
 
     // MARK: - Promote to Joke
 
-    private func promoteToJoke(folder: JokeFolder?) {
+    private func promoteToJoke(folder: JokeFolder?, openMic: Bool = false) {
         let trimmed = idea.content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
         let title = String(trimmed.prefix(60))
         let joke = Joke(content: trimmed, title: title, folder: folder)
         joke.importSource = "Brainstorm"
+        joke.isOpenMic = openMic
         // Carry over notes if the brainstorm had any
         if !idea.notes.isEmpty {
             joke.notes = idea.notes

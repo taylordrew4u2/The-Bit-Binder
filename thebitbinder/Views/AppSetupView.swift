@@ -604,7 +604,7 @@ struct AppSetupView: View {
         case .home:          return "Dashboard with stats and quick actions"
         case .brainstorm:    return "Freeform ideas and premises"
         case .jokes:         return "Your joke library (always included)"
-        case .sets:          return "Set lists for performances"
+        case .sets:          return "Set lists and run-throughs"
         case .recordings:    return "Audio recordings and transcriptions"
         case .notebookSaver: return "Photos and scanned notes"
         case .settings:      return ""

@@ -64,8 +64,8 @@ enum FAQData {
                     "Tap the + button in the Set Lists section, give it a name, then add jokes from your library."),
             FAQItem("Can I reorder jokes in a set list?",
                     "Yes — open the set list and long-press then drag any joke to reorder it."),
-            FAQItem("What does finalized mean?",
-                    "A finalized set list shows a green checkmark and indicates you're happy with the order. It's just for your own tracking."),
+            FAQItem("Can I add notes and timing?",
+                    "Yes — when you create a set list, you can add a target length, venue, date, and notes."),
         ]),
         FAQSectionModel(title: "Recordings", icon: "waveform.circle.fill", items: [
             FAQItem("How do I record a set?",
@@ -79,7 +79,7 @@ enum FAQData {
         ]),
         FAQSectionModel(title: "Roast Mode", icon: "flame.fill", items: [
             FAQItem("What is Roast Mode?",
-                    "Roast Mode transforms the entire app into a dedicated roasting environment with a dark ember theme. The menu shows Roasts and Settings only."),
+                    "Roast Mode transforms the app into a dedicated roasting environment with a dark ember theme. Only the Roasts tab stays visible until you switch Roast Mode off."),
             FAQItem("How do I turn on Roast Mode?",
                     "Go to Settings and toggle Roast Mode on. The entire app instantly switches themes."),
             FAQItem("Are roast jokes separate from regular jokes?",
@@ -88,8 +88,6 @@ enum FAQData {
                     "In Roast Mode, go to the Roasts section and tap + to add a target. Then add roast jokes under that person."),
             FAQItem("What are the All, Openers, and Backups filters?",
                     "Inside a roast target, use the filter chips to view All roasts, only Openers (your main jokes), or only Backups (alternates assigned to an opener)."),
-            FAQItem("How do I access Roast Sets?",
-                    "Tap the overflow menu (•••) in Roast Mode and choose 'Roast Sets' under Performance. You can create, edit, and perform from your roast set lists."),
         ]),
         FAQSectionModel(title: "iCloud Sync", icon: "icloud.and.arrow.up.fill", items: [
             FAQItem("How do I enable iCloud Sync?",
@@ -125,7 +123,7 @@ enum FAQData {
             FAQItem("What is BitBuddy?",
                     "BitBuddy is your on-device comedy writing sidekick. It handles analyze / improve / premise / generate commands, plus quick workflow help — all from a chat pane that rides alongside whatever you're working on."),
             FAQItem("How do I open BitBuddy?",
-                    "Tap the BitBuddy avatar floating on any screen. A chat pane slides in from the right so you can ask things without leaving your current joke."),
+                    "In standard mode, tap the floating BitBuddy avatar. A chat pane slides in from the right so you can ask things without leaving your current joke."),
             FAQItem("What commands can I use?",
                     "• analyze: [joke] — Get structure, strengths, and edit suggestions\n• improve: [joke] — Get 2-3 concrete edit suggestions\n• premise [topic] — Generate a premise for a topic\n• generate [topic] — Create a joke matching your style\n• style — See your writing style summary"),
             FAQItem("Does BitBuddy use the internet?",

@@ -558,7 +558,6 @@ struct AutoOrganizeView: View {
                 .padding(28)
                 .frame(maxWidth: 320)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-                .shadow(color: .black.opacity(0.2), radius: 20)
             }
             .animation(.easeInOut(duration: 0.3), value: analysisProgress)
         }

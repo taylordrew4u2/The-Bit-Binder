@@ -144,7 +144,7 @@ enum AppScreen: String, CaseIterable {
     }
 
     static var roastScreens: [AppScreen] {
-        [.jokes, .settings]
+        [.jokes]
     }
 
     // Default screens for the tab bar when no custom selection exists
@@ -153,7 +153,7 @@ enum AppScreen: String, CaseIterable {
     }
 
     static var defaultRoastTabBarScreens: [AppScreen] {
-        [.jokes, .sets]
+        [.jokes]
     }
 
     /// Ordered list of all screens that can appear in the tab bar.
@@ -162,18 +162,20 @@ enum AppScreen: String, CaseIterable {
         [.home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver]
     }
 
-    /// Returns the user's custom tab selection (plus Settings, always appended).
+    /// Returns visible tabs for the current mode.
+    /// Roast Mode intentionally exposes only Roasts until the user exits it.
+    /// Standard mode uses the user's custom tab selection plus Settings.
     static func customTabBarScreens(from raw: String, roastMode: Bool) -> [AppScreen] {
-        let defaults = roastMode ? defaultRoastTabBarScreens : defaultTabBarScreens
+        if roastMode {
+            return defaultRoastTabBarScreens
+        }
+
+        let defaults = defaultTabBarScreens
         guard !raw.isEmpty else { return defaults + [.settings] }
 
         let selected = Set(raw.split(separator: ",").compactMap { AppScreen(rawValue: String($0)) })
         // Filter to ordered list, always include Settings at the end
         let ordered = tabBarOrder.filter { selected.contains($0) }
-        if roastMode {
-            let required = defaultRoastTabBarScreens.filter { !ordered.contains($0) }
-            return (required + ordered) + [.settings]
-        }
         return (ordered.isEmpty ? defaults : ordered) + [.settings]
     }
 
@@ -308,7 +310,7 @@ struct MainTabView: View {
         }
         .tint(Color.bitbinderAccent)
         .onAppear {
-            if !hasCompletedSetup && scenePhase == .active {
+            if !roastMode && !hasCompletedSetup && scenePhase == .active {
                 showSetup = true
             }
             // Mark first launch complete after showing Home
@@ -334,6 +336,14 @@ struct MainTabView: View {
         }
         .onChange(of: roastMode) { _, isRoast in
             haptic(.medium)
+            if isRoast {
+                showGagGrabber = false
+                showSetup = false
+                bitBuddyDrawer.close()
+                bitBuddyPresenter.close()
+            } else if !hasCompletedSetup && scenePhase == .active {
+                showSetup = true
+            }
             // Redirect to valid tab when mode changes
             if !visibleTabs.contains(selectedTab.wrappedValue) {
                 selectedTabRaw = (isRoast ? AppScreen.jokes : .home).rawValue
@@ -342,7 +352,7 @@ struct MainTabView: View {
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .active:
-                if !hasCompletedSetup && !showSetup {
+                if !roastMode && !hasCompletedSetup && !showSetup {
                     showSetup = true
                 }
             case .background, .inactive:
@@ -372,7 +382,7 @@ struct MainTabView: View {
             HybridGagGrabberSheet()
         }
         .overlay(alignment: .topLeading) {
-            if userPreferences.bitBuddyEnabled {
+            if userPreferences.bitBuddyEnabled && !roastMode {
                 GeometryReader { geo in
                     let bubbleSize: CGFloat = 56
                     let defaultX = geo.size.width - bubbleSize - 16
@@ -421,7 +431,7 @@ struct MainTabView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if audioService.isRecording {
+            if audioService.isRecording && !roastMode {
                 GlobalRecordingIndicator {
                     stopGlobalRecording()
                 }
@@ -443,8 +453,8 @@ struct MainTabView: View {
         } message: {
             Text(globalRecordingError ?? "The recording could not be saved.")
         }
-        .bitBuddyDrawer(controller: bitBuddyDrawer, roastMode: roastMode)
-        .bitBuddyCompactWindow(presenter: bitBuddyPresenter, roastMode: roastMode)
+        .bitBuddyDrawer(controller: bitBuddyDrawer, roastMode: false)
+        .bitBuddyCompactWindow(presenter: bitBuddyPresenter, roastMode: false)
         .onChange(of: bitBuddyPresenter.mode) { _, mode in
             // Keep the full-drawer controller in sync with the presenter so
             // existing call sites that open .full still route correctly.

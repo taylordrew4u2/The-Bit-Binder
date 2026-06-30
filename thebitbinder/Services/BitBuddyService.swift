@@ -853,7 +853,7 @@ final class BitBuddyService: NSObject, ObservableObject {
         // MARK: Set Lists — Context-dependent → Navigate
         case "rename_set_list", "delete_set_list", "add_joke_to_set",
              "remove_joke_from_set", "reorder_set", "shuffle_set",
-             "present_set", "find_set_list":
+             "find_set_list":
             print(" [BitBuddy] \(actionType) → navigating to Set Lists")
             pendingNavigation = .setLists
 
@@ -915,8 +915,7 @@ final class BitBuddyService: NSObject, ObservableObject {
             handleCreateRoastTargetAction(action)
         case "add_roast_joke":
             handleAddRoastJokeAction(action)
-        case "search_roasts", "create_roast_set", "present_roast_set",
-             "attach_photo_to_target":
+        case "search_roasts", "attach_photo_to_target":
             print(" [BitBuddy] \(actionType) → navigating to Roast Mode")
             pendingNavigation = .roastMode
 

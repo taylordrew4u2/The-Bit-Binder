@@ -35,7 +35,6 @@ struct EmberCTAButton: View {
             .padding(.vertical, 16)
             .background(FirePalette.emberCTA)
             .clipShape(Capsule())
-            .shadow(color: FirePalette.core.opacity(0.3), radius: 14, y: 6)
         }
         .accessibilityAddTraits(.isButton)
     }

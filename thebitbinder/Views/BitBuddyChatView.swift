@@ -308,7 +308,6 @@ struct BitBuddyChatView: View {
                 if roastMode {
                     suggestionChip("Give me roast lines for a finance bro")
                     suggestionChip("Create a roast target")
-                    suggestionChip("Build a roast set for battle night")
                     suggestionChip("Shorten this burn")
                 } else {
                     suggestionChip("Analyze this joke: I told my therapist I feel invisible. She said 'Next!'")
@@ -538,6 +537,17 @@ struct BitBuddyChatView: View {
     
     /// Maps a BitBuddySection to the corresponding AppScreen for navigation.
     private func appScreen(for section: BitBuddySection) -> AppScreen? {
+        if roastMode {
+            switch section {
+            case .jokes, .roastMode, .importFlow:
+                return .jokes
+            case .bitbuddy:
+                return nil
+            default:
+                return nil
+            }
+        }
+
         switch section {
         case .jokes, .roastMode:  return .jokes
         case .brainstorm:         return .brainstorm
@@ -734,36 +744,14 @@ struct RoastBuddyAvatar: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.23, green: 0.094, blue: 0.063),
-                            Color(red: 0.102, green: 0.051, blue: 0.031)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(Color(red: 0.16, green: 0.072, blue: 0.047))
             Circle()
                 .strokeBorder(FirePalette.core.opacity(0.27), lineWidth: 0.5)
-
-            // Ember glow in top-right
-            Circle()
-                .fill(RadialGradient(
-                    colors: [FirePalette.core.opacity(0.5), .clear],
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: size * 0.35
-                ))
-                .frame(width: size * 0.55, height: size * 0.55)
-                .blur(radius: size * 0.08)
-                .offset(x: size * 0.15, y: -size * 0.15)
 
             // Roast Buddy glyph — speech bubble + sparkle eyes + smirk + ember
             RoastBuddyGlyph(size: size * 0.56, color: color)
         }
         .frame(width: size, height: size)
-        .shadow(color: FirePalette.core.opacity(0.2), radius: 8, y: 2)
     }
 }
 

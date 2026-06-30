@@ -42,29 +42,27 @@ struct JokeCardView: View {
             // Hit / Open Mic accent strip
             RoundedRectangle(cornerRadius: 2, style: .continuous)
                 .fill(isHit ? Color.bitbinderAccent : (isOpenMic ? Color.bitbinderAccent : .clear))
-                .frame(width: 3)
-                .padding(.vertical, 8)
+                .frame(width: 4)
+                .padding(.vertical, 10)
             
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 // Header: Title + Hit / Open Mic indicator
-                HStack(alignment: .top, spacing: 6) {
+                HStack(alignment: .top, spacing: 8) {
                     Text(resolvedTitle)
-                        .font(.headline)
+                        .font(.headline.weight(.semibold))
                         .foregroundColor(.primary)
                         .lineLimit(2)
                     
                     Spacer(minLength: 4)
                     
-                    if isOpenMic {
-                        Image(systemName: "mic.fill")
-                            .font(.caption)
-                            .foregroundColor(Color.bitbinderAccent)
-                    }
-                    
-                    if isHit {
-                        Image(systemName: "star.fill")
-                            .font(.caption)
-                            .foregroundColor(Color.bitbinderAccent)
+                    HStack(spacing: 4) {
+                        if isOpenMic {
+                            JokeStatusGlyph(icon: "mic.fill", accessibilityLabel: "Open Mic")
+                        }
+
+                        if isHit {
+                            JokeStatusGlyph(icon: "star.fill", accessibilityLabel: "Hit")
+                        }
                     }
                 }
                 
@@ -82,24 +80,31 @@ struct JokeCardView: View {
                 // Footer: Date + folder indicator
                 HStack(spacing: 6) {
                     Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
-                        .font(.caption2)
+                        .font(.caption2.weight(.medium))
                         .foregroundColor(Color(UIColor.tertiaryLabel))
                     
                     Spacer()
                     
                     if let folders = joke.folders, !folders.isEmpty {
-                        Image(systemName: "folder.fill")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color(UIColor.quaternaryLabel))
+                        Label("\(folders.count)", systemImage: "folder.fill")
+                            .font(.caption2.weight(.medium))
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .labelStyle(.iconOnly)
+                            .accessibilityLabel("\(folders.count) folder\(folders.count == 1 ? "" : "s")")
                     }
                 }
             }
-            .padding(.leading, 8)
-            .padding(.trailing, 12)
+            .padding(.leading, 10)
+            .padding(.trailing, 14)
             .padding(.vertical, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(UIColor.secondarySystemBackground))
+        .overlay(
+            Rectangle()
+                .stroke(Color(UIColor.separator).opacity(0.35), lineWidth: 0.5)
+        )
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -112,28 +117,93 @@ struct JokeRowView: View {
     
     private var isHit: Bool { joke.isHit }
     private var isOpenMic: Bool { joke.isOpenMic }
+
+    private var resolvedTitle: String {
+        let explicit = joke.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !explicit.isEmpty { return explicit }
+        let generated = KeywordTitleGenerator.displayTitle(from: joke.content)
+        return generated.isEmpty ? "Untitled" : generated
+    }
+
+    private var contentPreview: String {
+        joke.content
+            .components(separatedBy: .newlines)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
-                .font(.body.weight(.medium))
-                .foregroundColor(.primary)
-                .lineLimit(1)
+        HStack(alignment: .top, spacing: 12) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(isHit || isOpenMic ? Color.bitbinderAccent : Color(UIColor.separator).opacity(0.55))
+                .frame(width: 4, height: 42)
+                .padding(.top, 2)
+                .accessibilityHidden(true)
 
-            HStack(spacing: 6) {
-                Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(resolvedTitle)
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
 
-                if showFullContent {
-                    Text(joke.content.components(separatedBy: .newlines).first ?? "")
+                    Spacer(minLength: 8)
+
+                    if isHit {
+                        JokeStatusBadge(text: "Hit", icon: "star.fill")
+                    } else if isOpenMic {
+                        JokeStatusBadge(text: "Stage", icon: "mic.fill")
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Text(joke.dateModified.formatted(.dateTime.month(.abbreviated).day()))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
+
+                    if showFullContent && !contentPreview.isEmpty {
+                        Text(contentPreview)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Joke Status Indicators
+
+private struct JokeStatusGlyph: View {
+    let icon: String
+    let accessibilityLabel: String
+
+    var body: some View {
+        Image(systemName: icon)
+            .font(.caption.weight(.bold))
+            .foregroundColor(Color.bitbinderAccent)
+            .frame(width: 22, height: 22)
+            .background(Color.bitbinderAccent.opacity(0.12), in: Circle())
+            .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+private struct JokeStatusBadge: View {
+    let text: String
+    let icon: String
+
+    var body: some View {
+        Label(text, systemImage: icon)
+            .font(.caption2.weight(.semibold))
+            .foregroundColor(Color.bitbinderAccent)
+            .lineLimit(1)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(Color.bitbinderAccent.opacity(0.10), in: Capsule())
     }
 }
 
@@ -232,48 +302,6 @@ struct TagFilterChip: View {
                 Text(activeTag.map { "#\($0)" } ?? "Tags")
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-            }
-            .foregroundColor(isSelected ? .white : .primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                isSelected
-                    ? AnyShapeStyle(Color.bitbinderAccent)
-                    : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
-            )
-            .clipShape(Capsule())
-            .animation(.easeInOut(duration: 0.2), value: isSelected)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Open Mic Chip
-
-struct OpenMicChip: View {
-    let count: Int
-    let isSelected: Bool
-    var roastMode: Bool = false
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: {
-            haptic(.selection)
-            action()
-        }) {
-            HStack(spacing: 4) {
-                Image(systemName: "mic.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(isSelected ? .white : Color.accentColor)
-
-                Text("Open Mic")
-                    .font(.subheadline.weight(.semibold))
-                
-                if count > 0 && !isSelected {
-                    Text("\(count)")
-                        .font(.caption.weight(.bold))
-                        .foregroundColor(Color.bitbinderAccent)
-                }
             }
             .foregroundColor(isSelected ? .white : .primary)
             .padding(.horizontal, 14)

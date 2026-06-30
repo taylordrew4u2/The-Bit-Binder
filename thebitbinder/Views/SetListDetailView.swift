@@ -6,7 +6,6 @@
 
 import SwiftUI
 import SwiftData
-import AVFoundation
 
 struct SetListDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -20,10 +19,6 @@ struct SetListDetailView: View {
     @State private var showingAddJokes = false
     @State private var isEditing = false
     
-    // Finalize & Performance
-    @State private var showingFinalizeSheet = false
-    @State private var showingLivePerformance = false
-    @State private var showingUnfinalizeAlert = false
     @State private var showingDeleteSetAlert = false
     @State private var operationError: String?
     @State private var showingOperationError = false
@@ -61,60 +56,8 @@ struct SetListDetailView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Finalized banner (when set is ready for performance)
-            if setList.isFinalized {
-                finalizedBanner
-            } else if setList.totalItemCount > 0 {
-                // Quick perform banner when NOT finalized but has jokes
-                quickPerformBanner
-            }
-            
-             // Inline recording header
-             VStack(spacing: 12) {
-                 HStack {
-                     if audioService.isRecording {
-                         Circle().fill(Color.recording).frame(width: 12, height: 12)
-                             .opacity(0.8)
-                             .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: audioService.isRecording)
-                         Text("Recording").font(.headline).foregroundColor(.recording)
-                         Spacer()
-                         Text(timeString(from: audioService.recordingTime))
-                             .font(.system(.title3, design: .monospaced))
-                             .foregroundColor(.primary)
-                     } else {
-                         Text("Ready to record").font(.headline)
-                         Spacer()
-                     }
-                 }
-                 
-                 HStack(spacing: 24) {
-                     if !audioService.isRecording {
-                         Button(action: startRecording) {
-                             Label("Start Recording", systemImage: "record.circle.fill")
-                                 .labelStyle(.iconOnly)
-                                 .font(.system(size: 44))
-                                 .foregroundColor(.recording)
-                         }
-                         .accessibilityLabel("Start Recording")
-                     } else {
-                         Button(action: pauseResumeRecording) {
-                             Image(systemName: audioService.isPaused ? "play.circle.fill" : "pause.circle.fill")
-                                 .font(.system(size: 40))
-                                 .foregroundColor(.accentColor)
-                         }
-                         .accessibilityLabel(audioService.isPaused ? "Resume" : "Pause")
-                         
-                         Button(action: stopRecording) {
-                             Image(systemName: "stop.circle.fill")
-                                 .font(.system(size: 40))
-                                 .foregroundColor(.recording)
-                         }
-                         .accessibilityLabel("Stop Recording")
-                     }
-                 }
-             }
-            .padding()
-            .background(Color(.systemGray6))
+            setHeader
+            setRecordingPanel
             
             if roastMode {
                 // Roast mode: show roast jokes
@@ -164,57 +107,17 @@ struct SetListDetailView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // Leading: GO LIVE button - always visible when set has jokes
             ToolbarItem(placement: .navigationBarLeading) {
-                if setList.totalItemCount > 0 {
-                    Button {
-                        showingLivePerformance = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "play.fill")
-                            Text("GO LIVE")
-                                .fontWeight(.bold)
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.accentColor)
-                        .clipShape(Capsule())
-                    }
+                Button(action: { showingAddJokes = true }) {
+                    Label(roastMode ? "Add Roast Jokes" : "Add Jokes", systemImage: "plus")
                 }
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    // Finalize / Unfinalize
-                    if setList.isFinalized {
-                        Button {
-                            showingLivePerformance = true
-                        } label: {
-                            Label("Start Performance", systemImage: "play.fill")
-                        }
-                        
-                        Button(role: .destructive) {
-                            showingUnfinalizeAlert = true
-                        } label: {
-                            Label("Unfinalize (Allow Edits)", systemImage: "lock.open")
-                        }
-                    } else {
-                        Button {
-                            showingFinalizeSheet = true
-                        } label: {
-                            Label("Finalize for Performance", systemImage: "checkmark.seal")
-                        }
-                        .disabled(setList.totalItemCount == 0)
-                    }
-                    
-                    Divider()
-                    
                     Button(action: { showingAddJokes = true }) {
                         Label(roastMode ? "Add Roast Jokes" : "Add Jokes", systemImage: "plus")
                     }
-                    .disabled(setList.isFinalized)
                     
                     Button(action: { showFullContent.toggle() }) {
                         Label(showFullContent ? "Show Titles Only" : "Show Full Content", systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
@@ -223,7 +126,7 @@ struct SetListDetailView: View {
                     Button(action: { isEditing.toggle() }) {
                         Label(isEditing ? "Done" : "Edit Order", systemImage: "arrow.up.arrow.down")
                     }
-                    .disabled(setList.isFinalized)
+                    .disabled(setList.totalItemCount == 0)
 
                     Button { shareSetList() } label: {
                         Label("Share Set List", systemImage: "square.and.arrow.up")
@@ -242,27 +145,13 @@ struct SetListDetailView: View {
                 }
             }
         }
-        .environment(\.editMode, .constant(isEditing && !setList.isFinalized ? .active : .inactive))
+        .environment(\.editMode, .constant(isEditing ? .active : .inactive))
         .sheet(isPresented: $showingAddJokes) {
             if roastMode {
                 AddRoastJokesToSetListView(setList: setList, currentRoastJokeIDs: setList.roastJokeIDs)
             } else {
                 AddJokesToSetListView(setList: setList, currentJokeIDs: setList.jokeIDs)
             }
-        }
-        .sheet(isPresented: $showingFinalizeSheet) {
-            FinalizeSetSheet(setList: setList)
-        }
-        .fullScreenCover(isPresented: $showingLivePerformance) {
-            LivePerformanceView(setList: setList)
-        }
-        .alert("Unfinalize Set?", isPresented: $showingUnfinalizeAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Unfinalize") {
-                unfinalizeSet()
-            }
-        } message: {
-            Text("This will allow editing the set again. You can re-finalize anytime before your performance.")
         }
         .alert("Delete Set?", isPresented: $showingDeleteSetAlert) {
             Button("Cancel", role: .cancel) { }
@@ -295,6 +184,93 @@ struct SetListDetailView: View {
         }
     }
     
+    private var setHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(setList.name.isEmpty ? "Untitled Set" : setList.name)
+                    .font(.title2.weight(.semibold))
+                    .lineLimit(2)
+
+                Spacer()
+
+                Text("\(setList.totalItemCount)")
+                    .font(.headline.monospacedDigit())
+                    .foregroundStyle(Color.bitbinderAccent)
+                    .accessibilityLabel("\(setList.totalItemCount) items")
+            }
+
+            HStack(spacing: 8) {
+                if setList.estimatedMinutes > 0 {
+                    Label("\(setList.estimatedMinutes) min", systemImage: "clock")
+                }
+                if !setList.venueName.isEmpty {
+                    Label(setList.venueName, systemImage: "mappin.and.ellipse")
+                }
+                if let setDate = setList.performanceDate {
+                    Label(setDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()), systemImage: "calendar")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+
+            if !setList.notes.isEmpty {
+                Text(setList.notes)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground))
+    }
+
+    private var setRecordingPanel: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: audioService.isRecording ? "record.circle.fill" : "mic.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(audioService.isRecording ? Color.recording : Color.bitbinderAccent)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(audioService.isRecording ? (audioService.isPaused ? "Recording Paused" : "Recording Set") : "Record This Set")
+                        .font(.headline)
+                    Text(audioService.isRecording ? timeString(from: audioService.recordingTime) : "Capture a run-through without leaving the set.")
+                        .font(audioService.isRecording ? .system(.body, design: .monospaced) : .caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 12) {
+                if audioService.isRecording {
+                    Button(action: pauseResumeRecording) {
+                        Label(audioService.isPaused ? "Resume" : "Pause", systemImage: audioService.isPaused ? "play.fill" : "pause.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button(role: .destructive, action: stopRecording) {
+                        Label("Stop", systemImage: "stop.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                } else {
+                    Button(action: startRecording) {
+                        Label("Start Recording", systemImage: "record.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.recording)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGroupedBackground))
+    }
+
     private func startRecording() {
         let name = recordingName.isEmpty ? setList.name : recordingName
         let started = audioService.startRecording(fileName: name)
@@ -454,110 +430,6 @@ struct SetListDetailView: View {
         let seconds = Int(duration) % 60
         return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
                          : String(format: "%d:%02d", minutes, seconds)
-    }
-    
-    // MARK: - Finalized Banner
-    
-    private var finalizedBanner: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.title2)
-                .foregroundColor(.white)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Ready to Perform")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                HStack(spacing: 8) {
-                    if setList.estimatedMinutes > 0 {
-                        Text("\(setList.estimatedMinutes) min")
-                    }
-                    if !setList.venueName.isEmpty {
-                        Text("•")
-                        Text(setList.venueName)
-                    }
-                    if let perfDate = setList.performanceDate {
-                        Text("•")
-                        Text(perfDate, format: .dateTime.month(.abbreviated).day().hour().minute())
-                    }
-                }
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.8))
-            }
-            
-            Spacer()
-            
-            Button {
-                showingLivePerformance = true
-            } label: {
-                Text("GO LIVE")
-                    .font(.caption.bold())
-                    .foregroundColor(Color.accentColor)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(UIColor.systemBackground))
-                    .clipShape(Capsule())
-            }
-        }
-        .padding()
-        .background(Color.accentColor)
-    }
-
-    // MARK: - Quick Perform Banner (for unfinalized sets)
-    
-    private var quickPerformBanner: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "play.circle.fill")
-                .font(.title2)
-                .foregroundColor(.white)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(setList.totalItemCount) joke\(setList.totalItemCount == 1 ? "" : "s") ready")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Text("Tap GO LIVE to perform • Finalize for full features")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            
-            Spacer()
-            
-            VStack(spacing: 6) {
-                Button {
-                    showingLivePerformance = true
-                } label: {
-                    Text("GO LIVE")
-                        .font(.caption.bold())
-                        .foregroundColor(Color.accentColor)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color(UIColor.systemBackground))
-                        .clipShape(Capsule())
-                }
-
-                Button {
-                    showingFinalizeSheet = true
-                } label: {
-                    Text("Finalize")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                }
-            }
-        }
-        .padding()
-        .background(Color.accentColor)
-    }
-    
-    private func unfinalizeSet() {
-        setList.unfinalize()
-        do {
-            try modelContext.save()
-        } catch {
-            operationError = "Could not unfinalize set: \(error.localizedDescription)"
-            showingOperationError = true
-        }
     }
     
     private func shareSetList() {

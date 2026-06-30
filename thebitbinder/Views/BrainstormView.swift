@@ -335,6 +335,13 @@ struct BrainstormView: View {
                         }
                         .swipeActions(edge: .leading, allowsFullSwipe: true) {
                             Button {
+                                promoteToJoke(idea, openMic: true)
+                            } label: {
+                                Label("Open Mic", systemImage: "mic.fill")
+                            }
+                            .tint(.purple)
+
+                            Button {
                                 promoteToJoke(idea)
                             } label: {
                                 Label("Promote", systemImage: "arrow.up.doc.fill")
@@ -346,6 +353,11 @@ struct BrainstormView: View {
                                 promoteToJoke(idea)
                             } label: {
                                 Label("Promote to Joke", systemImage: "arrow.up.doc.fill")
+                            }
+                            Button {
+                                promoteToJoke(idea, openMic: true)
+                            } label: {
+                                Label("Send to Open Mic", systemImage: "mic.fill")
                             }
                             Divider()
                             Button(role: .destructive) {
@@ -435,6 +447,11 @@ struct BrainstormView: View {
                     promoteToJoke(idea)
                 } label: {
                     Label("Promote to Joke", systemImage: "arrow.up.doc.fill")
+                }
+                Button {
+                    promoteToJoke(idea, openMic: true)
+                } label: {
+                    Label("Send to Open Mic", systemImage: "mic.fill")
                 }
                 Divider()
                 Button(role: .destructive) {
@@ -722,12 +739,13 @@ struct BrainstormView: View {
     
     // MARK: - Promote to Joke
     
-    private func promoteToJoke(_ idea: BrainstormIdea) {
+    private func promoteToJoke(_ idea: BrainstormIdea, openMic: Bool = false) {
         // Create a new joke from the brainstorm idea
         let title = String(idea.content.prefix(60))
         let joke = Joke(content: idea.content, title: title, folder: nil)
         joke.importSource = "Brainstorm"
-        
+        joke.isOpenMic = openMic
+
         modelContext.insert(joke)
         
         // Save joke first — only soft-delete the idea once it's confirmed persisted

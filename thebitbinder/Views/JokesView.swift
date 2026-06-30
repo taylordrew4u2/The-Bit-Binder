@@ -44,7 +44,6 @@ struct JokesView: View {
     @State private var showingDeleteRoastAlert = false
     
     @AppStorage("jokesViewMode") private var viewMode: JokesViewMode = .list
-    @AppStorage("roastViewMode") private var roastViewMode: JokesViewMode = .list
     @AppStorage("showFullContent") private var showFullContent = true
     @AppStorage("jokesGridScale") private var jokesGridScale: Double = 1.0
     @GestureState private var jokesPinchMagnification: CGFloat = 1.0
@@ -166,21 +165,6 @@ struct JokesView: View {
                         }
                     }
                 )
-                
-                // Open Mic chip
-                OpenMicChip(
-                    count: openMicCount,
-                    isSelected: showingOpenMicFilter,
-                    roastMode: roastMode,
-                    action: {
-                        showingOpenMicFilter.toggle()
-                        if showingOpenMicFilter {
-                            selectedFolder = nil
-                            showRecentlyAdded = false
-                            showingHitsFilter = false
-                        }
-                    }
-                )
 
                 // Tag filter chip — opens picker sheet, shows active tag inline
                 TagFilterChip(
@@ -263,7 +247,67 @@ struct JokesView: View {
         }
         .padding(.vertical, 6)
     }
-    
+
+    /// Open Mic gets its own full-width section above the rolodex chips so it
+    /// reads as a distinct destination ("jokes to try on stage") rather than
+    /// just another filter buried in the horizontal chip row.
+    private var openMicBanner: some View {
+        Button {
+            haptic(.selection)
+            showingOpenMicFilter.toggle()
+            if showingOpenMicFilter {
+                selectedFolder = nil
+                showRecentlyAdded = false
+                showingHitsFilter = false
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "mic.fill")
+                    .font(.headline)
+                    .foregroundColor(showingOpenMicFilter ? .white : Color.bitbinderAccent)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        Circle().fill(
+                            showingOpenMicFilter
+                                ? AnyShapeStyle(Color.white.opacity(0.2))
+                                : AnyShapeStyle(Color.bitbinderAccent.opacity(0.15))
+                        )
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Open Mic")
+                        .font(.subheadline.weight(.semibold))
+                    Text(openMicCount == 0
+                         ? "Set jokes aside to try on stage"
+                         : "\(openMicCount) joke\(openMicCount == 1 ? "" : "s") to try on stage")
+                        .font(.caption)
+                        .foregroundColor(showingOpenMicFilter ? .white.opacity(0.85) : .secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: showingOpenMicFilter ? "checkmark.circle.fill" : "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(showingOpenMicFilter ? .white : Color(UIColor.tertiaryLabel))
+            }
+            .foregroundColor(showingOpenMicFilter ? .white : .primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        showingOpenMicFilter
+                            ? AnyShapeStyle(Color.bitbinderAccent)
+                            : AnyShapeStyle(Color(UIColor.secondarySystemBackground))
+                    )
+            )
+            .animation(.easeInOut(duration: 0.2), value: showingOpenMicFilter)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
     @ViewBuilder
     private var emptyState: some View {
         JokesEmptyState(
@@ -290,7 +334,10 @@ struct JokesView: View {
     private var roastHomeView: some View {
         ScrollView(.vertical) {
             LazyVStack(spacing: 0) {
-                RoastHomeHeader(subjectCount: roastTargets.count)
+                RoastHomeHeader(
+                    subjectCount: roastTargets.count,
+                    onAddTarget: { showingAddRoastTarget = true }
+                )
 
                 ForEach(roastTargets) { target in
                     NavigationLink(destination: RoastTargetDetailView(target: target)) {
@@ -307,7 +354,7 @@ struct JokesView: View {
                     }
                 }
 
-                EmberOutlineButton(title: "Add subject") {
+                EmberOutlineButton(title: "Add another subject") {
                     showingAddRoastTarget = true
                 }
                 .padding(.horizontal, 16)
@@ -516,7 +563,14 @@ struct JokesView: View {
             roastSection
         } else {
             VStack(spacing: 0) {
-                // Filter chips (includes The Hits)
+                // Open Mic — its own dedicated section, set apart from the rolodex
+                openMicBanner
+
+                Divider()
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+
+                // Joke rolodex filter chips (Hits, tags, folders…)
                 folderChips
 
                 if filteredJokes.isEmpty {
@@ -542,46 +596,7 @@ struct JokesView: View {
                                                         .padding(10)
                                                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                                                 }
-                                                .contextMenu {
-                                                    Button {
-                                                        jokeToMove = joke
-                                                    } label: {
-                                                        Label("Move to Folder", systemImage: "folder")
-                                                    }
-
-                                                    Divider()
-
-                                                    Button {
-                                                        joke.isHit.toggle()
-                                                        joke.dateModified = Date()
-                                                    } label: {
-                                                        Label(joke.isHit ? "Remove from Hits" : "Add to Hits",
-                                                              systemImage: joke.isHit ? "star.slash" : "star.fill")
-                                                    }
-
-                                                    Button {
-                                                        joke.isOpenMic.toggle()
-                                                        joke.dateModified = Date()
-                                                    } label: {
-                                                        Label(joke.isOpenMic ? "Remove from Open Mic" : "Open Mic",
-                                                              systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill")
-                                                    }
-
-                                                    Divider()
-
-                                                    Button(role: .destructive) {
-                                                        joke.moveToTrash()
-                                                        do {
-                                                            try modelContext.save()
-                                                        } catch {
-                                                            print(" [JokesView] Failed to save after trash: \(error)")
-                                                            persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
-                                                            showingPersistenceError = true
-                                                        }
-                                                    } label: {
-                                                        Label("Move to Trash", systemImage: "trash")
-                                                    }
-                                                }
+                                                .contextMenu { jokeContextMenu(joke) }
                                         }
                                     }
                                 }
@@ -603,46 +618,7 @@ struct JokesView: View {
                                             .id(joke.id)
                                     }
                                     .draggable(JokeDragItem(jokeID: joke.id.uuidString))
-                                    .contextMenu {
-                                        Button {
-                                            jokeToMove = joke
-                                        } label: {
-                                            Label("Move to Folder", systemImage: "folder")
-                                        }
-                                        
-                                        Divider()
-                                        
-                                        Button {
-                                            joke.isHit.toggle()
-                                            joke.dateModified = Date()
-                                        } label: {
-                                            Label(joke.isHit ? "Remove from Hits" : "Add to Hits",
-                                                  systemImage: joke.isHit ? "star.slash" : "star.fill")
-                                        }
-
-                                        Button {
-                                            joke.isOpenMic.toggle()
-                                            joke.dateModified = Date()
-                                        } label: {
-                                            Label(joke.isOpenMic ? "Remove from Open Mic" : "Open Mic",
-                                                  systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill")
-                                        }
-                                        
-                                        Divider()
-                                        
-                                        Button(role: .destructive) {
-                                            joke.moveToTrash()
-                                            do {
-                                                try modelContext.save()
-                                            } catch {
-                                                print(" [JokesView] Failed to save after trash: \(error)")
-                                                persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
-                                                showingPersistenceError = true
-                                            }
-                                        } label: {
-                                            Label("Move to Trash", systemImage: "trash")
-                                        }
-                                    }
+                                    .contextMenu { jokeContextMenu(joke) }
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                         Button(role: .destructive) {
                                             HapticEngine.shared.delete()
@@ -751,7 +727,52 @@ struct JokesView: View {
         }
         .buttonStyle(.plain)
     }
-    
+
+    /// Long-press context menu shared by the grid cards and list rows so both
+    /// surfaces stay in lock-step. Grouped into sections (organize · mark ·
+    /// destructive) to match the joke editor's overflow menu.
+    @ViewBuilder
+    private func jokeContextMenu(_ joke: Joke) -> some View {
+        Button {
+            jokeToMove = joke
+        } label: {
+            Label("Move to Folder", systemImage: "folder")
+        }
+
+        Section {
+            Button {
+                joke.isHit.toggle()
+                joke.dateModified = Date()
+            } label: {
+                Label(joke.isHit ? "Remove from Hits" : "Add to Hits",
+                      systemImage: joke.isHit ? "star.slash" : "star.fill")
+            }
+
+            Button {
+                joke.isOpenMic.toggle()
+                joke.dateModified = Date()
+            } label: {
+                Label(joke.isOpenMic ? "Remove from Open Mic" : "Open Mic",
+                      systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill")
+            }
+        }
+
+        Section {
+            Button(role: .destructive) {
+                joke.moveToTrash()
+                do {
+                    try modelContext.save()
+                } catch {
+                    print(" [JokesView] Failed to save after trash: \(error)")
+                    persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
+                    showingPersistenceError = true
+                }
+            } label: {
+                Label("Move to Trash", systemImage: "trash")
+            }
+        }
+    }
+
     private var batchActionBar: some View {
         HStack(spacing: 16) {
             Button {
@@ -857,44 +878,13 @@ struct JokesView: View {
     private var combinedToolbarContent: some ToolbarContent {
         if roastMode {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showingAddRoastTarget = true
-                } label: {
-                    Image(systemName: "person.badge.plus")
-                        .accessibilityLabel("Add roast target")
-                }
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Section("View") {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                roastViewMode = roastViewMode == .grid ? .list : .grid
-                            }
-                        } label: {
-                            Label(roastViewMode == .grid ? "List View" : "Grid View",
-                                  systemImage: roastViewMode.icon)
-                        }
-                    }
-
                     Section("Export") {
                         Button(action: exportAllRoastsToPDF) {
                             Label("Export All Roasts to PDF", systemImage: "doc.richtext")
                         }
                         Button(action: exportAllRoastsToText) {
                             Label("Export All Roasts to Text", systemImage: "doc.text")
-                        }
-                    }
-
-                    Section("Performance") {
-                        Button {
-                            NotificationCenter.default.post(
-                                name: .navigateToScreen,
-                                object: nil,
-                                userInfo: ["screen": AppScreen.sets.rawValue]
-                            )
-                        } label: {
-                            Label("Roast Sets", systemImage: "play.rectangle")
                         }
                     }
                 } label: {
