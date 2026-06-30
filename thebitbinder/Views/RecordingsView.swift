@@ -59,6 +59,7 @@ struct RecordingsView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Start recording")
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -70,6 +71,7 @@ struct RecordingsView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("Recording options")
             }
         }
         .navigationDestination(isPresented: $showingTrash) {

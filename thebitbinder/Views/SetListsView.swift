@@ -68,6 +68,7 @@ struct SetListsView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
+                .accessibilityLabel("Create set list")
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -88,6 +89,7 @@ struct SetListsView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("Set list options")
             }
         }
         .navigationDestination(isPresented: $showingTrash) {

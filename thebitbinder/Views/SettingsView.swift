@@ -68,6 +68,7 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Edit display name")
                     }
                 }
             } header: {
@@ -220,7 +221,7 @@ struct SettingsView: View {
                 HStack {
                     Text("Version")
                     Spacer()
-                    Text("11.5")
+                    Text(appVersion)
                         .foregroundColor(.secondary)
                 }
             } header: {
@@ -242,6 +243,23 @@ struct SettingsView: View {
         }
         isEditingName = false
         nameFieldFocused = false
+    }
+
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String
+        let build = info?["CFBundleVersion"] as? String
+
+        switch (version?.isEmpty == false ? version : nil, build?.isEmpty == false ? build : nil) {
+        case let (version?, build?) where version != build:
+            return "\(version) (\(build))"
+        case let (version?, _):
+            return version
+        case let (_, build?):
+            return build
+        default:
+            return "Unknown"
+        }
     }
 
     @ViewBuilder

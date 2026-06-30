@@ -661,8 +661,10 @@ private struct PreviewMockView: View {
                             y: CGFloat((i * 53) % 70) - 35)
                     .rotationEffect(.degrees(Double((i * 73) % 360)))
             }
-            Text("🎤")
+            Image(systemName: "mic.fill")
                 .font(.largeTitle)
+                .foregroundStyle(roastMode ? FirePalette.core : Color.accentColor)
+                .accessibilityLabel("Microphone")
         }
         .frame(height: 70)
     }
