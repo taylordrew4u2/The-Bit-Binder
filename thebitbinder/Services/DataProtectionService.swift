@@ -6,8 +6,6 @@
 //
 
 import Foundation
-import SwiftData
-import CloudKit
 import UIKit
 
 /// Comprehensive data protection service to prevent data loss during app updates, migrations, and system failures

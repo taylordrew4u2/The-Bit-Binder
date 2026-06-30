@@ -21,9 +21,7 @@ final class ImportReviewViewModel: ObservableObject {
 
     /// Indices of items that were auto-accepted (from the high-confidence autoSavedJokes bucket)
     private(set) var autoAcceptedIndices: Set<Int> = []
-    
-    private let pipelineCoordinator = ImportPipelineCoordinator.shared
-    
+
     var currentItem: ImportReviewItem? {
         guard currentIndex < reviewItems.count else { return nil }
         return reviewItems[currentIndex]

@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 struct BitBuddyTurn: Sendable, Codable {
     enum Role: String, Codable, Sendable {

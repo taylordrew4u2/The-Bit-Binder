@@ -18,7 +18,6 @@ enum SyncedKeys {
     static let tabOrder          = "tabOrder"
     static let jokesViewMode     = "jokesViewMode"
     static let jokesGridScale    = "jokesGridScale"
-    static let roastGridScale    = "roastGridScale"
     static let iCloudSyncEnabled = "iCloudSyncEnabled"
     static let showFullContent   = "showFullContent"
     static let autoOrganizeEnabled = "autoOrganizeEnabled"
@@ -40,7 +39,6 @@ enum SyncedKeys {
         tabOrder,
         jokesViewMode,
         jokesGridScale,
-        roastGridScale,
         iCloudSyncEnabled,
         showFullContent,
         autoOrganizeEnabled,

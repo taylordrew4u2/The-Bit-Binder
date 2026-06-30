@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import SwiftData
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -386,11 +385,6 @@ class AutoOrganizeService {
         )
     }
 
-    // MARK: - Configuration
-    private static let confidenceThresholdForAutoOrganize: Double = 0.40
-    private static let confidenceThresholdForSuggestion: Double = 0.20
-    private static let multiCategoryThreshold: Double = 0.35
-    
     // MARK: - Comedy Category Lexicon
     // Keywords include both meta-labels AND actual content patterns found in jokes.
     private static let categories: [String: CategoryKeywords] = [

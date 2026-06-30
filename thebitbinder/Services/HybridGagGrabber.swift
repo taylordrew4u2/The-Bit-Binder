@@ -14,7 +14,6 @@
 //
 
 import SwiftUI
-import SwiftData
 import PDFKit
 import UniformTypeIdentifiers
 

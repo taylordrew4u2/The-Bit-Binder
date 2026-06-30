@@ -8,7 +8,6 @@
 
 import Foundation
 import UIKit
-import SwiftData
 
 /// Coordinates the entire import pipeline from file input to final joke objects.
 final class ImportPipelineCoordinator {
