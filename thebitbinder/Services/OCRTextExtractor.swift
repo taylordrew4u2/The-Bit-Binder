@@ -233,16 +233,44 @@ final class OCRTextExtractor {
     private func normalizeOCRText(_ text: String) -> String {
         var normalized = text
         
-        // Fix common OCR errors
+        // Fix common OCR errors without corrupting legitimate numbers.
         normalized = normalized.replacingOccurrences(of: "|", with: "I") // Common I/| confusion
-        normalized = normalized.replacingOccurrences(of: "0", with: "O") // In text contexts where 0 should be O
-        normalized = normalized.replacingOccurrences(of: "5", with: "S") // In text contexts where 5 should be S
+        normalized = replaceDigitConfusionsInsideWords(normalized)
         
         // Clean up whitespace
         normalized = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         normalized = normalized.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         
         return normalized
+    }
+
+    private func replaceDigitConfusionsInsideWords(_ text: String) -> String {
+        let characters = Array(text)
+        guard !characters.isEmpty else { return text }
+
+        var corrected = ""
+        corrected.reserveCapacity(text.count)
+
+        for index in characters.indices {
+            let character = characters[index]
+            let previousIsLetter = index > characters.startIndex && characters[characters.index(before: index)].isLetter
+            let nextIsLetter = characters.index(after: index) < characters.endIndex && characters[characters.index(after: index)].isLetter
+
+            if previousIsLetter || nextIsLetter {
+                if character == "0" {
+                    corrected.append("O")
+                    continue
+                }
+                if character == "5" {
+                    corrected.append("S")
+                    continue
+                }
+            }
+
+            corrected.append(character)
+        }
+
+        return corrected
     }
     
     private func calculateIndentationLevel(_ text: String) -> Int {

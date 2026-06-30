@@ -177,6 +177,8 @@ final class SpeechRecognitionManager: NSObject, ObservableObject, SFSpeechRecogn
         }
         guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
             isRestarting = false
+            shouldBeRunning = false
+            tearDownAudioPipeline(deactivateSession: true)
             DispatchQueue.main.async { [weak self] in
                 self?.error = "Speech recognition is not available"
                 self?.isRecording = false
@@ -219,7 +221,8 @@ final class SpeechRecognitionManager: NSObject, ObservableObject, SFSpeechRecogn
         // Validate audio format — some devices/routes report 0 sample rate
         guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
             isRestarting = false
-            audioEngine = nil
+            shouldBeRunning = false
+            tearDownAudioPipeline(deactivateSession: true)
             #if DEBUG
             print("Audio input format is invalid (sampleRate=\(recordingFormat.sampleRate))")
             #endif
@@ -322,9 +325,12 @@ final class SpeechRecognitionManager: NSObject, ObservableObject, SFSpeechRecogn
             print(" [SpeechRecognitionManager] Recognition error: \(nsError.domain) code \(nsError.code) — \(error.localizedDescription)")
             #endif
             DispatchQueue.main.async { [weak self] in
-                self?.error = SpeechErrorMapper.userMessage(for: error)
-                self?.isRecording = false
-                self?.isRestarting = false
+                guard let self else { return }
+                self.error = SpeechErrorMapper.userMessage(for: error)
+                self.shouldBeRunning = false
+                self.isRestarting = false
+                self.tearDownAudioPipeline(deactivateSession: true)
+                self.isRecording = false
             }
             return
         }

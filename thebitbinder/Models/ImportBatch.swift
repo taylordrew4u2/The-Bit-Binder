@@ -92,7 +92,11 @@ final class ImportedJokeMetadata: Identifiable {
     
     var tags: [String] {
         get { tagsString.isEmpty ? [] : tagsString.split(separator: "|").map(String.init) }
-        set { tagsString = newValue.joined(separator: "|") }
+        set { tagsString = Self.encodeTags(newValue) }
+    }
+
+    private static func encodeTags(_ tags: [String]) -> String {
+        tags.map { $0.replacingOccurrences(of: "|", with: "") }.joined(separator: "|")
     }
     
     init(
@@ -126,7 +130,7 @@ final class ImportedJokeMetadata: Identifiable {
         self.confidence = confidence
         self.sourceOrder = sourceOrder
         self.sourcePage = sourcePage
-        self.tagsString = tags.joined(separator: "|")
+        self.tagsString = Self.encodeTags(tags)
         self.parsingFlagsJSON = parsingFlagsJSON
         self.sourceFilename = sourceFilename
         self.importTimestamp = importTimestamp
@@ -169,7 +173,11 @@ final class UnresolvedImportFragment: Identifiable {
     
     var tags: [String] {
         get { tagsString.isEmpty ? [] : tagsString.split(separator: "|").map(String.init) }
-        set { tagsString = newValue.joined(separator: "|") }
+        set { tagsString = Self.encodeTags(newValue) }
+    }
+
+    private static func encodeTags(_ tags: [String]) -> String {
+        tags.map { $0.replacingOccurrences(of: "|", with: "") }.joined(separator: "|")
     }
     
     init(
@@ -199,7 +207,7 @@ final class UnresolvedImportFragment: Identifiable {
         self.sourcePage = sourcePage
         self.sourceFilename = sourceFilename
         self.titleCandidate = titleCandidate
-        self.tagsString = tags.joined(separator: "|")
+        self.tagsString = Self.encodeTags(tags)
         self.parsingFlagsJSON = parsingFlagsJSON
         self.createdAt = createdAt
         self.isResolved = isResolved

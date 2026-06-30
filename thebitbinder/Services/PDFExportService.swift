@@ -9,6 +9,23 @@ import UIKit
 import PDFKit
 
 class PDFExportService {
+    private static func outputURL(fileName: String, defaultName: String) -> URL {
+        let invalidCharacters = CharacterSet(charactersIn: "/\\:*?\"<>|")
+            .union(.newlines)
+            .union(.controlCharacters)
+        var safeName = fileName.components(separatedBy: invalidCharacters).joined(separator: "_")
+        safeName = safeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if safeName.isEmpty {
+            safeName = defaultName
+        }
+        if safeName.lowercased().hasSuffix(".pdf") {
+            safeName = String(safeName.dropLast(4))
+        }
+
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsURL.appendingPathComponent("\(safeName).pdf")
+    }
+
     private static func roastExportText(for joke: RoastJoke) -> String {
         var lines: [String] = []
 
@@ -44,8 +61,7 @@ class PDFExportService {
         
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
         
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let pdfURL = documentsURL.appendingPathComponent("\(fileName).pdf")
+        let pdfURL = outputURL(fileName: fileName, defaultName: "BitBinder_Jokes")
         
         do {
             try renderer.writePDF(to: pdfURL) { context in
@@ -148,8 +164,7 @@ class PDFExportService {
         
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
         
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let pdfURL = documentsURL.appendingPathComponent("\(fileName).pdf")
+        let pdfURL = outputURL(fileName: fileName, defaultName: "BitBinder_Roasts")
         
         do {
             try renderer.writePDF(to: pdfURL) { context in
@@ -413,8 +428,7 @@ class PDFExportService {
         let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
         
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let pdfURL = documentsURL.appendingPathComponent("\(fileName).pdf")
+        let pdfURL = outputURL(fileName: fileName, defaultName: "BitBinder_Brainstorm")
         
         do {
             try renderer.writePDF(to: pdfURL) { context in
@@ -499,8 +513,7 @@ class PDFExportService {
         let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
         
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let pdfURL = documentsURL.appendingPathComponent("\(fileName).pdf")
+        let pdfURL = outputURL(fileName: fileName, defaultName: "BitBinder_Export")
         
         let titleAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 24), .foregroundColor: UIColor.black]
         let sectionAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 18), .foregroundColor: UIColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1)]

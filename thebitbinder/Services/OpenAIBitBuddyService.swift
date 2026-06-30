@@ -2,6 +2,7 @@ import Foundation
 
 final class OpenAIBitBuddyService: BitBuddyBackend {
     static let shared = OpenAIBitBuddyService()
+    private static let completionsEndpoint = "https://api.openai.com/v1/chat/completions"
 
     private init() {}
 
@@ -71,7 +72,11 @@ final class OpenAIBitBuddyService: BitBuddyBackend {
             "temperature": 0.8
         ]
 
-        var request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        guard let url = URL(string: Self.completionsEndpoint) else {
+            throw BitBuddyBackendError.generationFailed
+        }
+
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
