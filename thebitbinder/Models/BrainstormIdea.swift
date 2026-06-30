@@ -37,20 +37,20 @@ final class BrainstormIdea: Identifiable {
     
     // Predefined color palette for sticky notes
     static let noteColors: [String] = [
-        "FFF9C4", // Light yellow
-        "FFECB3", // Amber
-        "FFE0B2", // Orange light
-        "F8BBD9", // Pink light
-        "E1BEE7", // Purple light
-        "C5CAE9", // Indigo light
-        "B3E5FC", // Light blue
-        "B2DFDB", // Teal light
-        "C8E6C9", // Green light
-        "DCEDC8", // Light green
+        "FFE082", // Yellow
+        "FFD54F", // Amber
+        "FFB74D", // Orange
+        "F48FB1", // Pink
+        "CE93D8", // Purple
+        "9FA8DA", // Indigo
+        "81D4FA", // Blue
+        "80CBC4", // Teal
+        "A5D6A7", // Green
+        "C5E1A5", // Light green
     ]
-    
+
     static func randomColor() -> String {
-        noteColors.randomElement() ?? "FFF9C4"
+        noteColors.randomElement() ?? "FFE082"
     }
 
     // MARK: - Trash Helpers

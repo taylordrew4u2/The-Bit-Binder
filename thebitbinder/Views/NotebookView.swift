@@ -172,54 +172,7 @@ struct NotebookView: View {
             }
 
             // MARK: - Photo Grid
-            Group {
-                if filteredPhotos.isEmpty {
-                    emptyStateView
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 14) {
-                            ForEach(filteredPhotos, id: \.id) { photo in
-                                let cell = NotebookThumbnailCell(
-                                    photo: photo,
-                                    isDragging: draggingPhoto?.id == photo.id,
-                                    isSelectMode: isSelectMode,
-                                    isSelected: selectedPhotoIDs.contains(photo.id)
-                                ) {
-                                    if isSelectMode {
-                                        toggleSelection(photo)
-                                    } else {
-                                        showingDetail = photo
-                                    }
-                                } onDelete: {
-                                    delete(photo)
-                                } onMove: {
-                                    photoToMove = photo
-                                    showingMoveSheet = true
-                                }
-
-                                if isSelectMode {
-                                    cell
-                                } else {
-                                    cell
-                                        .onDrag {
-                                            draggingPhoto = photo
-                                            return NSItemProvider(object: photo.id.uuidString as NSString)
-                                        }
-                                        .onDrop(of: [.text], delegate: NotebookDropDelegate(
-                                            item: photo,
-                                            draggingItem: $draggingPhoto,
-                                            onMove: move
-                                        ))
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
-                        .padding(.bottom, 20)
-                        .readableWidth()
-                    }
-                }
-            }
+            photoGridSection
 
             if isSelectMode {
                 HStack(spacing: 16) {
@@ -421,6 +374,63 @@ struct NotebookView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(persistenceError ?? "An unknown error occurred")
+        }
+    }
+
+    // MARK: - Photo Grid
+
+    @ViewBuilder
+    private var photoGridSection: some View {
+        if filteredPhotos.isEmpty {
+            emptyStateView
+        } else {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(filteredPhotos, id: \.id) { photo in
+                        gridCell(for: photo)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 20)
+                .readableWidth()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func gridCell(for photo: NotebookPhotoRecord) -> some View {
+        let cell = NotebookThumbnailCell(
+            photo: photo,
+            isDragging: draggingPhoto?.id == photo.id,
+            isSelectMode: isSelectMode,
+            isSelected: selectedPhotoIDs.contains(photo.id)
+        ) {
+            if isSelectMode {
+                toggleSelection(photo)
+            } else {
+                showingDetail = photo
+            }
+        } onDelete: {
+            delete(photo)
+        } onMove: {
+            photoToMove = photo
+            showingMoveSheet = true
+        }
+
+        if isSelectMode {
+            cell
+        } else {
+            cell
+                .onDrag {
+                    draggingPhoto = photo
+                    return NSItemProvider(object: photo.id.uuidString as NSString)
+                }
+                .onDrop(of: [.text], delegate: NotebookDropDelegate(
+                    item: photo,
+                    draggingItem: $draggingPhoto,
+                    onMove: move
+                ))
         }
     }
 

@@ -790,12 +790,16 @@ struct IdeaCard: View {
         idea.content.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var noteColor: Color {
+        Color(hex: idea.colorHex) ?? Color(UIColor.secondarySystemBackground)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 6) {
                 Text(previewText.isEmpty ? "Untitled thought" : previewText)
                     .font(showFullContent ? .subheadline : .headline)
-                    .foregroundColor(.primary)
+                    .foregroundColor(Color.black.opacity(0.85))
                     .lineLimit(showFullContent ? 4 : 2)
 
                 Spacer(minLength: 4)
@@ -803,14 +807,14 @@ struct IdeaCard: View {
                 if idea.isVoiceNote {
                     Image(systemName: "mic.fill")
                         .font(.caption)
-                    .foregroundColor(Color.bitbinderAccent)
+                    .foregroundColor(Color.black.opacity(0.55))
                 }
             }
 
             HStack(spacing: 6) {
                 Text(idea.dateCreated.formatted(.dateTime.month(.abbreviated).day()))
                     .font(.caption2)
-                    .foregroundColor(Color(UIColor.tertiaryLabel))
+                    .foregroundColor(Color.black.opacity(0.5))
 
                 Spacer()
             }
@@ -819,7 +823,7 @@ struct IdeaCard: View {
         .padding(.trailing, 12)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(noteColor)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

@@ -344,29 +344,17 @@ class AudioTranscriptionService {
             throw AudioTranscriptionError.audioExportFailed("Audio export is not available for \(originalURL.lastPathComponent).")
         }
 
-        exporter.outputURL = outputURL
-        exporter.outputFileType = .m4a
         exporter.timeRange = CMTimeRange(
             start: CMTime(seconds: start, preferredTimescale: 600),
             duration: CMTime(seconds: duration, preferredTimescale: 600)
         )
 
-        nonisolated(unsafe) let unsafeExporter = exporter
-        return try await withCheckedThrowingContinuation { continuation in
-            unsafeExporter.exportAsynchronously {
-                switch unsafeExporter.status {
-                case .completed:
-                    continuation.resume(returning: outputURL)
-                case .failed, .cancelled:
-                    let message = unsafeExporter.error?.localizedDescription ?? "Unknown export error"
-                    try? FileManager.default.removeItem(at: outputURL)
-                    continuation.resume(throwing: AudioTranscriptionError.audioExportFailed(message))
-                default:
-                    let message = unsafeExporter.error?.localizedDescription ?? "Audio export ended unexpectedly"
-                    try? FileManager.default.removeItem(at: outputURL)
-                    continuation.resume(throwing: AudioTranscriptionError.audioExportFailed(message))
-                }
-            }
+        do {
+            try await exporter.export(to: outputURL, as: .m4a)
+            return outputURL
+        } catch {
+            try? FileManager.default.removeItem(at: outputURL)
+            throw AudioTranscriptionError.audioExportFailed(error.localizedDescription)
         }
     }
     
