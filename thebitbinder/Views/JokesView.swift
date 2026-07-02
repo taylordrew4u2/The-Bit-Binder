@@ -30,6 +30,7 @@ struct ImportErrorMessage: LocalizedError {
 
 struct JokesView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(filter: #Predicate<Joke> { !$0.isTrashed }, sort: \Joke.dateModified, order: .reverse) private var jokes: [Joke]
     @Query(filter: #Predicate<JokeFolder> { !$0.isTrashed }) private var folders: [JokeFolder]
     @Query(filter: #Predicate<RoastTarget> { !$0.isTrashed }, sort: \RoastTarget.dateModified, order: .reverse) private var roastTargets: [RoastTarget]
@@ -63,10 +64,25 @@ struct JokesView: View {
             }
     }
 
-    // Grid columns derived from scale
+    private var gridCardBaseWidth: CGFloat {
+        horizontalSizeClass == .regular ? 190 : 140
+    }
+
+    private var gridCardSpacing: CGFloat {
+        horizontalSizeClass == .regular ? 12 : 10
+    }
+
+    private var gridHorizontalPadding: CGFloat {
+        horizontalSizeClass == .regular ? 20 : 12
+    }
+
+    // Grid columns derived from scale. Larger scale means wider cards and
+    // fewer columns; adaptive width prevents cramped 3-4 column iPhone grids.
     private var jokesColumns: [GridItem] {
-        let count = max(2, Int(4 / effectiveJokesScale))
-        return Array(repeating: GridItem(.flexible(), spacing: 0), count: count)
+        let minWidth = min(max(gridCardBaseWidth * effectiveJokesScale, 140), 320)
+        return [
+            GridItem(.adaptive(minimum: minWidth), spacing: gridCardSpacing, alignment: .top)
+        ]
     }
     
     @State private var showingAddJoke = false
@@ -579,29 +595,34 @@ struct JokesView: View {
                 } else {
                     if viewMode == .grid {
                         ScrollView {
-                                LazyVGrid(columns: jokesColumns, spacing: 0) {
-                                    ForEach(filteredJokes) { joke in
-                                        if isSelectMode {
-                                            jokeGridSelectableCard(joke: joke)
-                                        } else {
+                            LazyVGrid(columns: jokesColumns, spacing: gridCardSpacing) {
+                                ForEach(filteredJokes) { joke in
+                                    if isSelectMode {
+                                        jokeGridSelectableCard(joke: joke)
+                                    } else {
+                                        Button {
+                                            HapticEngine.shared.tap()
+                                            selectedJokeForDetail = joke
+                                        } label: {
                                             JokeCardView(joke: joke, scale: effectiveJokesScale, roastMode: roastMode, showFullContent: showFullContent)
-                                                .contentShape(Rectangle())
-                                                .onTapGesture {
-                                                    HapticEngine.shared.tap()
-                                                    selectedJokeForDetail = joke
-                                                }
-                                                .draggable(JokeDragItem(jokeID: joke.id.uuidString)) {
-                                                    // Drag preview
-                                                    Text(joke.title.isEmpty ? KeywordTitleGenerator.displayTitle(from: joke.content) : joke.title)
-                                                        .font(.subheadline.weight(.medium))
-                                                        .padding(10)
-                                                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                                }
-                                                .contextMenu { jokeContextMenu(joke) }
                                         }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("Open \(displayTitle(for: joke))")
+                                        .accessibilityHint("Shows joke details")
+                                        .draggable(JokeDragItem(jokeID: joke.id.uuidString)) {
+                                            // Drag preview
+                                            Text(displayTitle(for: joke))
+                                                .font(.subheadline.weight(.medium))
+                                                .padding(10)
+                                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        }
+                                        .contextMenu { jokeContextMenu(joke) }
                                     }
                                 }
-                                .animation(.easeOut(duration: 0.2), value: effectiveJokesScale)
+                            }
+                            .padding(.horizontal, gridHorizontalPadding)
+                            .padding(.vertical, 10)
+                            .animation(.easeOut(duration: 0.2), value: effectiveJokesScale)
                         }
                         .highPriorityGesture(jokesPinchGesture)
                         .navigationDestination(item: $selectedJokeForDetail) { joke in
@@ -622,28 +643,13 @@ struct JokesView: View {
                                     .contextMenu { jokeContextMenu(joke) }
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                         Button(role: .destructive) {
-                                            HapticEngine.shared.delete()
-                                            joke.moveToTrash()
-                                            do {
-                                                try modelContext.save()
-                                            } catch {
-                                                print(" [JokesView] Failed to save after swipe trash: \(error)")
-                                                persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
-                                                showingPersistenceError = true
-                                            }
+                                            moveToTrash(joke)
                                         } label: {
                                             Label("Trash", systemImage: "trash")
                                         }
                                         
                                         Button {
-                                            HapticEngine.shared.starToggle(!joke.isHit)
-                                            joke.isHit.toggle()
-                                            joke.dateModified = Date()
-                                            do {
-                                                try modelContext.save()
-                                            } catch {
-                                                print(" [JokesView] Failed to save hit toggle: \(error)")
-                                            }
+                                            toggleHit(for: joke)
                                         } label: {
                                             Label(joke.isHit ? "Remove Hit" : "Add Hit", systemImage: joke.isHit ? "star.slash" : "star.fill")
                                         }
@@ -651,23 +657,14 @@ struct JokesView: View {
                                     }
                                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                                         Button {
-                                            HapticEngine.shared.starToggle(!joke.isHit)
-                                            joke.isHit.toggle()
-                                            joke.dateModified = Date()
+                                            toggleHit(for: joke)
                                         } label: {
                                             Label(joke.isHit ? "Remove Hit" : "The Hits", systemImage: joke.isHit ? "star.slash.fill" : "star.fill")
                                         }
                                         .tint(.yellow)
                                         
                                         Button {
-                                            haptic(.medium)
-                                            joke.isOpenMic.toggle()
-                                            joke.dateModified = Date()
-                                            do {
-                                                try modelContext.save()
-                                            } catch {
-                                                print(" [JokesView] Failed to save open mic toggle: \(error)")
-                                            }
+                                            toggleOpenMic(for: joke)
                                         } label: {
                                             Label(joke.isOpenMic ? "Remove Open Mic" : "Open Mic", systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill")
                                         }
@@ -687,7 +684,7 @@ struct JokesView: View {
                     batchActionBar
                 }
             }
-            .readableWidth(DS.wideContentWidth)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -711,6 +708,9 @@ struct JokesView: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .buttonStyle(.plain)
+        .accessibilityLabel("\(isSelected ? "Deselect" : "Select") \(displayTitle(for: joke))")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityHint("Adds or removes this joke from the current selection")
     }
 
     @ViewBuilder
@@ -743,16 +743,14 @@ struct JokesView: View {
 
         Section {
             Button {
-                joke.isHit.toggle()
-                joke.dateModified = Date()
+                toggleHit(for: joke)
             } label: {
                 Label(joke.isHit ? "Remove from Hits" : "Add to Hits",
                       systemImage: joke.isHit ? "star.slash" : "star.fill")
             }
 
             Button {
-                joke.isOpenMic.toggle()
-                joke.dateModified = Date()
+                toggleOpenMic(for: joke)
             } label: {
                 Label(joke.isOpenMic ? "Remove from Open Mic" : "Open Mic",
                       systemImage: joke.isOpenMic ? "mic.slash" : "mic.fill")
@@ -761,16 +759,49 @@ struct JokesView: View {
 
         Section {
             Button(role: .destructive) {
-                joke.moveToTrash()
-                do {
-                    try modelContext.save()
-                } catch {
-                    print(" [JokesView] Failed to save after trash: \(error)")
-                    persistenceError = "Could not move joke to trash: \(error.localizedDescription)"
-                    showingPersistenceError = true
-                }
+                moveToTrash(joke)
             } label: {
                 Label("Move to Trash", systemImage: "trash")
+            }
+        }
+    }
+
+    private func displayTitle(for joke: Joke) -> String {
+        let explicit = joke.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !explicit.isEmpty { return explicit }
+        let generated = KeywordTitleGenerator.displayTitle(from: joke.content)
+        return generated.isEmpty ? "Untitled" : generated
+    }
+
+    private func toggleHit(for joke: Joke) {
+        HapticEngine.shared.starToggle(!joke.isHit)
+        joke.isHit.toggle()
+        joke.dateModified = Date()
+        saveJokeMutation("hit toggle")
+    }
+
+    private func toggleOpenMic(for joke: Joke) {
+        haptic(.medium)
+        joke.isOpenMic.toggle()
+        joke.dateModified = Date()
+        saveJokeMutation("open mic toggle")
+    }
+
+    private func moveToTrash(_ joke: Joke) {
+        HapticEngine.shared.delete()
+        joke.moveToTrash()
+        saveJokeMutation("trash", userMessage: "Could not move joke to trash")
+    }
+
+    private func saveJokeMutation(_ operation: String, userMessage: String? = nil) {
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            print(" [JokesView] Failed to save \(operation): \(error)")
+            if let userMessage {
+                persistenceError = "\(userMessage): \(error.localizedDescription)"
+                showingPersistenceError = true
             }
         }
     }
@@ -948,6 +979,24 @@ struct JokesView: View {
                         Button(action: { showFullContent.toggle() }) {
                             Label(showFullContent ? "Show Titles Only" : "Show Full Content",
                                   systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
+                        }
+                        if viewMode == .grid {
+                            Button {
+                                jokesGridScale = max(jokesGridScale - 0.25, 0.5)
+                            } label: {
+                                Label("More Grid Columns", systemImage: "rectangle.grid.3x2")
+                            }
+                            Button {
+                                jokesGridScale = min(jokesGridScale + 0.25, 2.0)
+                            } label: {
+                                Label("Larger Grid Cards", systemImage: "rectangle.grid.1x2")
+                            }
+                            Button {
+                                jokesGridScale = 1.0
+                            } label: {
+                                Label("Reset Grid Size", systemImage: "arrow.counterclockwise")
+                            }
+                            .disabled(jokesGridScale == 1.0)
                         }
                     }
                     Section("Organization") {
