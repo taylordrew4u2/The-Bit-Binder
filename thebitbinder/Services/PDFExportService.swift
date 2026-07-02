@@ -146,8 +146,104 @@ class PDFExportService {
         }
     }
     
+    // MARK: - Notebook Photo Export (Legacy)
+
+    /// Exports legacy photo-notebook records into a single PDF — one photo per
+    /// page with its notes underneath — so the images can be texted/AirDropped
+    /// as one file. Used by the Legacy Photo Notebook screen in Settings.
+    static func exportNotebookPhotosToPDF(_ photos: [NotebookPhotoRecord], fileName: String = "BitBinder_PhotoNotebook") -> URL? {
+        let pageWidth = 8.5 * 72.0
+        let pageHeight = 11.0 * 72.0
+        let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
+
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = [kCGPDFContextTitle: fileName] as [String: Any]
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        let pdfURL = outputURL(fileName: fileName, defaultName: "BitBinder_PhotoNotebook")
+        let margin: CGFloat = 36
+
+        do {
+            try renderer.writePDF(to: pdfURL) { context in
+                let noteAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 12),
+                    .foregroundColor: UIColor.black
+                ]
+
+                guard !photos.isEmpty else {
+                    context.beginPage()
+                    return
+                }
+
+                for photo in photos {
+                    context.beginPage()
+                    var y = margin
+
+                    if let data = photo.imageData, let image = UIImage(data: data) {
+                        let maxW = pageWidth - 2 * margin
+                        let maxH = pageHeight - 2 * margin - 80
+                        let scale = min(maxW / image.size.width, maxH / image.size.height, 1)
+                        let w = image.size.width * scale
+                        let h = image.size.height * scale
+                        image.draw(in: CGRect(x: (pageWidth - w) / 2, y: y, width: w, height: h))
+                        y += h + 16
+                    }
+
+                    let notes = photo.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !notes.isEmpty {
+                        let rect = CGRect(x: margin, y: y, width: pageWidth - 2 * margin, height: pageHeight - margin - y)
+                        notes.draw(in: rect, withAttributes: noteAttributes)
+                    }
+                }
+            }
+            return pdfURL
+        } catch {
+            print("Error creating photo notebook PDF: \(error)")
+            DataOperationLogger.shared.logError(error, operation: "exportNotebookPhotosToPDF", context: "Failed to write photo notebook PDF")
+            return nil
+        }
+    }
+
+    /// Exports the original photo bytes (plus any notes as .txt) as a single
+    /// `.zip`, preserving full image quality. Uses `NSFileCoordinator`'s
+    /// `.forUploading` option to zip a temp folder — no third-party dependency.
+    static func exportNotebookPhotosZip(_ photos: [NotebookPhotoRecord]) -> URL? {
+        let fm = FileManager.default
+        let workDir = fm.temporaryDirectory.appendingPathComponent("PhotoNotebook-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try fm.createDirectory(at: workDir, withIntermediateDirectories: true)
+            for (index, photo) in photos.enumerated() {
+                guard let data = photo.imageData else { continue }
+                let base = String(format: "photo-%03d", index + 1)
+                try data.write(to: workDir.appendingPathComponent("\(base).jpg"))
+                let notes = photo.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !notes.isEmpty, let noteData = notes.data(using: .utf8) {
+                    try noteData.write(to: workDir.appendingPathComponent("\(base).txt"))
+                }
+            }
+
+            var coordinatorError: NSError?
+            var resultURL: URL?
+            NSFileCoordinator().coordinate(readingItemAt: workDir, options: [.forUploading], error: &coordinatorError) { zippedURL in
+                let dest = fm.temporaryDirectory.appendingPathComponent("PhotoNotebook.zip")
+                try? fm.removeItem(at: dest)
+                do {
+                    try fm.copyItem(at: zippedURL, to: dest)
+                    resultURL = dest
+                } catch {
+                    print("Error copying zipped photo notebook: \(error)")
+                }
+            }
+            if let coordinatorError { throw coordinatorError }
+            return resultURL
+        } catch {
+            print("Error zipping photo notebook: \(error)")
+            DataOperationLogger.shared.logError(error, operation: "exportNotebookPhotosZip", context: "Failed to zip photo notebook originals")
+            return nil
+        }
+    }
+
     // MARK: - Roast Export
-    
+
     static func exportRoastsToPDF(targets: [RoastTarget], fileName: String = "BitBinder_Roasts") -> URL? {
         let pdfMetaData = [
             kCGPDFContextCreator: "The BitBinder",

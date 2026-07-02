@@ -2,15 +2,14 @@
 //  PersistenceController.swift
 //  thebitbinder
 //
-//  NSPersistentCloudKitContainer with two stores:
+//  NSPersistentCloudKitContainer with a single store:
 //
 //    1. `private.sqlite`  — backed by the user's CloudKit *private* database.
 //                           Holds their personal Workspace.
-//    2. `shared.sqlite`   — backed by the CloudKit *shared* database. Holds
-//                           Workspaces accepted from share invitations sent
-//                           by other iCloud users.
 //
-//  This stack runs in parallel with the existing SwiftData stack. It does NOT
+//  Multi-user library sharing (the CloudKit *shared* database) has been
+//  removed — data is now moved between people by exporting a file. This stack
+//  runs in parallel with the existing SwiftData stack. It does NOT
 //  yet replace SwiftData — see `SwiftDataToCoreDataMigrator` and the Phase 4
 //  refactor for the cutover plan. Until then, this controller is dormant
 //  unless explicitly initialized by debug / verification code paths.
@@ -32,13 +31,8 @@ final class PersistenceController {
     /// SQLite store name on disk for the user's private data.
     private static let privateStoreFilename = "BitBinder-private.sqlite"
 
-    /// SQLite store name on disk for shares accepted from other iCloud accounts.
-    private static let sharedStoreFilename = "BitBinder-shared.sqlite"
-
-    /// Logical names used by NSPersistentStoreDescription. CloudKit uses these
-    /// to disambiguate which database scope a record belongs to.
+    /// Logical name used by NSPersistentStoreDescription.
     static let privateStoreName = "Private"
-    static let sharedStoreName = "Shared"
 
     /// The lazily-built container. Avoid touching this from the SwiftData code
     /// paths until the cutover is complete.
@@ -97,25 +91,7 @@ final class PersistenceController {
         // later (e.g. for share routing).
         privateDescription.setOption(Self.privateStoreName as NSString, forKey: "name")
 
-        // -- Shared store description ----------------------------------------
-        let sharedURL = inMemory
-            ? URL(fileURLWithPath: "/dev/null")
-            : storeDirectory.appendingPathComponent(Self.sharedStoreFilename)
-        let sharedDescription = NSPersistentStoreDescription(url: sharedURL)
-        sharedDescription.configuration = nil
-        sharedDescription.shouldInferMappingModelAutomatically = true
-        sharedDescription.shouldMigrateStoreAutomatically = true
-        sharedDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
-        sharedDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
-
-        let sharedOptions = NSPersistentCloudKitContainerOptions(
-            containerIdentifier: Self.cloudKitContainerIdentifier
-        )
-        sharedOptions.databaseScope = .shared
-        sharedDescription.cloudKitContainerOptions = sharedOptions
-        sharedDescription.setOption(Self.sharedStoreName as NSString, forKey: "name")
-
-        container.persistentStoreDescriptions = [privateDescription, sharedDescription]
+        container.persistentStoreDescriptions = [privateDescription]
         self.container = container
 
         // Conflict resolution: when local and remote both change the same
@@ -162,7 +138,7 @@ final class PersistenceController {
                     self.storesLoaded = (firstError == nil)
                     self.isLoading = false
                     if firstError == nil {
-                        DataOperationLogger.shared.logSuccess("PersistenceController loaded both private + shared stores")
+                        DataOperationLogger.shared.logSuccess("PersistenceController loaded private store")
                     }
                     let waiters = self.inFlightLoadWaiters
                     self.inFlightLoadWaiters.removeAll()
@@ -206,14 +182,6 @@ final class PersistenceController {
             }
             return options.databaseScope == scope
         }
-    }
-
-    /// True if the given object lives in the shared store (i.e. it came from
-    /// another iCloud user's share). Use this to render UI badges and to
-    /// gate edits on participant-role objects.
-    func isShared(_ object: NSManagedObject) -> Bool {
-        guard let objectStore = object.objectID.persistentStore else { return false }
-        return objectStore == store(for: .shared)
     }
 
     /// Returns the user's Workspace root, or nil if migration hasn't created

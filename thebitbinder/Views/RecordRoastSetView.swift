@@ -197,7 +197,8 @@ struct RecordRoastSetView: View {
             duration: stoppedRecordingDuration
         )
         modelContext.insert(recording)
-        
+        recording.captureAudioData()   // capture bytes so the audio syncs across devices
+
         do {
             try modelContext.save()
             #if DEBUG

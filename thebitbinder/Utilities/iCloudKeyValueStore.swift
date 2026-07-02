@@ -11,6 +11,9 @@ import Combine
 
 /// Keys that should be synced to iCloud across devices
 enum SyncedKeys {
+    // Identity
+    static let userName          = "userName"
+
     // User preferences
     static let notepadText       = "notepadText"
     static let roastModeEnabled  = "roastModeEnabled"
@@ -21,7 +24,30 @@ enum SyncedKeys {
     static let iCloudSyncEnabled = "iCloudSyncEnabled"
     static let showFullContent   = "showFullContent"
     static let autoOrganizeEnabled = "autoOrganizeEnabled"
-    
+
+    // Display & layout preferences
+    static let appTextSize          = "appTextSize"
+    static let homeSelectedSections = "homeSelectedSections"
+    static let setupSelectedTabs    = "setupSelectedTabs"
+    static let brainstormLayoutMode = "brainstormLayoutMode"
+    static let brainstormGridScale  = "brainstormGridScale"
+
+    // Roast preferences
+    static let roastSortOption          = "roastSortOption"
+    static let roastTargetDisplayMode   = "roastTargetDisplayMode"
+    static let roastTargetHeaderCollapsed = "roastTargetHeaderCollapsed"
+    static let thingsIKnowCollapsed     = "thingsIKnowCollapsed"
+    static let roastNotepadCollapsed    = "roastNotepadCollapsed"
+    static let roastTextScale           = "roastTextScale"
+
+    // Feature toggles
+    static let bitBuddyEnabled = "bitBuddyEnabled"
+
+    // Onboarding / one-time flags
+    static let hasLaunchedBefore        = "hasLaunchedBefore"
+    static let hasCompletedSetup        = "hasCompletedSetup"
+    static let hasSeenImportSwipeTutorial = "hasSeenImportSwipeTutorial"
+
     // Notification settings
     static let dailyNotificationsEnabled = "dailyNotificationsEnabled"
     static let dailyNotifStartMinute = "dailyNotifStartMinute"
@@ -31,8 +57,14 @@ enum SyncedKeys {
     static let userId = "userId"
     static let lastSyncDate = "lastSyncDate"
 
+    // NOTE: Intentionally NOT synced — these are per-device by nature:
+    //   bitBuddyX / bitBuddyY / bitBuddyCompactCorner — absolute window position,
+    //     which is screen-size dependent and would land offscreen on another device.
+    //   selectedTabRawValue — transient "last open tab" navigation state.
+
     /// All keys that should be mirrored between UserDefaults and iCloud KV store
     static let all: [String] = [
+        userName,
         notepadText,
         roastModeEnabled,
         roastViewMode,
@@ -42,9 +74,21 @@ enum SyncedKeys {
         iCloudSyncEnabled,
         showFullContent,
         autoOrganizeEnabled,
-        dailyNotificationsEnabled,
-        dailyNotifStartMinute,
-        dailyNotifEndMinute,
+        appTextSize,
+        homeSelectedSections,
+        setupSelectedTabs,
+        brainstormLayoutMode,
+        brainstormGridScale,
+        roastSortOption,
+        roastTargetDisplayMode,
+        roastTargetHeaderCollapsed,
+        thingsIKnowCollapsed,
+        roastNotepadCollapsed,
+        roastTextScale,
+        bitBuddyEnabled,
+        hasLaunchedBefore,
+        hasCompletedSetup,
+        hasSeenImportSwipeTutorial,
         userId,
     ]
 }

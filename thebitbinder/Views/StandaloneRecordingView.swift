@@ -356,7 +356,8 @@ struct StandaloneRecordingView: View {
         )
         
         modelContext.insert(recording)
-        
+        recording.captureAudioData()   // capture bytes so the audio syncs across devices
+
         // Save context explicitly with error handling
         do {
             try modelContext.save()

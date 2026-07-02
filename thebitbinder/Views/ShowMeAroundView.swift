@@ -923,7 +923,7 @@ struct TourStep {
             icon: "gearshape.fill",
             color: .gray,
             features: [
-                "Set your display name and daily writing reminder",
+                "Set your display name and text size",
                 "Toggle Roast Mode for roast-battle material",
                 "Enable iCloud Sync to back everything up across devices",
                 "Review Data Protection, Trash, and Import History",
