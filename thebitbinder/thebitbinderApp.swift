@@ -24,6 +24,7 @@ struct thebitbinderApp: App {
             SetList.self,
             NotebookPhotoRecord.self,
             NotebookFolder.self,
+            NotebookNote.self,
             RoastTarget.self,
             RoastJoke.self,
             BrainstormIdea.self,
@@ -279,8 +280,6 @@ struct thebitbinderApp: App {
             startPostStartupWorkIfNeeded()
             iCloudKeyValueStore.shared.pullFromCloud()
             print(" [AppLifecycle] Foreground save skipped")
-
-            NotificationManager.shared.scheduleIfNeeded()
 
         case .inactive:
             print(" [AppLifecycle] App became inactive")

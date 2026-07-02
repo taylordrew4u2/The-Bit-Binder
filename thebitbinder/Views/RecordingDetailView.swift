@@ -47,7 +47,7 @@ struct RecordingDetailView: View {
                                 .multilineTextAlignment(.center)
                             
                             Button("Try Again") {
-                                audioPlayer.loadAudio(from: recording.resolvedURL)
+                                audioPlayer.loadAudio(from: recording.playableURL())
                             }
                             .buttonStyle(.borderedProminent)
                         }
@@ -202,7 +202,7 @@ struct RecordingDetailView: View {
             // Small delay to ensure audio session is ready
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 guard scenePhase == .active else { return }
-                audioPlayer.loadAudio(from: recording.resolvedURL)
+                audioPlayer.loadAudio(from: recording.playableURL())
             }
         }
         .onDisappear {
@@ -228,7 +228,7 @@ struct RecordingDetailView: View {
     private func togglePlayback() {
         // Don't try to play if there's a load error
         guard audioPlayer.loadError == nil else {
-            audioPlayer.loadAudio(from: recording.resolvedURL)
+            audioPlayer.loadAudio(from: recording.playableURL())
             return
         }
         
@@ -266,8 +266,8 @@ struct RecordingDetailView: View {
                     }
                 }
                 
-                let url = recording.resolvedURL
-                
+                let url = recording.playableURL()
+
                 // Verify file exists
                 guard FileManager.default.fileExists(atPath: url.path) else {
                     await MainActor.run {
@@ -313,8 +313,8 @@ struct RecordingDetailView: View {
     }
     
     private func shareRecording() {
-        let url = recording.resolvedURL
-        
+        let url = recording.playableURL()
+
         guard FileManager.default.fileExists(atPath: url.path) else {
             print(" Cannot share - file not found: \(url.path)")
             return

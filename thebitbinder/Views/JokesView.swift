@@ -362,7 +362,7 @@ struct JokesView: View {
                 .padding(.bottom, 32)
             }
             .frame(maxWidth: .infinity)
-            .readableWidth()
+            .readableWidth(DS.wideContentWidth)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(FirePalette.bg.ignoresSafeArea())
@@ -687,7 +687,7 @@ struct JokesView: View {
                     batchActionBar
                 }
             }
-            .readableWidth()
+            .readableWidth(DS.wideContentWidth)
         }
     }
 

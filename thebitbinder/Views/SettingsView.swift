@@ -139,23 +139,15 @@ struct SettingsView: View {
                 }
 
                 NavigationLink {
-                    ShareLibraryView()
-                } label: {
-                    HStack {
-                        Label("Share Library", systemImage: "person.2.crop.square.stack")
-                        Spacer()
-                        if let summary = ShareLibraryView.currentStatusSummary() {
-                            Text(summary)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                NavigationLink {
                     DataSafetyView()
                 } label: {
                     Label("Privacy & Data Safety", systemImage: "shield.checkered")
+                }
+
+                NavigationLink {
+                    LegacyPhotoNotebookView()
+                } label: {
+                    Label("Photo Notebook (Legacy)", systemImage: "photo.on.rectangle")
                 }
                 
                 NavigationLink {
@@ -174,11 +166,8 @@ struct SettingsView: View {
             } header: {
                 Text("Data")
             }
-            
-            
-            // MARK: - Notifications Section
-            DailyNotificationSection()
-            
+
+
             // MARK: - Customize Section
             Section {
                 Picker("Text Size", selection: appTextSize) {
@@ -334,49 +323,6 @@ struct MailComposerView: View {
     var body: some View { EmptyView() }
 }
 #endif
-
-// MARK: - Daily Notification Settings
-
-struct DailyNotificationSection: View {
-    @ObservedObject private var manager = NotificationManager.shared
-
-    private var startDate: Binding<Date> {
-        Binding(
-            get: { dateFromMinutes(manager.startMinute) },
-            set: { manager.startMinute = minutesFromDate($0) }
-        )
-    }
-    private var endDate: Binding<Date> {
-        Binding(
-            get: { dateFromMinutes(manager.endMinute) },
-            set: { manager.endMinute = minutesFromDate($0) }
-        )
-    }
-
-    var body: some View {
-        Section {
-            Toggle(isOn: $manager.isEnabled) {
-                Label("Daily Reminder", systemImage: "bell")
-            }
-
-            if manager.isEnabled {
-                DatePicker("Between", selection: startDate, displayedComponents: .hourAndMinute)
-                DatePicker("And", selection: endDate, displayedComponents: .hourAndMinute)
-            }
-        } header: {
-            Text("Notifications")
-        }
-    }
-
-    private func dateFromMinutes(_ mins: Int) -> Date {
-        Calendar.current.date(bySettingHour: mins / 60, minute: mins % 60, second: 0, of: Date()) ?? Date()
-    }
-
-    private func minutesFromDate(_ date: Date) -> Int {
-        let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
-        return (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
-    }
-}
 
 #Preview {
     NavigationStack {
