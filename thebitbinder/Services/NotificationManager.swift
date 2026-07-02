@@ -191,23 +191,15 @@ final class NotificationManager: NSObject, ObservableObject, @preconcurrency UNU
 
     // MARK: - Public API
 
-    /// Call once on app launch / didBecomeActive
+    /// Daily reminder notifications have been removed from the app. These entry
+    /// points are kept so existing call sites compile, but they no longer
+    /// schedule anything — they only clear any reminders left by older versions.
     func scheduleIfNeeded() {
-        guard isEnabled else { return }
-        let id = notifID
-        UNUserNotificationCenter.current().getPendingNotificationRequests { [weak self] reqs in
-            let hasPending = reqs.contains { $0.identifier == id }
-            if !hasPending {
-                DispatchQueue.main.async { self?.scheduleNext() }
-            }
-        }
+        cancelAll()
     }
 
-    /// Force a fresh schedule (removes old, creates new)
     func rescheduleIfEnabled() {
-        guard isEnabled else { return }
         cancelAll()
-        scheduleNext()
     }
 
     // MARK: - Permission
@@ -258,7 +250,7 @@ final class NotificationManager: NSObject, ObservableObject, @preconcurrency UNU
 
     // MARK: - Cancel
 
-    private func cancelAll() {
+    func cancelAll() {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [notifID])
     }
 

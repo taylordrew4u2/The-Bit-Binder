@@ -393,7 +393,7 @@ struct NotebookView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
                 .padding(.bottom, 20)
-                .readableWidth()
+                .readableWidth(DS.wideContentWidth)
             }
         }
     }

@@ -63,7 +63,13 @@ enum DS {
     }
 
     /// Max width for primary content columns on regular-width (iPad) layouts.
+    /// Use for text-heavy lists where long line lengths hurt readability.
     static let readableWidth: CGFloat = 728
+
+    /// Wider max width for grid/visual layouts (Home, Jokes, Notebook) on iPad,
+    /// so multi-column content fills more of a large screen instead of sitting in
+    /// a narrow centered column. Still capped to leave margins on iPad Pro 12.9".
+    static let wideContentWidth: CGFloat = 1024
 }
 
 // MARK: - Readable Width (iPad)
