@@ -481,7 +481,7 @@ struct AppSetupView: View {
                     .frame(width: 28)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(screen.rawValue)
+                    Text(screen.displayName)
                         .font(.body)
                         .foregroundColor(.primary)
                     Text(tabDescription(for: screen))
@@ -618,7 +618,7 @@ struct AppSetupView: View {
         case .jokes:         return "Your joke library (always included)"
         case .sets:          return "Set lists and run-throughs"
         case .recordings:    return "Audio recordings and transcriptions"
-        case .notebookSaver: return "Photos and scanned notes"
+        case .notebookSaver: return "A lined notepad for freeform notes"
         case .settings:      return ""
         }
     }
