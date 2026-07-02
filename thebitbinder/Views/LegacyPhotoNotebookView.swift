@@ -3,7 +3,7 @@
 //  thebitbinder
 //
 //  Read-only viewer + exporter for the old Photo Notebook. The photo notebook
-//  was replaced by the text-based line notebook (see LineNotebookView), but
+//  was replaced by the text-based notepad (see NotepadView), but
 //  existing photo data is preserved and reachable here from Settings so users
 //  can view and export the files they uploaded before deleting anything.
 //
