@@ -1,0 +1,45 @@
+# The BitBinder
+
+> The BitBinder is a free, native iOS app for stand-up comedians and comedy
+> writers. It combines joke writing, brainstorming, set lists, audio recording,
+> on-device transcription, roast material, a lined notepad, and multi-format
+> importing in one app. It works offline, requires no account, and syncs across
+> a user's own devices through their private iCloud.
+
+## Key facts
+
+- Name: The BitBinder (also written "BitBinder")
+- Platform: iOS (iPhone and iPad), native SwiftUI app
+- Price: Free on the Apple App Store
+- Audience: Stand-up comedians, open-mic performers, comedy writers
+- Privacy: Works offline, no account required; data stays on device and, if
+  iCloud is enabled, in the user's private iCloud database. Transcription is
+  on-device (Apple speech recognition). Nothing is shared with third parties
+  unless the user explicitly exports it.
+- Maker: Taylor Drew
+
+## What it does
+
+- Joke library: write or dictate jokes, organize with folders and tags, star
+  stage-ready "hits", recover deleted jokes from trash.
+- Brainstorm board: capture rough ideas as cards or voice notes and promote the
+  best into full jokes.
+- Set lists: order jokes, estimate runtime, add venue/date, and use a
+  performance view on stage.
+- Recording and transcription: record practice or live sets (recording
+  continues while navigating the app), play them back, and transcribe on-device.
+  With iCloud on, the recorded audio also syncs across devices.
+- Roast mode: dedicated roast targets, traits, and roast jokes, kept separate
+  from regular material.
+- Notepad: a single lined, scrollable notepad for freeform notes.
+- Smart import: import from text, PDFs, photos, scanned pages, and audio; an
+  import pipeline splits material into jokes and routes uncertain results to a
+  review queue.
+- BitBuddy: an on-device writing assistant that can analyze jokes and suggest
+  edits without sending material off the device.
+
+## Links
+
+- App Store: https://apps.apple.com/us/app/the-bitbinder/id6756085897
+- Website: https://taylordrew4u2.github.io/The-Bit-Binder/
+- Source (iOS codebase): https://github.com/taylordrew4u2/The-Bit-Binder

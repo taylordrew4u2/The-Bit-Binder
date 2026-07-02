@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0b0f" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+
+  <title>The BitBinder — The notebook app for stand-up comedians</title>
+  <meta name="description" content="The BitBinder is a native iOS app for stand-up comedians and comedy writers to capture jokes, brainstorm ideas, build set lists, record and transcribe sets, and import material — private by default, synced across your devices.">
+  <link rel="canonical" href="https://taylordrew4u2.github.io/The-Bit-Binder/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="The BitBinder">
+  <meta property="og:title" content="The BitBinder — The notebook app for stand-up comedians">
+  <meta property="og:description" content="Capture jokes, brainstorm bits, build set lists, record and transcribe sets, and import material. A native iOS app for comics. Private by default, synced across your devices.">
+  <meta property="og:url" content="https://taylordrew4u2.github.io/The-Bit-Binder/">
+  <meta property="og:image" content="https://taylordrew4u2.github.io/The-Bit-Binder/og-image.svg">
+  <meta property="og:image:alt" content="The BitBinder app for stand-up comedians">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The BitBinder — The notebook app for stand-up comedians">
+  <meta name="twitter:description" content="Capture jokes, build set lists, record and transcribe sets, and import material. A native iOS app for comics. Private by default.">
+  <meta name="twitter:image" content="https://taylordrew4u2.github.io/The-Bit-Binder/og-image.svg">
+
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Structured data: the app -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "MobileApplication",
+    "name": "The BitBinder",
+    "alternateName": "BitBinder",
+    "operatingSystem": "iOS",
+    "applicationCategory": "ProductivityApplication",
+    "description": "A native iOS app for stand-up comedians and comedy writers to capture jokes, brainstorm ideas, build set lists, record and transcribe sets, run roast material, and import written or audio material. Private by default and synced across the user's devices via iCloud.",
+    "url": "https://taylordrew4u2.github.io/The-Bit-Binder/",
+    "downloadUrl": "https://apps.apple.com/us/app/the-bitbinder/id6756085897",
+    "installUrl": "https://apps.apple.com/us/app/the-bitbinder/id6756085897",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "featureList": [
+      "Joke library with folders, tags, and hit flags",
+      "Brainstorm board for rough ideas",
+      "Set lists with ordering, runtime, and performance mode",
+      "Audio recording with playback and on-device transcription",
+      "Roast mode for roast targets and roast jokes",
+      "Lined Notepad for freeform notes",
+      "Import from text, PDF, photos, scanned pages, and audio",
+      "BitBuddy on-device writing assistant",
+      "iCloud sync across devices"
+    ],
+    "author": { "@type": "Person", "name": "Taylor Drew" },
+    "publisher": { "@type": "Person", "name": "Taylor Drew" }
+  }
+  </script>
+
+  <!-- Structured data: website -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "The BitBinder",
+    "url": "https://taylordrew4u2.github.io/The-Bit-Binder/"
+  }
+  </script>
+
+  <!-- Structured data: FAQ (for rich results + AI answer engines) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is The BitBinder?",
+        "acceptedAnswer": { "@type": "Answer", "text": "The BitBinder is a native iOS app for stand-up comedians and comedy writers. It puts joke writing, brainstorming, set lists, audio recording, transcription, roast material, and importing in one place, so material can move from a rough idea to a polished set without getting lost." }
+      },
+      {
+        "@type": "Question",
+        "name": "Who is The BitBinder for?",
+        "acceptedAnswer": { "@type": "Answer", "text": "It is built for working stand-up comedians, open-mic performers, and comedy writers who currently scatter material across notes apps, voice memos, photos of notebooks, and text files." }
+      },
+      {
+        "@type": "Question",
+        "name": "How much does The BitBinder cost?",
+        "acceptedAnswer": { "@type": "Answer", "text": "The BitBinder is free to download on the Apple App Store for iPhone and iPad." }
+      },
+      {
+        "@type": "Question",
+        "name": "Does The BitBinder work offline and keep my material private?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. The app works fully offline and requires no account. Your material is stored on your device and, when you enable iCloud, in your own private iCloud database. Transcription runs on-device with Apple speech recognition, and nothing is shared with third parties unless you explicitly export it." }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I record and transcribe my sets?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. You can record practice or live sets, keep recording while you navigate around the app, play recordings back, and transcribe them on-device. With iCloud on, the audio itself syncs so you can play a set on your other devices." }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I import jokes I already wrote?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. You can import from plain text, PDFs, photos, scanned pages, and audio. The import pipeline extracts and splits material into individual jokes and sends uncertain results to a review queue before saving." }
+      }
+    ]
+  }
+  </script>
+</head>
+
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <span class="brand" aria-label="The BitBinder">🎤 The BitBinder</span>
+      <nav aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#faq">FAQ</a>
+        <a class="btn btn-small" href="https://apps.apple.com/us/app/the-bitbinder/id6756085897">Get the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap">
+      <h1>The notebook app for stand-up comedians</h1>
+      <p class="lede">
+        <strong>The BitBinder</strong> is a native iOS app that gives comics one place to
+        capture jokes, brainstorm bits, build set lists, record and transcribe sets, and
+        import old material — so your writing moves from a rough idea to a polished set
+        without getting lost across notes apps, voice memos, and photos of notebooks.
+      </p>
+      <p class="cta-row">
+        <a class="btn" href="https://apps.apple.com/us/app/the-bitbinder/id6756085897">Download on the App Store</a>
+        <span class="meta">Free · iPhone &amp; iPad · No account required</span>
+      </p>
+    </section>
+
+    <section id="features" class="wrap">
+      <h2>Everything a comic needs in one binder</h2>
+      <ul class="grid" role="list">
+        <li>
+          <h3>Joke library</h3>
+          <p>Write or dictate jokes, group them into folders, add tags, and star your stage-ready hits. Deleted jokes go to trash so nothing is lost.</p>
+        </li>
+        <li>
+          <h3>Brainstorm board</h3>
+          <p>Capture rough ideas as color-coded cards or voice notes, then promote the strong ones into full jokes.</p>
+        </li>
+        <li>
+          <h3>Set lists</h3>
+          <p>Order jokes for a show, estimate runtime, add venue and date, and switch to a performance view for the stage.</p>
+        </li>
+        <li>
+          <h3>Record &amp; transcribe</h3>
+          <p>Record practice or live sets, keep recording as you navigate, and transcribe on-device with Apple speech recognition.</p>
+        </li>
+        <li>
+          <h3>Roast mode</h3>
+          <p>A dedicated space for roast targets, traits, and roast jokes — kept separate from your regular material.</p>
+        </li>
+        <li>
+          <h3>Notepad</h3>
+          <p>A single lined, scrollable notepad for freeform notes, premises, and to-dos that follows you across devices.</p>
+        </li>
+        <li>
+          <h3>Smart import</h3>
+          <p>Bring in material from text, PDFs, photos, scanned pages, and audio. Uncertain results go to a review queue before saving.</p>
+        </li>
+        <li>
+          <h3>BitBuddy assistant</h3>
+          <p>An on-device writing sidekick that can analyze a joke, suggest edits, and riff on premises — your material stays on your phone.</p>
+        </li>
+        <li>
+          <h3>Private &amp; synced</h3>
+          <p>Works offline with no account. Turn on iCloud to sync jokes, recordings, and settings across your iPhone and iPad.</p>
+        </li>
+      </ul>
+    </section>
+
+    <section id="how" class="wrap">
+      <h2>How The BitBinder works</h2>
+      <ol class="steps" role="list">
+        <li><strong>Capture.</strong> Type or dictate a joke, jot a premise in Brainstorm, or scan a page from your notebook.</li>
+        <li><strong>Organize.</strong> Sort jokes into folders, tag them, and mark the ones that kill.</li>
+        <li><strong>Build a set.</strong> Drag jokes into a set list, set a target runtime, and open performance mode.</li>
+        <li><strong>Record &amp; review.</strong> Record the set, transcribe it on-device, and compare the written joke to the live take.</li>
+        <li><strong>Keep it safe.</strong> Everything syncs to your private iCloud and can be exported whenever you want.</li>
+      </ol>
+    </section>
+
+    <section id="faq" class="wrap">
+      <h2>Frequently asked questions</h2>
+
+      <details open>
+        <summary>What is The BitBinder?</summary>
+        <p>The BitBinder is a native iOS app for stand-up comedians and comedy writers. It puts joke writing, brainstorming, set lists, audio recording, transcription, roast material, and importing in one place, so material can move from a rough idea to a polished set without getting lost.</p>
+      </details>
+
+      <details>
+        <summary>Who is it for?</summary>
+        <p>Working stand-up comedians, open-mic performers, and comedy writers who currently scatter material across notes apps, voice memos, photos of notebooks, and loose text files.</p>
+      </details>
+
+      <details>
+        <summary>How much does it cost?</summary>
+        <p>The BitBinder is free to download on the Apple App Store for iPhone and iPad.</p>
+      </details>
+
+      <details>
+        <summary>Does it work offline and keep my material private?</summary>
+        <p>Yes. The app works fully offline and requires no account. Your material is stored on your device and, when you enable iCloud, in your own private iCloud database. Transcription runs on-device with Apple speech recognition, and nothing is shared with third parties unless you explicitly export it.</p>
+      </details>
+
+      <details>
+        <summary>Can I record and transcribe my sets?</summary>
+        <p>Yes. Record practice or live sets, keep recording while you navigate the app, play recordings back, and transcribe them on-device. With iCloud on, the audio itself syncs so you can play a set on your other devices.</p>
+      </details>
+
+      <details>
+        <summary>Can I import jokes I already wrote?</summary>
+        <p>Yes. Import from plain text, PDFs, photos, scanned pages, and audio. The import pipeline extracts and splits material into individual jokes and sends uncertain results to a review queue before saving.</p>
+      </details>
+    </section>
+
+    <section class="wrap final-cta">
+      <h2>Get The BitBinder</h2>
+      <p>Free on the App Store for iPhone and iPad.</p>
+      <p><a class="btn" href="https://apps.apple.com/us/app/the-bitbinder/id6756085897">Download on the App Store</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>The BitBinder is a native iOS app for stand-up comedians. Built by Taylor Drew.</p>
+      <p>© <span id="year">2026</span> Taylor Drew. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
