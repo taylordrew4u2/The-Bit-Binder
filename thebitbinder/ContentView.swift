@@ -184,7 +184,7 @@ enum AppScreen: String, CaseIterable {
     /// `setupSelectedTabs`) and must stay stable even when the label changes.
     var displayName: String {
         switch self {
-        case .notebookSaver: return "Notebook"
+        case .notebookSaver: return "Notepad"
         default:             return rawValue
         }
     }
@@ -220,7 +220,7 @@ enum AppScreen: String, CaseIterable {
         case .jokes:         return "Roasts"
         case .sets:          return "Roast Sets"
         case .recordings:    return "Recordings"
-        case .notebookSaver: return "Notebook"
+        case .notebookSaver: return "Notepad"
         case .settings:      return "Settings"
         }
     }
@@ -611,7 +611,7 @@ struct MainTabView: View {
         case .recordings:
             RecordingsView()
         case .notebookSaver:
-            LineNotebookView()
+            NotepadView()
         case .settings:
             SettingsView()
         }
