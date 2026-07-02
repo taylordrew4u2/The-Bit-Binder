@@ -19,7 +19,7 @@ final class DataMigrationService: ObservableObject {
     private let dataValidation = DataValidationService.shared
     
     // Current migration version (increment when adding new migrations)
-    private let currentMigrationVersion = 1
+    private let currentMigrationVersion = 2
     
     init() {
         print(" [DataMigration] Service initialized")
@@ -117,6 +117,8 @@ final class DataMigrationService: ObservableObject {
         switch version {
         case 1:
             try await migration_v1(context: context)
+        case 2:
+            try await migration_v2(context: context)
         default:
             print(" [DataMigration] Unknown migration version: \(version)")
         }
@@ -136,7 +138,28 @@ final class DataMigrationService: ObservableObject {
         // Save any changes
         try context.save()
     }
-    
+
+    /// Migration v2: backfill audio bytes into `Recording.audioData` for
+    /// recordings created before audio was synced. Previously only the local
+    /// file was kept; copying its bytes into the synced attribute lets existing
+    /// recordings propagate to other devices via CloudKit.
+    private func migration_v2(context: ModelContext) async throws {
+        print(" [DataMigration] Running migration v2 (backfill recording audio)...")
+
+        let recordings = try context.fetch(FetchDescriptor<Recording>())
+        var backfilled = 0
+        for recording in recordings where recording.audioData == nil {
+            let url = recording.resolvedURL
+            guard FileManager.default.fileExists(atPath: url.path),
+                  let data = try? Data(contentsOf: url) else { continue }
+            recording.audioData = data
+            backfilled += 1
+        }
+
+        print(" [DataMigration] v2 backfilled audio for \(backfilled)/\(recordings.count) recordings")
+        try context.save()
+    }
+
     // MARK: - Rollback Capabilities
     
     /// Restores the most recent pre-migration backup and resets the migration

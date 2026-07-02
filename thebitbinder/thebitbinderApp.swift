@@ -280,8 +280,6 @@ struct thebitbinderApp: App {
             iCloudKeyValueStore.shared.pullFromCloud()
             print(" [AppLifecycle] Foreground save skipped")
 
-            NotificationManager.shared.scheduleIfNeeded()
-
         case .inactive:
             print(" [AppLifecycle] App became inactive")
 

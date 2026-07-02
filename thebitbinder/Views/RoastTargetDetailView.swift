@@ -18,6 +18,8 @@ struct RoastTargetDetailView: View {
     @AppStorage("roastSortOption") private var sortOption: RoastJokeSortOption = .newest
     @AppStorage("roastTargetDisplayMode") private var roastTargetDisplayModeRaw = RoastTargetDisplayMode.cards.rawValue
     @AppStorage("roastTargetHeaderCollapsed") private var isHeaderCollapsed = true
+    @AppStorage("thingsIKnowCollapsed") private var isThingsIKnowCollapsed = false
+    @AppStorage("roastNotepadCollapsed") private var isRoastNotepadCollapsed = false
     @AppStorage("roastTextScale") private var roastTextScale = 1.0
     @Bindable var target: RoastTarget
     
@@ -544,71 +546,74 @@ struct RoastTargetDetailView: View {
             workspaceHeader(
                 title: "Things I Know",
                 detail: target.traits.isEmpty ? "No details yet" : "\(target.traits.count) detail\(target.traits.count == 1 ? "" : "s")",
-                icon: "list.bullet.clipboard"
+                icon: "list.bullet.clipboard",
+                isCollapsed: $isThingsIKnowCollapsed
             )
 
-            if target.traits.isEmpty {
-                Text("No details saved for \(safeTargetName).")
-                    .font(.subheadline)
-                    .foregroundColor(FirePalette.sub)
-            } else {
-                VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                    ForEach(Array(target.traits.enumerated()), id: \.offset) { index, trait in
-                        if index < target.traits.count {
-                            HStack(alignment: .top, spacing: DS.Spacing.sm) {
-                                Text("•")
-                                    .font(.headline.weight(.bold))
-                                    .foregroundColor(accentColor)
-                                    .padding(.top, 1)
+            if !isThingsIKnowCollapsed {
+                if target.traits.isEmpty {
+                    Text("No details saved for \(safeTargetName).")
+                        .font(.subheadline)
+                        .foregroundColor(FirePalette.sub)
+                } else {
+                    VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+                        ForEach(Array(target.traits.enumerated()), id: \.offset) { index, trait in
+                            if index < target.traits.count {
+                                HStack(alignment: .top, spacing: DS.Spacing.sm) {
+                                    Text("•")
+                                        .font(.headline.weight(.bold))
+                                        .foregroundColor(accentColor)
+                                        .padding(.top, 1)
 
-                                TextField("What do you know?", text: Binding(
-                                    get: { index < target.traits.count ? target.traits[index] : trait },
-                                    set: { newValue in
-                                        guard index < target.traits.count else { return }
-                                        target.traits[index] = newValue
-                                        persistTargetFacts()
+                                    TextField("What do you know?", text: Binding(
+                                        get: { index < target.traits.count ? target.traits[index] : trait },
+                                        set: { newValue in
+                                            guard index < target.traits.count else { return }
+                                            target.traits[index] = newValue
+                                            persistTargetFacts()
+                                        }
+                                    ), axis: .vertical)
+                                    .font(.subheadline)
+                                    .foregroundColor(FirePalette.text)
+
+                                    Button {
+                                        removeTrait(at: index)
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(FirePalette.sub)
                                     }
-                                ), axis: .vertical)
-                                .font(.subheadline)
-                                .foregroundColor(FirePalette.text)
-
-                                Button {
-                                    removeTrait(at: index)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(FirePalette.sub)
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Remove detail")
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Remove detail")
+                                .padding(DS.Spacing.sm)
+                                .background(Color.white.opacity(0.04))
+                                .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
                             }
-                            .padding(DS.Spacing.sm)
-                            .background(Color.white.opacity(0.04))
-                            .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
                         }
                     }
                 }
-            }
 
-            HStack(spacing: DS.Spacing.sm) {
-                TextField("Add a bullet point", text: $newTraitText, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .foregroundColor(FirePalette.text)
-                    .padding(DS.Spacing.md)
-                    .background(Color.white.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
-                    .submitLabel(.done)
-                    .onSubmit(addTraitFromInput)
+                HStack(spacing: DS.Spacing.sm) {
+                    TextField("Add a bullet point", text: $newTraitText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .foregroundColor(FirePalette.text)
+                        .padding(DS.Spacing.md)
+                        .background(Color.white.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
+                        .submitLabel(.done)
+                        .onSubmit(addTraitFromInput)
 
-                Button {
-                    addTraitFromInput()
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(canAddTrait ? accentColor : FirePalette.sub)
+                    Button {
+                        addTraitFromInput()
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(canAddTrait ? accentColor : FirePalette.sub)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canAddTrait)
+                    .accessibilityLabel("Add detail")
                 }
-                .buttonStyle(.plain)
-                .disabled(!canAddTrait)
-                .accessibilityLabel("Add detail")
             }
         }
         .padding(DS.Spacing.lg)
@@ -625,50 +630,53 @@ struct RoastTargetDetailView: View {
             workspaceHeader(
                 title: "Roast Notepad",
                 detail: target.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Empty" : "Drafting",
-                icon: "square.and.pencil"
+                icon: "square.and.pencil",
+                isCollapsed: $isRoastNotepadCollapsed
             )
 
-            SelectableRoastNotepad(
-                text: $target.notes,
-                selectedText: $selectedScratchpadText,
-                placeholder: "Start writing premises, angles, alternate punchlines, tags, or rough roast ideas..."
-            )
-            .frame(minHeight: 180)
-            .background(Color.white.opacity(0.04))
-            .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous)
-                    .strokeBorder(FirePalette.edge, lineWidth: 0.5)
-            )
+            if !isRoastNotepadCollapsed {
+                SelectableRoastNotepad(
+                    text: $target.notes,
+                    selectedText: $selectedScratchpadText,
+                    placeholder: "Start writing premises, angles, alternate punchlines, tags, or rough roast ideas..."
+                )
+                .frame(minHeight: 180)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous)
+                        .strokeBorder(FirePalette.edge, lineWidth: 0.5)
+                )
 
-            HStack(spacing: DS.Spacing.sm) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No text selected" : "Selected text ready")
-                        .font(.caption.weight(.medium))
-                        .foregroundColor(FirePalette.sub)
-                    if !selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text(selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines))
-                            .font(.caption)
-                            .lineLimit(2)
-                            .foregroundColor(FirePalette.text.opacity(0.8))
+                HStack(spacing: DS.Spacing.sm) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No text selected" : "Selected text ready")
+                            .font(.caption.weight(.medium))
+                            .foregroundColor(FirePalette.sub)
+                        if !selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(selectedScratchpadText.trimmingCharacters(in: .whitespacesAndNewlines))
+                                .font(.caption)
+                                .lineLimit(2)
+                                .foregroundColor(FirePalette.text.opacity(0.8))
+                        }
                     }
-                }
 
-                Spacer()
+                    Spacer()
 
-                Button {
-                    promoteSelectedScratchpadText()
-                } label: {
-                    Label("Promote to Roast", systemImage: "flame.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, DS.Spacing.md)
-                        .padding(.vertical, 10)
-                        .background(canPromoteSelection ? AnyShapeStyle(FirePalette.emberCTA) : AnyShapeStyle(Color.white.opacity(0.06)))
-                        .foregroundColor(canPromoteSelection ? .white : FirePalette.sub)
-                        .clipShape(Capsule())
+                    Button {
+                        promoteSelectedScratchpadText()
+                    } label: {
+                        Label("Promote to Roast", systemImage: "flame.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, DS.Spacing.md)
+                            .padding(.vertical, 10)
+                            .background(canPromoteSelection ? AnyShapeStyle(FirePalette.emberCTA) : AnyShapeStyle(Color.white.opacity(0.06)))
+                            .foregroundColor(canPromoteSelection ? .white : FirePalette.sub)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canPromoteSelection)
                 }
-                .buttonStyle(.plain)
-                .disabled(!canPromoteSelection)
             }
         }
         .padding(DS.Spacing.lg)
@@ -680,7 +688,7 @@ struct RoastTargetDetailView: View {
         )
     }
 
-    private func workspaceHeader(title: String, detail: String, icon: String) -> some View {
+    private func workspaceHeader(title: String, detail: String, icon: String, isCollapsed: Binding<Bool>? = nil) -> some View {
         HStack(alignment: .center, spacing: DS.Spacing.sm) {
             Image(systemName: icon)
                 .font(.headline)
@@ -700,7 +708,22 @@ struct RoastTargetDetailView: View {
                 .padding(.vertical, 4)
                 .background(accentColor.opacity(0.1))
                 .clipShape(Capsule())
+
+            if let isCollapsed {
+                Image(systemName: isCollapsed.wrappedValue ? "chevron.down.circle.fill" : "chevron.up.circle.fill")
+                    .font(.title3)
+                    .foregroundColor(accentColor)
+                    .accessibilityHidden(true)
+            }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard let isCollapsed else { return }
+            withAnimation(.easeInOut(duration: 0.2)) { isCollapsed.wrappedValue.toggle() }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isCollapsed == nil ? [] : .isButton)
+        .accessibilityLabel(isCollapsed == nil ? Text(title) : Text(isCollapsed!.wrappedValue ? "\(title), collapsed" : "\(title), expanded"))
     }
 
     @ViewBuilder

@@ -44,6 +44,13 @@ struct HomeView: View {
     @Query(filter: #Predicate<Recording> { !$0.isTrashed }) private var allRecordings: [Recording]
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+
+    /// Stats grid: 2 columns on iPhone, a single row of 4 on iPad's wider canvas.
+    private var statsColumns: [GridItem] {
+        let count = hSizeClass == .regular ? 4 : 2
+        return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
+    }
 
     /// Unified sheet state — only one sheet can present at a time in SwiftUI,
     /// so an optional enum prevents conflicting `isPresented` booleans.
@@ -161,7 +168,7 @@ struct HomeView: View {
             if selectedHomeSections.contains(.stats) {
                 // MARK: - At a Glance Stats
                 Section("At a Glance") {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    LazyVGrid(columns: statsColumns, spacing: 12) {
                         StatCard(
                             label: "Jokes",
                             value: allJokes.count,
@@ -278,7 +285,7 @@ struct HomeView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .readableWidth()
+        .readableWidth(DS.wideContentWidth)
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationDestination(for: Joke.self) { joke in
             JokeDetailView(joke: joke)

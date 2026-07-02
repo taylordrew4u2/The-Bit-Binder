@@ -18,6 +18,13 @@ final class Recording: Identifiable {
     var transcription: String?
     var isProcessed: Bool = false  // Added per CD_Recording schema
 
+    /// The actual audio bytes, stored via external storage so CloudKit syncs the
+    /// recording itself across devices. `fileURL` only names a local file, which
+    /// never leaves the device; this attribute is what makes playback work on a
+    /// second device. Populated at save time (`captureAudioData`) and for legacy
+    /// recordings by the v2 data migration.
+    @Attribute(.externalStorage) var audioData: Data?
+
     // Soft-delete (trash) support
     var isTrashed: Bool = false
     var deletedDate: Date?
@@ -54,11 +61,36 @@ final class Recording: Identifiable {
         return documentsPath.appendingPathComponent(fileURL)
     }
 
+    /// Returns a local file URL that is guaranteed to contain the audio, if we
+    /// have it at all. If the file isn't present on this device (e.g. a recording
+    /// created on another device that synced down via CloudKit), the synced
+    /// `audioData` is written to the Documents directory first. Use this — not
+    /// `resolvedURL` — for playback, transcription, and sharing.
+    func playableURL() -> URL {
+        let url = resolvedURL
+        if FileManager.default.fileExists(atPath: url.path) {
+            return url
+        }
+        if let data = audioData {
+            try? data.write(to: url, options: .atomic)
+        }
+        return url
+    }
+
+    /// Reads the freshly-recorded local file into `audioData` so the audio syncs
+    /// across devices. Call right after inserting a new recording. No-op if the
+    /// bytes are already captured or the file can't be read.
+    func captureAudioData() {
+        guard audioData == nil else { return }
+        audioData = try? Data(contentsOf: resolvedURL)
+    }
+
     // MARK: - Trash Helpers
 
-    /// True if the backing audio file exists on disk at `resolvedURL`.
+    /// True if the audio is available on this device — either the local file
+    /// exists or the synced bytes are present (and can be materialized on demand).
     var backingFileExists: Bool {
-        FileManager.default.fileExists(atPath: resolvedURL.path)
+        FileManager.default.fileExists(atPath: resolvedURL.path) || audioData != nil
     }
 
     /// Soft-deletes this recording record. The audio file is NOT deleted here.

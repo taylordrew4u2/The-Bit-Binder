@@ -179,6 +179,16 @@ enum AppScreen: String, CaseIterable {
         return (ordered.isEmpty ? defaults : ordered) + [.settings]
     }
 
+    /// User-facing tab label. Kept separate from `rawValue` because the raw
+    /// value backs persisted tab selections (`selectedTabRawValue`,
+    /// `setupSelectedTabs`) and must stay stable even when the label changes.
+    var displayName: String {
+        switch self {
+        case .notebookSaver: return "Notepad"
+        default:             return rawValue
+        }
+    }
+
     var icon: String {
         switch self {
         case .home:          return "house"
@@ -186,7 +196,7 @@ enum AppScreen: String, CaseIterable {
         case .jokes:         return "text.quote"
         case .sets:          return "list.bullet.rectangle.portrait"
         case .recordings:    return "waveform"
-        case .notebookSaver: return "photo.on.rectangle"
+        case .notebookSaver: return "note.text"
         case .settings:      return "gearshape"
         }
     }
@@ -198,7 +208,7 @@ enum AppScreen: String, CaseIterable {
         case .jokes:         return "text.quote"
         case .sets:          return "list.bullet.rectangle.portrait.fill"
         case .recordings:    return "waveform"
-        case .notebookSaver: return "photo.on.rectangle.fill"
+        case .notebookSaver: return "note.text"
         case .settings:      return "gearshape.fill"
         }
     }
@@ -210,7 +220,7 @@ enum AppScreen: String, CaseIterable {
         case .jokes:         return "Roasts"
         case .sets:          return "Roast Sets"
         case .recordings:    return "Recordings"
-        case .notebookSaver: return "Photo Notebook"
+        case .notebookSaver: return "Notepad"
         case .settings:      return "Settings"
         }
     }
@@ -497,6 +507,7 @@ struct MainTabView: View {
             duration: globalRecordingDuration
         )
         modelContext.insert(recording)
+        recording.captureAudioData()   // capture bytes so the audio syncs across devices
 
         do {
             try modelContext.save()
@@ -551,7 +562,7 @@ struct MainTabView: View {
                 }
                 .tabItem {
                     Label(
-                        screen.rawValue,
+                        screen.displayName,
                         systemImage: selectedTab.wrappedValue == screen ? screen.selectedIcon : screen.icon
                     )
                 }
@@ -600,7 +611,7 @@ struct MainTabView: View {
         case .recordings:
             RecordingsView()
         case .notebookSaver:
-            NotebookView()
+            NotepadView()
         case .settings:
             SettingsView()
         }
