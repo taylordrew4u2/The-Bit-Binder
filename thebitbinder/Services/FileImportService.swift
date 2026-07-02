@@ -49,7 +49,13 @@ final class FileImportService {
             dataLogger.logDataCreation(joke, context: modelContext)
         }
 
-        try modelContext.save()
-        dataLogger.logBulkOperation("IMPORT_SAVE", entityType: "Joke", count: jokes.count, context: modelContext)
+        do {
+            try modelContext.save()
+            dataLogger.logBulkOperation("IMPORT_SAVE", entityType: "Joke", count: jokes.count, context: modelContext)
+        } catch {
+            modelContext.rollback()
+            dataLogger.logError(error, operation: "IMPORT_SAVE", context: "Saving \(jokes.count) approved jokes")
+            throw error
+        }
     }
 }

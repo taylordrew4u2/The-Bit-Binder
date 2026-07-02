@@ -65,6 +65,11 @@ final class HybridGagGrabber: ObservableObject {
                 extractedJokes = deduped
                 return
             }
+        } else if let single = results.first.map(Self.cleanJokeText),
+                  Self.isReasonableSingleJokeCandidate(single) {
+            print(" [GagGrabber] Structural split found 1 joke")
+            extractedJokes = [single]
+            return
         }
 
         let manager = AIJokeExtractionManager.shared
@@ -78,6 +83,11 @@ final class HybridGagGrabber: ObservableObject {
                 if deduped.count >= 2 {
                     print(" [GagGrabber] AI found \(deduped.count) joke(s)")
                     extractedJokes = deduped
+                    return
+                } else if let single = deduped.first,
+                          Self.isReasonableSingleJokeCandidate(single) {
+                    print(" [GagGrabber] AI found 1 joke")
+                    extractedJokes = [single]
                     return
                 }
             } catch {
@@ -165,6 +175,14 @@ final class HybridGagGrabber: ObservableObject {
         cleanJokeText(text)
     }
 
+    /// Allows single-joke imports without accepting an entire long document as
+    /// one result when the splitter cannot find boundaries.
+    nonisolated static func isReasonableSingleJokeCandidate(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let wordCount = trimmed.split(whereSeparator: \.isWhitespace).count
+        return wordCount >= 3 && trimmed.count <= 1_200
+    }
+
     // MARK: - Dedup Helper
 
     static func deduplicateJokes(_ jokes: [String]) -> [String] {
@@ -243,6 +261,11 @@ struct HybridGagGrabberToolbarButton: View {
 struct HybridGagGrabberSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+
+    private static let supportedFileExtensions: Set<String> = [
+        "txt", "text", "md", "markdown", "csv",
+        "pdf", "rtf", "rtfd", "html", "htm"
+    ]
 
     @StateObject private var grabber = HybridGagGrabber()
 
@@ -508,6 +531,8 @@ struct HybridGagGrabberSheet: View {
         let raw = googleDocsURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return }
 
+        resetImportSession()
+
         guard let docID = Self.extractGoogleDocID(from: raw) else {
             grabber.lastError = "Couldn't read that link. Paste the full Google Docs URL (starts with docs.google.com)."
             return
@@ -519,6 +544,7 @@ struct HybridGagGrabberSheet: View {
         grabber.statusMessage = "Fetching from Google Docs…"
 
         let exportURLString = "https://docs.google.com/document/d/\(docID)/export?format=txt"
+        print(" [GagGrabber] Starting Google Docs import")
         guard let exportURL = URL(string: exportURLString) else {
             grabber.lastError = "Invalid document link."
             grabber.isExtracting = false
@@ -579,6 +605,7 @@ struct HybridGagGrabberSheet: View {
     // MARK: - Document Handling
 
     private func handlePickedDocument(_ url: URL) async {
+        resetImportSession()
         grabber.statusMessage = "Opening your file…"
         grabber.isExtracting = true
         let didAccess = url.startAccessingSecurityScopedResource()
@@ -587,6 +614,19 @@ struct HybridGagGrabberSheet: View {
         }
 
         let ext = url.pathExtension.lowercased()
+        print(" [GagGrabber] Starting file import: \(url.lastPathComponent) (.\(ext.isEmpty ? "unknown" : ext))")
+
+        guard Self.supportedFileExtensions.contains(ext) else {
+            if ext == "doc" || ext == "docx" {
+                grabber.lastError = "Word documents (.doc/.docx) aren't supported yet. Save as PDF or plain text and try again."
+            } else {
+                let label = ext.isEmpty ? "This file" : ".\(ext) files"
+                grabber.lastError = "\(label) can't be imported with GagGrabber. Use TXT, PDF, RTF, CSV, HTML, or Google Docs."
+            }
+            grabber.isExtracting = false
+            grabber.statusMessage = ""
+            return
+        }
 
         do {
             let text: String
@@ -611,11 +651,6 @@ struct HybridGagGrabberSheet: View {
                     documentAttributes: nil
                 )
                 text = attributed.string
-            } else if ext == "doc" || ext == "docx" {
-                grabber.lastError = "Word documents (.doc/.docx) aren't supported yet. Save as PDF or plain text and try again."
-                grabber.isExtracting = false
-                grabber.statusMessage = ""
-                return
             } else {
                 if let utf8 = try? String(contentsOf: url, encoding: .utf8) {
                     text = utf8
@@ -630,6 +665,12 @@ struct HybridGagGrabberSheet: View {
             grabber.isExtracting = false
             grabber.statusMessage = ""
         }
+    }
+
+    private func resetImportSession() {
+        savedJokeIDs.removeAll()
+        grabber.lastError = nil
+        grabber.extractedJokes = []
     }
 
     // MARK: - Persistence
@@ -652,6 +693,7 @@ struct HybridGagGrabberSheet: View {
             savedJokeIDs.insert(index)
             print(" [GagGrabber] Saved joke #\(index + 1) to library")
         } catch {
+            modelContext.rollback()
             grabber.lastError = "Failed to save joke: \(error.localizedDescription)"
             print(" [GagGrabber] Save failed: \(error)")
         }
@@ -660,10 +702,11 @@ struct HybridGagGrabberSheet: View {
     private func addAllJokesToLibrary() {
         var count = 0
         var duplicateCount = 0
+        var pendingSavedIDs = Set<Int>()
         for (index, jokeText) in grabber.extractedJokes.enumerated() {
             guard !savedJokeIDs.contains(index) else { continue }
             if DuplicateDetectionService.findDuplicate(content: jokeText, title: nil, in: modelContext, threshold: 0.90) != nil {
-                savedJokeIDs.insert(index)
+                pendingSavedIDs.insert(index)
                 duplicateCount += 1
                 continue
             }
@@ -671,11 +714,12 @@ struct HybridGagGrabberSheet: View {
             joke.importSource = "GagGrabber"
             joke.importTimestamp = Date()
             modelContext.insert(joke)
-            savedJokeIDs.insert(index)
+            pendingSavedIDs.insert(index)
             count += 1
         }
         do {
             try modelContext.save()
+            savedJokeIDs.formUnion(pendingSavedIDs)
             var msg = "Saved \(count) joke(s) to library"
             if duplicateCount > 0 { msg += " (\(duplicateCount) duplicate\(duplicateCount == 1 ? "" : "s") skipped)" }
             print(" [GagGrabber] \(msg)")
@@ -683,6 +727,7 @@ struct HybridGagGrabberSheet: View {
                 grabber.lastError = "\(duplicateCount) duplicate\(duplicateCount == 1 ? "" : "s") skipped — already in your library."
             }
         } catch {
+            modelContext.rollback()
             grabber.lastError = "Failed to save jokes: \(error.localizedDescription)"
             print(" [GagGrabber] Batch save failed: \(error)")
         }
