@@ -63,7 +63,6 @@ struct JokesView: View {
                 jokesGridScale = Double(min(max(newScale, 0.5), 2.0))
             }
     }
-
     private var gridCardBaseWidth: CGFloat {
         horizontalSizeClass == .regular ? 190 : 140
     }
