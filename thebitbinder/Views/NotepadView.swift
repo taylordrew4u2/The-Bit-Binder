@@ -18,7 +18,6 @@ struct NotepadView: View {
     var body: some View {
         LinedNotepadEditor(text: $notepadText, isFocused: $isFocused)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .readableWidth(DS.wideContentWidth)
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .overlay(alignment: .topLeading) {
                 if notepadText.isEmpty {

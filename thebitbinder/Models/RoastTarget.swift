@@ -35,6 +35,11 @@ final class RoastTarget: Identifiable {
     var name: String = ""
     var notes: String = ""
     var traits: [String] = []
+    var instagramHandle: String = ""
+    var tiktokHandle: String = ""
+    var xHandle: String = ""
+    var facebookURL: String = ""
+    var websiteURL: String = ""
     @Attribute(.externalStorage) var photoData: Data?
     var dateCreated: Date = Date()
     var dateModified: Date = Date()
@@ -109,11 +114,26 @@ final class RoastTarget: Identifiable {
         !id.uuidString.isEmpty && !isTrashed
     }
 
-    init(name: String, notes: String = "", traits: [String] = [], photoData: Data? = nil) {
+    init(
+        name: String,
+        notes: String = "",
+        traits: [String] = [],
+        instagramHandle: String = "",
+        tiktokHandle: String = "",
+        xHandle: String = "",
+        facebookURL: String = "",
+        websiteURL: String = "",
+        photoData: Data? = nil
+    ) {
         self.id = UUID()
         self.name = name
         self.notes = notes
         self.traits = traits
+        self.instagramHandle = instagramHandle
+        self.tiktokHandle = tiktokHandle
+        self.xHandle = xHandle
+        self.facebookURL = facebookURL
+        self.websiteURL = websiteURL
         self.photoData = photoData
         self.dateCreated = Date()
         self.dateModified = Date()

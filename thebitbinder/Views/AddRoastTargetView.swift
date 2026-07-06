@@ -16,6 +16,11 @@ struct AddRoastTargetView: View {
     @State private var name = ""
     @State private var notes = ""
     @State private var traits: [String] = [""]
+    @State private var instagramHandle = ""
+    @State private var tiktokHandle = ""
+    @State private var xHandle = ""
+    @State private var facebookURL = ""
+    @State private var websiteURL = ""
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoData: Data?
     @State private var photoImage: UIImage?
@@ -29,6 +34,11 @@ struct AddRoastTargetView: View {
     private enum Field: Hashable {
         case name
         case notes
+        case instagram
+        case tiktok
+        case x
+        case facebook
+        case website
         case detail(Int)
     }
 
@@ -83,7 +93,56 @@ struct AddRoastTargetView: View {
                         .roastRowBackground()
                         .focused($focusedField, equals: .notes)
                         .submitLabel(.next)
+                        .onSubmit { focusedField = .instagram }
+                }
+
+                Section("Social media (optional)") {
+                    TextField("@instagram", text: $instagramHandle)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .roastRowBackground()
+                        .focused($focusedField, equals: .instagram)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .tiktok }
+                        .accessibilityLabel("Instagram handle")
+
+                    TextField("@tiktok", text: $tiktokHandle)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .roastRowBackground()
+                        .focused($focusedField, equals: .tiktok)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .x }
+                        .accessibilityLabel("TikTok handle")
+
+                    TextField("@x or @twitter", text: $xHandle)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .roastRowBackground()
+                        .focused($focusedField, equals: .x)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .facebook }
+                        .accessibilityLabel("X handle")
+
+                    TextField("facebook.com/profile", text: $facebookURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .roastRowBackground()
+                        .focused($focusedField, equals: .facebook)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .website }
+                        .accessibilityLabel("Facebook profile")
+
+                    TextField("website or link", text: $websiteURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .roastRowBackground()
+                        .focused($focusedField, equals: .website)
+                        .submitLabel(.next)
                         .onSubmit { focusedField = .detail(0) }
+                        .accessibilityLabel("Website or social link")
                 }
 
                 Section {
@@ -175,6 +234,11 @@ struct AddRoastTargetView: View {
             name: trimmed,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
             traits: cleanTraits,
+            instagramHandle: normalizedHandle(instagramHandle),
+            tiktokHandle: normalizedHandle(tiktokHandle),
+            xHandle: normalizedHandle(xHandle),
+            facebookURL: normalizedURLText(facebookURL),
+            websiteURL: normalizedURLText(websiteURL),
             photoData: photoData
         )
         
@@ -215,5 +279,15 @@ struct AddRoastTargetView: View {
             photoImage = scaled
             self.selectedPhoto = nil
         }
+    }
+
+    private func normalizedHandle(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+    }
+
+    private func normalizedURLText(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

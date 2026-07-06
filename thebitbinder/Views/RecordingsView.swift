@@ -49,7 +49,6 @@ struct RecordingsView: View {
                     .onDelete(perform: deleteRecordings)
                 }
                 .listStyle(.insetGrouped)
-                .readableWidth()
                 .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             }
         }

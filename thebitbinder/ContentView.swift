@@ -569,6 +569,7 @@ struct MainTabView: View {
                 .tag(screen)
             }
         }
+        .tabViewStyle(.sidebarAdaptable)
     }
 
     private var roastModeRoot: some View {
@@ -595,6 +596,7 @@ struct MainTabView: View {
                 .tag(screen)
             }
         }
+        .tabViewStyle(.sidebarAdaptable)
     }
     
     @ViewBuilder

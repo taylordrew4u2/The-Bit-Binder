@@ -58,7 +58,6 @@ struct SetListsView: View {
                     .onDelete(perform: deleteSetLists)
                 }
                 .listStyle(.insetGrouped)
-                .readableWidth()
                 .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             }
         }

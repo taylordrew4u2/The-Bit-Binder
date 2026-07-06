@@ -14,13 +14,14 @@ import UIKit
 struct RoastTargetDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("showFullContent") private var showFullContent = true
+    @Environment(\.openURL) private var openURL
     @AppStorage("roastSortOption") private var sortOption: RoastJokeSortOption = .newest
-    @AppStorage("roastTargetDisplayMode") private var roastTargetDisplayModeRaw = RoastTargetDisplayMode.cards.rawValue
+    @AppStorage("roastTargetWorkspaceMode") private var workspaceModeRaw = RoastTargetWorkspaceMode.both.rawValue
     @AppStorage("roastTargetHeaderCollapsed") private var isHeaderCollapsed = true
     @AppStorage("thingsIKnowCollapsed") private var isThingsIKnowCollapsed = false
     @AppStorage("roastNotepadCollapsed") private var isRoastNotepadCollapsed = false
     @AppStorage("roastTextScale") private var roastTextScale = 1.0
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Bindable var target: RoastTarget
     
     // Query all non-deleted roast jokes for this target - SwiftData will auto-update the view
@@ -28,6 +29,7 @@ struct RoastTargetDetailView: View {
 
     @State private var showingAddRoast = false
     @State private var editingJoke: RoastJoke?
+    @State private var showingEditJoke = false
     @State private var showingEditTarget = false
     @State private var showingTalkToText = false
     @State private var showingDeleteTargetAlert = false
@@ -46,10 +48,14 @@ struct RoastTargetDetailView: View {
     @State private var filterMode: RoastFilterMode = .all
     
     private var accentColor: Color { FirePalette.core }
-    private var roastBodyFontSize: CGFloat { 17 * roastTextScale }
-    private var roastSupportFontSize: CGFloat { max(12, 14 * roastTextScale) }
-    private var displayMode: RoastTargetDisplayMode {
-        RoastTargetDisplayMode(rawValue: roastTargetDisplayModeRaw) ?? .cards
+    private var roastBodyFontSize: CGFloat { 15 * roastTextScale }
+    private var roastSupportFontSize: CGFloat { max(12, 12 * roastTextScale) }
+    private var workspaceMode: RoastTargetWorkspaceMode {
+        get { RoastTargetWorkspaceMode(rawValue: workspaceModeRaw) ?? .both }
+        nonmutating set { workspaceModeRaw = newValue.rawValue }
+    }
+    private var showsRoasts: Bool {
+        workspaceMode == .roasts || workspaceMode == .both
     }
     private var canAddTrait: Bool {
         !newTraitText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -65,9 +71,44 @@ struct RoastTargetDetailView: View {
         var id: UUID { opener.id }
     }
 
-    private enum RoastTargetDisplayMode: String {
-        case cards
-        case preview
+    private enum RoastTargetWorkspaceMode: String, CaseIterable, Identifiable {
+        case workspace
+        case roasts
+        case both
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .workspace: return "Notes"
+            case .roasts: return "Roasts"
+            case .both: return "Both"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .workspace: return "note.text"
+            case .roasts: return "text.quote"
+            case .both: return "rectangle.split.2x1"
+            }
+        }
+    }
+
+    private struct TargetSocialProfile: Identifiable {
+        let id: String
+        let label: String
+        let displayValue: String
+        let icon: String
+        let url: URL
+    }
+
+    private enum SocialProfileKind {
+        case instagram
+        case tiktok
+        case x
+        case facebook
+        case website
     }
 
     enum RoastFilterMode: String, CaseIterable {
@@ -175,6 +216,58 @@ struct RoastTargetDetailView: View {
     private var safeTargetName: String {
         target.isValid ? target.name : ""
     }
+
+    private var socialProfiles: [TargetSocialProfile] {
+        guard target.isValid else { return [] }
+
+        var profiles: [TargetSocialProfile] = []
+        if let instagram = socialProfile(
+            id: "instagram",
+            label: "Instagram",
+            rawValue: target.instagramHandle,
+            icon: "camera.circle",
+            kind: .instagram
+        ) {
+            profiles.append(instagram)
+        }
+        if let tiktok = socialProfile(
+            id: "tiktok",
+            label: "TikTok",
+            rawValue: target.tiktokHandle,
+            icon: "music.note",
+            kind: .tiktok
+        ) {
+            profiles.append(tiktok)
+        }
+        if let x = socialProfile(
+            id: "x",
+            label: "X",
+            rawValue: target.xHandle,
+            icon: "at",
+            kind: .x
+        ) {
+            profiles.append(x)
+        }
+        if let facebook = socialProfile(
+            id: "facebook",
+            label: "Facebook",
+            rawValue: target.facebookURL,
+            icon: "person.2.circle",
+            kind: .facebook
+        ) {
+            profiles.append(facebook)
+        }
+        if let website = socialProfile(
+            id: "website",
+            label: "Website",
+            rawValue: target.websiteURL,
+            icon: "link.circle",
+            kind: .website
+        ) {
+            profiles.append(website)
+        }
+        return profiles
+    }
     
     /// Opening roasts for this target (for backup assignment)
     private var openingRoastsForTarget: [RoastJoke] {
@@ -193,13 +286,17 @@ struct RoastTargetDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             targetHeaderCard
-            filterChips
+            workspaceModeControl
 
-            if showingFontSlider {
-                fontSliderBar
+            if showsRoasts {
+                filterChips
+
+                if showingFontSlider {
+                    fontSliderBar
+                }
+
+                Divider().opacity(0.3)
             }
-
-            Divider().opacity(0.3)
 
             targetWorkspaceAndRoasts
         }
@@ -224,8 +321,12 @@ struct RoastTargetDetailView: View {
         .sheet(isPresented: $showingAddRoast) {
             AddRoastJokeView(target: target)
         }
-        .sheet(item: $editingJoke) { joke in
-            EditRoastJokeView(joke: joke)
+        .sheet(isPresented: $showingEditJoke, onDismiss: {
+            editingJoke = nil
+        }) {
+            if let editingJoke {
+                EditRoastJokeView(joke: editingJoke)
+            }
         }
         .sheet(isPresented: $showingEditTarget) {
             EditRoastTargetView(target: target)
@@ -287,8 +388,7 @@ struct RoastTargetDetailView: View {
     }
 
     private var targetHeaderCard: some View {
-        let heat = min(100, target.jokeCount * 4)
-        return ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .topTrailing) {
             VStack(spacing: isHeaderCollapsed ? DS.Spacing.sm : DS.Spacing.md) {
                 HStack(alignment: .center, spacing: DS.Spacing.md) {
                     if isHeaderCollapsed {
@@ -305,9 +405,6 @@ struct RoastTargetDetailView: View {
                                 .foregroundColor(FirePalette.text)
 
                             HStack(spacing: DS.Spacing.sm) {
-                                HeatBar(heat: heat)
-                                    .frame(width: 120)
-
                                 Text("\(target.jokeCount)")
                                     .font(.caption.monospacedDigit().weight(.semibold))
                                     .foregroundColor(accentColor)
@@ -332,10 +429,6 @@ struct RoastTargetDetailView: View {
                             Text(safeTargetName)
                                 .font(.title3.bold())
                                 .foregroundColor(FirePalette.text)
-
-                            HeatBar(heat: heat)
-                                .frame(width: 200)
-                                .padding(.top, 2)
                         }
 
                         Spacer()
@@ -367,6 +460,10 @@ struct RoastTargetDetailView: View {
                         .padding(.horizontal, DS.Spacing.xxl)
                     }
 
+                    if !socialProfiles.isEmpty {
+                        socialProfileLinks
+                    }
+
                     HStack(spacing: DS.Spacing.lg) {
                         StatBadge(
                             count: target.jokeCount,
@@ -392,6 +489,123 @@ struct RoastTargetDetailView: View {
             .padding(DS.Spacing.md)
         }
         .background(FirePalette.card)
+    }
+
+    private var socialProfileLinks: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(socialProfiles) { profile in
+                    Button {
+                        openURL(profile.url)
+                    } label: {
+                        Label {
+                            Text(profile.label)
+                                .font(.caption.weight(.semibold))
+                        } icon: {
+                            Image(systemName: profile.icon)
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundColor(accentColor)
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(accentColor.opacity(0.12), in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(accentColor.opacity(0.24), lineWidth: 0.5)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(profile.label): \(profile.displayValue)")
+                }
+            }
+        }
+        .padding(.horizontal, DS.Spacing.xxl)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func socialProfile(
+        id: String,
+        label: String,
+        rawValue: String,
+        icon: String,
+        kind: SocialProfileKind
+    ) -> TargetSocialProfile? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let handle = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        let urlString: String
+        let displayValue: String
+        switch kind {
+        case .instagram:
+            guard !handle.isEmpty else { return nil }
+            urlString = "https://instagram.com/\(handle)"
+            displayValue = "@\(handle)"
+        case .tiktok:
+            guard !handle.isEmpty else { return nil }
+            urlString = "https://www.tiktok.com/@\(handle)"
+            displayValue = "@\(handle)"
+        case .x:
+            guard !handle.isEmpty else { return nil }
+            urlString = "https://x.com/\(handle)"
+            displayValue = "@\(handle)"
+        case .facebook:
+            urlString = absoluteURLString(from: trimmed, defaultHost: "facebook.com")
+            displayValue = trimmed
+        case .website:
+            urlString = absoluteURLString(from: trimmed, defaultHost: nil)
+            displayValue = trimmed
+        }
+
+        guard let encoded = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: encoded) else {
+            return nil
+        }
+
+        return TargetSocialProfile(
+            id: id,
+            label: label,
+            displayValue: displayValue,
+            icon: icon,
+            url: url
+        )
+    }
+
+    private func absoluteURLString(from rawValue: String, defaultHost: String?) -> String {
+        let lowercased = rawValue.lowercased()
+        if lowercased.hasPrefix("http://") || lowercased.hasPrefix("https://") {
+            return rawValue
+        }
+        if let defaultHost, !rawValue.contains(".") {
+            return "https://\(defaultHost)/\(rawValue)"
+        }
+        return "https://\(rawValue)"
+    }
+
+    private var workspaceModeControl: some View {
+        VStack(spacing: 0) {
+            Picker("Target workspace mode", selection: Binding(
+                get: { workspaceMode },
+                set: { newValue in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        workspaceMode = newValue
+                    }
+                }
+            )) {
+                ForEach(RoastTargetWorkspaceMode.allCases) { mode in
+                    Label(mode.title, systemImage: mode.icon)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, DS.Spacing.lg)
+            .padding(.vertical, DS.Spacing.sm)
+            .accessibilityLabel("Target workspace mode")
+
+            Divider().opacity(0.25)
+        }
+        .background(FirePalette.bg.opacity(0.96))
     }
     
     private var filterChips: some View {
@@ -482,54 +696,100 @@ struct RoastTargetDetailView: View {
     }
     
     private var targetWorkspaceAndRoasts: some View {
+        Group {
+            switch workspaceMode {
+            case .workspace:
+                workspaceScrollView
+            case .roasts:
+                roastsScrollView
+            case .both:
+                if horizontalSizeClass == .regular {
+                    HStack(spacing: 0) {
+                        workspaceScrollView
+                            .frame(minWidth: 320, idealWidth: 390, maxWidth: 460)
+
+                        Divider().opacity(0.4)
+
+                        roastsScrollView
+                    }
+                } else {
+                    combinedScrollView
+                }
+            }
+        }
+    }
+
+    private var workspaceScrollView: some View {
+        ScrollView {
+            targetWorkspaceSection
+                .padding(.top, 12)
+                .padding(.bottom, DS.Spacing.lg)
+        }
+        .background(FirePalette.bg)
+    }
+
+    private var combinedScrollView: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 targetWorkspaceSection
-
-                if displayGroups.isEmpty {
-                    emptyState
-                } else {
-                    if displayMode == .preview {
-                        previewModeView
-                    } else {
-                        ForEach(displayGroups) { group in
-                            roastGroupView(group)
-                                .transition(.asymmetric(
-                                    insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                    removal: .scale(scale: 0.5).combined(with: .opacity).combined(with: .move(edge: .trailing))
-                                ))
-                        }
-                    }
-
-                    if displayMode == .cards {
-                        Button {
-                            showingAddRoast = true
-                        } label: {
-                            HStack(spacing: DS.Spacing.sm + 2) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous)
-                                        .fill(accentColor.opacity(DS.Opacity.light))
-                                        .frame(width: 42, height: 42)
-                                    Image(systemName: "plus")
-                                        .font(.title3.weight(.semibold))
-                                        .foregroundColor(accentColor)
-                                }
-
-                                Text("Add another roast")
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundColor(accentColor)
-
-                                Spacer()
-                            }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, DS.Spacing.lg)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                roastsContent
             }
             .padding(.vertical, 8)
         }
+    }
+
+    private var roastsScrollView: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                roastsContent
+            }
+            .padding(.vertical, 8)
+        }
+        .background(FirePalette.bg)
+    }
+
+    @ViewBuilder
+    private var roastsContent: some View {
+        if displayGroups.isEmpty {
+            emptyState
+                .frame(minHeight: 360)
+        } else {
+            ForEach(displayGroups) { group in
+                roastGroupView(group)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 0.5).combined(with: .opacity).combined(with: .move(edge: .trailing))
+                    ))
+            }
+
+            addAnotherRoastButton
+        }
+    }
+
+    private var addAnotherRoastButton: some View {
+        Button {
+            showingAddRoast = true
+        } label: {
+            HStack(spacing: DS.Spacing.sm + 2) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous)
+                        .fill(accentColor.opacity(DS.Opacity.light))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: "plus")
+                        .font(.title3.weight(.semibold))
+                        .foregroundColor(accentColor)
+                }
+
+                Text("Add another roast")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(accentColor)
+
+                Spacer()
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, DS.Spacing.lg)
+        }
+        .buttonStyle(.plain)
     }
 
     private var targetWorkspaceSection: some View {
@@ -780,6 +1040,7 @@ struct RoastTargetDetailView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: DS.Corner.lg, style: .continuous)
                     .strokeBorder(FirePalette.edge, lineWidth: 0.5)
+                    .allowsHitTesting(false)
             )
             .padding(.horizontal, 16)
         } else {
@@ -791,16 +1052,19 @@ struct RoastTargetDetailView: View {
     private func roastCard(for joke: RoastJoke, nested: Bool = false, embeddedInGroup: Bool = false) -> some View {
         DraggableRoastCard(
             joke: joke,
-            showFullContent: showFullContent,
+            showFullContent: true,
             accentColor: accentColor,
             embeddedInGroup: embeddedInGroup,
             onTap: {
-                editingJoke = joke
+                editRoast(joke)
             },
             onTrash: {
                 withAnimation(.easeOut(duration: 0.25)) {
                     trashJoke(joke)
                 }
+            },
+            onDuplicate: {
+                duplicateRoast(joke)
             },
             onToggleOpening: {
                 toggleOpeningRoast(joke)
@@ -824,7 +1088,7 @@ struct RoastTargetDetailView: View {
                 VStack(alignment: .leading, spacing: DS.Spacing.sm) {
                     previewTextBlock(
                         sequence: "\(index + 1)",
-                        label: group.opener.isOpeningRoast ? openerLabel(for: group.opener).uppercased() : "ROAST",
+                        label: group.opener.isOpeningRoast ? openerLabel(for: group.opener).uppercased() : "",
                         joke: group.opener
                     )
 
@@ -852,36 +1116,42 @@ struct RoastTargetDetailView: View {
 
     private func previewTextBlock(sequence: String, label: String, joke: RoastJoke) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+            if !label.isEmpty {
+                HStack(spacing: 8) {
+                    Text(sequence)
+                        .font(.caption.bold().monospacedDigit())
+                        .foregroundColor(FirePalette.text)
+                    Text(label)
+                        .font(.caption2.weight(.bold))
+                }
+                .foregroundColor(accentColor)
+            } else {
                 Text(sequence)
                     .font(.caption.bold().monospacedDigit())
-                    .foregroundColor(FirePalette.text)
-                Text(label)
-                    .font(.caption2.weight(.bold))
+                    .foregroundColor(accentColor)
             }
-                .foregroundColor(accentColor)
 
             if !joke.setup.isEmpty {
                 Text(joke.setup)
-                    .font(.system(size: roastBodyFontSize, weight: .semibold, design: .serif))
+                    .font(.system(size: roastBodyFontSize, weight: .regular))
                     .foregroundColor(FirePalette.text)
                     .lineSpacing(6)
             }
 
             Text(joke.content)
-                .font(.system(size: roastBodyFontSize, weight: .regular, design: .serif))
+                .font(.system(size: roastBodyFontSize, weight: .regular))
                 .foregroundColor(FirePalette.text)
                 .lineSpacing(7)
 
             if !joke.punchline.isEmpty {
                 Text("Punchline: \(joke.punchline)")
-                    .font(.system(size: roastSupportFontSize, weight: .medium, design: .rounded))
+                    .font(.system(size: roastSupportFontSize, weight: .regular))
                     .foregroundColor(FirePalette.sub)
             }
 
             if !joke.performanceNotes.isEmpty {
                 Text("Notes: \(joke.performanceNotes)")
-                    .font(.system(size: roastSupportFontSize, weight: .regular, design: .rounded))
+                    .font(.system(size: roastSupportFontSize, weight: .regular))
                     .foregroundColor(FirePalette.sub)
                     .italic()
             }
@@ -948,24 +1218,6 @@ struct RoastTargetDetailView: View {
         
         ToolbarItem(placement: .navigationBarTrailing) {
             Menu {
-                Section("View") {
-                    Button {
-                        roastTargetDisplayModeRaw = RoastTargetDisplayMode.cards.rawValue
-                    } label: {
-                        Label("Grouped Cards", systemImage: displayMode == .cards ? "checkmark.rectangle.stack.fill" : "rectangle.stack")
-                    }
-
-                    Button {
-                        roastTargetDisplayModeRaw = RoastTargetDisplayMode.preview.rawValue
-                    } label: {
-                        Label("Preview Text", systemImage: displayMode == .preview ? "checkmark.circle.fill" : "text.page")
-                    }
-
-                    Button(action: { showFullContent.toggle() }) {
-                        Label(showFullContent ? "Compact View" : "Full Content", systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
-                    }
-                }
-
                 Section("Text Size") {
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -1023,6 +1275,27 @@ struct RoastTargetDetailView: View {
     private func trashJoke(_ joke: RoastJoke) {
         joke.moveToTrash()
         saveContext("trash joke")
+    }
+
+    private func editRoast(_ joke: RoastJoke) {
+        editingJoke = joke
+        showingEditJoke = true
+    }
+
+    private func duplicateRoast(_ joke: RoastJoke) {
+        let duplicate = RoastJoke(
+            content: joke.content,
+            title: joke.title.isEmpty ? "" : "\(joke.title) Copy",
+            target: target
+        )
+        duplicate.setup = joke.setup
+        duplicate.punchline = joke.punchline
+        duplicate.performanceNotes = joke.performanceNotes
+        duplicate.relatabilityScore = joke.relatabilityScore
+        duplicate.displayOrder = (jokesForTarget.map(\.displayOrder).max() ?? -1) + 1
+        modelContext.insert(duplicate)
+        target.dateModified = Date()
+        saveContext("duplicate roast")
     }
     
     private func toggleOpeningRoast(_ joke: RoastJoke) {
@@ -1249,6 +1522,7 @@ struct DraggableRoastCard: View {
     var embeddedInGroup: Bool = false
     var onTap: (() -> Void)? = nil
     var onTrash: (() -> Void)? = nil
+    var onDuplicate: (() -> Void)? = nil
     var onToggleOpening: (() -> Void)? = nil
     var onSetOpenerPosition: ((Int) -> Void)? = nil
     var openerCount: Int = 0
@@ -1268,41 +1542,208 @@ struct DraggableRoastCard: View {
     }
     
     var body: some View {
-        cardContent
-            .background(
-                Group {
-                    if embeddedInGroup {
-                        Color.clear
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topTrailing) {
+                cardSurface
+
+                quickActionsMenu
+                    .padding(.top, DS.Spacing.sm)
+                    .padding(.trailing, DS.Spacing.sm)
+            }
+
+            roastRoleControls
+        }
+        .padding(.horizontal, embeddedInGroup ? 0 : 16)
+        .confirmationDialog("Delete Roast?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Move to Trash", role: .destructive) {
+                onTrash?()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This roast will be moved to trash.")
+        }
+    }
+
+    private var cardSurface: some View {
+        Button {
+            onTap?()
+        } label: {
+            cardContent
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    Group {
+                        if embeddedInGroup {
+                            Color.clear
+                        } else {
+                            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                                .fill(Color(FirePalette.card))
+                        }
+                    }
+                )
+                .overlay(
+                    Group {
+                        if !embeddedInGroup {
+                            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                                .strokeBorder(FirePalette.edge, lineWidth: 0.5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("Edit roast")
+    }
+
+    private var quickActionsMenu: some View {
+        Menu {
+            contextMenuContent
+        } label: {
+            Image(systemName: "ellipsis.circle.fill")
+                .font(.title3)
+                .foregroundStyle(accentColor, FirePalette.card)
+                .frame(width: 34, height: 34)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Roast actions")
+    }
+
+    private var roastRoleControls: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+            HStack(spacing: DS.Spacing.sm) {
+                Button {
+                    onTap?()
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(accentColor)
+
+                if joke.isOpeningRoast {
+                    Label(currentOpenerPosition > 0 ? "Opener \(currentOpenerPosition)" : "Opener", systemImage: "star.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(accentColor)
+
+                    if openerCount > 1 {
+                        openerPositionMenu
+                    }
+
+                    Button {
+                        onToggleOpening?()
+                    } label: {
+                        Text("Remove opener")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(FirePalette.sub)
+                } else {
+                    Button {
+                        onToggleOpening?()
+                    } label: {
+                        Label("Make opener", systemImage: "star.circle")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(accentColor)
+
+                    if openingRoastsForTarget.isEmpty {
+                        Text("Make an opener first to assign backups")
+                            .font(.caption)
+                            .foregroundColor(FirePalette.sub)
+                            .lineLimit(1)
                     } else {
-                        RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                            .fill(Color(FirePalette.card))
+                        backupAssignmentMenu
                     }
                 }
-            )
+
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, DS.Spacing.md)
+        .padding(.bottom, DS.Spacing.sm)
+        .padding(.top, 2)
+        .background(embeddedInGroup ? Color.clear : Color(FirePalette.card))
+    }
+
+    private var openerPositionMenu: some View {
+        Menu {
+            ForEach(1...openerCount, id: \.self) { position in
+                Button {
+                    onSetOpenerPosition?(position)
+                } label: {
+                    Label(
+                        "Opener \(position)",
+                        systemImage: position == currentOpenerPosition ? "checkmark.circle.fill" : "\(position).circle"
+                    )
+                }
+                .disabled(position == currentOpenerPosition)
+            }
+        } label: {
+            Label("Position", systemImage: "arrow.up.arrow.down")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(accentColor)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var backupAssignmentMenu: some View {
+        Menu {
+            Button {
+                onAssignAsBackup?(nil)
+            } label: {
+                Label(
+                    "None",
+                    systemImage: joke.parentOpeningRoastID == nil ? "checkmark.circle.fill" : "circle"
+                )
+            }
+
+            ForEach(openingRoastsForTarget) { opening in
+                Button {
+                    onAssignAsBackup?(opening.id)
+                } label: {
+                    Label(
+                        openerLabel(for: opening),
+                        systemImage: joke.parentOpeningRoastID == opening.id ? "checkmark.circle.fill" : "star.circle"
+                    )
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Label("Backup for", systemImage: "arrow.turn.down.right")
+                    .font(.caption.weight(.semibold))
+
+                Text(currentBackupLabel)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+            }
+            .foregroundColor(accentColor)
+            .padding(.horizontal, DS.Spacing.sm)
+            .padding(.vertical, 6)
+            .background(accentColor.opacity(0.12), in: Capsule())
             .overlay(
-                Group {
-                    if !embeddedInGroup {
-                        RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
-                            .strokeBorder(FirePalette.edge, lineWidth: 0.5)
-                    }
-                }
+                Capsule()
+                    .strokeBorder(accentColor.opacity(0.24), lineWidth: 0.5)
+                    .allowsHitTesting(false)
             )
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onTap?()
-            }
-            .contextMenu {
-                contextMenuContent
-            }
-            .padding(.horizontal, embeddedInGroup ? 0 : 16)
-            .confirmationDialog("Delete Roast?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                Button("Move to Trash", role: .destructive) {
-                    onTrash?()
-                }
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text("This roast will be moved to trash.")
-            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Assign backup")
+    }
+
+    private var currentBackupLabel: String {
+        guard let parentID = joke.parentOpeningRoastID,
+              let opener = openingRoastsForTarget.first(where: { $0.id == parentID }) else {
+            return "None"
+        }
+        return openerLabel(for: opener)
     }
 
     private var cardContent: some View {
@@ -1318,59 +1759,15 @@ struct DraggableRoastCard: View {
     @ViewBuilder
     private var contextMenuContent: some View {
         Button {
-            onToggleOpening?()
+            UIPasteboard.general.string = copyableRoastText
         } label: {
-            Label(joke.isOpeningRoast ? "Remove as Opener" : "Mark as Opening Roast", systemImage: joke.isOpeningRoast ? "star.circle" : "star.circle.fill")
+            Label("Copy Text", systemImage: "doc.on.doc")
         }
 
-        if joke.isOpeningRoast && openerCount > 1 {
-            Menu {
-                ForEach(1...openerCount, id: \.self) { position in
-                    Button {
-                        onSetOpenerPosition?(position)
-                    } label: {
-                        Label(
-                            "Opener \(position)",
-                            systemImage: position == currentOpenerPosition ? "checkmark.circle.fill" : "\(position).circle"
-                        )
-                    }
-                    .disabled(position == currentOpenerPosition)
-                }
-            } label: {
-                Label("Change Opener Number", systemImage: "arrow.up.arrow.down")
-            }
-        }
-        
-        if !joke.isOpeningRoast && !openingRoastsForTarget.isEmpty {
-            Button {
-                onAssignAsBackup?(nil)
-            } label: {
-                Label(
-                    joke.parentOpeningRoastID == nil ? "Backup: None (Unassigned)" : "Remove Backup Assignment",
-                    systemImage: joke.parentOpeningRoastID == nil ? "checkmark.circle" : "arrow.uturn.backward.circle"
-                )
-            }
-
-            ForEach(Array(openingRoastsForTarget.enumerated()), id: \.element.id) { _, opening in
-                Button {
-                    onAssignAsBackup?(opening.id)
-                } label: {
-                    Label(
-                        joke.parentOpeningRoastID == opening.id
-                            ? "Backup for \(openerLabel(for: opening))"
-                            : "Assign to \(openerLabel(for: opening))",
-                        systemImage: joke.parentOpeningRoastID == opening.id ? "checkmark.circle.fill" : "arrow.turn.down.right"
-                    )
-                }
-            }
-        }
-        
-        Divider()
-        
         Button {
-            onTap?()
+            onDuplicate?()
         } label: {
-            Label("Edit", systemImage: "pencil")
+            Label("Duplicate", systemImage: "plus.square.on.square")
         }
         
         Divider()
@@ -1380,6 +1777,21 @@ struct DraggableRoastCard: View {
         } label: {
             Label("Move to Trash", systemImage: "trash")
         }
+    }
+
+    private var copyableRoastText: String {
+        var parts: [String] = []
+        if !joke.setup.isEmpty {
+            parts.append(joke.setup)
+        }
+        parts.append(joke.content)
+        if !joke.punchline.isEmpty {
+            parts.append(joke.punchline)
+        }
+        if !joke.performanceNotes.isEmpty {
+            parts.append("Notes: \(joke.performanceNotes)")
+        }
+        return parts.joined(separator: "\n\n")
     }
 }
 
@@ -1410,13 +1822,13 @@ struct EditRoastJokeView: View {
     
     /// Get other opening roasts for this same target (for backup assignment)
     private var openingRoastsForTarget: [RoastJoke] {
-        guard let targetName = joke.target?.name else { return [] }
+        guard let targetID = joke.target?.id else { return [] }
         return allRoastJokes.filter { roast in
             guard !roast.isTrashed,
                   roast.isOpeningRoast,
                   roast.id != joke.id,
-                  let name = roast.target?.name else { return false }
-            return name == targetName
+                  let roastTargetID = roast.target?.id else { return false }
+            return roastTargetID == targetID
         }.sorted { $0.displayOrder < $1.displayOrder }
     }
     
@@ -1441,16 +1853,36 @@ struct EditRoastJokeView: View {
                     VStack(spacing: 16) {
                         // The roast content - main focus
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("ROAST")
-                                .font(.caption.bold())
-                                .foregroundColor(.secondary)
-                            
                             TextEditor(text: $joke.content)
                                 .focused($isContentFocused)
                                 .frame(minHeight: 120)
                                 .padding(DS.Spacing.md)
                                 .background(Color(.secondarySystemBackground))
                                 .clipShape(RoundedRectangle(cornerRadius: DS.Corner.md, style: .continuous))
+
+                            HStack(spacing: DS.Spacing.md) {
+                                Button {
+                                    UIPasteboard.general.string = copyableJokeText
+                                } label: {
+                                    Label("Copy", systemImage: "doc.on.doc")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundColor(accentColor)
+                                .disabled(copyableJokeText.isEmpty)
+
+                                Button {
+                                    pasteIntoJoke()
+                                } label: {
+                                    Label("Paste", systemImage: "doc.on.clipboard")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundColor(accentColor)
+                                .disabled(UIPasteboard.general.string?.isEmpty ?? true)
+
+                                Spacer()
+                            }
                         }
                         .padding(.horizontal, DS.Spacing.lg)
                         
@@ -1677,6 +2109,31 @@ struct EditRoastJokeView: View {
             showSaveError = true
         }
     }
+
+    private var copyableJokeText: String {
+        var parts: [String] = []
+        if !joke.setup.isEmpty {
+            parts.append(joke.setup)
+        }
+        parts.append(joke.content)
+        if !joke.punchline.isEmpty {
+            parts.append(joke.punchline)
+        }
+        if !joke.performanceNotes.isEmpty {
+            parts.append("Notes: \(joke.performanceNotes)")
+        }
+        return parts.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func pasteIntoJoke() {
+        guard let pasted = UIPasteboard.general.string,
+              !pasted.isEmpty else { return }
+        if joke.content.isEmpty {
+            joke.content = pasted
+        } else {
+            joke.content += "\n\(pasted)"
+        }
+    }
 }
 
 // MARK: - Edit Roast Target Sheet
@@ -1697,6 +2154,11 @@ struct EditRoastTargetView: View {
     private enum Field: Hashable {
         case name
         case notes
+        case instagram
+        case tiktok
+        case x
+        case facebook
+        case website
         case detail(Int)
     }
 
@@ -1732,7 +2194,51 @@ struct EditRoastTargetView: View {
                     TextField("e.g. friend, coworker, celebrity...", text: $target.notes)
                         .focused($focusedField, equals: .notes)
                         .submitLabel(.next)
+                        .onSubmit { focusedField = .instagram }
+                }
+
+                Section("Social media (optional)") {
+                    TextField("@instagram", text: $target.instagramHandle)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($focusedField, equals: .instagram)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .tiktok }
+                        .accessibilityLabel("Instagram handle")
+
+                    TextField("@tiktok", text: $target.tiktokHandle)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($focusedField, equals: .tiktok)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .x }
+                        .accessibilityLabel("TikTok handle")
+
+                    TextField("@x or @twitter", text: $target.xHandle)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($focusedField, equals: .x)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .facebook }
+                        .accessibilityLabel("X handle")
+
+                    TextField("facebook.com/profile", text: $target.facebookURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($focusedField, equals: .facebook)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .website }
+                        .accessibilityLabel("Facebook profile")
+
+                    TextField("website or link", text: $target.websiteURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($focusedField, equals: .website)
+                        .submitLabel(.next)
                         .onSubmit { focusedField = .detail(0) }
+                        .accessibilityLabel("Website or social link")
                 }
                 
                 Section {
@@ -1786,6 +2292,7 @@ struct EditRoastTargetView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         // Photo data is already set via onChange handler with downscaling
+                        normalizeSocialFields()
                         target.dateModified = Date()
                         do {
                             try modelContext.save()
@@ -1817,6 +2324,20 @@ struct EditRoastTargetView: View {
                 }
             }
         }
+    }
+
+    private func normalizeSocialFields() {
+        target.instagramHandle = normalizedHandle(target.instagramHandle)
+        target.tiktokHandle = normalizedHandle(target.tiktokHandle)
+        target.xHandle = normalizedHandle(target.xHandle)
+        target.facebookURL = target.facebookURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        target.websiteURL = target.websiteURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func normalizedHandle(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
     }
 
     private func loadSelectedPhoto() async {
@@ -2028,8 +2549,11 @@ struct RoastExportSheet: View {
         let groups = exportGroups()
 
         for (index, group) in groups.enumerated() {
-            let label = group.opener.isOpeningRoast ? "OPENER \(openerIndex(for: group.opener, in: groups))" : "ROAST"
-            text += "\(index + 1). \(label)\n"
+            if group.opener.isOpeningRoast {
+                text += "\(index + 1). OPENER \(openerIndex(for: group.opener, in: groups))\n"
+            } else {
+                text += "\(index + 1).\n"
+            }
             appendTextBody(for: group.opener, to: &text, indent: "   ")
 
             if !group.backups.isEmpty {

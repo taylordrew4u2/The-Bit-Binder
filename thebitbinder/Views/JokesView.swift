@@ -378,7 +378,6 @@ struct JokesView: View {
                 .padding(.bottom, 32)
             }
             .frame(maxWidth: .infinity)
-            .readableWidth(DS.wideContentWidth)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(FirePalette.bg.ignoresSafeArea())
@@ -590,6 +589,10 @@ struct JokesView: View {
                 // Joke rolodex filter chips (Hits, tags, folders…)
                 folderChips
 
+                if viewMode == .grid && !filteredJokes.isEmpty {
+                    gridSizeControls
+                }
+
                 if filteredJokes.isEmpty {
                     emptyState
                 } else {
@@ -688,6 +691,54 @@ struct JokesView: View {
         }
     }
 
+    private var gridSizeControls: some View {
+        HStack(spacing: 12) {
+            Button {
+                adjustGridScale(by: -0.25)
+            } label: {
+                Image(systemName: "minus.magnifyingglass")
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(.bordered)
+            .disabled(jokesGridScale <= 0.5)
+            .accessibilityLabel("Show more grid columns")
+
+            Slider(value: $jokesGridScale, in: 0.5...2.0, step: 0.25) {
+                Text("Grid card size")
+            } minimumValueLabel: {
+                Image(systemName: "rectangle.grid.3x2")
+            } maximumValueLabel: {
+                Image(systemName: "rectangle.grid.1x2")
+            }
+            .accessibilityLabel("Grid card size")
+            .accessibilityValue("\(Int(jokesGridScale * 100)) percent")
+
+            Button {
+                adjustGridScale(by: 0.25)
+            } label: {
+                Image(systemName: "plus.magnifyingglass")
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(.bordered)
+            .disabled(jokesGridScale >= 2.0)
+            .accessibilityLabel("Show larger grid cards")
+
+            Button {
+                jokesGridScale = 1.0
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(.bordered)
+            .disabled(jokesGridScale == 1.0)
+            .accessibilityLabel("Reset grid size")
+        }
+        .padding(.horizontal, gridHorizontalPadding)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
+        .background(Color(UIColor.systemBackground))
+    }
+
     // MARK: - Batch Select Mode Views
     
     @ViewBuilder
@@ -771,6 +822,10 @@ struct JokesView: View {
         if !explicit.isEmpty { return explicit }
         let generated = KeywordTitleGenerator.displayTitle(from: joke.content)
         return generated.isEmpty ? "Untitled" : generated
+    }
+
+    private func adjustGridScale(by delta: Double) {
+        jokesGridScale = min(max(jokesGridScale + delta, 0.5), 2.0)
     }
 
     private func toggleHit(for joke: Joke) {

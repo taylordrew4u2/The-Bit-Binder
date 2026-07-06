@@ -6,6 +6,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct AddRoastJokeView: View {
     @Environment(\.modelContext) private var modelContext
@@ -91,6 +92,23 @@ struct AddRoastJokeView: View {
                 }
                 .frame(maxHeight: .infinity)
                 .background(FirePalette.bg)
+
+                HStack {
+                    Button {
+                        pasteIntoContent()
+                    } label: {
+                        Label("Paste", systemImage: "doc.on.clipboard")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(accentColor)
+                    .disabled(UIPasteboard.general.string?.isEmpty ?? true)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(FirePalette.card)
 
                 // Bottom controls
                 VStack(spacing: 12) {
@@ -252,6 +270,16 @@ struct AddRoastJokeView: View {
             #endif
             saveErrorMessage = "Could not save roast: \(error.localizedDescription)"
             showSaveError = true
+        }
+    }
+
+    private func pasteIntoContent() {
+        guard let pasted = UIPasteboard.general.string,
+              !pasted.isEmpty else { return }
+        if content.isEmpty {
+            content = pasted
+        } else {
+            content += "\n\(pasted)"
         }
     }
 }
