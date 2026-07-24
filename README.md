@@ -86,7 +86,6 @@ The project is organized as a native Xcode app:
 - `bit`: Background asset downloader extension target.
 - `docs`: Archived product and technical documentation.
 - `fastlane`: TestFlight and App Store build/upload lanes.
-- `.github`: Copilot and agent instruction files.
 
 App flow:
 
