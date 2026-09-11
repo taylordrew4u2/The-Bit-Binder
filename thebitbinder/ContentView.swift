@@ -539,34 +539,33 @@ struct MainTabView: View {
     private var standardTabRoot: some View {
         TabView(selection: selectedTab) {
             ForEach(visibleTabs, id: \.self) { screen in
-                NavigationStack {
-                    screenView(for: screen)
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            // GagGrabber file upload — Jokes page only
-                            if screen == .jokes {
-                                ToolbarItem(placement: .navigationBarTrailing) {
-                                    Button {
-                                        showGagGrabber = true
-                                    } label: {
-                                        Image("GagGrabberGlyph")
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .frame(width: 20, height: 20)
+                Tab(value: screen) {
+                    NavigationStack {
+                        screenView(for: screen)
+                            .navigationTitle("")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                if screen == .jokes {
+                                    ToolbarItem(placement: .topBarTrailing) {
+                                        Button {
+                                            showGagGrabber = true
+                                        } label: {
+                                            Image("GagGrabberGlyph")
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fit)
+                                                .frame(width: 20, height: 20)
+                                        }
+                                        .accessibilityLabel("Import jokes with GagGrabber")
                                     }
                                 }
                             }
-
-                        }
-                }
-                .tabItem {
+                    }
+                } label: {
                     Label(
                         screen.displayName,
                         systemImage: selectedTab.wrappedValue == screen ? screen.selectedIcon : screen.icon
                     )
                 }
-                .tag(screen)
             }
         }
         .tabViewStyle(.sidebarAdaptable)
@@ -575,25 +574,25 @@ struct MainTabView: View {
     private var roastModeRoot: some View {
         TabView(selection: selectedTab) {
             ForEach(visibleTabs, id: \.self) { screen in
-                NavigationStack {
-                    screenView(for: screen)
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Exit Roast Mode") {
-                                    roastMode = false
+                Tab(value: screen) {
+                    NavigationStack {
+                        screenView(for: screen)
+                            .navigationTitle("")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .navigationBarLeading) {
+                                    Button("Exit Roast Mode") {
+                                        roastMode = false
+                                    }
                                 }
                             }
-                        }
-                }
-                .tabItem {
+                    }
+                } label: {
                     Label(
                         screen.roastName,
                         systemImage: selectedTab.wrappedValue == screen ? screen.roastSelectedIcon : screen.roastIcon
                     )
                 }
-                .tag(screen)
             }
         }
         .tabViewStyle(.sidebarAdaptable)
@@ -659,5 +658,11 @@ struct GlobalRecordingIndicator: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Joke.self, inMemory: true)
+        .environmentObject(UserPreferences())
+        .modelContainer(for: [
+            Joke.self, JokeFolder.self, Recording.self, SetList.self,
+            NotebookPhotoRecord.self, NotebookFolder.self, RoastTarget.self,
+            RoastJoke.self, BrainstormIdea.self, ImportBatch.self,
+            ImportedJokeMetadata.self, UnresolvedImportFragment.self
+        ], inMemory: true)
 }

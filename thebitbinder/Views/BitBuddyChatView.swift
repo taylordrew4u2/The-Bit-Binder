@@ -11,8 +11,12 @@ import SwiftData
 /// Chat view hosted inside BitBuddyDrawer — slides in from the right edge so
 /// you can chat alongside whatever you're working on.
 struct BitBuddyChatView: View {
+    private func closeChat() {
+        if let onClose { onClose() } else { dismiss() }
+    }
+
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.dismissBitBuddyDrawer) private var dismissDrawer
+    var onClose: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -22,6 +26,8 @@ struct BitBuddyChatView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     
     @State private var inputText = ""
+    @State private var persistenceError: String?
+    @State private var showingPersistenceError = false
     @State private var isTyping = false
     @State private var typingMessageId: UUID?
     @State private var displayedText = ""
@@ -107,8 +113,7 @@ struct BitBuddyChatView: View {
                     // Brief delay lets keyboard frame animation complete
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         guard scenePhase == .active else { return }
-                        dismissDrawer()
-                        dismiss()
+                        closeChat()
                     }
                 }
                 .foregroundColor(accentColor)
@@ -130,6 +135,11 @@ struct BitBuddyChatView: View {
             }
         }
         .tint(accentColor)
+        .alert("Save Failed", isPresented: $showingPersistenceError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(persistenceError ?? "The item could not be saved.")
+        }
         .onAppear {
             handleAppear()
             // Provide larger context for local analysis (200 items)
@@ -159,75 +169,62 @@ struct BitBuddyChatView: View {
                   !jokeText.isEmpty else { return }
             let folderName = notification.userInfo?["folder"] as? String
             let newJoke = Joke(content: jokeText)
+            var createdFolder: JokeFolder?
             // If a folder was specified, try to find or create it
             if let folderName = folderName, !folderName.isEmpty {
-                let existingFolders = (try? modelContext.fetch(FetchDescriptor<JokeFolder>())) ?? []
+                let existingFolders: [JokeFolder]
+                do { existingFolders = try modelContext.fetch(FetchDescriptor<JokeFolder>()) } catch {
+                    reportPersistenceError(error)
+                    return
+                }
                 if let folder = existingFolders.first(where: { $0.name.lowercased() == folderName.lowercased() && !$0.isTrashed }) {
                     newJoke.folder = folder
                 } else {
                     let folder = JokeFolder(name: folderName)
                     modelContext.insert(folder)
+                    createdFolder = folder
                     newJoke.folder = folder
                 }
             }
             modelContext.insert(newJoke)
-            do {
-                try modelContext.save()
-                print(" [BitBuddy→SwiftData] Joke saved via action dispatch")
-            } catch {
-                print(" [BitBuddy→SwiftData] Failed to save joke: \(error)")
+            saveCreatedRecord(newJoke) {
+                if let createdFolder { modelContext.delete(createdFolder) }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyAddBrainstormNote)) { notification in
             guard let text = notification.userInfo?["text"] as? String, !text.isEmpty else { return }
             let idea = BrainstormIdea(content: text, colorHex: BrainstormIdea.randomColor())
             modelContext.insert(idea)
-            do {
-                try modelContext.save()
-                print(" [BitBuddy→SwiftData] Brainstorm idea saved via action dispatch")
-            } catch {
-                print(" [BitBuddy→SwiftData] Failed to save brainstorm idea: \(error)")
-            }
+            saveCreatedRecord(idea)
         }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyCreateSetList)) { notification in
             guard let name = notification.userInfo?["name"] as? String, !name.isEmpty else { return }
             let setList = SetList(name: name)
             modelContext.insert(setList)
-            do {
-                try modelContext.save()
-                print(" [BitBuddy→SwiftData] Set list '\(name)' created via action dispatch")
-            } catch {
-                print(" [BitBuddy→SwiftData] Failed to create set list: \(error)")
-            }
+            saveCreatedRecord(setList)
         }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyCreateFolder)) { notification in
             guard let name = notification.userInfo?["name"] as? String, !name.isEmpty else { return }
             // Check for duplicate folder names before creating
-            let existingFolders = (try? modelContext.fetch(FetchDescriptor<JokeFolder>())) ?? []
+            let existingFolders: [JokeFolder]
+            do { existingFolders = try modelContext.fetch(FetchDescriptor<JokeFolder>()) } catch {
+                reportPersistenceError(error)
+                return
+            }
             if existingFolders.contains(where: { $0.name.lowercased() == name.lowercased() && !$0.isTrashed }) {
                 print(" [BitBuddy→SwiftData] Folder '\(name)' already exists — skipping create")
                 return
             }
             let folder = JokeFolder(name: name)
             modelContext.insert(folder)
-            do {
-                try modelContext.save()
-                print(" [BitBuddy→SwiftData] Folder '\(name)' created via action dispatch")
-            } catch {
-                print(" [BitBuddy→SwiftData] Failed to create folder: \(error)")
-            }
+            saveCreatedRecord(folder)
         }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyCreateRoastTarget)) { notification in
             guard let name = notification.userInfo?["name"] as? String, !name.isEmpty else { return }
             let notes = notification.userInfo?["notes"] as? String ?? ""
             let target = RoastTarget(name: name, notes: notes)
             modelContext.insert(target)
-            do {
-                try modelContext.save()
-                print(" [BitBuddy→SwiftData] Roast target '\(name)' created via action dispatch")
-            } catch {
-                print(" [BitBuddy→SwiftData] Failed to create roast target: \(error)")
-            }
+            saveCreatedRecord(target)
         }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddyAddRoastJoke)) { notification in
             guard let jokeText = notification.userInfo?["joke"] as? String, !jokeText.isEmpty else { return }
@@ -235,29 +232,23 @@ struct BitBuddyChatView: View {
             let roastJoke = RoastJoke(content: jokeText)
             // If a target was named, find it and attach
             if let targetName = targetName, !targetName.isEmpty {
-                let allTargets = (try? modelContext.fetch(FetchDescriptor<RoastTarget>())) ?? []
+                let allTargets: [RoastTarget]
+                do { allTargets = try modelContext.fetch(FetchDescriptor<RoastTarget>()) } catch {
+                    reportPersistenceError(error)
+                    return
+                }
                 if let target = allTargets.first(where: { $0.name.lowercased() == targetName.lowercased() && !$0.isTrashed }) {
                     roastJoke.target = target
                 }
             }
             modelContext.insert(roastJoke)
-            do {
-                try modelContext.save()
-                print(" [BitBuddy→SwiftData] Roast joke saved via action dispatch")
-            } catch {
-                print(" [BitBuddy→SwiftData] Failed to save roast joke: \(error)")
-            }
+            saveCreatedRecord(roastJoke)
         }
         .onReceive(NotificationCenter.default.publisher(for: .bitBuddySaveNotebookText)) { notification in
             guard let text = notification.userInfo?["text"] as? String, !text.isEmpty else { return }
             let record = NotebookPhotoRecord(notes: text, imageData: nil)
             modelContext.insert(record)
-            do {
-                try modelContext.save()
-                print(" [BitBuddy→SwiftData] Notebook text saved via action dispatch")
-            } catch {
-                print(" [BitBuddy→SwiftData] Failed to save notebook text: \(error)")
-            }
+            saveCreatedRecord(record)
         }
         .onChange(of: bitBuddy.pendingNavigation) { _, section in
             guard let section else { return }
@@ -274,8 +265,7 @@ struct BitBuddyChatView: View {
             )
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 guard scenePhase == .active else { return }
-                dismissDrawer()
-                dismiss()
+                closeChat()
             }
         }
     }
@@ -412,6 +402,24 @@ struct BitBuddyChatView: View {
         }
     }
     
+    private func reportPersistenceError(_ error: Error) {
+        persistenceError = "Could not save this item: \(error.localizedDescription)"
+        showingPersistenceError = true
+    }
+
+    private func saveCreatedRecord<Record: PersistentModel>(_ record: Record, cleanup: () -> Void = {}) {
+        do {
+            try JokeEditorPersistence.saveOrRestore {
+                try modelContext.save()
+            } restore: {
+                modelContext.delete(record)
+                cleanup()
+            }
+        } catch {
+            reportPersistenceError(error)
+        }
+    }
+
     private func handleAppear() {
         bitBuddy.refreshBackend()
 
@@ -877,10 +885,10 @@ extension View {
     }
 }
 
-
 #Preview {
     NavigationStack {
         BitBuddyChatView()
             .environmentObject(UserPreferences())
     }
+    .modelContainer(for: [Joke.self, BrainstormIdea.self, SetList.self, NotebookPhotoRecord.self, RoastTarget.self], inMemory: true)
 }

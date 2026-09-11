@@ -265,7 +265,7 @@ struct DataSafetyView: View {
             }
         }
         .sheet(isPresented: $showingBackups) {
-            BackupsView(backups: availableBackups)
+            BackupsView(backups: $availableBackups)
         }
         .confirmationDialog("Export Jokes", isPresented: $showExportOptions) {
             Button("Save PDF to Device") {
@@ -667,7 +667,7 @@ private struct ValidationIssueRow: View {
 }
 
 struct BackupsView: View {
-    @State var backups: [BackupInfo]
+    @Binding var backups: [BackupInfo]
     @Environment(\.dismiss) private var dismiss
     @StateObject private var dataProtection = DataProtectionService.shared
     
