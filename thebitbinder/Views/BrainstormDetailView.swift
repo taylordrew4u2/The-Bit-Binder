@@ -519,24 +519,22 @@ struct BrainstormDetailView: View {
             joke.notes = idea.notes
         }
 
+        let previousIsTrashed = idea.isTrashed
+        let previousDeletedDate = idea.deletedDate
         modelContext.insert(joke)
-
+        idea.moveToTrash()
         do {
-            try modelContext.save()
+            try JokeEditorPersistence.saveOrRestore {
+                try modelContext.save()
+            } restore: {
+                modelContext.delete(joke)
+                idea.isTrashed = previousIsTrashed
+                idea.deletedDate = previousDeletedDate
+            }
         } catch {
-            modelContext.delete(joke)
-            print(" [BrainstormDetailView] Failed to save promoted joke: \(error)")
             saveError = "Could not promote to joke: \(error.localizedDescription)"
             showingSaveError = true
             return
-        }
-
-        // Trash the brainstorm idea now that the joke is saved
-        idea.moveToTrash()
-        do {
-            try modelContext.save()
-        } catch {
-            print(" [BrainstormDetailView] Joke saved but failed to trash idea: \(error)")
         }
 
         HapticEngine.shared.success()

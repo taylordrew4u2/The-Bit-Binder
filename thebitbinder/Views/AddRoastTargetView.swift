@@ -139,7 +139,7 @@ struct AddRoastTargetView: View {
                         .autocorrectionDisabled()
                         .roastRowBackground()
                         .focused($focusedField, equals: .website)
-                        .submitLabel(.next)
+                        .submitLabel(.done)
                         .onSubmit { focusedField = nil }
                         .accessibilityLabel("Website or social link")
                 }

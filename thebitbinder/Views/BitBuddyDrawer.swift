@@ -50,14 +50,16 @@ struct BitBuddyDrawerOverlay: View {
             ZStack(alignment: .trailing) {
                 // Scrim — catches taps outside the drawer to close it.
                 if controller.isOpen {
-                    Color.scrim
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-                        .onTapGesture {
-                            withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.86)) {
-                                controller.close()
-                            }
+                    Button {
+                        withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.86)) {
+                            controller.close()
                         }
+                    } label: {
+                        Color.scrim.ignoresSafeArea()
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close BitBuddy")
+                    .transition(.opacity)
                 }
 
                 // Drawer panel

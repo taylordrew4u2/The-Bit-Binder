@@ -18,7 +18,8 @@ final class iCloudSyncDiagnostics: ObservableObject {
     
     private let container = CKContainer(identifier: "iCloud.The-BitBinder.thebitbinder")
     
-    struct SyncIssue {
+    struct SyncIssue: Identifiable {
+        let id = UUID()
         let type: IssueType
         let description: String
         let severity: Severity
