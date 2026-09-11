@@ -64,9 +64,6 @@ struct HomeView: View {
     @AppStorage("userName") private var userName = ""
     @AppStorage("homeSelectedSections") private var selectedSectionsRaw = ""
 
-    // Cached stats — rebuilt via .task(id:) when allJokes changes
-    @State private var cachedHitsCount: Int = 0
-    @State private var cachedThisWeekCount: Int = 0
     
     // Time-aware greeting
     private var greeting: String {
@@ -86,13 +83,12 @@ struct HomeView: View {
         return "\(greeting), \(name)"
     }
     
-    // Stats — use cached values; rebuilt by .task(id:) below
-    private var hitsCount: Int { cachedHitsCount }
-    private var thisWeekCount: Int { cachedThisWeekCount }
+    private var hitsCount: Int { allJokes.filter { $0.isHit }.count }
+    private var thisWeekCount: Int {
+        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        return allJokes.filter { $0.dateCreated >= weekAgo }.count
+    }
 
-    /// Invalidation key for stats — changes when joke count changes.
-    private var statsKey: Int { allJokes.count }
-    
     private var recentJokes: [Joke] {
         var seen = Set<UUID>()
         var result: [Joke] = []
@@ -299,11 +295,7 @@ struct HomeView: View {
                 StandaloneRecordingView()
             }
         }
-        .task(id: statsKey) {
-            cachedHitsCount = allJokes.filter { $0.isHit }.count
-            let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-            cachedThisWeekCount = allJokes.filter { $0.dateCreated >= weekAgo }.count
-        }
+
     }
     
     private var motivationalSubtitle: String {

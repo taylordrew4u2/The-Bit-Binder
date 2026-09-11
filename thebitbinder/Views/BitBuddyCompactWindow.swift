@@ -143,8 +143,8 @@ struct BitBuddyCompactWindow: View {
             // because its messages list is a ScrollView that adapts to
             // any height.
             NavigationStack {
-                BitBuddyChatView()
-                    .navigationBarHidden(true)
+                BitBuddyChatView(onClose: { presenter.close() })
+                    .toolbarVisibility(.hidden, for: .navigationBar)
             }
             .frame(height: max(0, windowHeight - headerHeight))
         }
@@ -158,9 +158,6 @@ struct BitBuddyCompactWindow: View {
                 .stroke(roastMode ? FirePalette.core.opacity(0.27) : Color.primary.opacity(0.08), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
-        .environment(\.dismissBitBuddyDrawer) {
-            presenter.close()
-        }
     }
 
     // MARK: - Header

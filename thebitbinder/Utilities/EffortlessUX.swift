@@ -169,56 +169,11 @@ struct EffortlessAnimation {
 
 // MARK: - Auto-Save Manager
 
-/// Automatic saving with debouncing - never lose work
-@MainActor
-final class AutoSaveManager: ObservableObject {
-    static let shared = AutoSaveManager()
-    
-    @Published var isSaving = false
-    @Published var lastSaveTime: Date?
-    @Published var hasUnsavedChanges = false
-    
-    private var saveSubject = PassthroughSubject<() -> Void, Never>()
-    private var cancellables = Set<AnyCancellable>()
-    
-    private init() {
-        // Debounce saves by 1.5 seconds
-        saveSubject
-            .debounce(for: .milliseconds(1500), scheduler: DispatchQueue.main)
-            .sink { [weak self] saveAction in
-                self?.performSave(saveAction)
-            }
-            .store(in: &cancellables)
-    }
-    
-    /// Schedule a save operation (debounced)
-    func scheduleSave(_ action: @escaping () -> Void) {
-        hasUnsavedChanges = true
-        saveSubject.send(action)
-    }
-    
-    /// Force an immediate save
-    func saveNow(_ action: @escaping () -> Void) {
-        performSave(action)
-    }
-    
-    private func performSave(_ action: () -> Void) {
-        isSaving = true
-        action()
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.isSaving = false
-            self.hasUnsavedChanges = false
-            self.lastSaveTime = Date()
-        }
-    }
-}
-
 // MARK: - Save Status Indicator
 
 /// Subtle auto-save status indicator
 struct SaveStatusIndicator: View {
-    @ObservedObject var autoSave: AutoSaveManager = .shared
+    @ObservedObject var autoSave: AutoSaveManager
     var roastMode: Bool = false
     
     var body: some View {

@@ -25,9 +25,9 @@ BitBinder is a shipped, production iOS app — [live on the App Store](https://a
 | **Persistence** | SwiftData with CloudKit private-database sync |
 | **Collaboration** | Cross-iCloud library sharing via CloudKit shared workspaces |
 | **AI** | Pluggable assistant with on-device (Apple Intelligence, MLX, Transformers) and cloud (OpenAI) backends |
-| **Codebase** | ~54,000 lines of Swift across 151 source files |
-| **Structure** | 13 SwiftData models · 49 services · 59 SwiftUI view files · 20 utility modules |
-| **CI / Release** | SwiftLint via GitHub Actions · fastlane TestFlight & App Store lanes |
+| **Codebase** | 156 Swift source files across the app and extension |
+| **Structure** | 13 SwiftData models · 49 services · 60 SwiftUI view files · 20 utility modules |
+| **CI / Release** | SwiftLint, regression checks, and simulator builds via GitHub Actions · fastlane TestFlight & App Store lanes |
 | **Distribution** | Native App Store release (current version 12.0) |
 
 ---
@@ -88,7 +88,7 @@ BitBinder is a native Xcode project layered into models, views, and services, wi
 ```
 thebitbinder/
 ├── Models/         13 SwiftData models (jokes, set lists, recordings, roast, imports, chat…)
-├── Views/          59 SwiftUI screens and reusable components across every feature area
+├── Views/          60 SwiftUI screens and reusable components across every feature area
 ├── Services/       49 services (recording, transcription, import, AI, sync, validation…)
 │   └── BitBuddyBackends/   Specialized assistant backends (e.g. Socratic guide)
 ├── CloudKit/       Sharing service, persistence controller, error classifier,
@@ -98,7 +98,7 @@ thebitbinder/
 bit/                Background asset downloader app extension
 docs/               Architecture, native-design, and sync-troubleshooting guides
 fastlane/           TestFlight and App Store build/upload lanes
-.github/workflows/  SwiftLint CI
+.github/workflows/  SwiftLint, regression checks, and iOS Simulator build CI
 ```
 
 **Data flow**
@@ -231,7 +231,7 @@ The UI is built from native SwiftUI controls with SF Symbol labeling and explici
 
 ## Testing & Quality
 
-SwiftLint runs on every push through GitHub Actions, and validation is backed by Xcode builds and structured manual QA across the primary flows:
+GitHub Actions runs SwiftLint, four Swift regression suites, and an unsigned iOS Simulator build. Run the regression suites locally with `bash Tests/run-regressions.sh`. Device validation includes structured manual QA across the primary flows:
 
 - Core capture, organization, and navigation.
 - Recording start → navigate away → stop/save → playback → transcription.

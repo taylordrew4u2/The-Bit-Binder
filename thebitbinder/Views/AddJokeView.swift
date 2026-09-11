@@ -79,6 +79,8 @@ struct AddJokeView: View {
                         }
 
                         TextEditor(text: $content)
+
+                            .accessibilityLabel("Joke text")
                             .font(.body)
                             .lineSpacing(6)
                             .frame(minHeight: 300)
@@ -221,8 +223,8 @@ struct AddJokeView: View {
                     .foregroundStyle(.secondary)
                 TextField("Add tag", text: $tagDraft)
                     .textFieldStyle(.plain)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                     .submitLabel(.done)
                     .focused($tagFocused)
                     .onSubmit { commitTagDraft() }

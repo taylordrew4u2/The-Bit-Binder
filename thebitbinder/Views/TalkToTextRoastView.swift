@@ -100,6 +100,8 @@ struct TalkToTextRoastView: View {
                         }
 
                         TextEditor(text: $transcribedText)
+
+                            .accessibilityLabel("Transcript")
                             .font(.body)
                             .foregroundColor(.primary)
                             .scrollContentBackground(.hidden)
