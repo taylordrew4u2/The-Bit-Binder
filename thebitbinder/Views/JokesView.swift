@@ -125,8 +125,6 @@ struct JokesView: View {
     
     // Performance: Debounced search and cached filtered results
     @State private var debouncedSearchText = ""
-    @State private var searchDebounceTask: Task<Void, Never>?
-    @State private var cachedFilteredJokes: [Joke] = []
 
     // MARK: - The Hits Button
     // This computed property returns the count for the chips
@@ -161,7 +159,6 @@ struct JokesView: View {
             return $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending
         }.map { $0.key }
     }
-
 
     private var folderChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -327,7 +324,7 @@ struct JokesView: View {
     private var emptyState: some View {
         JokesEmptyState(
             roastMode: roastMode,
-            hasFilter: selectedFolder != nil || showRecentlyAdded || showingHitsFilter || showingOpenMicFilter || !searchText.isEmpty,
+            hasFilter: selectedFolder != nil || showRecentlyAdded || showingHitsFilter || showingOpenMicFilter || activeTagFilter != nil || !searchText.isEmpty,
             onAddJoke: { showingAddJoke = true }
         )
     }
@@ -382,23 +379,8 @@ struct JokesView: View {
         .background(FirePalette.bg.ignoresSafeArea())
     }
 
-    // A stable key that changes whenever any *filter input* changes.
-    // Used by .task(id:) to re-run filtering only when the user changes a
-    // filter — NOT on every joke count change. Data-count changes are
-    // handled separately via .onChange(of: jokes.count).
-    private var filterKey: String {
-        let folder = selectedFolder?.id.uuidString ?? "nil"
-        let hits   = showingHitsFilter ? "1" : "0"
-        let openMic = showingOpenMicFilter ? "1" : "0"
-        let recent = showRecentlyAdded  ? "1" : "0"
-        let search = debouncedSearchText
-        let tag    = activeTagFilter ?? "nil"
-        return "\(folder)|\(hits)|\(openMic)|\(recent)|\(search)|\(tag)"
-    }
-
-    var filteredJokes: [Joke] { cachedFilteredJokes }
-
-    private func rebuildFilteredJokes() {
+    // Derive from observable model values so same-count edits update filters.
+    var filteredJokes: [Joke] {
         var base: [Joke]
         if showingHitsFilter {
             base = jokes.filter { $0.isHit }
@@ -437,9 +419,9 @@ struct JokesView: View {
         }
 
         if showRecentlyAdded {
-            cachedFilteredJokes = nonEmpty.sorted { $0.dateCreated > $1.dateCreated }
+            return nonEmpty.sorted { $0.dateCreated > $1.dateCreated }
         } else {
-            cachedFilteredJokes = nonEmpty
+            return nonEmpty
         }
     }
     
@@ -549,24 +531,10 @@ struct JokesView: View {
                     MoveJokeToFolderSheet(joke: joke, allFolders: folders)
                 }
                 .overlay { importOverlay }
-                // Rebuild filtered list whenever filter inputs change
-                .task(id: filterKey) {
-                    rebuildFilteredJokes()
-                }
-                // Also rebuild when the underlying data count changes (adds/deletes)
-                .onChange(of: jokes.count) { _, _ in
-                    rebuildFilteredJokes()
-                }
-                // Performance: Debounce search text updates
-                .onChange(of: searchText) { _, newValue in
-                    searchDebounceTask?.cancel()
-                    searchDebounceTask = Task {
-                        try? await Task.sleep(nanoseconds: 250_000_000) // 250ms debounce
-                        guard !Task.isCancelled else { return }
-                        await MainActor.run {
-                            debouncedSearchText = newValue
-                        }
-                    }
+                .task(id: searchText) {
+                    do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }
+                    guard !Task.isCancelled else { return }
+                    debouncedSearchText = searchText
                 }
     }
 

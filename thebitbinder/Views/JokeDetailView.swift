@@ -30,9 +30,12 @@ struct JokeDetailView: View {
     @State private var folders: [JokeFolder] = []
     @State private var setLists: [SetList] = []
 
-    @ObservedObject private var autoSave = AutoSaveManager.shared
+    @StateObject private var autoSave = AutoSaveManager()
     @StateObject private var speechManager = SpeechRecognitionManager()
     @State private var isRecording = false
+    @State private var isEditorVisible = false
+    @State private var savedSnapshot: JokeEditorSnapshot?
+    @State private var openingSnapshot: JokeEditorSnapshot?
     @State private var showingPermissionAlert = false
     @State private var saveError: String?
     @State private var showingSaveError = false
@@ -174,7 +177,10 @@ struct JokeDetailView: View {
             // screen is still on top, so flush a save on any non-active phase to
             // avoid losing edits made just before the user swipes the app away.
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active { saveJokeNow() }
+                if phase != .active {
+                    finishRecordingIfNeeded()
+                    saveJokeNow()
+                }
             }
     }
 
@@ -260,14 +266,21 @@ struct JokeDetailView: View {
     }
 
     private func handleAppear() {
+        isEditorVisible = true
+        if savedSnapshot == nil {
+            savedSnapshot = editorSnapshot
+            openingSnapshot = editorSnapshot
+        }
         guard joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            guard scenePhase == .active else { return }
+            guard isEditorVisible, scenePhase == .active else { return }
             focusedField = .content
         }
     }
 
     private func handleDisappear() {
+        isEditorVisible = false
+        finishRecordingIfNeeded()
         saveJokeNow()
         folders = []
     }
@@ -278,14 +291,16 @@ struct JokeDetailView: View {
         ZStack(alignment: .topLeading) {
             if joke.content.isEmpty {
                 Text("Start writing your bit\u{2026}")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(Color(UIColor.placeholderText))
                     .padding(.top, 8)
                     .allowsHitTesting(false)
             }
 
             TextEditor(text: $joke.content)
-                .font(.system(size: 18, weight: .medium))
+
+                .accessibilityLabel("Joke text")
+                .font(.body.weight(.medium))
                 .lineSpacing(8)
                 .frame(minHeight: 200)
                 .focused($focusedField, equals: .content)
@@ -370,11 +385,11 @@ struct JokeDetailView: View {
                 Image(systemName: icon)
                     .font(.system(size: 15))
                 Text(label)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.caption2.weight(.medium))
             }
             .foregroundColor(tint ?? .secondary)
             .frame(maxWidth: .infinity)
-            .frame(height: 40)
+            .frame(minHeight: 44)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill((tint ?? .accentColor).opacity(active ? 0.14 : 0))
@@ -483,13 +498,22 @@ struct JokeDetailView: View {
     }
 
     private func startRecording() {
+        guard isEditorVisible, scenePhase == .active else { return }
         speechManager.transcribedText = ""
         speechManager.startRecording()
         withAnimation { isRecording = true }
         haptic(.light)
     }
 
+    private func finishRecordingIfNeeded() {
+        if isRecording || speechManager.isRecording {
+            stopRecordingAndAppend()
+        }
+    }
+
     private func stopRecordingAndAppend() {
+        // Clear the UI flag before the manager publishes its stopped state.
+        isRecording = false
         speechManager.stopRecording()
         let text = speechManager.transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty {
@@ -507,37 +531,71 @@ struct JokeDetailView: View {
 
     // MARK: - Auto-Save
 
+    private var editorSnapshot: JokeEditorSnapshot {
+        JokeEditorSnapshot(
+            title: joke.title,
+            content: joke.content,
+            notes: joke.notes,
+            tags: joke.tags,
+            folderIDs: Set((joke.folders ?? []).map(\.id))
+        )
+    }
+
     private func scheduleAutoSave() {
-        autoSave.scheduleSave { [self] in
-            // The debounced closure can fire ~1.5s late — after the joke was
-            // trashed/removed and detached from its context. Bail rather than
-            // mutate a deleted model.
-            guard joke.modelContext != nil else { return }
-            joke.dateModified = Date()
-            joke.updateWordCount()
-            do {
-                try modelContext.save()
-            } catch {
-                print(" [JokeDetailView] Auto-save failed: \(error)")
-                saveError = "Your changes couldn't be saved: \(error.localizedDescription)"
-                showingSaveError = true
-            }
-        }
+        guard savedSnapshot != nil, editorSnapshot != savedSnapshot else { return }
+        autoSave.scheduleSave { persistJoke(finalizeTitle: false) }
     }
 
     private func saveJokeNow() {
-        guard joke.modelContext != nil else { return }
-        if joke.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           !joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        autoSave.saveNow { persistJoke() }
+    }
+
+    private func persistJoke(finalizeTitle: Bool = true) -> Bool {
+        guard joke.modelContext != nil, savedSnapshot != nil else { return true }
+        // Defer automatic titles until exit/background, even after autosave.
+        // A read-only visit never generates a title.
+        let shouldGenerateTitle = finalizeTitle
+            && editorSnapshot != openingSnapshot
+            && joke.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard editorSnapshot != savedSnapshot || shouldGenerateTitle else { return true }
+        if shouldGenerateTitle {
             joke.title = KeywordTitleGenerator.title(from: joke.content)
         }
         joke.dateModified = Date()
         joke.updateWordCount()
         do {
             try modelContext.save()
+            savedSnapshot = editorSnapshot
+            return true
         } catch {
-            print(" [JokeDetailView] Save failed: \(error)")
             saveError = "Your changes couldn't be saved: \(error.localizedDescription)"
+            showingSaveError = true
+            return false
+        }
+    }
+
+    private func changeTrashState(restore: Bool) {
+        finishRecordingIfNeeded()
+        let previousIsTrashed = joke.isTrashed
+        let previousDeletedDate = joke.deletedDate
+        let previousModifiedDate = joke.dateModified
+        if restore {
+            joke.restoreFromTrash()
+        } else {
+            joke.moveToTrash()
+        }
+        do {
+            try JokeEditorPersistence.saveOrRestore {
+                try modelContext.save()
+            } restore: {
+                joke.isTrashed = previousIsTrashed
+                joke.deletedDate = previousDeletedDate
+                joke.dateModified = previousModifiedDate
+            }
+            dismiss()
+        } catch {
+            saveError = "Couldn't \(restore ? "restore this joke" : "move this joke to Trash"): \(error.localizedDescription)"
             showingSaveError = true
         }
     }
@@ -614,11 +672,7 @@ struct JokeDetailView: View {
                         if joke.isTrashed {
                             Button {
                                 HapticEngine.shared.success()
-                                joke.restoreFromTrash()
-                                do { try modelContext.save() } catch {
-                                    print(" [JokeDetailView] Failed to save after restore: \(error)")
-                                }
-                                dismiss()
+                                changeTrashState(restore: true)
                             } label: {
                                 Label("Restore", systemImage: "arrow.uturn.backward.circle")
                             }
@@ -642,7 +696,7 @@ struct JokeDetailView: View {
         ToolbarItem(placement: .keyboard) {
             HStack {
                 // Subtle, transient save feedback — only visible while editing.
-                SaveStatusIndicator(roastMode: roastMode)
+                SaveStatusIndicator(autoSave: autoSave, roastMode: roastMode)
                 Spacer()
                 Button("Done") {
                     focusedField = nil
@@ -652,26 +706,15 @@ struct JokeDetailView: View {
         }
     }
 
-
     // MARK: - Delete Alert
 
     @ViewBuilder
     private var deleteAlertButtons: some View {
         if joke.isTrashed {
-            Button("Restore") {
-                joke.restoreFromTrash()
-                do { try modelContext.save() } catch {
-                    print(" [JokeDetailView] Failed to save after restore: \(error)")
-                }
-                dismiss()
-            }
+            Button("Restore") { changeTrashState(restore: true) }
         } else {
             Button("Move to Trash", role: .destructive) {
-                joke.moveToTrash()
-                do { try modelContext.save() } catch {
-                    print(" [JokeDetailView] Failed to save after trash: \(error)")
-                }
-                dismiss()
+                changeTrashState(restore: false)
             }
         }
         Button("Cancel", role: .cancel) { }
@@ -895,6 +938,8 @@ private struct NotesSheet: View {
                 }
 
                 TextEditor(text: $joke.notes)
+
+                    .accessibilityLabel("Notes")
                     .font(.body)
                     .lineSpacing(6)
                     .scrollContentBackground(.hidden)

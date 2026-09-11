@@ -908,15 +908,20 @@ struct NotebookDetailView: View {
 struct NotebookNotesSheet: View {
     @Bindable var photo: NotebookPhotoRecord
     @Environment(\.dismiss) private var dismiss
-    
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var autoSave = AutoSaveManager()
+    @State private var saveError: String?
+    @State private var showingSaveError = false
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("Notes") {
                     TextEditor(text: $photo.notes)
+                        .accessibilityLabel("Notes")
                         .frame(minHeight: 150)
                 }
-                
                 Section {
                     LabeledContent("Added") {
                         Text(photo.dateCreated, style: .date)
@@ -928,12 +933,36 @@ struct NotebookNotesSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        dismiss()
+                        if persistNotes() { dismiss() }
                     }
                 }
             }
+            .alert("Save Failed", isPresented: $showingSaveError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "Your notes could not be saved.")
+            }
+            .onChange(of: photo.notes) { _, _ in
+                autoSave.scheduleSave { persistNotes() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { autoSave.saveNow { persistNotes() } }
+            }
+            .onDisappear { autoSave.saveNow { persistNotes() } }
         }
         .presentationDetents([.medium])
+    }
+
+    private func persistNotes() -> Bool {
+        guard photo.modelContext != nil else { return true }
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            saveError = "Could not save notes: \(error.localizedDescription)"
+            showingSaveError = true
+            return false
+        }
     }
 }
 
@@ -1127,6 +1156,11 @@ private struct NotebookThumbnailCell: View {
         .scaleEffect(isDragging ? 1.05 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isDragging)
         .onTapGesture { onTap() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Notebook page")
+        .accessibilityValue(photo.dateCreated.formatted(date: .abbreviated, time: .omitted))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { onTap() }
         .contextMenu {
             if !isSelectMode {
                 Button(action: onMove) {
