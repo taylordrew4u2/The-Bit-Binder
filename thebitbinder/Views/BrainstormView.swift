@@ -404,6 +404,11 @@ struct BrainstormView: View {
                     selectedIdea = idea
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                if isSelectMode { toggleIdeaSelection(idea) } else { selectedIdea = idea }
+            }
             // High-priority (not simultaneous) so the pan wins over the
             // card's `.contextMenu` long-press interaction. With a simultaneous
             // gesture the context-menu recognizer frequently swallows the pan,

@@ -953,6 +953,10 @@ struct RoastTargetDetailView: View {
             withAnimation(.easeInOut(duration: 0.2)) { isCollapsed.wrappedValue.toggle() }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityAction {
+            guard let isCollapsed else { return }
+            withAnimation(.easeInOut(duration: 0.2)) { isCollapsed.wrappedValue.toggle() }
+        }
         .accessibilityAddTraits(isCollapsed == nil ? [] : .isButton)
         .accessibilityLabel(isCollapsed == nil ? Text(title) : Text(isCollapsed!.wrappedValue ? "\(title), collapsed" : "\(title), expanded"))
     }
@@ -1351,8 +1355,6 @@ struct RoastTargetDetailView: View {
         persistTargetFacts()
         haptic(.light)
     }
-
-
 
     private func persistTargetFacts() {
         target.dateModified = Date()
@@ -2244,7 +2246,7 @@ struct EditRoastTargetView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .focused($focusedField, equals: .website)
-                        .submitLabel(.next)
+                        .submitLabel(.done)
                         .onSubmit { focusedField = nil }
                         .accessibilityLabel("Website or social link")
                 }

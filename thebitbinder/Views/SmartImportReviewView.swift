@@ -360,11 +360,17 @@ struct SmartImportReviewView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 4) {
                 ForEach(Array(viewModel.reviewItems.enumerated()), id: \.element.id) { index, item in
-                    Circle()
-                        .fill(dotColor(for: item, isActive: index == viewModel.currentIndex))
-                        .frame(width: index == viewModel.currentIndex ? 10 : 6,
-                               height: index == viewModel.currentIndex ? 10 : 6)
-                        .onTapGesture { viewModel.goToItem(at: index) }
+                    Button { viewModel.goToItem(at: index) } label: {
+                        Circle()
+                            .fill(dotColor(for: item, isActive: index == viewModel.currentIndex))
+                            .frame(width: index == viewModel.currentIndex ? 10 : 6,
+                                   height: index == viewModel.currentIndex ? 10 : 6)
+                            .frame(minWidth: 24, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Review item \(index + 1) of \(viewModel.reviewItems.count)")
+                    .accessibilityAddTraits(index == viewModel.currentIndex ? .isSelected : [])
                 }
             }
         }

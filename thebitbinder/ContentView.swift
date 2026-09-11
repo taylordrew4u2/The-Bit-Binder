@@ -541,26 +541,25 @@ struct MainTabView: View {
             ForEach(visibleTabs, id: \.self) { screen in
                 Tab(value: screen) {
                     NavigationStack {
-                    screenView(for: screen)
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            // GagGrabber file upload — Jokes page only
-                            if screen == .jokes {
-                                ToolbarItem(placement: .navigationBarTrailing) {
-                                    Button {
-                                        showGagGrabber = true
-                                    } label: {
-                                        Image("GagGrabberGlyph")
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .frame(width: 20, height: 20)
+                        screenView(for: screen)
+                            .navigationTitle("")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                if screen == .jokes {
+                                    ToolbarItem(placement: .topBarTrailing) {
+                                        Button {
+                                            showGagGrabber = true
+                                        } label: {
+                                            Image("GagGrabberGlyph")
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fit)
+                                                .frame(width: 20, height: 20)
+                                        }
+                                        .accessibilityLabel("Import jokes with GagGrabber")
                                     }
                                 }
                             }
-
-                        }
-                }
+                    }
                 } label: {
                     Label(
                         screen.displayName,
@@ -577,17 +576,17 @@ struct MainTabView: View {
             ForEach(visibleTabs, id: \.self) { screen in
                 Tab(value: screen) {
                     NavigationStack {
-                    screenView(for: screen)
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Exit Roast Mode") {
-                                    roastMode = false
+                        screenView(for: screen)
+                            .navigationTitle("")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .navigationBarLeading) {
+                                    Button("Exit Roast Mode") {
+                                        roastMode = false
+                                    }
                                 }
                             }
-                        }
-                }
+                    }
                 } label: {
                     Label(
                         screen.roastName,
@@ -659,5 +658,11 @@ struct GlobalRecordingIndicator: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Joke.self, inMemory: true)
+        .environmentObject(UserPreferences())
+        .modelContainer(for: [
+            Joke.self, JokeFolder.self, Recording.self, SetList.self,
+            NotebookPhotoRecord.self, NotebookFolder.self, RoastTarget.self,
+            RoastJoke.self, BrainstormIdea.self, ImportBatch.self,
+            ImportedJokeMetadata.self, UnresolvedImportFragment.self
+        ], inMemory: true)
 }

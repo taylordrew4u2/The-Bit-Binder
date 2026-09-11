@@ -160,7 +160,6 @@ struct JokesView: View {
         }.map { $0.key }
     }
 
-
     private var folderChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {

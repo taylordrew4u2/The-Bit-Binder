@@ -169,13 +169,17 @@ private struct StepProgressPills: View {
             ForEach(0..<count, id: \.self) { i in
                 let isCurrent = i == current
                 let isDone = i < current
-                Capsule()
-                    .fill(isCurrent || isDone ? AnyShapeStyle(tint) : AnyShapeStyle(Color.secondary.opacity(0.22)))
-                    .frame(width: isCurrent ? 28 : 8, height: 8)
-                    .animation(.easeInOut(duration: 0.25), value: current)
-                    .contentShape(Rectangle())
-                    .onTapGesture { onTap(i) }
-                    .accessibilityLabel("Step \(i + 1) of \(count)")
+                Button { onTap(i) } label: {
+                    Capsule()
+                        .fill(isCurrent || isDone ? AnyShapeStyle(tint) : AnyShapeStyle(Color.secondary.opacity(0.22)))
+                        .frame(width: isCurrent ? 28 : 8, height: 8)
+                        .frame(minWidth: 28, minHeight: 44)
+                        .animation(.easeInOut(duration: 0.25), value: current)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Step \(i + 1) of \(count)")
+                .accessibilityAddTraits(isCurrent ? .isSelected : [])
             }
         }
     }
