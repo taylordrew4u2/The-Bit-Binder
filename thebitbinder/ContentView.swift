@@ -539,7 +539,8 @@ struct MainTabView: View {
     private var standardTabRoot: some View {
         TabView(selection: selectedTab) {
             ForEach(visibleTabs, id: \.self) { screen in
-                NavigationStack {
+                Tab(value: screen) {
+                    NavigationStack {
                     screenView(for: screen)
                         .navigationTitle("")
                         .navigationBarTitleDisplayMode(.inline)
@@ -560,13 +561,12 @@ struct MainTabView: View {
 
                         }
                 }
-                .tabItem {
+                } label: {
                     Label(
                         screen.displayName,
                         systemImage: selectedTab.wrappedValue == screen ? screen.selectedIcon : screen.icon
                     )
                 }
-                .tag(screen)
             }
         }
         .tabViewStyle(.sidebarAdaptable)
@@ -575,7 +575,8 @@ struct MainTabView: View {
     private var roastModeRoot: some View {
         TabView(selection: selectedTab) {
             ForEach(visibleTabs, id: \.self) { screen in
-                NavigationStack {
+                Tab(value: screen) {
+                    NavigationStack {
                     screenView(for: screen)
                         .navigationTitle("")
                         .navigationBarTitleDisplayMode(.inline)
@@ -587,13 +588,12 @@ struct MainTabView: View {
                             }
                         }
                 }
-                .tabItem {
+                } label: {
                     Label(
                         screen.roastName,
                         systemImage: selectedTab.wrappedValue == screen ? screen.roastSelectedIcon : screen.roastIcon
                     )
                 }
-                .tag(screen)
             }
         }
         .tabViewStyle(.sidebarAdaptable)

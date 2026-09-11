@@ -40,6 +40,8 @@ struct AddBrainstormIdeaSheet: View {
                 }
 
                 TextEditor(text: $content)
+
+                    .accessibilityLabel("Idea text")
                     .scrollContentBackground(.hidden)
                     .font(.body)
                     .lineSpacing(5)

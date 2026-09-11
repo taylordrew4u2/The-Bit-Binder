@@ -914,6 +914,7 @@ struct NotebookNotesSheet: View {
             Form {
                 Section("Notes") {
                     TextEditor(text: $photo.notes)
+                        .accessibilityLabel("Notes")
                         .frame(minHeight: 150)
                 }
                 

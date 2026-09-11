@@ -84,6 +84,8 @@ struct AddRoastJokeView: View {
                     }
 
                     TextEditor(text: $content)
+
+                        .accessibilityLabel("Roast text")
                         .focused($isTextFocused)
                         .scrollContentBackground(.hidden)
                         .foregroundColor(FirePalette.text)

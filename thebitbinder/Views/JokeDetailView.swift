@@ -30,7 +30,7 @@ struct JokeDetailView: View {
     @State private var folders: [JokeFolder] = []
     @State private var setLists: [SetList] = []
 
-    @ObservedObject private var autoSave = AutoSaveManager.shared
+    @StateObject private var autoSave = AutoSaveManager()
     @StateObject private var speechManager = SpeechRecognitionManager()
     @State private var isRecording = false
     @State private var isEditorVisible = false
@@ -291,14 +291,16 @@ struct JokeDetailView: View {
         ZStack(alignment: .topLeading) {
             if joke.content.isEmpty {
                 Text("Start writing your bit\u{2026}")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(Color(UIColor.placeholderText))
                     .padding(.top, 8)
                     .allowsHitTesting(false)
             }
 
             TextEditor(text: $joke.content)
-                .font(.system(size: 18, weight: .medium))
+
+                .accessibilityLabel("Joke text")
+                .font(.body.weight(.medium))
                 .lineSpacing(8)
                 .frame(minHeight: 200)
                 .focused($focusedField, equals: .content)
@@ -383,11 +385,11 @@ struct JokeDetailView: View {
                 Image(systemName: icon)
                     .font(.system(size: 15))
                 Text(label)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.caption2.weight(.medium))
             }
             .foregroundColor(tint ?? .secondary)
             .frame(maxWidth: .infinity)
-            .frame(height: 40)
+            .frame(minHeight: 44)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill((tint ?? .accentColor).opacity(active ? 0.14 : 0))
@@ -541,18 +543,22 @@ struct JokeDetailView: View {
 
     private func scheduleAutoSave() {
         guard savedSnapshot != nil, editorSnapshot != savedSnapshot else { return }
-        autoSave.scheduleSave { saveJokeNow(finalizeTitle: false) }
+        autoSave.scheduleSave { persistJoke(finalizeTitle: false) }
     }
 
-    private func saveJokeNow(finalizeTitle: Bool = true) {
-        guard joke.modelContext != nil, savedSnapshot != nil else { return }
+    private func saveJokeNow() {
+        autoSave.saveNow { persistJoke() }
+    }
+
+    private func persistJoke(finalizeTitle: Bool = true) -> Bool {
+        guard joke.modelContext != nil, savedSnapshot != nil else { return true }
         // Defer automatic titles until exit/background, even after autosave.
         // A read-only visit never generates a title.
         let shouldGenerateTitle = finalizeTitle
             && editorSnapshot != openingSnapshot
             && joke.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !joke.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        guard editorSnapshot != savedSnapshot || shouldGenerateTitle else { return }
+        guard editorSnapshot != savedSnapshot || shouldGenerateTitle else { return true }
         if shouldGenerateTitle {
             joke.title = KeywordTitleGenerator.title(from: joke.content)
         }
@@ -561,9 +567,11 @@ struct JokeDetailView: View {
         do {
             try modelContext.save()
             savedSnapshot = editorSnapshot
+            return true
         } catch {
             saveError = "Your changes couldn't be saved: \(error.localizedDescription)"
             showingSaveError = true
+            return false
         }
     }
 
@@ -688,7 +696,7 @@ struct JokeDetailView: View {
         ToolbarItem(placement: .keyboard) {
             HStack {
                 // Subtle, transient save feedback — only visible while editing.
-                SaveStatusIndicator(roastMode: roastMode)
+                SaveStatusIndicator(autoSave: autoSave, roastMode: roastMode)
                 Spacer()
                 Button("Done") {
                     focusedField = nil
@@ -930,6 +938,8 @@ private struct NotesSheet: View {
                 }
 
                 TextEditor(text: $joke.notes)
+
+                    .accessibilityLabel("Notes")
                     .font(.body)
                     .lineSpacing(6)
                     .scrollContentBackground(.hidden)

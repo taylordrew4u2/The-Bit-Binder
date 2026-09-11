@@ -11,26 +11,11 @@
 
 import SwiftUI
 
-// MARK: - Environment action for closing the drawer
-
-/// Environment value that any view inside the drawer (e.g. BitBuddyChatView's
-/// "Done" button) can call to request the drawer close itself. Default is a
-/// no-op so previews and non-drawer call sites don't crash.
-private struct DismissBitBuddyDrawerKey: EnvironmentKey {
-    static let defaultValue: () -> Void = {}
-}
-
-extension EnvironmentValues {
-    var dismissBitBuddyDrawer: () -> Void {
-        get { self[DismissBitBuddyDrawerKey.self] }
-        set { self[DismissBitBuddyDrawerKey.self] = newValue }
-    }
-}
-
 // MARK: - Controller
 
 /// Shared state for the BitBuddy drawer. Inject via `.environmentObject`
 /// at the app root so any view can request the drawer to open.
+@MainActor
 final class BitBuddyDrawerController: ObservableObject {
     @Published var isOpen: Bool = false
 
@@ -60,7 +45,7 @@ struct BitBuddyDrawerOverlay: View {
     var body: some View {
         GeometryReader { geo in
             let availableWidth = max(0, geo.size.width.isFinite ? geo.size.width : 0)
-            let drawerWidth = min(max(availableWidth * 0.88, 320), 440)
+            let drawerWidth = min(availableWidth, min(max(availableWidth * 0.88, 320), 440))
 
             ZStack(alignment: .trailing) {
                 // Scrim — catches taps outside the drawer to close it.
@@ -133,12 +118,11 @@ struct BitBuddyDrawerOverlay: View {
                 .padding(.bottom, 4)
 
             NavigationStack {
-                BitBuddyChatView()
-            }
-        }
-        .environment(\.dismissBitBuddyDrawer) {
-            withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.86)) {
-                controller.close()
+                BitBuddyChatView(onClose: {
+                    withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.86)) {
+                        controller.close()
+                    }
+                })
             }
         }
     }
