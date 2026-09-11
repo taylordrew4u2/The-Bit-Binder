@@ -112,8 +112,7 @@ struct iCloudSyncSettingsView: View {
                                     .foregroundColor(Color.bitbinderAccent)
                             }
                             
-                            ForEach(diagnostics.syncIssuesFound.prefix(3).indices, id: \.self) { index in
-                                let issue = diagnostics.syncIssuesFound[index]
+                            ForEach(diagnostics.syncIssuesFound.prefix(3)) { issue in
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(issue.description)
                                         .font(.system(size: 12, weight: .medium))
@@ -420,7 +419,7 @@ private struct DiagnosticsDetailView: View {
                     }
                 } else {
                     Section("Issues") {
-                        ForEach(Array(diagnostics.syncIssuesFound.enumerated()), id: \.offset) { _, issue in
+                        ForEach(diagnostics.syncIssuesFound) { issue in
                             VStack(alignment: .leading, spacing: 6) {
                                 Label(issue.description, systemImage: iconName(for: issue.severity))
                                     .font(.subheadline.weight(.semibold))

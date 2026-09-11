@@ -817,39 +817,10 @@ struct RoastTargetDetailView: View {
                         .foregroundColor(FirePalette.sub)
                 } else {
                     VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                        ForEach(Array(target.traits.enumerated()), id: \.offset) { index, trait in
-                            if index < target.traits.count {
-                                HStack(alignment: .top, spacing: DS.Spacing.sm) {
-                                    Text("•")
-                                        .font(.headline.weight(.bold))
-                                        .foregroundColor(accentColor)
-                                        .padding(.top, 1)
-
-                                    TextField("What do you know?", text: Binding(
-                                        get: { index < target.traits.count ? target.traits[index] : trait },
-                                        set: { newValue in
-                                            guard index < target.traits.count else { return }
-                                            target.traits[index] = newValue
-                                            persistTargetFacts()
-                                        }
-                                    ), axis: .vertical)
-                                    .font(.subheadline)
-                                    .foregroundColor(FirePalette.text)
-
-                                    Button {
-                                        removeTrait(at: index)
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(FirePalette.sub)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Remove detail")
-                                }
-                                .padding(DS.Spacing.sm)
-                                .background(Color.white.opacity(0.04))
-                                .clipShape(RoundedRectangle(cornerRadius: DS.Corner.sm, style: .continuous))
-                            }
-                        }
+                        EditableTextFields(values: Binding(
+                            get: { target.traits },
+                            set: { target.traits = $0; persistTargetFacts() }
+                        ), showsAddButton: false)
                     }
                 }
 
@@ -982,6 +953,10 @@ struct RoastTargetDetailView: View {
             withAnimation(.easeInOut(duration: 0.2)) { isCollapsed.wrappedValue.toggle() }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityAction {
+            guard let isCollapsed else { return }
+            withAnimation(.easeInOut(duration: 0.2)) { isCollapsed.wrappedValue.toggle() }
+        }
         .accessibilityAddTraits(isCollapsed == nil ? [] : .isButton)
         .accessibilityLabel(isCollapsed == nil ? Text(title) : Text(isCollapsed!.wrappedValue ? "\(title), collapsed" : "\(title), expanded"))
     }
@@ -1377,13 +1352,6 @@ struct RoastTargetDetailView: View {
         guard !trimmed.isEmpty else { return }
         target.traits.append(trimmed)
         newTraitText = ""
-        persistTargetFacts()
-        haptic(.light)
-    }
-
-    private func removeTrait(at index: Int) {
-        guard target.traits.indices.contains(index) else { return }
-        target.traits.remove(at: index)
         persistTargetFacts()
         haptic(.light)
     }
@@ -1854,6 +1822,7 @@ struct EditRoastJokeView: View {
                         // The roast content - main focus
                         VStack(alignment: .leading, spacing: 6) {
                             TextEditor(text: $joke.content)
+                                .accessibilityLabel("Roast text")
                                 .focused($isContentFocused)
                                 .frame(minHeight: 120)
                                 .padding(DS.Spacing.md)
@@ -2136,12 +2105,54 @@ struct EditRoastJokeView: View {
     }
 }
 
+private struct RoastTargetDraft {
+    var name: String
+    var notes: String
+    var traits: [String]
+    var instagramHandle: String
+    var tiktokHandle: String
+    var xHandle: String
+    var facebookURL: String
+    var websiteURL: String
+    var photoData: Data?
+
+    init(target: RoastTarget) {
+        name = target.name
+        notes = target.notes
+        traits = target.traits
+        instagramHandle = target.instagramHandle
+        tiktokHandle = target.tiktokHandle
+        xHandle = target.xHandle
+        facebookURL = target.facebookURL
+        websiteURL = target.websiteURL
+        photoData = target.photoData
+    }
+
+    func apply(to target: RoastTarget) {
+        target.name = name
+        target.notes = notes
+        target.traits = traits
+        target.instagramHandle = instagramHandle
+        target.tiktokHandle = tiktokHandle
+        target.xHandle = xHandle
+        target.facebookURL = facebookURL
+        target.websiteURL = websiteURL
+        target.photoData = photoData
+    }
+}
+
 // MARK: - Edit Roast Target Sheet
 
 struct EditRoastTargetView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @Bindable var target: RoastTarget
+    let target: RoastTarget
+    @State private var draft: RoastTargetDraft
+
+    init(target: RoastTarget) {
+        self.target = target
+        _draft = State(initialValue: RoastTargetDraft(target: target))
+    }
 
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoImage: UIImage?
@@ -2159,7 +2170,6 @@ struct EditRoastTargetView: View {
         case x
         case facebook
         case website
-        case detail(Int)
     }
 
     var body: some View {
@@ -2172,7 +2182,7 @@ struct EditRoastTargetView: View {
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {
                             RoastEditableAvatar(
                                 uiImage: photoImage,
-                                photoData: target.photoData,
+                                photoData: draft.photoData,
                                 accentColor: accentColor
                             )
                         }
@@ -2183,7 +2193,7 @@ struct EditRoastTargetView: View {
                 }
 
                 Section("Name") {
-                    TextField("Name", text: $target.name)
+                    TextField("Name", text: $draft.name)
                         .font(.headline)
                         .focused($focusedField, equals: .name)
                         .submitLabel(.next)
@@ -2191,14 +2201,14 @@ struct EditRoastTargetView: View {
                 }
 
                 Section("Notes (optional)") {
-                    TextField("e.g. friend, coworker, celebrity...", text: $target.notes)
+                    TextField("e.g. friend, coworker, celebrity...", text: $draft.notes)
                         .focused($focusedField, equals: .notes)
                         .submitLabel(.next)
                         .onSubmit { focusedField = .instagram }
                 }
 
                 Section("Social media (optional)") {
-                    TextField("@instagram", text: $target.instagramHandle)
+                    TextField("@instagram", text: $draft.instagramHandle)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .focused($focusedField, equals: .instagram)
@@ -2206,7 +2216,7 @@ struct EditRoastTargetView: View {
                         .onSubmit { focusedField = .tiktok }
                         .accessibilityLabel("Instagram handle")
 
-                    TextField("@tiktok", text: $target.tiktokHandle)
+                    TextField("@tiktok", text: $draft.tiktokHandle)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .focused($focusedField, equals: .tiktok)
@@ -2214,7 +2224,7 @@ struct EditRoastTargetView: View {
                         .onSubmit { focusedField = .x }
                         .accessibilityLabel("TikTok handle")
 
-                    TextField("@x or @twitter", text: $target.xHandle)
+                    TextField("@x or @twitter", text: $draft.xHandle)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .focused($focusedField, equals: .x)
@@ -2222,7 +2232,7 @@ struct EditRoastTargetView: View {
                         .onSubmit { focusedField = .facebook }
                         .accessibilityLabel("X handle")
 
-                    TextField("facebook.com/profile", text: $target.facebookURL)
+                    TextField("facebook.com/profile", text: $draft.facebookURL)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -2231,51 +2241,18 @@ struct EditRoastTargetView: View {
                         .onSubmit { focusedField = .website }
                         .accessibilityLabel("Facebook profile")
 
-                    TextField("website or link", text: $target.websiteURL)
+                    TextField("website or link", text: $draft.websiteURL)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .focused($focusedField, equals: .website)
-                        .submitLabel(.next)
-                        .onSubmit { focusedField = .detail(0) }
+                        .submitLabel(.done)
+                        .onSubmit { focusedField = nil }
                         .accessibilityLabel("Website or social link")
                 }
                 
                 Section {
-                    ForEach(Array(target.traits.enumerated()), id: \.offset) { index, _ in
-                        if index < target.traits.count {
-                            HStack {
-                                TextField("e.g. works in finance, always late...", text: Binding(
-                                    get: { index < target.traits.count ? target.traits[index] : "" },
-                                    set: { newValue in
-                                        if index < target.traits.count {
-                                            target.traits[index] = newValue
-                                        }
-                                    }
-                                ))
-                                .focused($focusedField, equals: .detail(index))
-                                .submitLabel(.done)
-                                if target.traits.count > 1 {
-                                    Button {
-                                        if index < target.traits.count {
-                                            target.traits.remove(at: index)
-                                        }
-                                    } label: {
-                                        Image(systemName: "minus.circle.fill")
-                                            .foregroundColor(Color.destructive.opacity(DS.Opacity.heavy))
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Remove detail")
-                                }
-                            }
-                        }
-                    }
-                    Button {
-                        target.traits.append("")
-                    } label: {
-                        Label("Add another", systemImage: "plus.circle")
-                            .foregroundColor(accentColor)
-                    }
+                    EditableTextFields(values: $draft.traits)
                 } header: {
                     Text("What do you know about them?")
                 } footer: {
@@ -2293,9 +2270,17 @@ struct EditRoastTargetView: View {
                     Button("Save") {
                         // Photo data is already set via onChange handler with downscaling
                         normalizeSocialFields()
+                        let previous = RoastTargetDraft(target: target)
+                        let previousDate = target.dateModified
+                        draft.apply(to: target)
                         target.dateModified = Date()
                         do {
-                            try modelContext.save()
+                            try JokeEditorPersistence.saveOrRestore {
+                                try modelContext.save()
+                            } restore: {
+                                previous.apply(to: target)
+                                target.dateModified = previousDate
+                            }
                             dismiss()
                         } catch {
                             #if DEBUG
@@ -2306,7 +2291,7 @@ struct EditRoastTargetView: View {
                         }
                     }
                     .fontWeight(.semibold)
-                    .disabled(target.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .alert("Save Failed", isPresented: $showSaveError) {
@@ -2319,7 +2304,7 @@ struct EditRoastTargetView: View {
             }
             .onAppear {
                 focusedField = .name
-                if let photoData = target.photoData {
+                if let photoData = draft.photoData {
                     photoImage = UIImage(data: photoData)
                 }
             }
@@ -2327,11 +2312,11 @@ struct EditRoastTargetView: View {
     }
 
     private func normalizeSocialFields() {
-        target.instagramHandle = normalizedHandle(target.instagramHandle)
-        target.tiktokHandle = normalizedHandle(target.tiktokHandle)
-        target.xHandle = normalizedHandle(target.xHandle)
-        target.facebookURL = target.facebookURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        target.websiteURL = target.websiteURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        draft.instagramHandle = normalizedHandle(draft.instagramHandle)
+        draft.tiktokHandle = normalizedHandle(draft.tiktokHandle)
+        draft.xHandle = normalizedHandle(draft.xHandle)
+        draft.facebookURL = draft.facebookURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        draft.websiteURL = draft.websiteURL.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func normalizedHandle(_ value: String) -> String {
@@ -2352,11 +2337,11 @@ struct EditRoastTargetView: View {
         let scaledData = scaled.jpegData(compressionQuality: 0.8)
 
         await MainActor.run {
-            guard target.photoData != scaledData else {
+            guard draft.photoData != scaledData else {
                 self.selectedPhoto = nil
                 return
             }
-            target.photoData = scaledData
+            draft.photoData = scaledData
             photoImage = scaled
             self.selectedPhoto = nil
         }

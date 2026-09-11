@@ -26,7 +26,7 @@ struct BrainstormDetailView: View {
     @State private var showPromoteOptions = false
 
     // Auto-save
-    @StateObject private var autoSave = AutoSaveManager.shared
+    @StateObject private var autoSave = AutoSaveManager()
     @State private var saveError: String?
     @State private var showingSaveError = false
 
@@ -45,7 +45,7 @@ struct BrainstormDetailView: View {
     }
 
     private var wordCount: Int {
-        idea.content.split(separator: " ").count
+        idea.content.split(whereSeparator: \.isWhitespace).count
     }
 
     var body: some View {
@@ -90,13 +90,21 @@ struct BrainstormDetailView: View {
         .successToast(message: "Promoted to Jokes", icon: "arrow.up.doc.fill", isPresented: $showPromotedToast, roastMode: roastMode)
         .alert("Move to Trash", isPresented: $showingDeleteAlert) {
             Button("Move to Trash", role: .destructive) {
+                let previousIsTrashed = idea.isTrashed
+                let previousDeletedDate = idea.deletedDate
                 idea.moveToTrash()
                 do {
-                    try modelContext.save()
+                    try JokeEditorPersistence.saveOrRestore {
+                        try modelContext.save()
+                    } restore: {
+                        idea.isTrashed = previousIsTrashed
+                        idea.deletedDate = previousDeletedDate
+                    }
+                    dismiss()
                 } catch {
-                    print(" [BrainstormDetailView] Failed to trash idea: \(error)")
+                    saveError = "Couldn't move this idea to Trash: \(error.localizedDescription)"
+                    showingSaveError = true
                 }
-                dismiss()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -135,30 +143,31 @@ struct BrainstormDetailView: View {
                 }
             }
         }
-        .onDisappear {
-            saveIdeaNow()
+        .onDisappear { saveIdeaNow() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { saveIdeaNow() }
         }
     }
 
     // MARK: - Auto-Save
 
     private func scheduleAutoSave() {
-        autoSave.scheduleSave { [self] in
-            do {
-                try modelContext.save()
-            } catch {
-                print(" [BrainstormDetailView] Auto-save failed: \(error)")
-                saveError = "Your changes couldn't be saved: \(error.localizedDescription)"
-                showingSaveError = true
-            }
-        }
+        autoSave.scheduleSave { persistIdea() }
     }
 
     private func saveIdeaNow() {
+        autoSave.saveNow { persistIdea() }
+    }
+
+    private func persistIdea() -> Bool {
+        guard idea.modelContext != nil else { return true }
         do {
             try modelContext.save()
+            return true
         } catch {
-            print(" [BrainstormDetailView] Save failed: \(error)")
+            saveError = "Your changes couldn't be saved: \(error.localizedDescription)"
+            showingSaveError = true
+            return false
         }
     }
 
@@ -197,7 +206,7 @@ struct BrainstormDetailView: View {
 
                 Spacer()
 
-                SaveStatusIndicator(roastMode: roastMode)
+                SaveStatusIndicator(autoSave: autoSave, roastMode: roastMode)
             }
         }
         .padding(.bottom, 12)
@@ -217,6 +226,8 @@ struct BrainstormDetailView: View {
             }
 
             TextEditor(text: $idea.content)
+
+                .accessibilityLabel("Idea text")
                 .scrollContentBackground(.hidden)
                 .font(.body)
                 .foregroundColor(.primary)
@@ -278,6 +289,8 @@ struct BrainstormDetailView: View {
                     }
 
                     TextEditor(text: $idea.notes)
+
+                        .accessibilityLabel("Notes")
                         .font(.subheadline)
                         .lineSpacing(5)
                         .frame(minHeight: 80)
@@ -506,24 +519,22 @@ struct BrainstormDetailView: View {
             joke.notes = idea.notes
         }
 
+        let previousIsTrashed = idea.isTrashed
+        let previousDeletedDate = idea.deletedDate
         modelContext.insert(joke)
-
+        idea.moveToTrash()
         do {
-            try modelContext.save()
+            try JokeEditorPersistence.saveOrRestore {
+                try modelContext.save()
+            } restore: {
+                modelContext.delete(joke)
+                idea.isTrashed = previousIsTrashed
+                idea.deletedDate = previousDeletedDate
+            }
         } catch {
-            modelContext.delete(joke)
-            print(" [BrainstormDetailView] Failed to save promoted joke: \(error)")
             saveError = "Could not promote to joke: \(error.localizedDescription)"
             showingSaveError = true
             return
-        }
-
-        // Trash the brainstorm idea now that the joke is saved
-        idea.moveToTrash()
-        do {
-            try modelContext.save()
-        } catch {
-            print(" [BrainstormDetailView] Joke saved but failed to trash idea: \(error)")
         }
 
         HapticEngine.shared.success()

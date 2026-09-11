@@ -181,7 +181,6 @@ struct SetListDetailView: View {
         }
         .onAppear {
             recordingName = "\(setList.name) - \(Date().formatted(date: .abbreviated, time: .shortened))"
-            cleanDanglingIDs()
         }
     }
     
@@ -334,29 +333,15 @@ struct SetListDetailView: View {
     }
     
     private func moveJokes(from source: IndexSet, to destination: Int) {
-        setList.jokeIDs.move(fromOffsets: source, toOffset: destination)
-        setList.dateModified = Date()
-        do {
-            try modelContext.save()
-        } catch {
-            operationError = "Could not save reorder: \(error.localizedDescription)"
-            showingOperationError = true
-        }
+        updateSetOrder(keyPath: \.jokeIDs, values: VisibleListOrder.moving(
+            offsets: source, to: destination, visible: setListJokes.map(\.id), stored: setList.jokeIDs
+        ))
     }
 
     private func deleteJokes(at offsets: IndexSet) {
-        for index in offsets.sorted(by: >) {
-            if index < setList.jokeIDs.count {
-                setList.jokeIDs.remove(at: index)
-            }
-        }
-        setList.dateModified = Date()
-        do {
-            try modelContext.save()
-        } catch {
-            operationError = "Could not remove joke: \(error.localizedDescription)"
-            showingOperationError = true
-        }
+        updateSetOrder(keyPath: \.jokeIDs, values: VisibleListOrder.removing(
+            offsets: offsets, visible: setListJokes.map(\.id), stored: setList.jokeIDs
+        ))
     }
     
     // MARK: - Roast Joke Helpers
@@ -401,29 +386,15 @@ struct SetListDetailView: View {
     }
     
     private func moveRoastJokes(from source: IndexSet, to destination: Int) {
-        setList.roastJokeIDs.move(fromOffsets: source, toOffset: destination)
-        setList.dateModified = Date()
-        do {
-            try modelContext.save()
-        } catch {
-            operationError = "Could not save reorder: \(error.localizedDescription)"
-            showingOperationError = true
-        }
+        updateSetOrder(keyPath: \.roastJokeIDs, values: VisibleListOrder.moving(
+            offsets: source, to: destination, visible: setListRoastJokes.map(\.id), stored: setList.roastJokeIDs
+        ))
     }
 
     private func deleteRoastJokes(at offsets: IndexSet) {
-        for index in offsets.sorted(by: >) {
-            if index < setList.roastJokeIDs.count {
-                setList.roastJokeIDs.remove(at: index)
-            }
-        }
-        setList.dateModified = Date()
-        do {
-            try modelContext.save()
-        } catch {
-            operationError = "Could not remove roast: \(error.localizedDescription)"
-            showingOperationError = true
-        }
+        updateSetOrder(keyPath: \.roastJokeIDs, values: VisibleListOrder.removing(
+            offsets: offsets, visible: setListRoastJokes.map(\.id), stored: setList.roastJokeIDs
+        ))
     }
     
     private func timeString(from duration: TimeInterval) -> String {
@@ -452,26 +423,42 @@ struct SetListDetailView: View {
         ShareHelper.shareText(lines.joined(separator: "\n"))
     }
 
-    private func deleteSet() {
-        setList.moveToTrash()
+    private func updateSetOrder(keyPath: ReferenceWritableKeyPath<SetList, [UUID]>, values: [UUID]) {
+        let previousIDs = setList[keyPath: keyPath]
+        let previousDate = setList.dateModified
+        guard previousIDs != values else { return }
+        setList[keyPath: keyPath] = values
+        setList.dateModified = Date()
         do {
-            try modelContext.save()
-            dismiss()
+            try JokeEditorPersistence.saveOrRestore {
+                try modelContext.save()
+            } restore: {
+                setList[keyPath: keyPath] = previousIDs
+                setList.dateModified = previousDate
+            }
         } catch {
-            #if DEBUG
-            print("⚠️ [SetListDetailView] Failed to delete set: \(error)")
-            #endif
-            operationError = "Delete may not have saved. The set will stay deleted but please check later."
+            operationError = "Could not update set: \(error.localizedDescription)"
             showingOperationError = true
-            dismiss()
         }
     }
 
-    private func cleanDanglingIDs() {
-        let jokeIDSet = Set(jokes.map(\.id))
-        let roastIDSet = Set(roastJokes.map(\.id))
-        if setList.cleanDanglingIDs(existingJokeIDs: jokeIDSet, existingRoastJokeIDs: roastIDSet) {
-            try? modelContext.save()
+    private func deleteSet() {
+        let wasTrashed = setList.isTrashed
+        let deletedDate = setList.deletedDate
+        let modifiedDate = setList.dateModified
+        setList.moveToTrash()
+        do {
+            try JokeEditorPersistence.saveOrRestore {
+                try modelContext.save()
+            } restore: {
+                setList.isTrashed = wasTrashed
+                setList.deletedDate = deletedDate
+                setList.dateModified = modifiedDate
+            }
+            dismiss()
+        } catch {
+            operationError = "Could not move this set to Trash: \(error.localizedDescription)"
+            showingOperationError = true
         }
     }
 }
