@@ -11,8 +11,12 @@ import SwiftData
 /// Chat view hosted inside BitBuddyDrawer — slides in from the right edge so
 /// you can chat alongside whatever you're working on.
 struct BitBuddyChatView: View {
+    private func closeChat() {
+        if let onClose { onClose() } else { dismiss() }
+    }
+
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.dismissBitBuddyDrawer) private var dismissDrawer
+    var onClose: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -107,8 +111,7 @@ struct BitBuddyChatView: View {
                     // Brief delay lets keyboard frame animation complete
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         guard scenePhase == .active else { return }
-                        dismissDrawer()
-                        dismiss()
+                        closeChat()
                     }
                 }
                 .foregroundColor(accentColor)
@@ -274,8 +277,7 @@ struct BitBuddyChatView: View {
             )
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 guard scenePhase == .active else { return }
-                dismissDrawer()
-                dismiss()
+                closeChat()
             }
         }
     }

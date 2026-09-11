@@ -99,6 +99,8 @@ struct TalkToTextView: View {
                             }
 
                             TextEditor(text: $transcribedText)
+
+                                .accessibilityLabel("Transcript")
                                 .font(.body)
                                 .scrollContentBackground(.hidden)
                                 .padding(10)

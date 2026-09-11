@@ -39,7 +39,6 @@ struct AddRoastTargetView: View {
         case x
         case facebook
         case website
-        case detail(Int)
     }
 
     var body: some View {
@@ -141,46 +140,12 @@ struct AddRoastTargetView: View {
                         .roastRowBackground()
                         .focused($focusedField, equals: .website)
                         .submitLabel(.next)
-                        .onSubmit { focusedField = .detail(0) }
+                        .onSubmit { focusedField = nil }
                         .accessibilityLabel("Website or social link")
                 }
 
                 Section {
-                    ForEach(Array(traits.enumerated()), id: \.offset) { index, _ in
-                        if index < traits.count {
-                            HStack {
-                                TextField("e.g. works in finance, always late...", text: Binding(
-                                    get: { index < traits.count ? traits[index] : "" },
-                                    set: { newValue in
-                                        if index < traits.count {
-                                            traits[index] = newValue
-                                        }
-                                    }
-                                ))
-                                .focused($focusedField, equals: .detail(index))
-                                .submitLabel(.done)
-                                if traits.count > 1 {
-                                    Button {
-                                        if index < traits.count {
-                                            traits.remove(at: index)
-                                        }
-                                    } label: {
-                                        Image(systemName: "minus.circle.fill")
-                                            .foregroundColor(.red.opacity(0.7))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .roastRowBackground()
-                        }
-                    }
-                    Button {
-                        traits.append("")
-                    } label: {
-                        Label("Add another", systemImage: "plus.circle")
-                            .foregroundColor(accentColor)
-                    }
-                    .roastRowBackground()
+                    EditableTextFields(values: $traits)
                 } header: {
                     Text("What do you know about them?")
                 } footer: {
