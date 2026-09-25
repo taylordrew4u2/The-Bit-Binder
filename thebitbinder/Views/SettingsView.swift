@@ -191,6 +191,14 @@ struct SettingsView: View {
             // MARK: - Support Section
             Section {
                 NavigationLink {
+                    SiriShortcutsView()
+                } label: {
+                    Label("Siri & Shortcuts", systemImage: "waveform")
+                }
+            }
+
+            Section {
+                NavigationLink {
                     ShowMeAroundView()
                 } label: {
                     Label("Show Me Around", systemImage: "figure.walk")

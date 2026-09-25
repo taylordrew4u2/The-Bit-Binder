@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import AppIntents
 
 @MainActor
 @main
@@ -14,6 +15,7 @@ struct thebitbinderApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var startup = AppStartupCoordinator()
     @StateObject private var userPreferences = UserPreferences()
+    @StateObject private var siriRouter = SiriNavigationRouter.shared
     @State private var postStartupTask: Task<Void, Never>?
     
     var sharedModelContainer: ModelContainer = {
@@ -181,6 +183,13 @@ struct thebitbinderApp: App {
         }
     }()
 
+    init() {
+        // Register the same store used by the UI before background intents run.
+        let container = sharedModelContainer
+        AppDependencyManager.shared.add(dependency: container)
+        BitBinderShortcuts.updateAppShortcutParameters()
+    }
+
     @Environment(\.scenePhase) private var scenePhase
 
     /// When Roast Mode is on, flip the app-wide tint from blue → red so every
@@ -188,6 +197,7 @@ struct thebitbinderApp: App {
     /// Toggles, Links, ProgressViews, navigation tint, etc.) turns red.
     @AppStorage("roastModeEnabled") private var roastMode: Bool = false
     @AppStorage("appTextSize") private var appTextSizeRawValue: String = AppTextSize.system.rawValue
+    @AppStorage("hasCompletedSetup") private var hasCompletedSetup = false
 
     private var appTextSize: AppTextSize {
         AppTextSize(rawValue: appTextSizeRawValue) ?? .system
@@ -204,6 +214,12 @@ struct thebitbinderApp: App {
                     LaunchScreenView(statusText: startup.statusText, userName: userPreferences.userName)
                         .transition(.opacity)
                 }
+            }
+            .background {
+                SiriNavigationHost(router: siriRouter,
+                                   isReady: startup.isReady && scenePhase == .active
+                                       && (hasCompletedSetup || roastMode))
+                    .frame(width: 0, height: 0)
             }
             .tint(roastMode ? FirePalette.core : .blue)
             .appTextSize(appTextSize)

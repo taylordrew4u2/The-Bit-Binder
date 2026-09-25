@@ -990,8 +990,10 @@ struct JokesView: View {
                     Button(action: { showingImagePicker = true }) {
                         Label("Photos", systemImage: "photo.on.rectangle")
                     }
-                    Button(action: { showingScanner = true }) {
-                        Label("Camera", systemImage: "camera.viewfinder")
+                    if DocumentScannerView.isSupported {
+                        Button(action: { showingScanner = true }) {
+                            Label("Camera", systemImage: "camera.viewfinder")
+                        }
                     }
                     Button(action: { showingAudioImport = true }) {
                         Label("Audio", systemImage: "waveform")
@@ -1011,6 +1013,7 @@ struct JokesView: View {
                         Button(action: { showingAddJoke = true }) {
                             Label("Write a Joke", systemImage: "square.and.pencil")
                         }
+                        .keyboardShortcut("n", modifiers: .command)
                         Button(action: { showingTalkToText = true }) {
                             Label("Dictate Joke", systemImage: "mic.badge.plus")
                         }

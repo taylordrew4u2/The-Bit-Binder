@@ -19,3 +19,5 @@ xcrun swiftc thebitbinder/Utilities/AppTextSize.swift Tests/SwiftUI/TextSizeRegr
 "$test_build_dir/text-size"
 xcrun swiftc thebitbinder/Utilities/ActionColors.swift Tests/SwiftUI/ActionColorsRegression.swift -o "$test_build_dir/action-colors"
 "$test_build_dir/action-colors"
+xcrun swiftc thebitbinder/Utilities/JokeEditorPersistence.swift thebitbinder/Utilities/KeywordTitleGenerator.swift thebitbinder/Utilities/SiriJokeCapture.swift Tests/SwiftUI/SiriCaptureRegression.swift -o "$test_build_dir/siri-capture"
+"$test_build_dir/siri-capture"

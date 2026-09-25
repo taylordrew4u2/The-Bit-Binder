@@ -36,9 +36,75 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/BitBinderBuild" -jobs 2 \
             ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO build 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Run Siri integration tests
+        run: |
+          set -o pipefail
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/siri-simulators.json"
+          siri_simulator_id="$(python3 - "$RUNNER_TEMP/siri-simulators.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as source:
+              runtimes = json.load(source)["devices"]
+          candidates = []
+          for runtime, devices in runtimes.items():
+              if not runtime.startswith("com.apple.CoreSimulator.SimRuntime.iOS-"):
+                  continue
+              version = tuple(int(part) for part in runtime.split("iOS-", 1)[1].split("-"))
+              if version < (18,):
+                  continue
+              for device in devices:
+                  if device.get("isAvailable", True) and device["name"].startswith("iPhone"):
+                      candidates.append((version, device.get("state") == "Booted", device["name"], device["udid"]))
+          if not candidates:
+              raise SystemExit("No available iPhone simulator running iOS 18 or later")
+          print(max(candidates)[3])
+          PY
+          )"
+          xcodebuild -project thebitbinder.xcodeproj -scheme thebitbinder \
+            -destination "platform=iOS Simulator,id=$siri_simulator_id" \
+            -destination-timeout 120 \
+            -derivedDataPath "$RUNNER_TEMP/BitBinderBuild" -jobs 2 \
+            -only-testing:thebitbinderTests/SiriIntegrationTests \
+            -parallel-testing-enabled NO \
+            -resultBundlePath "$RUNNER_TEMP/SiriIntegrationTests.xcresult" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- \
+            COMPILER_INDEX_STORE_ENABLE=NO test 2>&1 | tee "$RUNNER_TEMP/siri-tests.log"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: simulator-build-log
           path: ${{ runner.temp }}/build.log
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: siri-integration-results
+          path: |
+            ${{ runner.temp }}/siri-tests.log
+            ${{ runner.temp }}/SiriIntegrationTests.xcresult
+            ${{ runner.temp }}/siri-simulators.json
+          if-no-files-found: ignore
+
+  mac-build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build universal Mac Catalyst app
+        run: |
+          set -o pipefail
+          xcodebuild -project thebitbinder.xcodeproj -scheme thebitbinder \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+            -derivedDataPath "$RUNNER_TEMP/BitBinderMacBuild" -jobs 2 \
+            'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO build 2>&1 | tee "$RUNNER_TEMP/mac-build.log"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: mac-catalyst-build-log
+          path: ${{ runner.temp }}/mac-build.log
           if-no-files-found: ignore

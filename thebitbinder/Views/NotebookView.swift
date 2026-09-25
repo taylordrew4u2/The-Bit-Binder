@@ -236,8 +236,10 @@ struct NotebookView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Button { showingCamera = true } label: {
-                        Label("Take Photo", systemImage: "camera")
+                    if CameraView.isSupported {
+                        Button { showingCamera = true } label: {
+                            Label("Take Photo", systemImage: "camera")
+                        }
                     }
                     PhotosPicker(selection: $pickedPhotoItem,
                                  matching: .images,
@@ -1061,8 +1063,39 @@ struct ZoomableImageView: View {
 
 // MARK: - CameraView (UIKit wrapped)
 
+struct CameraView: View {
+    @Binding var image: UIImage?
+
+    static var isSupported: Bool {
+        #if targetEnvironment(macCatalyst)
+        false
+        #else
+        !ProcessInfo.processInfo.isiOSAppOnMac && UIImagePickerController.isSourceTypeAvailable(.camera)
+        #endif
+    }
+
+    var body: some View {
+        #if !targetEnvironment(macCatalyst)
+        if Self.isSupported {
+            CameraCaptureController(image: $image)
+        } else {
+            unavailableView
+        }
+        #else
+        unavailableView
+        #endif
+    }
+
+    private var unavailableView: some View {
+        CaptureUnavailableView(
+            title: "Camera Unavailable",
+            message: "Choose from Library or Import PDF from the Add menu instead."
+        )
+    }
+}
+
 #if !targetEnvironment(macCatalyst)
-struct CameraView: UIViewControllerRepresentable {
+private struct CameraCaptureController: UIViewControllerRepresentable {
     @Binding var image: UIImage?
     @Environment(\.dismiss) private var dismiss
     
@@ -1078,8 +1111,8 @@ struct CameraView: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
     
     class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-        let parent: CameraView
-        init(parent: CameraView) { self.parent = parent }
+        let parent: CameraCaptureController
+        init(parent: CameraCaptureController) { self.parent = parent }
         
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { parent.dismiss() }
         
@@ -1087,21 +1120,6 @@ struct CameraView: UIViewControllerRepresentable {
             if let uiImage = info[.originalImage] as? UIImage { parent.image = uiImage }
             parent.dismiss()
         }
-    }
-}
-#else
-struct CameraView: View {
-    @Binding var image: UIImage?
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "camera.badge.exclamationmark")
-                .font(.system(size: 44))
-                .foregroundColor(.secondary)
-            Text("Camera is not available on Mac.\nUse the photo picker instead.")
-                .multilineTextAlignment(.center)
-                .foregroundColor(.secondary)
-        }
-        .padding(40)
     }
 }
 #endif
