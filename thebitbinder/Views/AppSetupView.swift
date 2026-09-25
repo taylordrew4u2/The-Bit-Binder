@@ -2,7 +2,7 @@
 //  AppSetupView.swift
 //  thebitbinder
 //
-//  First-launch setup wizard and re-configurable preferences.
+//  First-launch setup with a compatibility route to direct preferences.
 //  Native iOS style: system blue, white background, clean typography.
 //
 
@@ -16,7 +16,6 @@ struct AppSetupView: View {
     // Persisted preferences
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("jokesViewMode") private var jokesViewMode: JokesViewMode = .grid
-    @AppStorage("showFullContent") private var showFullContent = true
     @AppStorage("setupSelectedTabs") private var selectedTabsRaw: String = ""
     @AppStorage("homeSelectedSections") private var selectedHomeSectionsRaw: String = ""
     @AppStorage("hasCompletedSetup") private var hasCompletedSetup = false
@@ -28,8 +27,7 @@ struct AppSetupView: View {
     @State private var selectedHomeSections: Set<HomeSection> = []
     @State private var iCloudSyncEnabled = false
 
-    /// When true, presented as the first-launch onboarding. When false,
-    /// it's opened from Settings so we skip the welcome page.
+    /// Existing callers can open direct preferences without repeating onboarding.
     var isFirstLaunch: Bool = true
 
     // All configurable tabs (excluding Settings — always shown)
@@ -41,9 +39,17 @@ struct AppSetupView: View {
 
     // First launch keeps only the essential steps; tabs/home/layout default
     // to sensible values and stay editable later in Settings.
-    private var pageCount: Int { isFirstLaunch ? 4 : 6 }
+    private let pageCount = 4
 
     var body: some View {
+        if isFirstLaunch {
+            onboarding
+        } else {
+            AppCustomizationView()
+        }
+    }
+
+    private var onboarding: some View {
         VStack(spacing: 0) {
             // Progress dots, with an optional Skip on first launch
             ZStack {
@@ -68,19 +74,10 @@ struct AppSetupView: View {
             .padding(.top, 16)
 
             TabView(selection: $currentPage) {
-                if isFirstLaunch {
-                    welcomePage.readableWidth().tag(0)
-                    privacyPage.readableWidth().tag(1)
-                    namePage.readableWidth().tag(2)
-                    readyPage.readableWidth().tag(3)
-                } else {
-                    privacyPage.readableWidth().tag(0)
-                    namePage.readableWidth().tag(1)
-                    tabsPage.readableWidth().tag(2)
-                    homePage.readableWidth().tag(3)
-                    jokeViewPage.readableWidth().tag(4)
-                    readyPage.readableWidth().tag(5)
-                }
+                welcomePage.readableWidth().tag(0)
+                privacyPage.readableWidth().tag(1)
+                namePage.readableWidth().tag(2)
+                readyPage.readableWidth().tag(3)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.easeInOut(duration: 0.3), value: currentPage)
@@ -114,8 +111,8 @@ struct AppSetupView: View {
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(Color.accentColor)
-                        .foregroundColor(.white)
+                        .background(ActionColors.blue)
+                        .foregroundStyle(ActionColors.foreground)
                         .clipShape(Capsule())
                     }
                 } else {
@@ -126,8 +123,8 @@ struct AppSetupView: View {
                             .font(.subheadline.weight(.semibold))
                             .padding(.horizontal, 24)
                             .padding(.vertical, 10)
-                            .background(Color.accentColor)
-                            .foregroundColor(.white)
+                            .background(ActionColors.blue)
+                            .foregroundStyle(ActionColors.foreground)
                             .clipShape(Capsule())
                     }
                 }
@@ -269,152 +266,6 @@ struct AppSetupView: View {
         }
     }
 
-    private var tabsPage: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                Spacer(minLength: 20)
-
-                Image(systemName: "dock.rectangle")
-                    .font(.system(size: 48))
-                    .foregroundColor(.accentColor)
-
-                Text("Choose Your Tabs")
-                    .font(.title2.bold())
-
-                Text("Pick which sections appear in your bottom bar.\nYou can always change this later.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-
-                VStack(spacing: 0) {
-                    ForEach(configurableTabs, id: \.self) { screen in
-                        tabRow(for: screen)
-                        if screen != configurableTabs.last {
-                            Divider().padding(.leading, 56)
-                        }
-                    }
-                }
-                .background(Color(UIColor.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 20)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("Settings is always available.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                // Roast mode toggle
-                VStack(spacing: 0) {
-                    Toggle(isOn: $roastMode) {
-                        Label("Roast Mode", systemImage: "flame.fill")
-                            .font(.body)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-                .background(Color(UIColor.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 20)
-
-                Text("Roast Mode organizes material by target instead of folder.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 24)
-
-                Spacer(minLength: 60)
-            }
-        }
-    }
-
-    private var jokeViewPage: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                Spacer(minLength: 20)
-
-                Image(systemName: "rectangle.grid.1x2")
-                    .font(.system(size: 48))
-                    .foregroundColor(.accentColor)
-
-                Text("How Do You Want to See Jokes?")
-                    .font(.title2.bold())
-
-                // View mode picker
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Layout")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 4)
-
-                    HStack(spacing: 12) {
-                        viewModeCard(mode: .list, icon: "list.bullet", title: "List")
-                        viewModeCard(mode: .grid, icon: "square.grid.2x2", title: "Grid")
-                    }
-                }
-                .padding(.horizontal, 20)
-
-                // Content preview toggle
-                VStack(spacing: 0) {
-                    Toggle(isOn: $showFullContent) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Show Full Content")
-                                .font(.body)
-                            Text("Display joke text in lists and cards")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-                .background(Color(UIColor.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 20)
-
-                Spacer(minLength: 60)
-            }
-        }
-    }
-
-    private var homePage: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                Spacer(minLength: 20)
-
-                Image(systemName: "house")
-                    .font(.system(size: 48))
-                    .foregroundColor(.accentColor)
-
-                Text("Choose Your Home Screen")
-                    .font(.title2.bold())
-
-                Text("Pick which sections show on Home.\nYour greeting always stays at the top.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-
-                VStack(spacing: 0) {
-                    ForEach(HomeSection.allCases, id: \.self) { section in
-                        homeSectionRow(for: section)
-                        if section != HomeSection.allCases.last {
-                            Divider().padding(.leading, 56)
-                        }
-                    }
-                }
-                .background(Color(UIColor.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 20)
-
-                Spacer(minLength: 60)
-            }
-        }
-    }
-
     private var readyPage: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -458,116 +309,6 @@ struct AppSetupView: View {
 
     // MARK: - Components
 
-    private func tabRow(for screen: AppScreen) -> some View {
-        let isSelected = selectedTabs.contains(screen)
-        return Button {
-            if isSelected {
-                // Don't allow deselecting Jokes — it's required
-                if screen != .jokes {
-                    selectedTabs.remove(screen)
-                }
-            } else {
-                // Max 5 tabs (iOS tab bar limit)
-                if selectedTabs.count < 5 {
-                    selectedTabs.insert(screen)
-                }
-            }
-            saveSelectedTabs()
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: isSelected ? screen.selectedIcon : screen.icon)
-                    .font(.title3)
-                    .foregroundColor(isSelected ? .accentColor : .secondary)
-                    .frame(width: 28)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(screen.displayName)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                    Text(tabDescription(for: screen))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .accentColor : Color(UIColor.tertiaryLabel))
-                    .font(.title3)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func viewModeCard(mode: JokesViewMode, icon: String, title: String) -> some View {
-        let isSelected = jokesViewMode == mode
-        return Button {
-            jokesViewMode = mode
-        } label: {
-            VStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.title2)
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.accentColor.opacity(0.1) : Color(UIColor.secondarySystemGroupedBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
-            )
-            .foregroundColor(isSelected ? .accentColor : .primary)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func homeSectionRow(for section: HomeSection) -> some View {
-        let isSelected = selectedHomeSections.contains(section)
-        return Button {
-            if isSelected {
-                if selectedHomeSections.count > 1 {
-                    selectedHomeSections.remove(section)
-                }
-            } else {
-                selectedHomeSections.insert(section)
-            }
-            saveSelectedHomeSections()
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: section.icon)
-                    .font(.title3)
-                    .foregroundColor(isSelected ? .accentColor : .secondary)
-                    .frame(width: 28)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(section.rawValue)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                    Text(section.detail)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .accentColor : Color(UIColor.tertiaryLabel))
-                    .font(.title3)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
     private func summaryRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
@@ -610,18 +351,6 @@ struct AppSetupView: View {
     }
 
     // MARK: - Helpers
-
-    private func tabDescription(for screen: AppScreen) -> String {
-        switch screen {
-        case .home:          return "Dashboard with stats and quick actions"
-        case .brainstorm:    return "Freeform ideas and premises"
-        case .jokes:         return "Your joke library (always included)"
-        case .sets:          return "Set lists and run-throughs"
-        case .recordings:    return "Audio recordings and transcriptions"
-        case .notebookSaver: return "A lined notepad for freeform notes"
-        case .settings:      return ""
-        }
-    }
 
     private func saveNameIfNeeded() {
         let trimmed = nameText.trimmingCharacters(in: .whitespacesAndNewlines)

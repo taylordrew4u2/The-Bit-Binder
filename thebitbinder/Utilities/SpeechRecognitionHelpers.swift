@@ -176,13 +176,13 @@ enum SpeechErrorMapper {
             case 203:
                 return "No internet connection for speech recognition. Reconnect and try again."
             case 1107, 1109:
-                return "The microphone was interrupted. Tap Start Recording to try again."
+                return "The microphone was interrupted. Tap Dictate to try again."
             default:
-                return "Recognition paused. Tap Start Recording to continue."
+                return "Recognition paused. Tap Dictate to continue."
             }
         }
 
         // Anything else — keep it short but informative.
-        return "Recognition paused. Tap Start Recording to continue."
+        return "Recognition paused. Tap Dictate to continue."
     }
 }

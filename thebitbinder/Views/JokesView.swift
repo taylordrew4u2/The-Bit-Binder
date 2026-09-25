@@ -163,6 +163,14 @@ struct JokesView: View {
     private var folderChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                FolderChip(
+                    name: "All Jokes",
+                    icon: "tray.full.fill",
+                    isSelected: !hasActiveFilters,
+                    roastMode: roastMode,
+                    action: clearLibraryFilters
+                )
+
                 // The Hits chip
                 TheHitsChip(
                     count: hitsCount,
@@ -178,40 +186,6 @@ struct JokesView: View {
                     }
                 )
 
-                // Tag filter chip — opens picker sheet, shows active tag inline
-                TagFilterChip(
-                    activeTag: activeTagFilter,
-                    isSelected: activeTagFilter != nil,
-                    roastMode: roastMode,
-                    action: { showingTagFilterSheet = true }
-                )
-
-                if activeTagFilter != nil {
-                    Button {
-                        activeTagFilter = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                            .imageScale(.medium)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear tag filter")
-                }
-                
-                // All Jokes
-                FolderChip(
-                    name: "All",
-                    icon: "tray.full.fill",
-                    isSelected: selectedFolder == nil && !showRecentlyAdded && !showingHitsFilter && !showingOpenMicFilter,
-                    roastMode: roastMode,
-                    action: {
-                        selectedFolder = nil
-                        showRecentlyAdded = false
-                        showingHitsFilter = false
-                        showingOpenMicFilter = false
-                    }
-                )
-                
                 // Recently Added
                 FolderChip(
                     name: "Recent",
@@ -257,6 +231,65 @@ struct JokesView: View {
             }
             .padding(.horizontal, 16)
         }
+        .padding(.vertical, 6)
+    }
+
+    private var hasActiveFilters: Bool {
+        selectedFolder != nil || showRecentlyAdded || showingHitsFilter || showingOpenMicFilter
+            || activeTagFilter != nil || !searchText.isEmpty || !debouncedSearchText.isEmpty
+    }
+
+    private var activeFilterSummary: String {
+        var filters: [String] = []
+        if showingHitsFilter { filters.append("The Hits") }
+        if showingOpenMicFilter { filters.append("Open Mic") }
+        if showRecentlyAdded { filters.append("Added in the last 7 days") }
+        if let selectedFolder { filters.append("Folder: \(selectedFolder.name)") }
+        if let activeTagFilter { filters.append("Tag: #\(activeTagFilter)") }
+        let query = debouncedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty { filters.append("Search: “\(query)”") }
+        return filters.joined(separator: " · ")
+    }
+
+    private func clearLibraryFilters() {
+        selectedFolder = nil
+        showRecentlyAdded = false
+        showingHitsFilter = false
+        showingOpenMicFilter = false
+        activeTagFilter = nil
+        searchText = ""
+        debouncedSearchText = ""
+    }
+
+    private var libraryFilterSummary: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("\(filteredJokes.count) joke\(filteredJokes.count == 1 ? "" : "s")")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    showingTagFilterSheet = true
+                } label: {
+                    Label("Filter by Tag", systemImage: activeTagFilter == nil ? "tag" : "tag.fill")
+                        .font(.subheadline)
+                }
+            }
+
+            if hasActiveFilters {
+                HStack(alignment: .top, spacing: 12) {
+                    Text(activeFilterSummary.isEmpty ? "Search active" : activeFilterSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Clear All", action: clearLibraryFilters)
+                        .font(.subheadline)
+                        .fixedSize()
+                        .accessibilityLabel("Clear all library filters and search")
+                }
+            }
+        }
+        .padding(.horizontal, 16)
         .padding(.vertical, 6)
     }
 
@@ -324,7 +357,7 @@ struct JokesView: View {
     private var emptyState: some View {
         JokesEmptyState(
             roastMode: roastMode,
-            hasFilter: selectedFolder != nil || showRecentlyAdded || showingHitsFilter || showingOpenMicFilter || activeTagFilter != nil || !searchText.isEmpty,
+            hasFilter: hasActiveFilters,
             onAddJoke: { showingAddJoke = true }
         )
     }
@@ -553,8 +586,9 @@ struct JokesView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
 
-                // Joke rolodex filter chips (Hits, tags, folders…)
+                // Library scopes, followed by the applied filters and result count.
                 folderChips
+                libraryFilterSummary
 
                 if viewMode == .grid && !filteredJokes.isEmpty {
                     gridSizeControls
@@ -948,6 +982,29 @@ struct JokesView: View {
                 }
             }
         } else {
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    Button(action: { showingFilePicker = true }) {
+                        Label("Files", systemImage: "doc.text")
+                    }
+                    Button(action: { showingImagePicker = true }) {
+                        Label("Photos", systemImage: "photo.on.rectangle")
+                    }
+                    Button(action: { showingScanner = true }) {
+                        Label("Camera", systemImage: "camera.viewfinder")
+                    }
+                    Button(action: { showingAudioImport = true }) {
+                        Label("Audio", systemImage: "waveform")
+                    }
+                    Section("More Options") {
+                        Button(action: { showingGagGrabber = true }) {
+                            Label("Review with GagGrabber…", systemImage: "text.magnifyingglass")
+                        }
+                    }
+                } label: {
+                    Text("Import Jokes")
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Section("Create") {
@@ -955,36 +1012,12 @@ struct JokesView: View {
                             Label("Write a Joke", systemImage: "square.and.pencil")
                         }
                         Button(action: { showingTalkToText = true }) {
-                            Label("Talk-to-Text", systemImage: "mic.badge.plus")
-                        }
-                    }
-                    Section("Import") {
-                        Button(action: { showingGagGrabber = true }) {
-                            Label {
-                                Text("GagGrabber (Extract Jokes)")
-                            } icon: {
-                                Image("GagGrabberGlyph")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 20, height: 20)
-                            }
-                        }
-                        Button(action: { showingFilePicker = true }) {
-                            Label("Import from Files", systemImage: "doc.text")
-                        }
-                        Button(action: { showingScanner = true }) {
-                            Label("Scan with Camera", systemImage: "camera.viewfinder")
-                        }
-                        Button(action: { showingImagePicker = true }) {
-                            Label("Import from Photos", systemImage: "photo.on.rectangle")
-                        }
-                        Button(action: { showingAudioImport = true }) {
-                            Label("Import from Voice Memos", systemImage: "waveform")
+                            Label("Dictate Joke", systemImage: "mic.badge.plus")
                         }
                     }
                 } label: {
                     Image(systemName: "plus")
-                        .accessibilityLabel("Add or Import")
+                        .accessibilityLabel("Create a joke")
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -999,7 +1032,7 @@ struct JokesView: View {
                                   systemImage: viewMode.icon)
                         }
                         Button(action: { showFullContent.toggle() }) {
-                            Label(showFullContent ? "Show Titles Only" : "Show Full Content",
+                            Label(showFullContent ? "Show Titles Only" : "Show Previews",
                                   systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
                         }
                         if viewMode == .grid {

@@ -232,29 +232,7 @@ private enum GagGrabberPDFReader {
     }
 }
 
-// MARK: - SwiftUI: Toolbar Button + Extraction Sheet
-
-struct HybridGagGrabberToolbarButton: View {
-    @State private var showSheet = false
-
-    var body: some View {
-        Button {
-            showSheet = true
-        } label: {
-            Label {
-                Text("Extract Jokes")
-            } icon: {
-                Image("GagGrabberGlyph")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 20, height: 20)
-            }
-        }
-        .sheet(isPresented: $showSheet) {
-            HybridGagGrabberSheet()
-        }
-    }
-}
+// MARK: - SwiftUI: Extraction Review Sheet
 
 /// Full-screen sheet: pick a document, extract jokes, and add them one-by-one
 /// to the user's Joke library.
@@ -274,97 +252,15 @@ struct HybridGagGrabberSheet: View {
     @State private var showGoogleDocsInput = false
     @State private var googleDocsURL = ""
 
-    private var faceMood: GagGrabberFace.Mood {
-        if grabber.isExtracting { return .working }
-        if grabber.lastError != nil { return .confused }
-        if !grabber.extractedJokes.isEmpty { return .happy }
-        return .idle
-    }
-
     var body: some View {
         NavigationStack {
             List {
-                // MARK: Welcome
-                Section {
-                    VStack(spacing: 14) {
-                        GagGrabberFace(mood: faceMood, size: 56)
-                            .padding(.top, 8)
-
-                        Text("GagGrabber")
-                            .font(.title2.weight(.bold))
-
-                        Text("Import a file and GagGrabber will pull out each joke so you can add them to your library.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
-                }
-
-                // MARK: Formatting Instructions
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Put a **blank line** between each joke:")
-                            .font(.subheadline)
-
-                        Text("""
-                        Why did the chicken cross the road?
-                        To get to the other side.
-
-                        I told my wife she draws her eyebrows too high.
-                        She looked surprised.
-
-                        What do you call a fake noodle?
-                        An impasta.
-                        """)
-                            .font(.caption)
-                            .monospaced()
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(DS.Corner.md)
-
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .font(.caption)
-                            Text("Also works with numbered lists, bullets (- or •), and --- separators.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                } header: {
-                    Label("How to format your file", systemImage: "doc.text")
-                }
-
-                // MARK: Supported Formats
-                Section {
-                    HStack(spacing: 6) {
-                        ForEach(["TXT", "PDF", "RTF", "Google Docs"], id: \.self) { fmt in
-                            Text(fmt)
-                                .font(.caption2.weight(.semibold))
-                                .foregroundColor(Color.accentColor)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 4)
-                                .background(Color.accentColor.opacity(0.1))
-                                .clipShape(Capsule())
-                        }
-                        Spacer()
-                    }
-                    .listRowBackground(Color.clear)
-                }
-
                 // MARK: Source
-                Section("Import") {
+                Section {
                     Button {
                         showPicker = true
                     } label: {
-                        Label("Pick a File (.txt, .pdf, .rtf, …)", systemImage: "doc.badge.plus")
+                        Label("Choose a File", systemImage: "doc.badge.plus")
                     }
                     .disabled(grabber.isExtracting)
 
@@ -399,6 +295,22 @@ struct HybridGagGrabberSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 4)
+                    }
+                } header: {
+                    Text("Choose a Source")
+                } footer: {
+                    Text("GagGrabber extracts jokes for you to review before adding them to your library. Supports text, PDF, RTF, CSV and HTML files.")
+                }
+
+                Section {
+                    DisclosureGroup("Formatting Tips") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Put a blank line between each joke, keeping its setup and punchline together.")
+                            Text("Numbered lists, bullets and --- separators also work. PDFs with selectable text give the best results.")
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
                     }
                 }
 

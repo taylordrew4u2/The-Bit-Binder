@@ -219,7 +219,6 @@ struct MainTabView: View {
     @AppStorage("hasCompletedSetup") private var hasCompletedSetup: Bool = false
     @AppStorage("setupSelectedTabs") private var setupSelectedTabs: String = ""
     @State private var assistantTab: AppScreen?
-    @State private var showGagGrabber = false
     @State private var showSetup = false
     @AppStorage("roastModeEnabled") private var roastMode = false
     @Environment(\.scenePhase) private var scenePhase
@@ -304,12 +303,11 @@ struct MainTabView: View {
             BitBuddyService.shared.setCurrentPage(newTab.bitBuddySection)
         }
         .fullScreenCover(isPresented: $showSetup) {
-            AppSetupView(isFirstLaunch: !hasLaunchedBefore)
+            AppSetupView()
         }
         .onChange(of: roastMode) { _, isRoast in
             haptic(.medium)
             if isRoast {
-                showGagGrabber = false
                 showSetup = false
                 bitBuddyDrawer.close()
                 bitBuddyPresenter.close()
@@ -326,7 +324,6 @@ struct MainTabView: View {
                     showSetup = true
                 }
             case .background, .inactive:
-                showGagGrabber = false
                 showSetup = false
                 bitBuddyDrawer.close()
                 bitBuddyPresenter.close()
@@ -349,9 +346,6 @@ struct MainTabView: View {
                     selectedTabRaw = screen.rawValue
                 }
             }
-        }
-        .sheet(isPresented: $showGagGrabber) {
-            HybridGagGrabberSheet()
         }
         .overlay(alignment: .topLeading) {
             if userPreferences.bitBuddyEnabled && !roastMode {
@@ -508,21 +502,6 @@ struct MainTabView: View {
                         screenView(for: screen)
                             .navigationTitle("")
                             .navigationBarTitleDisplayMode(.inline)
-                            .toolbar {
-                                if screen == .jokes {
-                                    ToolbarItem(placement: .topBarTrailing) {
-                                        Button {
-                                            showGagGrabber = true
-                                        } label: {
-                                            Image("GagGrabberGlyph")
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fit)
-                                                .frame(width: 20, height: 20)
-                                        }
-                                        .accessibilityLabel("Import jokes with GagGrabber")
-                                    }
-                                }
-                            }
                     }
                 } label: {
                     Label(

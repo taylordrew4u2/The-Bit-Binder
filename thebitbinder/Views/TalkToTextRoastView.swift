@@ -64,7 +64,7 @@ struct TalkToTextRoastView: View {
                              .symbolEffect(.variableColor, isActive: isRecording && !reduceMotion)
                      }
                      
-                     Text(isRecording ? "Listening..." : "Ready")
+                     Text(isRecording ? "Dictating…" : "Ready to Dictate")
                          .font(.title3)
                          .fontWeight(.semibold)
                 }
@@ -122,9 +122,15 @@ struct TalkToTextRoastView: View {
                 
                 Spacer()
                 
+                Text("Turns speech into editable text. Audio is not saved.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+
                 // Controls
                 VStack(spacing: 16) {
-                    // Main record button
+                    // Dictation adds text; it does not save an audio recording.
                     Button {
                         if isRecording {
                             stopRecording()
@@ -132,7 +138,7 @@ struct TalkToTextRoastView: View {
                             startRecording()
                         }
                     } label: {
-                        Label(isRecording ? "Stop" : "Start Recording",
+                        Label(isRecording ? "Stop Dictation" : "Dictate",
                               systemImage: isRecording ? "stop.fill" : "mic.fill")
                             .frame(maxWidth: .infinity)
                     }
@@ -158,6 +164,7 @@ struct TalkToTextRoastView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 30)
             }
+            .navigationTitle("Dictate Roast")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -194,7 +201,7 @@ struct TalkToTextRoastView: View {
                     dismiss()
                 }
             } message: {
-                Text("Microphone and Speech Recognition permissions are required for Talk-to-Text. Please enable them in Settings.")
+                Text("Microphone and Speech Recognition permissions are required for dictation. Please enable them in Settings.")
             }
             .onChange(of: speechRecognizer.transcribedText) { _, newValue in
                 transcribedText = newValue

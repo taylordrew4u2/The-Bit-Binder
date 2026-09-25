@@ -61,13 +61,10 @@ enum FirePalette {
         endPoint: .bottom
     )
 
-    // MARK: - Ember CTA gradient (buttons, pills)
+    // MARK: - Ember CTA fill (buttons, pills)
 
-    static let emberCTA = LinearGradient(
-        colors: [core, Color(red: 0.91, green: 0.27, blue: 0.12)],  // #E8451E
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    /// Keep bright decorative accents out of the background behind white text.
+    static let emberCTA = ActionColors.ember
 
     // MARK: - Heat scale
 

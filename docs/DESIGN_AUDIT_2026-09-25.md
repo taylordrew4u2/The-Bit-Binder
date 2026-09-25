@@ -4,7 +4,23 @@
 
 BitBinder has a useful native foundation, but the interface gives too much prominence to management controls, repeated statistics, and helper features relative to the user's writing and rehearsal. The most valuable design change is to make the material itself the focus: resume a draft, write a joke, arrange a set, and read it comfortably.
 
-This is a design audit, not an implemented redesign. Findings concern the source at `b5123f0`, after the seven earlier UI fixes. Those fixes remain in place.
+The findings below record the design at `b5123f0`, after the seven earlier UI fixes. The implementation pass described next addresses those findings; the original evidence is retained for comparison.
+
+## Implementation status
+
+Implemented after the audit:
+
+- **Sets:** Arrange/Rehearse modes, numbered full-text expansion, readable rehearsal text and Next Joke controls. Add/Reorder are visible; idle recording is compact and active recording has a persistent Stop action.
+- **Capture:** Dictate / Stop Dictation labels explain that speech adds text without saving audio. Record remains reserved for audio capture.
+- **Contrast and text:** opaque action colors separate from accents; source-color regression checks blue/white at 7.40:1 and ember/white at 5.75:1 in four macOS appearance variants. Roast content uses semantic text styles and accessibility layouts. These tests do not replace iOS rendered verification.
+- **Home:** concise greeting, writing/capture actions, Continue Writing, then a compact Activity row. Repeated header counts removed; a new library keeps a first-joke action and hides zero-value statistics.
+- **Import:** one labeled Import Jokes source menu. Optional GagGrabber review keeps its existing pipeline, with source actions before collapsed guidance. Removed duplicate shell import control.
+- **Filters:** All Jokes and Clear All reset folder/status/tag/search together. Result count and applied-filter descriptions explain the current scope.
+- **Preferences:** direct Appearance, Navigation, Home, Writing and Privacy sections replace repeat onboarding. Existing preference keys stay intact. The initial setup always uses the first-launch flow; the assistant is consistently named BitBuddy in Settings.
+
+The native design guide now documents these conventions. No data models, import processors, joke-save handlers, set order handlers or audio-save handlers were changed. `Tests/run-regressions.sh` includes the action-color regression alongside existing data-safety, navigation, layout and text-size checks.
+
+Current-device visual sign-off remains pending: this Mac has no full Xcode installation or iOS simulator. The checklist at the end is still required for rendered layout, VoiceOver, keyboard and device interaction validation. The existing optional assistant launcher remains available; moving it entirely into the editor was a consideration, not a required fix.
 
 ## Evidence and limits
 
@@ -123,4 +139,4 @@ The existing native-design guide describes a historical design state and conflic
 
 Capture current-build iPhone and iPad screens with realistic long jokes and set lists, including empty/populated/search/filter states, keyboard-visible editing, active recording, standard/roast appearances and accessibility text sizes. Then test: resume a draft, dictate a line, import a PDF, clear filters, reorder a set, and read it in full. Check contrast on actual rendered controls and ask users what each capture action will save.
 
-No implementation changes or tests were needed for this documentation-only audit.
+The original audit was documentation-only. The subsequent implementation and automated checks are described in the status section above; device visual acceptance remains separate.
