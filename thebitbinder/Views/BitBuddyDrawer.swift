@@ -142,7 +142,6 @@ extension View {
             .environmentObject(controller)
             .overlay {
                 BitBuddyDrawerOverlay(controller: controller, roastMode: roastMode)
-                    .ignoresSafeArea()
             }
     }
 }

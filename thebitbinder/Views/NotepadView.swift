@@ -24,7 +24,8 @@ struct NotepadView: View {
                     Text("Jot down premises, bits, tags, and to-dos…")
                         .font(.body)
                         .foregroundColor(.secondary)
-                        .padding(.horizontal, LinedNotepadEditor.horizontalInset + 5)
+                        .lineSpacing(LinedNotepadEditor.lineSpacing)
+                        .padding(.horizontal, LinedNotepadEditor.horizontalInset)
                         .padding(.top, LinedNotepadEditor.topInset)
                         .allowsHitTesting(false)
                 }
@@ -48,6 +49,7 @@ struct NotepadView: View {
 /// and the row height is matched to the font's line height plus spacing so
 /// each line of text sits on a rule.
 struct LinedNotepadEditor: UIViewRepresentable {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var text: String
     var isFocused: FocusState<Bool>.Binding
 
@@ -55,33 +57,37 @@ struct LinedNotepadEditor: UIViewRepresentable {
     static let topInset: CGFloat = 12
     static let lineSpacing: CGFloat = 8
 
-    private static var font: UIFont { UIFont.preferredFont(forTextStyle: .body) }
-    private static var rowHeight: CGFloat { ceil(font.lineHeight) + lineSpacing }
+    private func font(compatibleWith traits: UITraitCollection) -> UIFont {
+        let effectiveTraits = UITraitCollection(traitsFrom: [
+            traits,
+            UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
+        ])
+        return UIFont.preferredFont(forTextStyle: .body, compatibleWith: effectiveTraits)
+    }
 
     func makeUIView(context: Context) -> RuledTextView {
         let tv = RuledTextView()
-        tv.delegate = context.coordinator
-        tv.font = Self.font
-        tv.rowHeight = Self.rowHeight
+        // SwiftUI's effective size drives all metrics together, including custom
+        // app sizes. UIKit must not independently change just the font.
+        tv.adjustsFontForContentSizeCategory = false
         tv.backgroundColor = .clear
         tv.textColor = .label
         tv.ruleColor = UIColor.separator.withAlphaComponent(0.6)
         tv.textContainerInset = UIEdgeInsets(top: Self.topInset, left: Self.horizontalInset,
                                              bottom: Self.topInset, right: Self.horizontalInset)
         tv.textContainer.lineFragmentPadding = 0
-        tv.typingAttributes = Self.textAttributes
         tv.text = text
+        context.coordinator.applyTypography(to: tv)
+        tv.delegate = context.coordinator
         tv.alwaysBounceVertical = true
         tv.keyboardDismissMode = .interactive
         return tv
     }
 
     func updateUIView(_ tv: RuledTextView, context: Context) {
-        if tv.text != text {
-            // Preserve attributes when replacing text pushed in from iCloud sync.
-            tv.attributedText = NSAttributedString(string: text, attributes: Self.textAttributes)
-            tv.setNeedsDisplay()
-        }
+        context.coordinator.parent = self
+        context.coordinator.synchronizeText(in: tv)
+        context.coordinator.applyTypography(to: tv)
         if isFocused.wrappedValue, !tv.isFirstResponder {
             tv.becomeFirstResponder()
         } else if !isFocused.wrappedValue, tv.isFirstResponder {
@@ -91,7 +97,7 @@ struct LinedNotepadEditor: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-    private static var textAttributes: [NSAttributedString.Key: Any] {
+    private static func textAttributes(font: UIFont) -> [NSAttributedString.Key: Any] {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = lineSpacing
         // Pin the line height so text baselines line up with the drawn rules.
@@ -105,12 +111,87 @@ struct LinedNotepadEditor: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {
-        private let parent: LinedNotepadEditor
+        var parent: LinedNotepadEditor
+        private var appliedFont: UIFont?
+        private var isUpdatingView = false
+
         init(_ parent: LinedNotepadEditor) { self.parent = parent }
 
+        func synchronizeText(in textView: RuledTextView) {
+            // Never replace provisional input from an IME with a binding echo
+            // or a cloud update while composition is in progress.
+            guard !isUpdatingView, textView.markedTextRange == nil,
+                  textView.text != parent.text else { return }
+            isUpdatingView = true
+            defer { isUpdatingView = false }
+
+            let selection = textView.selectedRange
+            let font = parent.font(compatibleWith: textView.traitCollection)
+            let attributes = LinedNotepadEditor.textAttributes(font: font)
+            textView.attributedText = NSAttributedString(string: parent.text, attributes: attributes)
+            restoreSelection(selection, in: textView)
+            textView.typingAttributes = attributes
+            textView.setNeedsDisplay()
+        }
+
+        func applyTypography(to textView: RuledTextView) {
+            // Defer formatting until marked text is committed. Delegate callbacks
+            // retry this even if SwiftUI has no further update to deliver.
+            guard !isUpdatingView, textView.markedTextRange == nil else { return }
+            let font = parent.font(compatibleWith: textView.traitCollection)
+            guard appliedFont != font else { return }
+            isUpdatingView = true
+            let undoManager = textView.undoManager
+            let wasUndoRegistrationEnabled = undoManager?.isUndoRegistrationEnabled == true
+            if wasUndoRegistrationEnabled { undoManager?.disableUndoRegistration() }
+            defer {
+                if wasUndoRegistrationEnabled { undoManager?.enableUndoRegistration() }
+                isUpdatingView = false
+            }
+
+            let selection = textView.selectedRange
+            let attributes = LinedNotepadEditor.textAttributes(font: font)
+            textView.font = font
+            // Change attributes in place: a size preference must not replace
+            // characters, write the synced binding, or reset the user's selection.
+            textView.textStorage.beginEditing()
+            textView.textStorage.addAttributes(
+                attributes,
+                range: NSRange(location: 0, length: textView.textStorage.length)
+            )
+            textView.textStorage.endEditing()
+            restoreSelection(selection, in: textView)
+            textView.typingAttributes = attributes
+            textView.rowHeight = ceil(font.lineHeight) + LinedNotepadEditor.lineSpacing
+            appliedFont = font
+            textView.setNeedsLayout()
+            textView.setNeedsDisplay()
+        }
+
+        private func restoreSelection(_ selection: NSRange, in textView: UITextView) {
+            guard selection.location != NSNotFound else { return }
+            let length = textView.textStorage.length
+            let location = min(selection.location, length)
+            textView.selectedRange = NSRange(
+                location: location,
+                length: min(selection.length, length - location)
+            )
+        }
+
         func textViewDidChange(_ textView: UITextView) {
-            parent.text = textView.text
+            guard !isUpdatingView else { return }
+            if parent.text != textView.text {
+                parent.text = textView.text
+            }
+            if let ruledTextView = textView as? RuledTextView {
+                applyTypography(to: ruledTextView)
+            }
             textView.setNeedsDisplay()   // redraw rules as content grows
+        }
+
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            guard let ruledTextView = textView as? RuledTextView else { return }
+            applyTypography(to: ruledTextView)
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
@@ -118,6 +199,9 @@ struct LinedNotepadEditor: UIViewRepresentable {
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
+            if let ruledTextView = textView as? RuledTextView {
+                applyTypography(to: ruledTextView)
+            }
             parent.isFocused.wrappedValue = false
         }
     }

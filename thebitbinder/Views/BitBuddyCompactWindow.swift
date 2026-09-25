@@ -9,7 +9,7 @@
 //    puck tap          → open compact window (~280×360) pinned to the
 //                        closest corner of the screen
 //    compact: header   → drag to reposition; snaps to nearest corner on
-//                        release. Double-tap expands to full drawer.
+//                        release.
 //    compact: expand   → goes to full BitBuddyDrawerOverlay
 //    compact: close    → collapses back to the puck
 //
@@ -32,6 +32,7 @@ enum BitBuddyPresentation {
 /// compact window without changing `BitBuddyDrawerController`'s published
 /// API. The controller still exposes `isOpen` for the existing drawer
 /// code paths; new code reads `presentation`.
+@MainActor
 final class BitBuddyPresentationController: ObservableObject {
     @Published var mode: BitBuddyPresentation = .closed
 
@@ -41,42 +42,35 @@ final class BitBuddyPresentationController: ObservableObject {
 
     var corner: Corner {
         get { Corner(rawValue: storedCorner) ?? .bottomTrailing }
-        set { storedCorner = newValue.rawValue }
-    }
-
-    enum Corner: String, CaseIterable {
-        case topLeading, topTrailing, bottomLeading, bottomTrailing
-
-        var alignment: Alignment {
-            switch self {
-            case .topLeading:     return .topLeading
-            case .topTrailing:    return .topTrailing
-            case .bottomLeading:  return .bottomLeading
-            case .bottomTrailing: return .bottomTrailing
-            }
+        set {
+            guard newValue != corner else { return }
+            objectWillChange.send()
+            storedCorner = newValue.rawValue
         }
     }
 
+    typealias Corner = BitBuddyCompactLayout.Corner
+
     func openCompact() {
-        withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.82)) {
+        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .interactiveSpring(response: 0.35, dampingFraction: 0.82)) {
             mode = .compact
         }
     }
 
     func expandToFull() {
-        withAnimation(.easeInOut(duration: 0.28)) {
+        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.28)) {
             mode = .full
         }
     }
 
     func collapseToCompact() {
-        withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.82)) {
+        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .interactiveSpring(response: 0.35, dampingFraction: 0.82)) {
             mode = .compact
         }
     }
 
     func close() {
-        withAnimation(.easeInOut(duration: 0.22)) {
+        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.22)) {
             mode = .closed
         }
     }
@@ -88,38 +82,54 @@ struct BitBuddyCompactWindow: View {
     @ObservedObject var presenter: BitBuddyPresentationController
     let roastMode: Bool
 
-    /// Window dimensions. Wide enough for three lines of typical message
-    /// text without wrapping, tall enough for ~6 turns before scrolling.
-    private let windowWidth: CGFloat = 300
-    private let windowHeight: CGFloat = 380
-    private let margin: CGFloat = 14
-    private let headerHeight: CGFloat = 44
-
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.layoutDirection) private var layoutDirection
+    @Namespace private var dragCoordinateSpace
     @State private var dragOffset: CGSize = .zero
 
     private var accent: Color {
         roastMode ? FirePalette.core : .accentColor
     }
 
+    private var isRightToLeft: Bool { layoutDirection == .rightToLeft }
+
     var body: some View {
         GeometryReader { geo in
-            if presenter.mode == .compact {
-                ZStack(alignment: presenter.corner.alignment) {
-                    Color.clear
-                    windowPanel(geo: geo)
-                        .padding(margin)
-                        .offset(dragOffset)
-                        .gesture(dragGesture(geo: geo))
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.6, anchor: anchorPoint)
-                                .combined(with: .opacity),
-                            removal: .scale(scale: 0.6, anchor: anchorPoint)
-                                .combined(with: .opacity)
-                        ))
+            let layout = BitBuddyCompactLayout(
+                containerSize: geo.size,
+                needsExpandedLayout: dynamicTypeSize.isAccessibilitySize
+            )
+            let origin = layout.origin(for: presenter.corner, isRightToLeft: isRightToLeft)
+            let offset = layout.constrainedOffset(dragOffset, from: origin)
+
+            ZStack(alignment: .topLeading) {
+                Color.clear.allowsHitTesting(false)
+                if presenter.mode == .compact {
+                    windowPanel(layout: layout)
+                        .position(
+                            x: origin.x + layout.panelSize.width / 2 + offset.width,
+                            y: origin.y + layout.panelSize.height / 2 + offset.height
+                        )
+                        .transition(panelTransition)
+                        .onDisappear { dragOffset = .zero }
                 }
-                .ignoresSafeArea(.keyboard, edges: .bottom)
             }
+            .coordinateSpace(name: dragCoordinateSpace)
+            .onChange(of: geo.size) { dragOffset = .zero }
+            .onChange(of: dynamicTypeSize) { dragOffset = .zero }
         }
+        // Leave keyboard safe-area handling enabled. The same chat instance
+        // expands into the usable bounds instead of being remounted in a drawer.
+        .transaction { transaction in
+            if reduceMotion { transaction.animation = nil }
+        }
+    }
+
+    private var panelTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .scale(scale: 0.6, anchor: anchorPoint).combined(with: .opacity)
     }
 
     private var anchorPoint: UnitPoint {
@@ -133,106 +143,103 @@ struct BitBuddyCompactWindow: View {
 
     // MARK: - Panel
 
-    @ViewBuilder
-    private func windowPanel(geo: GeometryProxy) -> some View {
-        VStack(spacing: 0) {
-            header
+    private func windowPanel(layout: BitBuddyCompactLayout) -> some View {
+        let cornerRadius: CGFloat = layout.isExpanded ? 0 : 22
+        return VStack(spacing: 0) {
+            header(layout: layout)
             Divider().opacity(0.4)
-            // Host the real chat view inside a constrained frame. The
-            // chat view already knows how to compose a small-mode layout
-            // because its messages list is a ScrollView that adapts to
-            // any height.
             NavigationStack {
                 BitBuddyChatView(onClose: { presenter.close() })
                     .toolbarVisibility(.hidden, for: .navigationBar)
             }
-            .frame(height: max(0, windowHeight - headerHeight))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: windowWidth, height: windowHeight)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(roastMode ? Color(FirePalette.bg) : Color(UIColor.systemBackground))
-        )
+        .frame(width: layout.panelSize.width, height: layout.panelSize.height)
+        .background(roastMode ? Color(FirePalette.bg) : Color(UIColor.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .stroke(roastMode ? FirePalette.core.opacity(0.27) : Color.primary.opacity(0.08), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+        .shadow(color: .black.opacity(0.12), radius: layout.isExpanded ? 0 : 12, x: 0, y: 6)
     }
 
     // MARK: - Header
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            BitBuddyAvatar(roastMode: roastMode, size: 24, symbolSize: 14)
-            Text(roastMode ? "Roast Buddy" : "BitBuddy")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(roastMode ? FirePalette.text : .primary)
-            Spacer(minLength: 4)
+    private func header(layout: BitBuddyCompactLayout) -> some View {
+        HStack(spacing: 0) {
+            // Only this visible header region moves the panel. Conversation
+            // scrolling, text selection, and the neighboring buttons stay free
+            // of the window's drag gesture.
+            HStack(spacing: 8) {
+                BitBuddyAvatar(roastMode: roastMode, size: 24, symbolSize: 14)
+                    .accessibilityHidden(true)
+                Text(roastMode ? "Roast Buddy" : "BitBuddy")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(roastMode ? FirePalette.text : .primary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if !layout.isExpanded {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
+            .gesture(dragGesture(layout: layout), including: layout.isExpanded ? .none : .all)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
 
-            // Expand → full drawer
             Button {
                 presenter.expandToFull()
             } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Expand BitBuddy")
 
-            // Close → collapse back to puck
             Button {
                 presenter.close()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close BitBuddy")
         }
-        .padding(.horizontal, 14)
-        .frame(height: headerHeight)
-        .background(
-            // Subtle flat accent tint so the header feels tied to the puck.
-            accent.opacity(0.06)
-        )
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(accent.opacity(0.06))
     }
 
     // MARK: - Drag
 
-    private func dragGesture(geo: GeometryProxy) -> some Gesture {
-        DragGesture(minimumDistance: 4, coordinateSpace: .global)
+    private func dragGesture(layout: BitBuddyCompactLayout) -> some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .named(dragCoordinateSpace))
             .onChanged { value in
                 dragOffset = value.translation
             }
             .onEnded { value in
-                let predicted = CGPoint(
-                    x: value.predictedEndLocation.x,
-                    y: value.predictedEndLocation.y
+                let origin = layout.origin(for: presenter.corner, isRightToLeft: isRightToLeft)
+                let predictedCenter = CGPoint(
+                    x: origin.x + layout.panelSize.width / 2 + value.predictedEndTranslation.width,
+                    y: origin.y + layout.panelSize.height / 2 + value.predictedEndTranslation.height
                 )
-                let nearest = nearestCorner(to: predicted, in: geo.size)
-                withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.82)) {
+                let nearest = layout.nearestCorner(to: predictedCenter, isRightToLeft: isRightToLeft)
+                withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.4, dampingFraction: 0.82)) {
                     presenter.corner = nearest
                     dragOffset = .zero
                 }
             }
-    }
-
-    private func nearestCorner(to point: CGPoint, in size: CGSize) -> BitBuddyPresentationController.Corner {
-        let isTop = point.y < size.height / 2
-        let isLeading = point.x < size.width / 2
-        switch (isTop, isLeading) {
-        case (true,  true):  return .topLeading
-        case (true,  false): return .topTrailing
-        case (false, true):  return .bottomLeading
-        case (false, false): return .bottomTrailing
-        }
     }
 }
 

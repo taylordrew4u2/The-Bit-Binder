@@ -1,5 +1,18 @@
 # UI/UX and SwiftUI audit — 2026-09-25
 
+## Remediation
+
+All seven findings below have been addressed in source. The original evidence and runtime acceptance checks are retained as the audit record.
+
+- System text sizing is the default, and custom app preferences always honor system accessibility sizes. Existing explicit preferences retain their stored values.
+- Assistant navigation temporarily exposes hidden destinations without changing saved tab customization. Selection falls back to an available tab on launch, customization, and mode changes.
+- The assistant launcher is a labeled native Button with a separate drag gesture and is hidden from accessibility while chat is open.
+- Compact chat fits usable bounds, respects the keyboard, expands its layout when necessary without remounting the chat, and restricts dragging to the header. Close and Expand have 44-point targets. The full drawer also respects content safe areas.
+- Notepad refreshes font, paragraph, typing and ruled-line metrics together. Typography changes preserve characters and selection, avoid undo entries, and defer while marked text is being composed.
+- Home stacks quick actions and metrics and uses one stats column at accessibility text sizes.
+
+Validation: all seven executable regression suites pass (the original four plus tab navigation, compact geometry, and text-size policy); changed app Swift files pass frontend syntax parsing; diff whitespace check passes. Independent code review found no actionable defects. An iOS Simulator build and lint run are requested through the repository's existing GitHub Actions workflows after publication. Live simulator interaction, VoiceOver, IME behavior and visual acceptance checks remain pending; source fixes and logic tests do not establish runtime accessibility compliance.
+
 ## Scope and validation
 
 Source audit of the app shell, setup/settings, Home, BitBuddy chat/compact/drawer, Notepad, and selected editor, import, recording, notebook, and set-list save/error paths. Applied Build iOS Apps (SwiftUI UI Patterns) and SwiftUI Expert guidance. This is not a rendered visual audit or full persistence/security review. No application source was changed.

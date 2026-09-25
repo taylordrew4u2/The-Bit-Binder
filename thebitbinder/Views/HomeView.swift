@@ -45,10 +45,11 @@ struct HomeView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var hSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// Stats grid: 2 columns on iPhone, a single row of 4 on iPad's wider canvas.
     private var statsColumns: [GridItem] {
-        let count = hSizeClass == .regular ? 4 : 2
+        let count = dynamicTypeSize.isAccessibilitySize ? 1 : (hSizeClass == .regular ? 4 : 2)
         return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
     }
 
@@ -125,7 +126,10 @@ struct HomeView: View {
             if selectedHomeSections.contains(.quickActions) {
                 // MARK: - Quick Actions
                 Section {
-                    HStack(spacing: 10) {
+                    let layout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(spacing: 10))
+                        : AnyLayout(HStackLayout(spacing: 10))
+                    layout {
                         QuickActionTile(
                             title: "New Joke",
                             subtitle: "Write",
@@ -313,6 +317,7 @@ struct HomeView: View {
 // MARK: - Home Header
 
 private struct HomeHeader: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     let subtitle: String
     let jokeCount: Int
@@ -336,13 +341,13 @@ private struct HomeHeader: View {
                     Text(title)
                         .font(.title2.weight(.bold))
                         .foregroundColor(.primary)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.82)
 
                     Text(subtitle)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -356,7 +361,10 @@ private struct HomeHeader: View {
                     .accessibilityHidden(true)
             }
 
-            HStack(spacing: 8) {
+            let metricsLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(spacing: 8))
+            metricsLayout {
                 HomeMetricPill(text: progressLabel, icon: thisWeekCount > 0 ? "flame.fill" : "star.fill")
 
                 if jokeCount == 0 {
@@ -380,6 +388,7 @@ private struct HomeHeader: View {
 }
 
 private struct HomeMetricPill: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let text: String
     let icon: String
 
@@ -387,7 +396,7 @@ private struct HomeMetricPill: View {
         Label(text, systemImage: icon)
             .font(.caption.weight(.medium))
             .foregroundColor(Color.bitbinderAccent)
-            .lineLimit(1)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
             .background(Color.bitbinderAccent.opacity(0.10), in: Capsule())
@@ -397,6 +406,7 @@ private struct HomeMetricPill: View {
 // MARK: - Quick Action Tile
 
 private struct QuickActionTile: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     enum Prominence {
         case primary
         case secondary
@@ -437,12 +447,12 @@ private struct QuickActionTile: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.78)
 
                     Text(subtitle)
                         .font(.caption)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                         .opacity(prominence == .primary ? 0.86 : 0.72)
                 }
             }
