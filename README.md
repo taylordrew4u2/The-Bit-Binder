@@ -19,7 +19,7 @@ BitBinder is a shipped, production iOS app — [live on the App Store](https://a
 
 | | |
 |---|---|
-| **Platform** | iOS 18+, iPhone and iPad |
+| **Platform** | iPhone and iPad on iOS/iPadOS 18+; native Mac Catalyst target for macOS 15+ |
 | **Language** | Swift 5 |
 | **UI** | SwiftUI (adaptive layouts, readable-width iPad support) |
 | **Persistence** | SwiftData with CloudKit private-database sync |
@@ -27,10 +27,18 @@ BitBinder is a shipped, production iOS app — [live on the App Store](https://a
 | **AI** | Pluggable assistant with on-device (Apple Intelligence, MLX, Transformers) and cloud (OpenAI) backends |
 | **Codebase** | 156 Swift source files across the app and extension |
 | **Structure** | 13 SwiftData models · 49 services · 60 SwiftUI view files · 20 utility modules |
-| **CI / Release** | SwiftLint, regression checks, and simulator builds via GitHub Actions · fastlane TestFlight & App Store lanes |
+| **CI / Release** | SwiftLint, regressions, Siri integration tests, iOS Simulator and universal Mac Catalyst builds · fastlane TestFlight & App Store lanes |
 | **Distribution** | Native App Store release (current version 12.0) |
 
 ---
+
+## Siri and device support
+
+The development build includes three Siri and Shortcuts actions: “Save a joke in BitBinder,” “Find jokes in BitBinder,” and “Open my sets in BitBinder.” Siri asks for the joke or search text when needed. The app's Settings → Siri & Shortcuts screen explains them. See [Siri validation](Tests/Siri.md) for testing details.
+
+The shared app target supports iPhone, iPad, and Mac Catalyst. Choose **My Mac (Mac Catalyst)** in Xcode for the desktop build. The Mac target builds for Apple silicon and Intel; the MLX backend remains iOS-only, while the app retains its other assistant backends and local fallback. Camera and document-scanning controls follow device capabilities, with Photos and Files available for imports. Editors use a readable width in large windows, with ⌘N for a new joke, ⌘S to save it, and Escape to cancel.
+
+Mac and Siri support in this repository requires a new signed release before it is available through the App Store. Local Mac runs need an Apple development signing certificate because the app uses iCloud and App Groups; ad-hoc signing cannot provide those capabilities. CloudKit synchronization and Siri voice invocation require separate signed-device release checks.
 
 ## The Problem
 

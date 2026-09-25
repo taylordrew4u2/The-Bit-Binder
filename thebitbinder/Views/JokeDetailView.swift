@@ -207,6 +207,8 @@ struct JokeDetailView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
             }
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom, spacing: 8) {
@@ -221,6 +223,8 @@ struct JokeDetailView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .frame(maxWidth: 700)
+            .frame(maxWidth: .infinity)
         }
     }
 

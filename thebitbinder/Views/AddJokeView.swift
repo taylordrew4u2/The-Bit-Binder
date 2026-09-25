@@ -134,12 +134,14 @@ struct AddJokeView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .keyboardShortcut(.cancelAction)
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         saveJoke()
                     }
+                    .keyboardShortcut("s", modifiers: .command)
                     .disabled(!canSave || isSaving)
                     .fontWeight(.semibold)
                 }

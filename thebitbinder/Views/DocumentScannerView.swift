@@ -8,8 +8,39 @@
 import SwiftUI
 import VisionKit
 
+struct DocumentScannerView: View {
+    let completion: ([UIImage]) -> Void
+
+    static var isSupported: Bool {
+        #if targetEnvironment(macCatalyst)
+        false
+        #else
+        !ProcessInfo.processInfo.isiOSAppOnMac && VNDocumentCameraViewController.isSupported
+        #endif
+    }
+
+    var body: some View {
+        #if !targetEnvironment(macCatalyst)
+        if Self.isSupported {
+            DocumentCameraController(completion: completion)
+        } else {
+            unavailableView
+        }
+        #else
+        unavailableView
+        #endif
+    }
+
+    private var unavailableView: some View {
+        CaptureUnavailableView(
+            title: "Camera Scanning Unavailable",
+            message: "Choose Photos or Files from Import Jokes instead."
+        )
+    }
+}
+
 #if !targetEnvironment(macCatalyst)
-struct DocumentScannerView: UIViewControllerRepresentable {
+private struct DocumentCameraController: UIViewControllerRepresentable {
     let completion: ([UIImage]) -> Void
     
     func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
@@ -42,7 +73,7 @@ struct DocumentScannerView: UIViewControllerRepresentable {
             for i in 0..<scan.pageCount {
                 let raw = scan.imageOfPage(at: i)
                 let downscaled: UIImage = autoreleasepool {
-                    DocumentScannerView.downscale(raw, maxLongEdge: 2048) ?? raw
+                    DocumentCameraController.downscale(raw, maxLongEdge: 2048) ?? raw
                 }
                 images.append(downscaled)
             }
@@ -85,20 +116,22 @@ struct DocumentScannerView: UIViewControllerRepresentable {
         }
     }
 }
-#else
-/// Stub so call sites compile on macOS Catalyst (camera scanning not available)
-struct DocumentScannerView: View {
-    let completion: ([UIImage]) -> Void
+#endif
+
+/// A dismissible fallback for unsupported hardware and restored presentations.
+struct CaptureUnavailableView: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let message: String
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "camera.badge.exclamationmark")
-                .font(.largeTitle)
-                .foregroundColor(.secondary)
-            Text("Document scanning is not available on Mac.")
-                .multilineTextAlignment(.center)
-                .foregroundColor(.secondary)
+        ContentUnavailableView {
+            Label(title, systemImage: "camera.badge.exclamationmark")
+        } description: {
+            Text(message)
+        } actions: {
+            Button("Done") { dismiss() }
+                .keyboardShortcut(.cancelAction)
         }
-        .padding(40)
     }
 }
-#endif
