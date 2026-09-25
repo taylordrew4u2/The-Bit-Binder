@@ -102,7 +102,7 @@ struct SettingsView: View {
                 Text("Organize material by roast target instead of folder.")
             }
             
-            // MARK: - Buddy Section
+            // MARK: - BitBuddy Section
             Section {
                 Toggle(isOn: $userPreferences.bitBuddyEnabled) {
                     HStack(spacing: 8) {
@@ -111,10 +111,10 @@ struct SettingsView: View {
                                 .fill(userPreferences.bitBuddyEnabled ? Color.accentColor.opacity(0.15) : Color(.systemGray5))
                                 .frame(width: 32, height: 32)
                             Image(systemName: "sparkles")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.body.weight(.semibold))
                                 .foregroundColor(userPreferences.bitBuddyEnabled ? .accentColor : .secondary)
                         }
-                        Text("Buddy")
+                        Text("BitBuddy")
                             .font(.body.weight(.medium))
                     }
                 }
@@ -122,7 +122,7 @@ struct SettingsView: View {
 
             } footer: {
                 Text(userPreferences.bitBuddyEnabled
-                    ? "Your on-device writing partner for punch-ups and smarter joke extraction."
+                    ? "Writing help, punch-up suggestions, and smarter joke extraction."
                     : "Turn on to get a writing partner for punch-ups and smarter joke extraction from files.")
             }
 
@@ -177,7 +177,7 @@ struct SettingsView: View {
                 }
 
                 NavigationLink {
-                    AppSetupView(isFirstLaunch: false)
+                    AppCustomizationView()
                         .environmentObject(userPreferences)
                 } label: {
                     Label("Customize App", systemImage: "slider.horizontal.3")

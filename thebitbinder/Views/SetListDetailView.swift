@@ -12,12 +12,12 @@ struct SetListDetailView: View {
     @Query private var jokes: [Joke]
     @Query private var roastJokes: [RoastJoke]
     @AppStorage("roastModeEnabled") private var roastMode = false
-    @AppStorage("showFullContent") private var showFullContent = true
     
     @Environment(\.dismiss) private var dismiss
     @Bindable var setList: SetList
     @State private var showingAddJokes = false
     @State private var isEditing = false
+    @State private var mode: SetDetailMode = .arrange
     
     @State private var showingDeleteSetAlert = false
     @State private var operationError: String?
@@ -54,80 +54,57 @@ struct SetListDetailView: View {
         return result
     }
     
+    private var visibleItemCount: Int {
+        roastMode ? setListRoastJokes.count : setListJokes.count
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            setHeader
-            setRecordingPanel
-            
-            if roastMode {
-                // Roast mode: show roast jokes
-                if setListRoastJokes.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Roast Jokes", systemImage: "flame")
-                    } description: {
-                        Text("Add roast jokes to build your set.")
-                    } actions: {
-                        Button("Add Roast Jokes") { showingAddJokes = true }
-                            .buttonStyle(.borderedProminent)
-                            .tint(Color.accentColor)
-                    }
-                } else {
-                    List {
-                        ForEach(setListRoastJokes) { joke in
-                            roastJokeRow(joke)
-                        }
-                        .onMove(perform: moveRoastJokes)
-                        .onDelete(perform: deleteRoastJokes)
-                    }
-                    .listStyle(.plain)
+        ScrollViewReader { proxy in
+            List {
+                setHeader
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+
+                setModeControls
+                    .listRowSeparator(.hidden)
+
+                if audioService.isRecording || mode == .rehearse {
+                    setRecordingPanel
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
                 }
-            } else {
-                // Regular mode: show regular jokes
-                if setListJokes.isEmpty {
+
+                if visibleItemCount == 0 {
                     ContentUnavailableView {
-                        Label("No Jokes Yet", systemImage: "text.quote")
+                        Label(roastMode ? "No Roast Jokes" : "No Jokes Yet",
+                              systemImage: roastMode ? "flame" : "text.quote")
                     } description: {
-                        Text("Add jokes to build your set list.")
-                    } actions: {
-                        Button("Add Jokes") { showingAddJokes = true }
-                            .buttonStyle(.borderedProminent)
+                        Text("Add jokes in Arrange to build your set.")
                     }
+                } else if roastMode {
+                    roastMaterialRows(proxy: proxy)
                 } else {
-                    List {
-                        ForEach(setListJokes) { joke in
-                            JokeRowView(joke: joke, showFullContent: showFullContent)
-                        }
-                        .onMove(perform: moveJokes)
-                        .onDelete(perform: deleteJokes)
-                    }
-                    .listStyle(.plain)
+                    regularMaterialRows(proxy: proxy)
                 }
             }
+            .listStyle(.plain)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { showingAddJokes = true }) {
-                    Label(roastMode ? "Add Roast Jokes" : "Add Jokes", systemImage: "plus")
+            if audioService.isRecording {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: stopRecording) {
+                        Label("Stop", systemImage: "stop.fill")
+                    }
+                    .tint(Color.recording)
+                    .accessibilityLabel("Stop audio recording")
+                    .accessibilityHint("Stops recording and opens the save options.")
                 }
             }
-            
+
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Button(action: { showingAddJokes = true }) {
-                        Label(roastMode ? "Add Roast Jokes" : "Add Jokes", systemImage: "plus")
-                    }
-                    
-                    Button(action: { showFullContent.toggle() }) {
-                        Label(showFullContent ? "Show Titles Only" : "Show Full Content", systemImage: showFullContent ? "list.bullet" : "text.justify.leading")
-                    }
-                    
-                    Button(action: { isEditing.toggle() }) {
-                        Label(isEditing ? "Done" : "Edit Order", systemImage: "arrow.up.arrow.down")
-                    }
-                    .disabled(setList.totalItemCount == 0)
-
                     Button { shareSetList() } label: {
                         Label("Share Set List", systemImage: "square.and.arrow.up")
                     }
@@ -147,6 +124,8 @@ struct SetListDetailView: View {
             }
         }
         .environment(\.editMode, .constant(isEditing ? .active : .inactive))
+        .onChange(of: mode) { _, _ in isEditing = false }
+        .onChange(of: roastMode) { _, _ in isEditing = false }
         .sheet(isPresented: $showingAddJokes) {
             if roastMode {
                 AddRoastJokesToSetListView(setList: setList, currentRoastJokeIDs: setList.roastJokeIDs)
@@ -184,6 +163,105 @@ struct SetListDetailView: View {
         }
     }
     
+    private var setModeControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("Set mode", selection: $mode) {
+                ForEach(SetDetailMode.allCases) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if mode == .arrange {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        arrangeButtons
+                    }
+                    .fixedSize(horizontal: true, vertical: false)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        arrangeButtons
+                    }
+                }
+
+                if !audioService.isRecording {
+                    Button(action: startRecording) {
+                        Label("Record Set Audio", systemImage: "record.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.subheadline)
+                    .frame(minHeight: 44)
+                    .accessibilityHint("Records audio that you can save after stopping.")
+                }
+            } else {
+                Text("Read each joke in full. Use Next Joke to move through your set.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var arrangeButtons: some View {
+        Button { showingAddJokes = true } label: {
+            Label(roastMode ? "Add Roast Jokes" : "Add Jokes", systemImage: "plus")
+        }
+        .buttonStyle(.borderedProminent)
+
+        Button { isEditing.toggle() } label: {
+            Label(isEditing ? "Done Reordering" : "Reorder",
+                  systemImage: isEditing ? "checkmark" : "arrow.up.arrow.down")
+        }
+        .buttonStyle(.bordered)
+        .disabled(visibleItemCount == 0)
+        .accessibilityHint("Change the order or remove a joke from this set.")
+    }
+
+    private func regularMaterialRows(proxy: ScrollViewProxy) -> some View {
+        let material = setListJokes
+        return ForEach(Array(material.enumerated()), id: \.element.id) { index, joke in
+            SetMaterialRow(
+                number: index + 1,
+                total: material.count,
+                title: joke.title,
+                content: joke.content,
+                isRehearsing: mode == .rehearse,
+                nextAction: index + 1 < material.count ? {
+                    proxy.scrollTo(material[index + 1].id, anchor: .top)
+                } : nil
+            )
+            .id(joke.id)
+            .moveDisabled(mode == .rehearse)
+            .deleteDisabled(mode == .rehearse)
+        }
+        .onMove(perform: moveJokes)
+        .onDelete(perform: deleteJokes)
+    }
+
+    private func roastMaterialRows(proxy: ScrollViewProxy) -> some View {
+        let material = setListRoastJokes
+        return ForEach(Array(material.enumerated()), id: \.element.id) { index, joke in
+            SetMaterialRow(
+                number: index + 1,
+                total: material.count,
+                title: joke.title,
+                content: joke.content,
+                setup: joke.setup,
+                targetName: joke.target?.name,
+                isRehearsing: mode == .rehearse,
+                nextAction: index + 1 < material.count ? {
+                    proxy.scrollTo(material[index + 1].id, anchor: .top)
+                } : nil
+            )
+            .id(joke.id)
+            .moveDisabled(mode == .rehearse)
+            .deleteDisabled(mode == .rehearse)
+        }
+        .onMove(perform: moveRoastJokes)
+        .onDelete(perform: deleteRoastJokes)
+    }
+
     private var setHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
@@ -234,9 +312,9 @@ struct SetListDetailView: View {
                     .foregroundStyle(audioService.isRecording ? Color.recording : Color.bitbinderAccent)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(audioService.isRecording ? (audioService.isPaused ? "Recording Paused" : "Recording Set") : "Record This Set")
+                    Text(audioService.isRecording ? (audioService.isPaused ? "Recording Paused" : "Recording Set") : "Record Set Audio")
                         .font(.headline)
-                    Text(audioService.isRecording ? timeString(from: audioService.recordingTime) : "Capture a run-through without leaving the set.")
+                    Text(audioService.isRecording ? timeString(from: audioService.recordingTime) : "Save an audio recording of your run-through.")
                         .font(audioService.isRecording ? .system(.body, design: .monospaced) : .caption)
                         .foregroundStyle(.secondary)
                 }
@@ -259,7 +337,7 @@ struct SetListDetailView: View {
                     .buttonStyle(.borderedProminent)
                 } else {
                     Button(action: startRecording) {
-                        Label("Start Recording", systemImage: "record.circle.fill")
+                        Label("Record Set Audio", systemImage: "record.circle.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -346,45 +424,6 @@ struct SetListDetailView: View {
     
     // MARK: - Roast Joke Helpers
     
-    @ViewBuilder
-    private func roastJokeRow(_ joke: RoastJoke) -> some View {
-            HStack(alignment: .top, spacing: 12) {
-                 Image(systemName: "flame.fill")
-                     .font(.system(size: 14))
-                     .foregroundColor(Color.accentColor)
-                     .padding(.top, 3)
-                 
-                 VStack(alignment: .leading, spacing: 4) {
-                     if showFullContent {
-                         if !joke.setup.isEmpty {
-                             Text("SETUP")
-                                 .font(.caption2.weight(.bold))
-                                 .foregroundColor(Color.accentColor)
-                             Text(joke.setup)
-                                 .font(.system(size: 14))
-                                 .foregroundColor(.secondary)
-                         }
-
-                         Text(joke.content)
-                             .font(.system(size: 15))
-                             .foregroundColor(.primary)
-                     } else {
-                         Text(joke.previewDisplayText)
-                             .font(.system(size: 15, weight: .medium))
-                             .foregroundColor(.primary)
-                             .lineLimit(1)
-                     }
-                     
-                     if let targetName = joke.target?.name {
-                         Text("for \(targetName)")
-                             .font(.system(size: 12, weight: .medium))
-                             .foregroundColor(Color.accentColor.opacity(0.8))
-                     }
-                 }
-             }
-        .padding(.vertical, 4)
-    }
-    
     private func moveRoastJokes(from source: IndexSet, to destination: Int) {
         updateSetOrder(keyPath: \.roastJokeIDs, values: VisibleListOrder.moving(
             offsets: source, to: destination, visible: setListRoastJokes.map(\.id), stored: setList.roastJokeIDs
@@ -460,5 +499,106 @@ struct SetListDetailView: View {
             operationError = "Could not move this set to Trash: \(error.localizedDescription)"
             showingOperationError = true
         }
+    }
+}
+
+private enum SetDetailMode: String, CaseIterable, Identifiable {
+    case arrange = "Arrange"
+    case rehearse = "Rehearse"
+
+    var id: Self { self }
+}
+
+/// Set rows expose the complete material, independently of library preview preferences.
+private struct SetMaterialRow: View {
+    let number: Int
+    let total: Int
+    let title: String
+    let content: String
+    var setup: String = ""
+    var targetName: String?
+    let isRehearsing: Bool
+    var nextAction: (() -> Void)?
+
+    @State private var isExpanded = false
+
+    private var displayTitle: String {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? "Untitled Joke" : title
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if isRehearsing {
+                rowHeading
+                    .accessibilityAddTraits(.isHeader)
+                fullText
+
+                if let nextAction {
+                    Button(action: nextAction) {
+                        Label("Next Joke", systemImage: "arrow.down")
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityHint("Moves to joke \(number + 1) of \(total).")
+                } else {
+                    Text("End of set")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                DisclosureGroup(isExpanded: $isExpanded) {
+                    fullText
+                        .padding(.top, 8)
+                } label: {
+                    rowHeading
+                }
+            }
+        }
+        .padding(.vertical, isRehearsing ? 12 : 6)
+    }
+
+    private var rowHeading: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("\(number).")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            Text(displayTitle)
+                .foregroundStyle(.primary)
+        }
+        .font(isRehearsing ? .title3.weight(.semibold) : .headline)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Joke \(number) of \(total): \(displayTitle)")
+    }
+
+    private var fullText: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let targetName, !targetName.isEmpty {
+                Text("For \(targetName)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !setup.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Setup")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(setup)
+                }
+            }
+
+            if content.isEmpty {
+                Text("No joke text yet.")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(content)
+            }
+        }
+        .font(.body)
+        .lineSpacing(isRehearsing ? 6 : 3)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .textSelection(.enabled)
     }
 }

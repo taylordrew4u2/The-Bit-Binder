@@ -132,7 +132,7 @@ final class SpeechRecognitionManager: NSObject, ObservableObject, SFSpeechRecogn
         guard !available, shouldBeRunning else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.error = "Speech recognition is temporarily unavailable. Tap Start Recording to try again."
+            self.error = "Speech recognition is temporarily unavailable. Tap Dictate to try again."
             self.shouldBeRunning = false
             self.isRestarting = false
             self.tearDownAudioPipeline(deactivateSession: true)

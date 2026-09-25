@@ -17,3 +17,5 @@ xcrun swiftc thebitbinder/Utilities/BitBuddyCompactLayout.swift Tests/SwiftUI/Bi
 "$test_build_dir/compact-layout"
 xcrun swiftc thebitbinder/Utilities/AppTextSize.swift Tests/SwiftUI/TextSizeRegression.swift -o "$test_build_dir/text-size"
 "$test_build_dir/text-size"
+xcrun swiftc thebitbinder/Utilities/ActionColors.swift Tests/SwiftUI/ActionColorsRegression.swift -o "$test_build_dir/action-colors"
+"$test_build_dir/action-colors"

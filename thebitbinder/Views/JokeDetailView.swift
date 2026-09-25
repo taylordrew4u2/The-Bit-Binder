@@ -96,7 +96,7 @@ struct JokeDetailView: View {
             } message: {
                 Text(saveError ?? "Your changes might not be saved. Try editing again.")
             }
-            .alert("Recording Problem", isPresented: $showingRecordingError) {
+            .alert("Dictation Problem", isPresented: $showingRecordingError) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(recordingError ?? "Couldn't transcribe your audio. Try again.")
@@ -185,35 +185,31 @@ struct JokeDetailView: View {
     }
 
     private var editorRoot: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Title
+                TextField("Give it a name\u{2026}", text: $joke.title, axis: .vertical)
+                    .font(.title.weight(.bold))
+                    .lineLimit(3)
+                    .focused($focusedField, equals: .title)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 6)
 
-                    // Title
-                    TextField("Give it a name\u{2026}", text: $joke.title, axis: .vertical)
-                        .font(.title.weight(.bold))
-                        .lineLimit(3)
-                        .focused($focusedField, equals: .title)
+                // Meta strip + folder chip (hidden while writing)
+                if focusedField != .content {
+                    metaStrip
                         .padding(.horizontal, 20)
                         .padding(.top, 6)
-
-                    // Meta strip + folder chip (hidden while writing)
-                    if focusedField != .content {
-                        metaStrip
-                            .padding(.horizontal, 20)
-                            .padding(.top, 6)
-                    }
-
-                    // The bit — plain text, no container
-                    bitContentSection
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
-
-                    Color.clear.frame(height: 90)
                 }
-            }
-            .scrollDismissesKeyboard(.interactively)
 
+                // The bit — plain text, no container
+                bitContentSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom, spacing: 8) {
             VStack(spacing: 8) {
                 if isRecording {
                     recordingBanner
@@ -346,23 +342,30 @@ struct JokeDetailView: View {
     // MARK: - Floating Action Bar
 
     private var actionBar: some View {
-        HStack(spacing: 4) {
-            if userPreferences.bitBuddyEnabled && !roastMode {
-                actionButton(icon: "sparkle", label: "Punch up") {
-                    openBitBuddyPunchUp()
-                    haptic(.medium)
+        VStack(spacing: 6) {
+            HStack(spacing: 4) {
+                if userPreferences.bitBuddyEnabled && !roastMode {
+                    actionButton(icon: "sparkle", label: "Punch up") {
+                        openBitBuddyPunchUp()
+                        haptic(.medium)
+                    }
                 }
+
+                actionButton(
+                    icon: isRecording ? "stop.circle.fill" : "mic",
+                    label: isRecording ? "Stop dictation" : "Dictate",
+                    tint: isRecording ? .red : nil,
+                    active: isRecording
+                ) {
+                    toggleRecording()
+                }
+                .accessibilityHint("Adds speech to this joke as text. Audio is not saved.")
             }
 
-            actionButton(
-                icon: isRecording ? "stop.circle.fill" : "mic",
-                label: isRecording ? "Stop" : "Record",
-                tint: isRecording ? .red : nil,
-                active: isRecording
-            ) {
-                toggleRecording()
-            }
-
+            Text("Adds speech to this joke. Audio is not saved.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
         .padding(8)
         .background(
@@ -370,7 +373,7 @@ struct JokeDetailView: View {
                 .fill(Color(UIColor.secondarySystemBackground))
         )
         .padding(.horizontal, 12)
-        .padding(.bottom, 28)
+        .padding(.bottom, 8)
     }
 
     private func actionButton(
@@ -426,7 +429,7 @@ struct JokeDetailView: View {
                 .modifier(PulseEffect())
 
             Text(speechManager.transcribedText.isEmpty
-                 ? "Listening..."
+                 ? "Dictating…"
                  : speechManager.transcribedText.suffix(80))
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(1)
@@ -437,8 +440,8 @@ struct JokeDetailView: View {
             Button {
                 stopRecordingAndAppend()
             } label: {
-                Text("Done")
-                    .font(.system(size: 13, weight: .bold))
+                Text("Stop dictation")
+                    .font(.caption.weight(.bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)

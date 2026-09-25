@@ -1207,7 +1207,7 @@ struct RoastTargetDetailView: View {
                 
                 Section("Other Ways to Add") {
                     Button(action: { showingTalkToText = true }) {
-                        Label("Talk-to-Text", systemImage: "mic.badge.plus")
+                        Label("Dictate Joke", systemImage: "mic.badge.plus")
                     }
                 }
                 

@@ -2,13 +2,13 @@
 //  RoastButtons.swift
 //  thebitbinder
 //
-//  Shared Roast Mode CTA button styles. Dedupes the ember-gradient pill
+//  Shared Roast Mode CTA button styles. Dedupes the ember-filled pill
 //  used in cold state, target detail empty state, and other roast-mode CTAs.
 //
 
 import SwiftUI
 
-/// Primary roast CTA — ember gradient, capsule, white text, glow shadow.
+/// Primary roast CTA with a contrast-safe fill and Dynamic Type label.
 struct EmberCTAButton: View {
     let icon: String?
     let title: String
@@ -25,18 +25,21 @@ struct EmberCTAButton: View {
             HStack(spacing: 8) {
                 if let icon {
                     Image(systemName: icon)
-                        .font(.system(size: 14))
+                        .font(.headline)
+                        .accessibilityHidden(true)
                 }
                 Text(title)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.center)
             }
-            .foregroundColor(.white)
+            .foregroundStyle(ActionColors.foreground)
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
             .background(FirePalette.emberCTA)
-            .clipShape(Capsule())
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
-        .accessibilityAddTraits(.isButton)
+        .buttonStyle(.plain)
     }
 }
 
@@ -57,12 +60,16 @@ struct EmberOutlineButton: View {
             HStack(spacing: 8) {
                 if let icon {
                     Image(systemName: icon)
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.subheadline.weight(.bold))
+                        .accessibilityHidden(true)
                 }
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.center)
             }
             .foregroundColor(FirePalette.core)
+            .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity)
             .background(FirePalette.core.opacity(0.08))

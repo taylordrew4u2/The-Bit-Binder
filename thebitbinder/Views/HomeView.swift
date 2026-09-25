@@ -18,6 +18,16 @@ enum HomeSection: String, CaseIterable, Hashable {
     case recent = "Recent"
     case more = "More"
 
+    // Keep raw values stable for existing saved Home preferences.
+    var title: String {
+        switch self {
+        case .quickActions: return "Quick Actions"
+        case .stats: return "Activity"
+        case .recent: return "Continue Writing"
+        case .more: return "Library"
+        }
+    }
+
     var icon: String {
         switch self {
         case .quickActions: return "bolt.fill"
@@ -29,7 +39,7 @@ enum HomeSection: String, CaseIterable, Hashable {
 
     var detail: String {
         switch self {
-        case .quickActions: return "New joke, capture idea, and record set"
+        case .quickActions: return "Write a joke, dictate an idea, or record audio"
         case .stats: return "Counts for jokes, hits, sets, and weekly work"
         case .recent: return "Recently edited jokes"
         case .more: return "Brainstorm and recording summaries"
@@ -44,14 +54,7 @@ struct HomeView: View {
     @Query(filter: #Predicate<Recording> { !$0.isTrashed }) private var allRecordings: [Recording]
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.horizontalSizeClass) private var hSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    /// Stats grid: 2 columns on iPhone, a single row of 4 on iPad's wider canvas.
-    private var statsColumns: [GridItem] {
-        let count = dynamicTypeSize.isAccessibilitySize ? 1 : (hSizeClass == .regular ? 4 : 2)
-        return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
-    }
 
     /// Unified sheet state — only one sheet can present at a time in SwiftUI,
     /// so an optional enum prevents conflicting `isPresented` booleans.
@@ -114,16 +117,13 @@ struct HomeView: View {
             Section {
                 HomeHeader(
                     title: greetingName,
-                    subtitle: allJokes.isEmpty ? "Let's get your first joke on paper" : motivationalSubtitle,
-                    jokeCount: allJokes.count,
-                    hitCount: hitsCount,
-                    thisWeekCount: thisWeekCount
+                    subtitle: allJokes.isEmpty ? "Start with a line. Make it yours." : "Pick up a draft or try a new idea."
                 )
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 10, trailing: 16))
             }
 
-            if selectedHomeSections.contains(.quickActions) {
+            if selectedHomeSections.contains(.quickActions) || allJokes.isEmpty {
                 // MARK: - Quick Actions
                 Section {
                     let layout = dynamicTypeSize.isAccessibilitySize
@@ -141,8 +141,8 @@ struct HomeView: View {
                         }
 
                         QuickActionTile(
-                            title: "Capture",
-                            subtitle: "Idea",
+                            title: "Dictate",
+                            subtitle: "Save text",
                             icon: "mic.fill",
                             prominence: .secondary
                         ) {
@@ -152,7 +152,7 @@ struct HomeView: View {
 
                         QuickActionTile(
                             title: "Record",
-                            subtitle: "Set",
+                            subtitle: "Save audio",
                             icon: "record.circle",
                             prominence: .secondary
                         ) {
@@ -165,43 +165,9 @@ struct HomeView: View {
                 }
             }
 
-            if selectedHomeSections.contains(.stats) {
-                // MARK: - At a Glance Stats
-                Section("At a Glance") {
-                    LazyVGrid(columns: statsColumns, spacing: 12) {
-                        StatCard(
-                            label: "Jokes",
-                            value: allJokes.count,
-                            icon: "text.quote",
-                            tint: .accentColor
-                        )
-                        StatCard(
-                            label: "Hits",
-                            value: hitsCount,
-                            icon: "star.fill",
-                            tint: Color.accentColor
-                        )
-                        StatCard(
-                            label: "Sets",
-                            value: allSets.count,
-                            icon: "list.bullet.rectangle.portrait",
-                            tint: Color.accentColor
-                        )
-                        StatCard(
-                            label: "This Week",
-                            value: thisWeekCount,
-                            icon: "flame.fill",
-                            tint: Color.accentColor
-                        )
-                    }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowBackground(Color.clear)
-                }
-            }
-
             // MARK: - Recent Activity
             if selectedHomeSections.contains(.recent) && !recentJokes.isEmpty {
-                Section("Recent") {
+                Section("Continue Writing") {
                     ForEach(recentJokes) { joke in
                         NavigationLink(value: joke) {
                             HStack(spacing: 12) {
@@ -214,7 +180,7 @@ struct HomeView: View {
                                     Text(joke.title.isEmpty ? String(joke.content.prefix(50)) : joke.title)
                                         .font(.body)
                                         .foregroundColor(.primary)
-                                        .lineLimit(1)
+                                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
 
                                     HStack(spacing: 8) {
                                         Text(joke.dateModified.relativeHomeLabel)
@@ -237,9 +203,25 @@ struct HomeView: View {
                 }
             }
             
+            // Activity supports the work above and is hidden for a new library.
+            if selectedHomeSections.contains(.stats) && !allJokes.isEmpty {
+                Section("Activity") {
+                    let layout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+                        : AnyLayout(HStackLayout(spacing: 16))
+                    layout {
+                        ActivityMetric(label: "Jokes", value: allJokes.count)
+                        ActivityMetric(label: "Hits", value: hitsCount)
+                        ActivityMetric(label: "Sets", value: allSets.count)
+                        ActivityMetric(label: "This Week", value: thisWeekCount)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
             // MARK: - Ideas & Recordings Summary
             if selectedHomeSections.contains(.more) && (allIdeas.count > 0 || allRecordings.count > 0) {
-                Section("More") {
+                Section("Library") {
                     if allIdeas.count > 0 {
                         NavigationLink {
                             BrainstormView()
@@ -302,104 +284,25 @@ struct HomeView: View {
 
     }
     
-    private var motivationalSubtitle: String {
-        if thisWeekCount > 0 {
-            return "\(thisWeekCount) new joke\(thisWeekCount == 1 ? "" : "s") this week — keep it going"
-        } else if hitsCount > 0 {
-            return "You've got \(hitsCount) hit\(hitsCount == 1 ? "" : "s") in your set"
-        } else {
-            return "\(allJokes.count) joke\(allJokes.count == 1 ? "" : "s") and counting"
-        }
-    }
-
 }
 
 // MARK: - Home Header
 
 private struct HomeHeader: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     let subtitle: String
-    let jokeCount: Int
-    let hitCount: Int
-    let thisWeekCount: Int
-
-    private var progressLabel: String {
-        if thisWeekCount > 0 {
-            return "\(thisWeekCount) this week"
-        }
-        if hitCount > 0 {
-            return "\(hitCount) hit\(hitCount == 1 ? "" : "s")"
-        }
-        return "\(jokeCount) saved"
-    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.title2.weight(.bold))
-                        .foregroundColor(.primary)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .minimumScaleFactor(dynamicTypeSize.isAccessibilitySize ? 1 : 0.82)
-
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 12)
-
-                Image(systemName: "text.quote")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color.bitbinderAccent)
-                    .frame(width: 42, height: 42)
-                    .background(Color.bitbinderAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .accessibilityHidden(true)
-            }
-
-            let metricsLayout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-                : AnyLayout(HStackLayout(spacing: 8))
-            metricsLayout {
-                HomeMetricPill(text: progressLabel, icon: thisWeekCount > 0 ? "flame.fill" : "star.fill")
-
-                if jokeCount == 0 {
-                    HomeMetricPill(text: "Start fresh", icon: "sparkles")
-                } else {
-                    HomeMetricPill(text: "\(jokeCount) joke\(jokeCount == 1 ? "" : "s")", icon: "rectangle.stack.fill")
-                }
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.primary)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(UIColor.secondarySystemGroupedBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.bitbinderAccent.opacity(0.12), lineWidth: 1)
-        )
+        .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .combine)
-    }
-}
-
-private struct HomeMetricPill: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    let text: String
-    let icon: String
-
-    var body: some View {
-        Label(text, systemImage: icon)
-            .font(.caption.weight(.medium))
-            .foregroundColor(Color.bitbinderAccent)
-            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(Color.bitbinderAccent.opacity(0.10), in: Capsule())
     }
 }
 
@@ -419,13 +322,13 @@ private struct QuickActionTile: View {
     let action: () -> Void
 
     private var foregroundColor: Color {
-        prominence == .primary ? .white : Color.bitbinderAccent
+        prominence == .primary ? ActionColors.foreground : Color.primary
     }
 
     private var backgroundStyle: AnyShapeStyle {
         switch prominence {
         case .primary:
-            return AnyShapeStyle(Color.bitbinderAccent)
+            return AnyShapeStyle(ActionColors.blue)
         case .secondary:
             return AnyShapeStyle(Color(UIColor.secondarySystemGroupedBackground))
         }
@@ -453,7 +356,6 @@ private struct QuickActionTile: View {
                     Text(subtitle)
                         .font(.caption)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-                        .opacity(prominence == .primary ? 0.86 : 0.72)
                 }
             }
             .foregroundColor(foregroundColor)
@@ -470,44 +372,24 @@ private struct QuickActionTile: View {
     }
 }
 
-// MARK: - Stat Card
+// MARK: - Activity Metric
 
-private struct StatCard: View {
+private struct ActivityMetric: View {
     let label: String
     let value: Int
-    let icon: String
-    let tint: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(tint)
-                    .frame(width: 24, height: 24)
-                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .accessibilityHidden(true)
-                Spacer()
-            }
 
-            Text("\(value)")
-                .font(.title2.weight(.bold))
-                .foregroundColor(.primary)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value, format: .number)
+                .font(.headline)
                 .monospacedDigit()
                 .contentTransition(.numericText())
-
             Text(label)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
-        .padding(12)
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(UIColor.separator).opacity(0.35), lineWidth: 0.5)
-        )
-        .accessibilityElement(children: .combine)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label): \(value)")
     }
 }
