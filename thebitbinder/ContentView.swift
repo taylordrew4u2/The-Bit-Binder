@@ -118,15 +118,7 @@ struct RoastTakeoverOverlay: View {
 
 // MARK: - App Screens
 
-enum AppScreen: String, CaseIterable {
-    case home = "Home"
-    case brainstorm = "Brainstorm"
-    case jokes = "Jokes"
-    case sets = "Sets"
-    case recordings = "Recordings"
-    case notebookSaver = "Photo Notebook"
-    case settings = "Settings"
-
+extension AppScreen {
     /// Maps the active tab to BitBuddy's section enum so the chatbot knows
     /// which page the user is on when they ask a question. Returns nil for
     /// .home — Home is a meta-page (overview), and the assistant should rely
@@ -141,42 +133,6 @@ enum AppScreen: String, CaseIterable {
         case .notebookSaver: return .notebook
         case .settings:      return .settings
         }
-    }
-
-    static var roastScreens: [AppScreen] {
-        [.jokes]
-    }
-
-    // Default screens for the tab bar when no custom selection exists
-    static var defaultTabBarScreens: [AppScreen] {
-        [.home, .jokes, .sets, .notebookSaver]
-    }
-
-    static var defaultRoastTabBarScreens: [AppScreen] {
-        [.jokes]
-    }
-
-    /// Ordered list of all screens that can appear in the tab bar.
-    /// Used to maintain a stable ordering regardless of selection order.
-    static var tabBarOrder: [AppScreen] {
-        [.home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver]
-    }
-
-    /// Returns visible tabs for the current mode.
-    /// Roast Mode intentionally exposes only Roasts until the user exits it.
-    /// Standard mode uses the user's custom tab selection plus Settings.
-    static func customTabBarScreens(from raw: String, roastMode: Bool) -> [AppScreen] {
-        if roastMode {
-            return defaultRoastTabBarScreens
-        }
-
-        let defaults = defaultTabBarScreens
-        guard !raw.isEmpty else { return defaults + [.settings] }
-
-        let selected = Set(raw.split(separator: ",").compactMap { AppScreen(rawValue: String($0)) })
-        // Filter to ordered list, always include Settings at the end
-        let ordered = tabBarOrder.filter { selected.contains($0) }
-        return (ordered.isEmpty ? defaults : ordered) + [.settings]
     }
 
     /// User-facing tab label. Kept separate from `rawValue` because the raw
@@ -262,10 +218,12 @@ struct MainTabView: View {
     @AppStorage("hasLaunchedBefore") private var hasLaunchedBefore: Bool = false
     @AppStorage("hasCompletedSetup") private var hasCompletedSetup: Bool = false
     @AppStorage("setupSelectedTabs") private var setupSelectedTabs: String = ""
+    @State private var assistantTab: AppScreen?
     @State private var showGagGrabber = false
     @State private var showSetup = false
     @AppStorage("roastModeEnabled") private var roastMode = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var userPreferences: UserPreferences
     @ObservedObject private var audioService = AudioRecordingService.shared
 
@@ -290,15 +248,9 @@ struct MainTabView: View {
     private var selectedTab: Binding<AppScreen> {
         Binding(
             get: {
-                // On first launch, always show Home
-                if !hasLaunchedBefore {
-                    return .home
-                }
-                // Otherwise, restore the saved tab (if valid for current mode)
-                if let tab = AppScreen(rawValue: selectedTabRaw), visibleTabs.contains(tab) {
-                    return tab
-                }
-                return roastMode ? .jokes : .home
+                AppScreen.resolvedSelection(
+                    raw: selectedTabRaw, visibleTabs: visibleTabs, firstLaunch: !hasLaunchedBefore
+                )
             },
             set: { newTab in
                 selectedTabRaw = newTab.rawValue
@@ -307,7 +259,13 @@ struct MainTabView: View {
     }
 
     private var visibleTabs: [AppScreen] {
-        AppScreen.customTabBarScreens(from: setupSelectedTabs, roastMode: roastMode)
+        AppScreen.visibleTabs(from: setupSelectedTabs, roastMode: roastMode, temporaryTab: assistantTab)
+    }
+
+    private func reconcileSelectedTab() {
+        selectedTabRaw = AppScreen.resolvedSelection(
+            raw: selectedTabRaw, visibleTabs: visibleTabs, firstLaunch: !hasLaunchedBefore
+        ).rawValue
     }
     
     var body: some View {
@@ -320,6 +278,7 @@ struct MainTabView: View {
         }
         .tint(Color.bitbinderAccent)
         .onAppear {
+            reconcileSelectedTab()
             if !roastMode && !hasCompletedSetup && scenePhase == .active {
                 showSetup = true
             }
@@ -335,6 +294,9 @@ struct MainTabView: View {
             BitBuddyService.shared.setCurrentPage(selectedTab.wrappedValue.bitBuddySection)
         }
         .onChange(of: selectedTab.wrappedValue) { _, newTab in
+            if let assistantTab, newTab != assistantTab {
+                self.assistantTab = nil
+            }
             // Keep BitBuddy aware of which page the user is on. Asked
             // questions like "help me here" or "what can I do on this page"
             // resolve against this rather than defaulting to a generic
@@ -354,10 +316,8 @@ struct MainTabView: View {
             } else if !hasCompletedSetup && scenePhase == .active {
                 showSetup = true
             }
-            // Redirect to valid tab when mode changes
-            if !visibleTabs.contains(selectedTab.wrappedValue) {
-                selectedTabRaw = (isRoast ? AppScreen.jokes : .home).rawValue
-            }
+            assistantTab = nil
+            reconcileSelectedTab()
         }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
@@ -375,15 +335,17 @@ struct MainTabView: View {
             }
         }
         .onChange(of: setupSelectedTabs) { _, _ in
-            // If current tab was removed, redirect
-            if !visibleTabs.contains(selectedTab.wrappedValue) {
-                selectedTabRaw = (visibleTabs.first ?? .home).rawValue
-            }
+            assistantTab = nil
+            reconcileSelectedTab()
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToScreen)) { notification in
             if let screenRaw = notification.userInfo?["screen"] as? String,
                let screen = AppScreen(rawValue: screenRaw) {
-                if visibleTabs.contains(screen) {
+                // Keep the user's saved tab customization; expose hidden destinations
+                // for this visit so assistant navigation always has a valid target.
+                let configured = AppScreen.customTabBarScreens(from: setupSelectedTabs, roastMode: roastMode)
+                if !roastMode || configured.contains(screen) {
+                    assistantTab = configured.contains(screen) ? nil : screen
                     selectedTabRaw = screen.rawValue
                 }
             }
@@ -400,16 +362,27 @@ struct MainTabView: View {
                     let posX = bitBuddyX < 0 ? defaultX : bitBuddyX
                     let posY = bitBuddyY < 0 ? defaultY : bitBuddyY
 
-                    BitBuddyAvatar(roastMode: roastMode, size: bubbleSize, symbolSize: 22)
+                    Button {
+                        guard !isDragging else { return }
+                        haptic(.light)
+                        bitBuddyPresenter.openCompact()
+                    } label: {
+                        BitBuddyAvatar(roastMode: roastMode, size: bubbleSize, symbolSize: 22)
+                            .accessibilityHidden(true)
+                    }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open BitBuddy")
+                        .accessibilityHint("Opens your writing assistant")
+                        .accessibilityHidden(bitBuddyPresenter.mode != .closed || bitBuddyDrawer.isOpen)
                         .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
-                        .scaleEffect(isDragging ? 1.15 : 1.0)
+                        .scaleEffect(isDragging && !reduceMotion ? 1.15 : 1.0)
                         .opacity(bitBuddyPresenter.mode == .closed && !bitBuddyDrawer.isOpen ? 1 : 0)
                         .contentShape(Circle().inset(by: -10))
                         .position(
                             x: min(max(bubbleSize / 2, posX + dragOffset.width), geo.size.width - bubbleSize / 2),
                             y: min(max(bubbleSize / 2, posY + dragOffset.height), geo.size.height - bubbleSize / 2)
                         )
-                        .gesture(
+                        .highPriorityGesture(
                             DragGesture(minimumDistance: 6)
                                 .onChanged { value in
                                     isDragging = true
@@ -424,17 +397,8 @@ struct MainTabView: View {
                                     isDragging = false
                                 }
                         )
-                        .simultaneousGesture(
-                            TapGesture()
-                                .onEnded {
-                                    if !isDragging {
-                                        haptic(.light)
-                                        bitBuddyPresenter.openCompact()
-                                    }
-                                }
-                        )
-                        .animation(.easeInOut(duration: 0.2), value: bitBuddyDrawer.isOpen)
-                        .animation(.easeInOut(duration: 0.15), value: isDragging)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: bitBuddyDrawer.isOpen)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: isDragging)
                         .allowsHitTesting(bitBuddyPresenter.mode == .closed && !bitBuddyDrawer.isOpen)
                 }
                 .ignoresSafeArea()

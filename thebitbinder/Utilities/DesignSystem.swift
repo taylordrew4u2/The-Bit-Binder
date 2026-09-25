@@ -9,34 +9,24 @@
 
 import SwiftUI
 
-// MARK: - Spacing
+// MARK: - Text Size
 
-enum AppTextSize: String, CaseIterable, Identifiable {
-    case small
-    case standard
-    case large
-    case extraLarge
+private struct AppTextSizeModifier: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var systemSize
+    let preference: AppTextSize
 
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .small: return "Small"
-        case .standard: return "Standard"
-        case .large: return "Large"
-        case .extraLarge: return "Extra Large"
-        }
-    }
-
-    var dynamicTypeSize: DynamicTypeSize {
-        switch self {
-        case .small: return .small
-        case .standard: return .large
-        case .large: return .xLarge
-        case .extraLarge: return .xxLarge
-        }
+    func body(content: Content) -> some View {
+        content.dynamicTypeSize(preference.resolvedDynamicTypeSize(systemSize: systemSize))
     }
 }
+
+extension View {
+    func appTextSize(_ preference: AppTextSize) -> some View {
+        modifier(AppTextSizeModifier(preference: preference))
+    }
+}
+
+// MARK: - Design Tokens
 
 enum DS {
     enum Spacing {

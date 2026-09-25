@@ -23,14 +23,14 @@ struct SettingsView: View {
         return f
     }()
     @AppStorage("roastModeEnabled") private var roastMode = false
-    @AppStorage("appTextSize") private var appTextSizeRawValue = AppTextSize.standard.rawValue
+    @AppStorage("appTextSize") private var appTextSizeRawValue = AppTextSize.system.rawValue
     @State private var isEditingName = false
     @State private var editingNameText = ""
     @FocusState private var nameFieldFocused: Bool
 
     private var appTextSize: Binding<AppTextSize> {
         Binding(
-            get: { AppTextSize(rawValue: appTextSizeRawValue) ?? .standard },
+            get: { AppTextSize(rawValue: appTextSizeRawValue) ?? .system },
             set: { appTextSizeRawValue = $0.rawValue }
         )
     }
@@ -185,7 +185,7 @@ struct SettingsView: View {
             } header: {
                 Text("Customize")
             } footer: {
-                Text("Change your text size, tabs, joke layout, and display preferences.")
+                Text("System follows your device's text size. Accessibility text sizes always take priority. Customize App changes your tabs, joke layout, and display preferences.")
             }
 
             // MARK: - Support Section
