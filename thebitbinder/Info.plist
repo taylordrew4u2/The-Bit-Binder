@@ -24,10 +24,10 @@
 		<string>The-BitBinder.thebitbinder.refresh</string>
 		<string>The-BitBinder.thebitbinder.sync</string>
 	</array>
-	<key>CFBundleDisplayName</key>
-	<string>BitBinder</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>BitBinder</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconName</key>
@@ -106,6 +106,8 @@
 	<string>Allow saving processed notebook images back to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Allow photo library access to import images containing jokes.</string>
+	<key>NSSiriUsageDescription</key>
+	<string>Allow Siri to save jokes and open your sets in BitBinder.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Allow speech recognition to transcribe recordings and enable Talk-to-Text joke creation.</string>
 	<key>NSUbiquitousContainers</key>

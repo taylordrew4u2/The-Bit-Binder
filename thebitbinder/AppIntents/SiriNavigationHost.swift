@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import UIKit
 
 /// A Siri command may arrive while a draft sheet is already open. Present from
 /// the active scene's top controller so that draft stays intact underneath.

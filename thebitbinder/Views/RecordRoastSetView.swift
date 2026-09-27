@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import AVFoundation
 
 struct RecordRoastSetView: View {
