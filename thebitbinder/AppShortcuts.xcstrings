@@ -1,6 +1,49 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Find jokes in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Find jokes in ${applicationName}",
+              "Search my jokes in ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "Open my sets in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Open my sets in ${applicationName}",
+              "Show my set lists in ${applicationName}"
+            ]
+          }
+        }
+      }
+    },
+    "Save a joke in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "Save a joke in ${applicationName}",
+              "Add a joke to ${applicationName}",
+              "Capture a joke in ${applicationName}"
+            ]
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }

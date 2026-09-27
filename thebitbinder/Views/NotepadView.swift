@@ -58,10 +58,9 @@ struct LinedNotepadEditor: UIViewRepresentable {
     static let lineSpacing: CGFloat = 8
 
     private func font(compatibleWith traits: UITraitCollection) -> UIFont {
-        let effectiveTraits = UITraitCollection(traitsFrom: [
-            traits,
-            UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
-        ])
+        let effectiveTraits = traits.modifyingTraits { mutableTraits in
+            mutableTraits.preferredContentSizeCategory = UIContentSizeCategory(dynamicTypeSize)
+        }
         return UIFont.preferredFont(forTextStyle: .body, compatibleWith: effectiveTraits)
     }
 
@@ -219,7 +218,7 @@ final class RuledTextView: UITextView {
         }
 
         ctx.setStrokeColor(ruleColor.cgColor)
-        ctx.setLineWidth(1.0 / (window?.screen.scale ?? UIScreen.main.scale))
+        ctx.setLineWidth(1.0 / traitCollection.displayScale)
 
         // Draw a rule at the bottom of every text row, across the full content
         // height, so the lines scroll with the text.

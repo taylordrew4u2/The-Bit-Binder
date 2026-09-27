@@ -1,5 +1,4 @@
 import SwiftData
-import UIKit
 import XCTest
 @testable import thebitbinder
 
