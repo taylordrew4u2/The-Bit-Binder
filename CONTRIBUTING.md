@@ -39,7 +39,7 @@ the business logic and integrations, and `Utilities/` the cross-cutting helpers.
   `print(" [CloudKit] …")`, to keep diagnostics greppable.
 - **Secrets never go in source.** API keys belong in the Keychain (see
   `OpenAIKeychainStore`); `Secrets.plist` is git-ignored.
-- **User data is high-stakes.** Per `.github/copilot-instructions.md`: no silent
+- **User data is high-stakes.** No silent
   deletes, no assumed-successful saves. Audit create/update/save/delete/import/
   export/migration/sync paths before changing them, and prefer explicit,
   recoverable destructive actions.
