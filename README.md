@@ -1,4 +1,6 @@
-# BitBinder
+<p align="center"><img src="docs/media/app-icon.png" width="128" alt="BitBinder app icon"></p>
+
+<h1 align="center">BitBinder</h1>
 
 **A native SwiftUI app that takes stand-up comedy material from a rough thought to a stage-ready set: capture, organize, record, transcribe, import, and refine in one place.**
 
@@ -12,7 +14,22 @@
 
 BitBinder is a shipped production app, [live on the App Store](https://apps.apple.com/us/app/the-bitbinder/id6756085897) at version 12.0. This repository is the full native codebase behind it: SwiftData models, CloudKit sync and cross-account sharing, an on-device and cloud AI writing assistant, an audio recording and transcription stack, a multi-format import pipeline, Siri Shortcuts, and fastlane release automation.
 
-> Screenshots and the full feature tour are on the [App Store listing](https://apps.apple.com/us/app/the-bitbinder/id6756085897).
+## Demo
+
+<p align="center"><img src="docs/media/walkthrough.gif" width="300" alt="App walkthrough: Home, Settings, Roast Mode settings, and new roast target screens"></p>
+
+<p align="center"><sub>App walkthrough: a slideshow of the iPhone screenshots from the App Store listing (Home, Settings, Roast Mode, new roast target). Not a screen recording.</sub></p>
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/media/screenshot-home.png" width="200" alt="Home screen with quick actions for New Joke, Capture Idea, and Record Set, plus At a Glance stats">
+  <img src="docs/media/screenshot-settings.png" width="200" alt="Settings with Roast Mode, the Buddy assistant toggle, iCloud Sync, and Trash">
+  <img src="docs/media/screenshot-roast-settings.png" width="200" alt="Settings in Roast Mode with the dark orange theme">
+  <img src="docs/media/screenshot-roast-target.png" width="200" alt="New roast target form with traits and a BitBuddy guided option">
+</p>
+
+<p align="center"><sub>iPhone screenshots from the <a href="https://apps.apple.com/us/app/the-bitbinder/id6756085897">App Store listing</a>, captured on earlier releases; the listing also has the iPad screenshots and full feature tour.</sub></p>
 
 ---
 
@@ -167,8 +184,12 @@ thebitbinderTests/   Siri integration tests (XCTest)
 Tests/               Standalone regression suites and runner script
 fastlane/            TestFlight and App Store lanes
 site/                Static marketing site
-docs/                Architecture, design, and sync-troubleshooting guides
+docs/                Architecture, design, and sync-troubleshooting guides; README media in docs/media/
 ```
+
+The static marketing site in `site/`:
+
+<p align="center"><img src="docs/media/site-hero.png" width="640" alt="Marketing site hero: The notebook app for stand-up comedians"></p>
 
 For the layering, assistant abstractions, and import pipeline in more depth, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Build and contribution conventions are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
