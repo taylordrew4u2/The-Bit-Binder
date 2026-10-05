@@ -90,8 +90,7 @@ Business logic lives in services rather than views. Notable boundaries:
   `DataProtectionService`, `DataMigrationService`, `DataValidationService`,
   `DataOperationLogger`, and CloudKit utilities (`iCloudSyncService`,
   `iCloudSyncDiagnostics`, `SchemaDeploymentService`, `CloudKitResetUtility`).
-  The guiding principle (see `.github/copilot-instructions.md`) is that user
-  data is high-stakes: no silent deletes, no assumed-successful saves.
+  The guiding principle is that user data is high-stakes: no silent deletes, no assumed-successful saves.
 
 ## Cross-cutting utilities (`Utilities/`)
 
