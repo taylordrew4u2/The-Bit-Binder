@@ -1,138 +1,126 @@
-<p align="center"><img src="docs/media/app-icon.png" width="128" alt="BitBinder app icon"></p>
+<div align="center">
 
-<h1 align="center">BitBinder</h1>
+<img src="docs/media/app-icon.png" width="120" alt="BitBinder app icon">
 
-**A native SwiftUI app that takes stand-up comedy material from a rough thought to a stage-ready set: capture, organize, record, transcribe, import, and refine in one place.**
+# BitBinder
 
-[![App Store](https://img.shields.io/badge/App%20Store-Download-000000?logo=apple&logoColor=white)](https://apps.apple.com/us/app/the-bitbinder/id6756085897)
-[![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS%2018%2B%20%7C%20Mac%20Catalyst-0A84FF)](https://apps.apple.com/us/app/the-bitbinder/id6756085897)
-[![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)](https://swift.org)
-[![UI](https://img.shields.io/badge/UI-SwiftUI-0A84FF)](https://developer.apple.com/xcode/swiftui/)
-[![Data](https://img.shields.io/badge/data-SwiftData%20%2B%20CloudKit-34C759)](https://developer.apple.com/xcode/swiftdata/)
+**A native iOS notebook for stand-up comedians: write, record, transcribe, import, and build sets from one library.**
+
+[![Swift 5](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)](https://swift.org)
+[![iOS 18+](https://img.shields.io/badge/iOS-18%2B-0A84FF?logo=apple&logoColor=white)](https://developer.apple.com/ios/)
 [![Swift build](https://github.com/taylordrew4u2/The-Bit-Binder/actions/workflows/swift-build.yml/badge.svg)](https://github.com/taylordrew4u2/The-Bit-Binder/actions/workflows/swift-build.yml)
 [![SwiftLint](https://github.com/taylordrew4u2/The-Bit-Binder/actions/workflows/swiftlint.yml/badge.svg)](https://github.com/taylordrew4u2/The-Bit-Binder/actions/workflows/swiftlint.yml)
+[![App Store](https://img.shields.io/badge/App%20Store-live-000000?logo=apple&logoColor=white)](https://apps.apple.com/us/app/the-bitbinder/id6756085897)
 
-BitBinder is a shipped production app, [live on the App Store](https://apps.apple.com/us/app/the-bitbinder/id6756085897) at version 12.0. This repository is the full native codebase behind it: SwiftData models, CloudKit sync and cross-account sharing, an on-device and cloud AI writing assistant, an audio recording and transcription stack, a multi-format import pipeline, Siri Shortcuts, and fastlane release automation.
+<a href="https://apps.apple.com/us/app/the-bitbinder/id6756085897"><img src="https://img.shields.io/badge/Download_on_the-App_Store-000000?style=for-the-badge&logo=apple&logoColor=white" height="40" alt="Download on the App Store"></a>
 
-## Demo
+<br><br>
 
-<p align="center"><img src="docs/media/walkthrough.gif" width="300" alt="App walkthrough: Home, Settings, Roast Mode settings, and new roast target screens"></p>
+<img src="docs/media/walkthrough.gif" width="280" alt="Walkthrough of the Home, Settings, Roast Mode settings, and new roast target screens">
 
-<p align="center"><sub>App walkthrough: a slideshow of the iPhone screenshots from the App Store listing (Home, Settings, Roast Mode, new roast target). Not a screen recording.</sub></p>
+<sub>Walkthrough built from the App Store screenshots (Home, Settings, Roast Mode, new roast target). A slideshow, not a screen recording.</sub>
 
-## Screenshots
-
-<p align="center">
-  <img src="docs/media/screenshot-home.png" width="200" alt="Home screen with quick actions for New Joke, Capture Idea, and Record Set, plus At a Glance stats">
-  <img src="docs/media/screenshot-settings.png" width="200" alt="Settings with Roast Mode, the Buddy assistant toggle, iCloud Sync, and Trash">
-  <img src="docs/media/screenshot-roast-settings.png" width="200" alt="Settings in Roast Mode with the dark orange theme">
-  <img src="docs/media/screenshot-roast-target.png" width="200" alt="New roast target form with traits and a BitBuddy guided option">
-</p>
-
-<p align="center"><sub>iPhone screenshots from the <a href="https://apps.apple.com/us/app/the-bitbinder/id6756085897">App Store listing</a>, captured on earlier releases; the listing also has the iPad screenshots and full feature tour.</sub></p>
+</div>
 
 ---
 
-## Why it exists
+## Why I built it
 
-Comedy material scatters. A premise is typed into a notes app, the tag lands in a voice memo, a notebook page becomes a photo, an old set lives in a PDF, and the version that actually worked exists only as a recording. When it is time to build a tight set, that fragmentation makes it hard to find older bits, compare the written joke with how it landed, or assemble a set from scattered drafts.
+Comedy material scatters: a premise in a notes app, the tag in a voice memo, a notebook page saved as a photo, an old set in a PDF, and the version that actually worked only on a recording. BitBinder pulls all of it into one library so a comic can find old bits, compare the written joke with how it landed, and assemble a set without hunting across apps.
 
-BitBinder puts all of it in one library. A comic can write or dictate jokes, group them into folders and set lists, record a practice or live set, transcribe it with Apple speech recognition, and pull in material from text, PDFs, photos, scanned pages, or audio. Every import passes through a review step before anything is saved.
+## Highlights
 
----
-
-## At a glance
-
-| | |
-|---|---|
-| **Platforms** | iPhone and iPad on iOS/iPadOS 18+; Mac Catalyst target for macOS 15+ (Apple silicon and Intel) |
-| **Stack** | Swift 5, SwiftUI, SwiftData, CloudKit |
-| **AI** | Pluggable assistant with on-device (Apple Intelligence, MLX, Transformers) and cloud (OpenAI) backends, plus a local fallback |
-| **Codebase** | 168 Swift files across the app and extension: 13 SwiftData models, 51 services, 62 view files, 29 utility modules |
-| **CI** | GitHub Actions: SwiftLint, Swift regression suites, iOS Simulator build, Siri integration tests, universal Mac Catalyst build |
-| **Release** | fastlane lanes for TestFlight and the App Store |
-
----
+- **Assistant that works with or without a model.** BitBuddy classifies each message first. App commands (save a joke, move it to a folder, create a set list) match one of 91 routed intents in `BitBuddyIntentRouter` and run on a deterministic local backend, so they never wait on a download, an API key, or Apple Intelligence. Open-ended writing help goes through an ordered chain: Apple Intelligence, then MLX, then Hugging Face Transformers, then OpenAI, each behind the same `BitBuddyBackend` protocol.
+- **Staged, reviewable import.** `ImportPipelineCoordinator` runs validation, file-type routing, extraction (PDFKit, Vision OCR, VisionKit scanning, Speech), line normalization, chunked joke extraction, and mapping. Extraction tries Apple's on-device Foundation Model, then OpenAI if the user added a key, then an on-device embedding segmenter. Nothing is saved until the user approves, rejects, or flags each item for splitting in a review queue, so a bad split never silently becomes a joke.
+- **Defensive persistence.** One SwiftData store with CloudKit private-database sync. If CloudKit setup fails, the app reopens the same store file locally rather than switching files. Versioned on-disk backups, a staged restore that runs before the store opens, and soft deletion (`isTrashed` + `deletedDate`) on every major content type protect user writing.
+- **Recording that survives navigation.** Recording and transcription live in shared services, with an app-wide indicator that can stop and save from any screen, and sandbox-path repair so recordings still resolve after the container path changes.
+- **Platform integration.** Siri and Shortcuts via App Intents, a Background Assets downloader extension for model files, BackgroundTasks scheduling, and a Mac Catalyst target that CI builds as a universal binary.
+- **Tested and automated.** Nine standalone Swift regression suites, a 12-test XCTest Siri integration suite, SwiftLint, iOS Simulator and Mac Catalyst builds on every push and pull request, and fastlane lanes for TestFlight and the App Store.
 
 ## Features
 
-**Writing and organization**
-- Joke library with titles, body text, notes, folders, tags, hit and open-mic flags, import metadata, and trash recovery.
-- Brainstorm board for rough ideas: color-coded cards, attached voice notes, and one-tap promotion to a full joke.
-- Set lists with joke and roast-joke ordering, estimated runtime, venue and date, finalization, and a distraction-free performance mode.
-- Notebook for photo-based source material, with folders, image import, and on-device document scanning.
-- Roast mode with targets, traits and photos, roast jokes, relatability scoring, custom ordering, and roast sets.
+| Area | What it does |
+|---|---|
+| **Jokes** | Library with folders, tags, hit and open-mic flags, import metadata, drag and drop, PDF export, and trash recovery |
+| **Brainstorm** | Color-coded idea cards with voice notes and one-tap promotion to a full joke |
+| **Set lists** | Ordered jokes and roast jokes, estimated runtime, venue and date, and a distraction-free performance mode |
+| **Recording** | Record practice or live sets, play back, and transcribe with Apple speech recognition (m4a, wav, mp3, aac, caf, aiff) |
+| **Import** | Text, PDFs, photos (OCR), scanned pages, and audio, with a review step and import history |
+| **Notebook** | Photo-based source pages with folders and on-device document scanning |
+| **Roast mode** | Targets with traits and photos, roast jokes, relatability scoring, and roast sets |
+| **BitBuddy** | In-app writing assistant with app actions, a per-writer style profile, and pluggable model backends |
+| **Organization** | Auto-organize, duplicate detection, and private on-device search |
+| **Sync** | iCloud sync through CloudKit, iCloud key-value preferences, backups, and sync diagnostics |
 
-**Recording and transcription**
-- Audio recording with playback, set-list recording, and trash recovery.
-- An app-wide recording indicator that stops and saves from any screen.
-- Transcription through Apple speech recognition, including imported m4a, wav, mp3, aac, caf, aiff, and aif files.
+## Screenshots
 
-**Import and assistant**
-- Import pipeline for text, PDFs, images (OCR), scanned documents, and audio, with review queues, unresolved-fragment handling, and import history.
-- BitBuddy writing assistant with app-specific intent routing and a per-writer style profile.
-- Auto-organization, duplicate detection, private on-device search, and PDF export.
+<table>
+  <tr>
+    <td align="center"><img src="docs/media/screenshot-home.png" width="200" alt="Home screen"><br><sub>Home: quick actions and stats</sub></td>
+    <td align="center"><img src="docs/media/screenshot-settings.png" width="200" alt="Settings screen"><br><sub>Settings: BitBuddy, iCloud sync, trash</sub></td>
+    <td align="center"><img src="docs/media/screenshot-roast-settings.png" width="200" alt="Settings in Roast Mode"><br><sub>Roast Mode theme</sub></td>
+    <td align="center"><img src="docs/media/screenshot-roast-target.png" width="200" alt="New roast target form"><br><sub>New roast target</sub></td>
+  </tr>
+</table>
 
-**Sync, sharing, and platform integration**
-- SwiftData persistence with CloudKit private-database sync, iCloud key-value preferences, validation, migration, backups, and sync diagnostics.
-- Cross-iCloud library sharing through CloudKit shared workspaces, with collaborator views for jokes, ideas, set lists, and roast material.
-- Siri and Shortcuts actions to save a joke, find jokes, and open set lists.
-- Mac Catalyst build with readable-width editors and keyboard shortcuts (⌘N new joke, ⌘S save, Escape cancel).
-- Background task registration and a background asset downloader extension for model files.
+<sub>iPhone screenshots from the <a href="https://apps.apple.com/us/app/the-bitbinder/id6756085897">App Store listing</a>, captured on earlier releases.</sub>
 
----
+## Architecture
 
-## Engineering highlights
+```mermaid
+flowchart TD
+    UI["SwiftUI Views"] --> SVC["Services"]
+    SIRI["App Intents (Siri / Shortcuts)"] --> UI
 
-- **Apple-native end to end.** SwiftUI, SwiftData, CloudKit, AVFoundation, Speech, Vision/VisionKit, PDFKit, App Intents, BackgroundTasks, and the Keychain, with two third-party Swift packages (both for on-device models).
-- **A 13-model data layer shaped for CloudKit.** Jokes, joke folders, set lists, recordings, brainstorm ideas, roast targets, roast jokes, notebook folders and photos, import batches, categorization results, extraction hints, and chat messages. Optional relationships, serialized ordering identifiers, external storage for images, and explicit migration and validation keep data intact across schema changes and sync.
-- **Provider-agnostic AI.** The assistant sits behind a `BitBuddyBackend` protocol and a factory that picks an implementation at runtime, so a backend can be added or the default swapped without touching UI code. A deterministic local fallback means the feature still works with no model and no network.
-- **Staged, reviewable import.** Route, extract, normalize, split, AI-extract, review, persist. Anything uncertain goes to a human review queue instead of silently becoming an incorrect joke record.
-- **Resilient recording.** Recording and transcription live in shared services that preserve in-progress audio across navigation and resolve stale sandbox paths back to the Documents directory, so a recording is never lost because the user switched screens.
-- **Cross-account sharing.** CloudKit shared workspaces backed by a purpose-built SwiftData-to-Core Data migrator.
-- **Soft deletion everywhere.** `isTrashed` plus `deletedDate` across every major content type, so one mistaken swipe never destroys writing.
-- **Owned release path.** CI on every push and pull request, and fastlane lanes for TestFlight and App Store uploads.
+    subgraph Assistant["BitBuddy"]
+        BB["BitBuddyService"] --> ROUTER{"Intent router"}
+        ROUTER -->|app action| LOCAL["Local deterministic backend"]
+        ROUTER -->|writing help| CHAIN["Apple Intelligence → MLX → Transformers → OpenAI"]
+    end
 
----
+    subgraph Import["Import pipeline"]
+        IR["ImportRouter"] --> EXT["PDFKit / Vision OCR / Speech"]
+        EXT --> NORM["LineNormalizer"]
+        NORM --> AIX["Extraction: Apple FM → OpenAI → embedding segmenter"]
+        AIX --> REVIEW["Review queue (user approves)"]
+    end
 
-## BitBuddy assistant backends
+    SVC --> BB
+    SVC --> IR
+    SVC --> REC["Recording + transcription"]
+    LOCAL --> DATA
+    REVIEW --> DATA
+    REC --> DATA
+    UI --> DATA[("SwiftData store")]
+    DATA <--> CK[("CloudKit private DB")]
+```
 
-| Backend | Where it runs | Notes |
-|---|---|---|
-| Apple Intelligence | On device | Used where the platform supports it |
-| MLX | On device (iOS only) | Local inference via `mlx-swift-lm`, with a shared runtime to manage memory pressure |
-| Hugging Face Transformers | On device | Via `swift-transformers` |
-| OpenAI | Cloud | API key entered in-app and stored in the Keychain |
-| Local fallback | On device | Deterministic; no model or network needed |
+**Design decisions**
 
----
+- **Route before generating.** Commands that change data go through the intent router and a deterministic backend; only open-ended requests reach an LLM. App actions stay predictable, and the assistant still works on devices with no model and no network.
+- **One protocol, many backends.** Every assistant and extraction backend conforms to a shared protocol and is tried in a fixed order, so adding or reordering a provider does not touch UI code.
+- **Review before persist.** Imported material is staged and approved by the user. A wrong split is cheap to fix in review and expensive to clean up later.
+- **Never switch store files.** Every fallback path opens the same SwiftData file, because a new empty store looks to the user like lost data.
+- **Extraction is gated.** `AIJokeExtractionManager` only accepts calls from the import pipeline, so interactive features cannot trigger bulk extraction by accident.
+
+More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/SYNC_TROUBLESHOOTING.md](docs/SYNC_TROUBLESHOOTING.md).
 
 ## Tech stack
 
-- **Language and UI:** Swift 5, SwiftUI, SwiftData.
-- **Persistence and sync:** SwiftData with a CloudKit private-database configuration, plus a Core Data bridge for CloudKit shared workspaces.
-- **Apple frameworks:** AVFoundation, Speech, Vision/VisionKit, PDFKit, CloudKit, App Intents, BackgroundTasks, UserNotifications, Security, CoreTransferable, UniformTypeIdentifiers.
-- **Swift packages:** [`mlx-swift-lm`](https://github.com/ml-explore/mlx-swift-lm) and Hugging Face [`swift-transformers`](https://github.com/huggingface/swift-transformers).
-- **Accounts:** No external account system. `AuthService` keeps a generated user identifier in iCloud key-value storage.
-- **Tooling:** Xcode, SwiftLint, GitHub Actions, fastlane.
+| Layer | Technology |
+|---|---|
+| Language and UI | Swift 5, SwiftUI |
+| Persistence and sync | SwiftData (12 `@Model` types), CloudKit private database, iCloud key-value store |
+| Audio and text | AVFoundation, Speech, Vision, VisionKit, PDFKit |
+| Assistant | Apple Foundation Models, [`mlx-swift-lm`](https://github.com/ml-explore/mlx-swift-lm), [`swift-transformers`](https://github.com/huggingface/swift-transformers), OpenAI API |
+| System | App Intents, BackgroundTasks, Background Assets, UserNotifications, Keychain |
+| Tooling | Xcode, SwiftLint, GitHub Actions, fastlane |
 
----
-
-## Security and privacy
-
-- OpenAI API keys are stored in the Keychain via `OpenAIKeychainStore`; legacy keys found in `UserDefaults` are migrated automatically.
-- App Transport Security blocks arbitrary loads and allows TLS exceptions only for configured AI provider domains.
-- User data syncs through the app's CloudKit **private** database.
-- Search and the on-device assistant backends keep processing local where possible.
-
----
+The OpenAI key is entered in the app and stored in the Keychain (legacy `UserDefaults` values are migrated out). App Transport Security blocks arbitrary loads and lists exceptions only for AI provider domains.
 
 ## Getting started
 
-**Requirements**
-- macOS with a current Xcode (CI uses Xcode 26.3).
-- An Apple developer account with signing for iCloud/CloudKit, App Groups, speech recognition, and background modes.
-- An iOS 18+ simulator or device.
+**Requirements:** a current Xcode (CI uses Xcode 26.3), an iOS 18+ simulator or device, and an Apple developer team for the iCloud, App Groups, and background-mode entitlements.
 
 ```bash
 git clone https://github.com/taylordrew4u2/The-Bit-Binder.git
@@ -140,20 +128,14 @@ cd The-Bit-Binder
 open thebitbinder.xcodeproj
 ```
 
-In Xcode, select the `thebitbinder` scheme, choose an iOS 18+ simulator or device (or **My Mac (Mac Catalyst)**), set your signing team and bundle identifier, then build and run.
+Select the `thebitbinder` scheme, pick an iOS 18+ simulator, device, or **My Mac (Mac Catalyst)**, set your signing team and bundle identifier, and run. Swift packages resolve automatically. No `.env` file is needed. The `bit` scheme builds the background downloader extension on its own.
 
-No `.env` file is needed. Optional provider credentials, such as an OpenAI key, are entered in the app and stored in the Keychain.
-
-Running on a Mac requires an Apple development certificate, since iCloud and App Groups cannot be ad-hoc signed. Siri and Mac support in this repository ship with the next signed App Store release.
-
-**Release builds** (require App Store Connect credentials and local signing, which are not committed):
+Release builds need App Store Connect credentials, which are not committed:
 
 ```bash
 bundle exec fastlane beta      # TestFlight
 bundle exec fastlane release   # App Store
 ```
-
----
 
 ## Testing
 
@@ -161,42 +143,32 @@ bundle exec fastlane release   # App Store
 bash Tests/run-regressions.sh
 ```
 
-This compiles and runs nine standalone Swift regression suites (joke-editor persistence, autosave, list ordering, editable rows, tab navigation, assistant layout, text size, action colors, and Siri capture). GitHub Actions runs the same suites, plus SwiftLint, an iOS Simulator build, the `SiriIntegrationTests` XCTest target, and a universal Mac Catalyst build. See [Tests/Siri.md](Tests/Siri.md) for Siri validation.
+This compiles and runs nine standalone regression suites against the production source files: joke-editor persistence, autosave, list ordering, editable rows, tab navigation, BitBuddy compact layout, text size, action colors, and Siri capture.
 
-Device QA covers recording across navigation and playback, imported-audio transcription, import review for each input type, CloudKit sync (fresh install, offline, multi-device), trash and restore, and adaptive layout on iPhone and iPad.
+The `thebitbinderTests` XCTest target holds `SiriIntegrationTests` (12 tests). Run it from Xcode or with `xcodebuild test -scheme thebitbinder -only-testing:thebitbinderTests/SiriIntegrationTests` on an iOS 18+ simulator. See [Tests/Siri.md](Tests/Siri.md).
 
----
+[GitHub Actions](.github/workflows) runs the regression suites, an iOS Simulator build, the Siri tests, a universal Mac Catalyst build, and SwiftLint.
 
 ## Project structure
 
 ```
 thebitbinder/
-├── Models/          13 SwiftData models
-├── Views/           SwiftUI screens and reusable components
-├── Services/        Recording, transcription, import, assistant, sync, validation
-│   └── BitBuddyBackends/
-├── CloudKit/        Sharing, persistence controller, error classifier, SwiftData→Core Data migrator
-├── AppIntents/      Siri and Shortcuts actions
-├── Utilities/       Design system, logging, speech helpers, memory monitoring, iCloud KVS
-└── Assets.xcassets
-bit/                 Background asset downloader extension
-thebitbinderTests/   Siri integration tests (XCTest)
-Tests/               Standalone regression suites and runner script
-fastlane/            TestFlight and App Store lanes
-site/                Static marketing site
-docs/                Architecture, design, and sync-troubleshooting guides; README media in docs/media/
+├── Models/       SwiftData models
+├── Views/        SwiftUI screens and components
+├── Services/     Assistant, import, recording, transcription, sync, data safety
+├── CloudKit/     Error classifier and Core Data groundwork
+├── AppIntents/   Siri and Shortcuts
+└── Utilities/    Design system, logging, editor helpers
+bit/              Background Assets downloader extension
+thebitbinderTests/ Siri integration tests (XCTest)
+Tests/            Standalone regression suites + runner
+fastlane/         TestFlight and App Store lanes
+site/             Static marketing site
+docs/             Architecture, sync troubleshooting, design specs, README media
 ```
 
-The static marketing site in `site/`:
-
-<p align="center"><img src="docs/media/site-hero.png" width="640" alt="Marketing site hero: The notebook app for stand-up comedians"></p>
-
-For the layering, assistant abstractions, and import pipeline in more depth, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Build and contribution conventions are in [CONTRIBUTING.md](CONTRIBUTING.md).
+Contribution conventions are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## Author and license
-
-Built and maintained by **Taylor Drew** ([@taylordrew4u2](https://github.com/taylordrew4u2)).
-
-Copyright © Taylor Drew. All rights reserved.
+<p align="center">Built by Taylor Drew · <a href="https://github.com/taylordrew4u2">github.com/taylordrew4u2</a></p>
