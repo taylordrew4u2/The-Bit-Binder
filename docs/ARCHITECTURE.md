@@ -38,6 +38,8 @@ thebitbinder/
 ├── Models/                   SwiftData @Model types (the domain)
 ├── Views/                    SwiftUI feature screens & components
 ├── Services/                 Business logic, integrations, AI backends
+├── CloudKit/                 Error classifier + dormant Core Data stack (see below)
+├── AppIntents/               Siri and Shortcuts actions
 ├── Utilities/                Cross-cutting helpers (logging, design system…)
 └── Assets.xcassets/          Images, colors, app icon
 bit/                          App extension (background download handling)
@@ -51,12 +53,27 @@ target automatically — there is no manual `pbxproj` membership step.
 
 ## Domain model (`Models/`)
 
-The persistent domain is a set of SwiftData `@Model` types, including: `Joke`,
-`JokeFolder`, `SetList`, `Recording`, `BrainstormIdea`, `RoastTarget`,
-`RoastJoke`, `NotebookFolder`, `NotebookPhotoRecord`, `ImportBatch`,
-`ChatMessage`, plus supporting value types (`CategorizationResult`,
-`ExtractionHints`). These are CloudKit-compatible and mirror to the user's
-private database.
+The persistent domain is 12 SwiftData `@Model` types, registered in the
+`Schema` in `thebitbinderApp.swift`: `Joke`, `JokeFolder`, `SetList`,
+`Recording`, `BrainstormIdea`, `RoastTarget`, `RoastJoke`, `NotebookFolder`,
+`NotebookPhotoRecord`, `ImportBatch`, `ImportedJokeMetadata`, and
+`UnresolvedImportFragment`. `Models/` also holds plain value types that are not
+persisted as models: `ChatBubbleMessage` (in `ChatMessage.swift`),
+`CategoryMatch` (in `CategorizationResult.swift`), and `ExtractionHints`.
+The models are CloudKit-compatible and mirror to the user's private database.
+
+## CloudKit folder (`CloudKit/`)
+
+Sync in the shipping app is SwiftData's built-in CloudKit mirroring to the
+**private** database (`iCloud.The-BitBinder.thebitbinder`). If CloudKit setup
+fails, the app reopens the same store file without sync.
+
+`CloudKit/` also contains a Core Data stack (`BitBinderModel`,
+`PersistenceController`, `SwiftDataToCoreDataMigrator`) built as groundwork for
+a future cutover. It is **dormant**: the controller is only initialized by
+debug and verification code paths. Multi-user library sharing through the
+CloudKit shared database has been removed; material moves between people by
+exporting a file. `CloudErrorClassifier` is used for sync error handling.
 
 ## Services (`Services/`)
 
@@ -121,11 +138,12 @@ Nothing is written to the store until the user approves the review queue.
 
 ## Build & run
 
-1. Open `thebitbinder.xcodeproj` in Xcode 16+.
+1. Open `thebitbinder.xcodeproj` in a current Xcode (CI builds with Xcode 26.3).
 2. Swift Package Manager resolves dependencies from the tracked
-   `Package.resolved` (the `.swiftpm/` working directory is intentionally
+   `Package.resolved` under `project.xcworkspace/xcshareddata/swiftpm/` (the `.swiftpm/` working directory is intentionally
    ignored and regenerated locally).
-3. Select the `thebitbinder` scheme and run on an iOS 17+ simulator or device.
+3. Select the `thebitbinder` scheme and run on an iOS 18+ simulator or device
+   (deployment target iOS 18.0; the Mac Catalyst target needs macOS 15.0).
 
 CloudKit and OpenAI features require the corresponding entitlements / API key;
 the app falls back to local-only behavior when they are absent.
