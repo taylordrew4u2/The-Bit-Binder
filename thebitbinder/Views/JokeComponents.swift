@@ -281,43 +281,6 @@ struct TheHitsChip: View {
     }
 }
 
-// MARK: - Tag Filter Chip
-
-struct TagFilterChip: View {
-    let activeTag: String?
-    let isSelected: Bool
-    var roastMode: Bool = false
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: {
-            haptic(.selection)
-            action()
-        }) {
-            HStack(spacing: 4) {
-                Image(systemName: "tag.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(isSelected ? .white : Color.accentColor)
-
-                Text(activeTag.map { "#\($0)" } ?? "Tags")
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-            }
-            .foregroundColor(isSelected ? .white : .primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                isSelected
-                    ? AnyShapeStyle(Color.bitbinderAccent)
-                    : AnyShapeStyle(Color(UIColor.tertiarySystemFill))
-            )
-            .clipShape(Capsule())
-            .animation(.easeInOut(duration: 0.2), value: isSelected)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Jokes Empty State
 
 struct JokesEmptyState: View {

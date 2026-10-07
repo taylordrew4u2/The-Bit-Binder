@@ -16,26 +16,6 @@ import MLXLLM
 import MLXLMCommon
 #endif
 
-// MARK: - Apple AI Generable Types
-
-#if canImport(FoundationModels)
-@available(iOS 26, *)
-@Generable(description: "A comedy joke categorization result")
-struct AppleAICategoryResult {
-    @Guide(description: "The best-fitting category name from the available list")
-    var category: String
-
-    @Guide(description: "Confidence from 0.0 to 1.0")
-    var confidence: Double
-
-    @Guide(description: "Short explanation of why this category fits")
-    var reasoning: String
-
-    @Guide(description: "Key words from the joke that support this categorization", .maximumCount(5))
-    var matchedKeywords: [String]
-}
-#endif
-
 // MARK: - Organize Mode
 
 enum OrganizeMode: String, CaseIterable, Identifiable {

@@ -525,8 +525,6 @@ struct BitBuddyChatView: View {
                 return "The selected BitBuddy model is unavailable. I can still help locally if you ask again."
             case .generationFailed:
                 return "The model failed to generate a reply. Try a shorter prompt, or ask for a local action like creating a folder, set list, or note."
-            case .invalidStructuredResponse:
-                return "BitBuddy received a malformed action response. Try rephrasing with the exact item or text you want changed."
             }
         }
 
@@ -562,7 +560,7 @@ struct BitBuddyChatView: View {
         case .brainstorm:         return .brainstorm
         case .setLists:           return .sets
         case .recordings:         return .recordings
-        case .notebook:           return .notebookSaver
+        case .notebook:           return .home         // Notepad lives on Home
         case .settings, .sync:    return .settings
         case .help:               return .settings   // Help lives under Settings
         case .importFlow:         return .jokes       // Import lands on Jokes

@@ -64,6 +64,11 @@ struct HomeView: View {
     }
     @State private var activeSheet: ActiveSheet?
 
+    // The Notepad lives on Home, under Quick Actions. Same iCloud-synced key
+    // as the full-page NotepadView, so both show the same text.
+    @AppStorage("notepadText") private var notepadText = ""
+    @FocusState private var isNotepadFocused: Bool
+
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("userName") private var userName = ""
     @AppStorage("homeSelectedSections") private var selectedSectionsRaw = ""
@@ -162,6 +167,41 @@ struct HomeView: View {
                     }
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
                     .listRowBackground(Color.clear)
+                }
+            }
+
+            // MARK: - Notepad
+            Section {
+                LinedNotepadEditor(
+                    text: $notepadText,
+                    isFocused: $isNotepadFocused,
+                    isScrollEnabled: false,
+                    minimumRows: 6
+                )
+                .overlay(alignment: .topLeading) {
+                    if notepadText.isEmpty {
+                        Text("Jot down premises, bits, tags, and to-dos…")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .lineSpacing(LinedNotepadEditor.lineSpacing)
+                            .padding(.horizontal, LinedNotepadEditor.horizontalInset)
+                            .padding(.top, LinedNotepadEditor.topInset)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .listRowInsets(EdgeInsets())
+            } header: {
+                HStack {
+                    Text("Notepad")
+                    Spacer()
+                    NavigationLink {
+                        NotepadView()
+                    } label: {
+                        Text("Open")
+                            .font(.footnote.weight(.medium))
+                            .textCase(nil)
+                    }
+                    .accessibilityLabel("Open full-page Notepad")
                 }
             }
 
@@ -267,7 +307,16 @@ struct HomeView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollDismissesKeyboard(.interactively)
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        .toolbar {
+            if isNotepadFocused {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { isNotepadFocused = false }
+                }
+            }
+        }
         .navigationDestination(for: Joke.self) { joke in
             JokeDetailView(joke: joke)
         }

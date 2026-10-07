@@ -41,7 +41,7 @@ struct BitBuddyDataContext: Sendable {
     var isRoastMode: Bool = false
 }
 
-// MARK: - Structured Action Response
+// MARK: - Actions
 
 /// An action BitBuddy wants the app to perform.
 struct BitBuddyAction: Sendable, Codable {
@@ -51,19 +51,6 @@ struct BitBuddyAction: Sendable, Codable {
     init(type: String, parameters: [String: String] = [:]) {
         self.type = type
         self.parameters = parameters
-    }
-}
-
-/// The full structured response from any backend.
-struct BitBuddyStructuredResponse: Sendable {
-    let text: String
-    let actions: [BitBuddyAction]
-    let routedSection: BitBuddySection?
-
-    init(text: String, actions: [BitBuddyAction] = [], routedSection: BitBuddySection? = nil) {
-        self.text = text
-        self.actions = actions
-        self.routedSection = routedSection
     }
 }
 
@@ -88,16 +75,13 @@ extension BitBuddyBackend {
 enum BitBuddyBackendError: LocalizedError {
     case unavailable
     case generationFailed
-    case invalidStructuredResponse
-    
+
     var errorDescription: String? {
         switch self {
         case .unavailable:
             return "BitBuddy isn't available on this device right now."
         case .generationFailed:
             return "BitBuddy couldn't generate a response."
-        case .invalidStructuredResponse:
-            return "BitBuddy returned an invalid structured response."
         }
     }
 }

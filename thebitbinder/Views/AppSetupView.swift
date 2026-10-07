@@ -32,10 +32,10 @@ struct AppSetupView: View {
 
     // All configurable tabs (excluding Settings — always shown)
     private let configurableTabs: [AppScreen] = [
-        .home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver
+        .home, .brainstorm, .jokes, .sets, .recordings
     ]
 
-    private let defaultTabs: Set<AppScreen> = [.home, .jokes, .sets, .notebookSaver]
+    private let defaultTabs: Set<AppScreen> = [.home, .jokes, .sets]
 
     // First launch keeps only the essential steps; tabs/home/layout default
     // to sensible values and stay editable later in Settings.

@@ -6,7 +6,6 @@ enum AppScreen: String, CaseIterable {
     case jokes = "Jokes"
     case sets = "Sets"
     case recordings = "Recordings"
-    case notebookSaver = "Photo Notebook"
     case settings = "Settings"
 
     static var roastScreens: [AppScreen] {
@@ -15,7 +14,7 @@ enum AppScreen: String, CaseIterable {
 
     // Default screens for the tab bar when no custom selection exists
     static var defaultTabBarScreens: [AppScreen] {
-        [.home, .jokes, .sets, .notebookSaver]
+        [.home, .jokes, .sets]
     }
 
     static var defaultRoastTabBarScreens: [AppScreen] {
@@ -25,7 +24,7 @@ enum AppScreen: String, CaseIterable {
     /// Ordered list of all screens that can appear in the tab bar.
     /// Used to maintain a stable ordering regardless of selection order.
     static var tabBarOrder: [AppScreen] {
-        [.home, .brainstorm, .jokes, .sets, .recordings, .notebookSaver]
+        [.home, .brainstorm, .jokes, .sets, .recordings]
     }
 
     /// Returns visible tabs for the current mode.

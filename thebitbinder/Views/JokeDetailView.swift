@@ -796,58 +796,6 @@ struct SetListPickerForJoke: View {
     }
 }
 
-// MARK: - Folder Picker
-
-struct FolderPickerView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var selectedFolder: JokeFolder?
-    let folders: [JokeFolder]
-    @AppStorage("roastModeEnabled") private var roastMode = false
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Button {
-                    selectedFolder = nil
-                    dismiss()
-                } label: {
-                    HStack {
-                        Label("No Folder", systemImage: "tray")
-                        Spacer()
-                        if selectedFolder == nil {
-                            Image(systemName: "checkmark")
-                                .foregroundColor(roastMode ? FirePalette.core : .accentColor)
-                        }
-                    }
-                }
-
-                ForEach(folders) { folder in
-                    Button {
-                        selectedFolder = folder
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Label(folder.name, systemImage: "folder.fill")
-                            Spacer()
-                            if selectedFolder?.id == folder.id {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(roastMode ? FirePalette.core : .accentColor)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Choose Folder")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Multi-Folder Picker
 
 struct MultiFolderPickerView: View {

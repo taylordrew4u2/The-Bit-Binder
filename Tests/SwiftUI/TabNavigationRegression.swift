@@ -4,7 +4,7 @@ import Foundation
 struct TabNavigationRegression {
     static func main() {
         let defaults = AppScreen.visibleTabs(from: "", roastMode: false, temporaryTab: nil)
-        precondition(defaults == [.home, .jokes, .sets, .notebookSaver, .settings])
+        precondition(defaults == [.home, .jokes, .sets, .settings])
 
         // Every combination of saved tabs must have a valid selection, even if
         // preferences contain an old value or Home was removed during setup.

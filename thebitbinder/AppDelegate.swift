@@ -197,9 +197,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         scheduleBackgroundRefresh()
         
         let refreshTask = Task {
-            // Refresh background download status
             // Task inherits @MainActor from handleAppRefresh — no hop needed.
-            BackgroundDownloadScheduler.shared.refresh()
             let elapsed = Date().timeIntervalSince(startTime)
             print(" [BGTask] App refresh COMPLETED in \(String(format: "%.1f", elapsed))s")
             task.setTaskCompleted(success: true)
@@ -224,14 +222,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         scheduleBackgroundSync()
         
         let syncTask = Task {
-            // Refresh background download status. SwiftData + CloudKit will
-            // automatically process any pending remote changes when the
-            // persistent store coordinator runs its history processing.
-            // Do NOT manually post .NSPersistentStoreRemoteChange — that
+            // SwiftData + CloudKit will automatically process any pending remote
+            // changes when the persistent store coordinator runs its history
+            // processing. Do NOT manually post .NSPersistentStoreRemoteChange — that
             // cascades into handleRemoteChange and triggers a redundant sync cycle.
             // Task inherits @MainActor from handleBackgroundSync — no hop needed.
-            BackgroundDownloadScheduler.shared.refresh()
-            
+
             // Allow a brief window for SwiftData to process any pending merges
             try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
             

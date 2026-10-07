@@ -52,6 +52,11 @@ struct LinedNotepadEditor: UIViewRepresentable {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var text: String
     var isFocused: FocusState<Bool>.Binding
+    /// When false the text view grows with its content instead of scrolling,
+    /// so it can sit inside another scrolling container such as the Home list.
+    var isScrollEnabled: Bool = true
+    /// Minimum number of ruled rows to show when the editor sizes to content.
+    var minimumRows: Int = 0
 
     static let horizontalInset: CGFloat = 20
     static let topInset: CGFloat = 12
@@ -78,7 +83,8 @@ struct LinedNotepadEditor: UIViewRepresentable {
         tv.text = text
         context.coordinator.applyTypography(to: tv)
         tv.delegate = context.coordinator
-        tv.alwaysBounceVertical = true
+        tv.isScrollEnabled = isScrollEnabled
+        tv.alwaysBounceVertical = isScrollEnabled
         tv.keyboardDismissMode = .interactive
         return tv
     }
@@ -92,6 +98,17 @@ struct LinedNotepadEditor: UIViewRepresentable {
         } else if !isFocused.wrappedValue, tv.isFirstResponder {
             tv.resignFirstResponder()
         }
+    }
+
+    /// Sizes the editor to its text when scrolling is disabled so the host
+    /// list grows with the note. Scrolling editors keep SwiftUI's default.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: RuledTextView, context: Context) -> CGSize? {
+        guard !isScrollEnabled else { return nil }
+        let width = proposal.width ?? uiView.bounds.width
+        guard width > 0 else { return nil }
+        let fitting = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        let minimumHeight = Self.topInset * 2 + uiView.rowHeight * CGFloat(minimumRows)
+        return CGSize(width: width, height: max(ceil(fitting.height), minimumHeight))
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -185,6 +202,7 @@ struct LinedNotepadEditor: UIViewRepresentable {
             if let ruledTextView = textView as? RuledTextView {
                 applyTypography(to: ruledTextView)
             }
+            textView.invalidateIntrinsicContentSize()   // let a non-scrolling editor grow
             textView.setNeedsDisplay()   // redraw rules as content grows
         }
 

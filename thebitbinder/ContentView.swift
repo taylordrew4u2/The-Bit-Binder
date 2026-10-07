@@ -130,20 +130,14 @@ extension AppScreen {
         case .jokes:         return .jokes
         case .sets:          return .setLists
         case .recordings:    return .recordings
-        case .notebookSaver: return .notebook
         case .settings:      return .settings
         }
     }
 
     /// User-facing tab label. Kept separate from `rawValue` because the raw
     /// value backs persisted tab selections (`selectedTabRawValue`,
-    /// `setupSelectedTabs`) and must stay stable even when the label changes.
-    var displayName: String {
-        switch self {
-        case .notebookSaver: return "Notepad"
-        default:             return rawValue
-        }
-    }
+    /// `setupSelectedTabs`) and must stay stable even if a label changes.
+    var displayName: String { rawValue }
 
     var icon: String {
         switch self {
@@ -152,7 +146,6 @@ extension AppScreen {
         case .jokes:         return "text.quote"
         case .sets:          return "list.bullet.rectangle.portrait"
         case .recordings:    return "waveform"
-        case .notebookSaver: return "note.text"
         case .settings:      return "gearshape"
         }
     }
@@ -164,7 +157,6 @@ extension AppScreen {
         case .jokes:         return "text.quote"
         case .sets:          return "list.bullet.rectangle.portrait.fill"
         case .recordings:    return "waveform"
-        case .notebookSaver: return "note.text"
         case .settings:      return "gearshape.fill"
         }
     }
@@ -176,7 +168,6 @@ extension AppScreen {
         case .jokes:         return "Roasts"
         case .sets:          return "Roast Sets"
         case .recordings:    return "Recordings"
-        case .notebookSaver: return "Notepad"
         case .settings:      return "Settings"
         }
     }
@@ -554,8 +545,6 @@ struct MainTabView: View {
             SetListsView()
         case .recordings:
             RecordingsView()
-        case .notebookSaver:
-            NotepadView()
         case .settings:
             SettingsView()
         }

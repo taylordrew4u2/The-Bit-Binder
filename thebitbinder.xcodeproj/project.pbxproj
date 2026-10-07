@@ -7,19 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		BAD6B2CE2F6F753E00A09B53 /* bit.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = BAD6B2C62F6F753E00A09B53 /* bit.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BAFA10012F99000100A1B2C3 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = BAFA10022F99000100A1B2C3 /* MLXLLM */; };
 		BAFA10032F99000100A1B2C3 /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = BAFA10042F99000100A1B2C3 /* Transformers */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		BAD6B2CC2F6F753E00A09B53 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = BAB3D0492EDF80F5007295C1 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = BAD6B2C52F6F753E00A09B53;
-			remoteInfo = bit;
-		};
 		BAF510012FAF00010051A101 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BAB3D0492EDF80F5007295C1 /* Project object */;
@@ -36,7 +28,6 @@
 			dstPath = Extensions;
 			dstSubfolderSpec = 1;
 			files = (
-				BAD6B2CE2F6F753E00A09B53 /* bit.appex in Embed ExtensionKit Extensions */,
 			);
 			name = "Embed ExtensionKit Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -45,18 +36,10 @@
 
 /* Begin PBXFileReference section */
 		BAB3D0522EDF80F5007295C1 /* thebitbinder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = thebitbinder.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		BAD6B2C62F6F753E00A09B53 /* bit.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = bit.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BAF510022FAF00010051A101 /* thebitbinderTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = thebitbinderTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		BA7961162F7EF76F00D1E24A /* Exceptions for "bit" folder in "bit" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				BackgroundDownloadHandler.swift,
-			);
-			target = BAD6B2C52F6F753E00A09B53 /* bit */;
-		};
 		BA79611A2F7EF77000D1E24A /* Exceptions for "thebitbinder" folder in "thebitbinder" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -67,14 +50,6 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		BA7961132F7EF76E00D1E24A /* bit */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				BA7961162F7EF76F00D1E24A /* Exceptions for "bit" folder in "bit" target */,
-			);
-			path = bit;
-			sourceTree = "<group>";
-		};
 		BAB3D0542EDF80F5007295C1 /* thebitbinder */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -100,13 +75,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BAD6B2C32F6F753E00A09B53 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		BAF510042FAF00010051A101 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -120,7 +88,6 @@
 		BAB3D0482EDF80F5007295C1 = {
 			isa = PBXGroup;
 			children = (
-				BA7961132F7EF76E00D1E24A /* bit */,
 				BAB3D0542EDF80F5007295C1 /* thebitbinder */,
 				BAF510032FAF00010051A101 /* thebitbinderTests */,
 				BAB3D0532EDF80F5007295C1 /* Products */,
@@ -131,7 +98,6 @@
 			isa = PBXGroup;
 			children = (
 				BAB3D0522EDF80F5007295C1 /* thebitbinder.app */,
-				BAD6B2C62F6F753E00A09B53 /* bit.appex */,
 				BAF510022FAF00010051A101 /* thebitbinderTests.xctest */,
 			);
 			name = Products;
@@ -152,7 +118,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				BAD6B2CD2F6F753E00A09B53 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				BAB3D0542EDF80F5007295C1 /* thebitbinder */,
@@ -165,25 +130,6 @@
 			productName = thebitbinder;
 			productReference = BAB3D0522EDF80F5007295C1 /* thebitbinder.app */;
 			productType = "com.apple.product-type.application";
-		};
-		BAD6B2C52F6F753E00A09B53 /* bit */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = BAD6B2CF2F6F753E00A09B53 /* Build configuration list for PBXNativeTarget "bit" */;
-			buildPhases = (
-				BAD6B2C22F6F753E00A09B53 /* Sources */,
-				BAD6B2C32F6F753E00A09B53 /* Frameworks */,
-				BAD6B2C42F6F753E00A09B53 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = bit;
-			packageProductDependencies = (
-			);
-			productName = bit;
-			productReference = BAD6B2C62F6F753E00A09B53 /* bit.appex */;
-			productType = "com.apple.product-type.extensionkit-extension";
 		};
 		BAF510052FAF00010051A101 /* thebitbinderTests */ = {
 			isa = PBXNativeTarget;
@@ -221,9 +167,6 @@
 					BAB3D0512EDF80F5007295C1 = {
 						CreatedOnToolsVersion = 16.2;
 					};
-					BAD6B2C52F6F753E00A09B53 = {
-						CreatedOnToolsVersion = 26.3;
-					};
 					BAF510052FAF00010051A101 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = BAB3D0512EDF80F5007295C1;
@@ -242,6 +185,7 @@
 			packageReferences = (
 				BAFA10052F99000100A1B2C3 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				BAFA10062F99000100A1B2C3 /* XCRemoteSwiftPackageReference "swift-transformers" */,
+				BA52C9AC3075C8E0003FED3D /* XCRemoteSwiftPackageReference "swift-collections" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BAB3D0532EDF80F5007295C1 /* Products */;
@@ -249,7 +193,6 @@
 			projectRoot = "";
 			targets = (
 				BAB3D0512EDF80F5007295C1 /* thebitbinder */,
-				BAD6B2C52F6F753E00A09B53 /* bit */,
 				BAF510052FAF00010051A101 /* thebitbinderTests */,
 			);
 		};
@@ -257,13 +200,6 @@
 
 /* Begin PBXResourcesBuildPhase section */
 		BAB3D0502EDF80F5007295C1 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		BAD6B2C42F6F753E00A09B53 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -287,13 +223,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		BAD6B2C22F6F753E00A09B53 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		BAF510072FAF00010051A101 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -304,12 +233,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		BAD6B2CD2F6F753E00A09B53 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			platformFilter = ios;
-			target = BAD6B2C52F6F753E00A09B53 /* bit */;
-			targetProxy = BAD6B2CC2F6F753E00A09B53 /* PBXContainerItemProxy */;
-		};
 		BAF510082FAF00010051A101 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = BAB3D0512EDF80F5007295C1 /* thebitbinder */;
@@ -327,7 +250,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "thebitbinder/thebitbinder-mac.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 16;
 				DEAD_CODE_STRIPPING = YES;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				DEVELOPMENT_TEAM = R44WG942GS;
@@ -348,6 +271,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = thebitbinder/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Taylor Drew. All rights reserved.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -361,7 +285,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 12.0;
+				MARKETING_VERSION = 15.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "The-BitBinder.thebitbinder";
@@ -387,7 +311,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "thebitbinder/thebitbinder-mac.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 16;
 				DEAD_CODE_STRIPPING = YES;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				DEVELOPMENT_TEAM = R44WG942GS;
@@ -408,6 +332,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = thebitbinder/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Taylor Drew. All rights reserved.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -421,7 +346,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 12.0;
+				MARKETING_VERSION = 15.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = "The-BitBinder.thebitbinder";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = "The-BitBinder.thebitbinder";
@@ -558,79 +483,6 @@
 			};
 			name = Release;
 		};
-		BAD6B2D02F6F753E00A09B53 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = bit/bit.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
-				DEVELOPMENT_TEAM = R44WG942GS;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = bit/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = bit;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder.bit";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		BAD6B2D12F6F753E00A09B53 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = bit/bit.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
-				DEVELOPMENT_TEAM = R44WG942GS;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = bit/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = bit;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 12.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "The-BitBinder.thebitbinder.bit";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
 		BAF510092FAF00010051A101 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -710,15 +562,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		BAD6B2CF2F6F753E00A09B53 /* Build configuration list for PBXNativeTarget "bit" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				BAD6B2D02F6F753E00A09B53 /* Debug */,
-				BAD6B2D12F6F753E00A09B53 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		BAF5100B2FAF00010051A101 /* Build configuration list for PBXNativeTarget "thebitbinderTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -731,6 +574,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		BA52C9AC3075C8E0003FED3D /* XCRemoteSwiftPackageReference "swift-collections" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-collections.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.0;
+			};
+		};
 		BAFA10052F99000100A1B2C3 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
