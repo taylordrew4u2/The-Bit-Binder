@@ -81,7 +81,8 @@ struct BitBinderShortcuts: AppShortcutsProvider {
             phrases: [
                 "Save a joke in \(.applicationName)",
                 "Add a joke to \(.applicationName)",
-                "Capture a joke in \(.applicationName)"
+                "Capture a joke in \(.applicationName)",
+                "Add something to \(.applicationName)"
             ],
             shortTitle: "Save a Joke",
             systemImageName: "square.and.pencil"

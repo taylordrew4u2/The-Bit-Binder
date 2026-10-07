@@ -11,11 +11,6 @@ import Speech
 import AVFoundation
 
 struct BrainstormView: View {
-    private enum LayoutMode: String {
-        case board
-        case list
-    }
-
     private struct BoardLayout {
         let boardSize: CGSize
         let noteWidth: CGFloat
@@ -33,7 +28,6 @@ struct BrainstormView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("showFullContent") private var showFullContent = true
     @AppStorage("brainstormGridScale") private var brainstormGridScale: Double = 1.0
-    @AppStorage("brainstormLayoutMode") private var brainstormLayoutMode: String = LayoutMode.list.rawValue
     
     @State private var showAddSheet = false
     @GestureState private var pinchMagnification: CGFloat = 1.0
@@ -71,10 +65,6 @@ struct BrainstormView: View {
         min(max(CGFloat(brainstormGridScale) * pinchMagnification, 0.5), 2.0)
     }
 
-    private var layoutMode: LayoutMode {
-        LayoutMode(rawValue: brainstormLayoutMode) ?? .board
-    }
-
     private var batchDeleteAlertTitle: String {
         let count = selectedIdeaIDs.count
         return "Delete \(count) Thought\(count == 1 ? "" : "s")?"
@@ -88,22 +78,12 @@ struct BrainstormView: View {
         isRecording ? "stop.circle.fill" : "mic.fill"
     }
 
-    private var layoutMenuLabel: String {
-        layoutMode == .board ? "Show as List" : "Show as Sticky Notes"
-    }
-
-    private var layoutMenuIcon: String {
-        layoutMode == .board ? "list.bullet.rectangle" : "square.grid.3x3.fill"
-    }
-
     @ViewBuilder
     private var brainstormContent: some View {
         if ideas.isEmpty {
             emptyState
-        } else if layoutMode == .board {
-            brainstormBoard
         } else {
-            brainstormList
+            brainstormBoard
         }
     }
     
@@ -226,12 +206,6 @@ struct BrainstormView: View {
                         showFullContent ? "Show Titles Only" : "Show Full Content",
                         systemImage: showFullContent ? "list.bullet" : "text.justify.leading"
                     )
-                }
-
-                Button {
-                    brainstormLayoutMode = layoutMode == .board ? LayoutMode.list.rawValue : LayoutMode.board.rawValue
-                } label: {
-                    Label(layoutMenuLabel, systemImage: layoutMenuIcon)
                 }
 
                 if !ideas.isEmpty {
@@ -385,9 +359,11 @@ struct BrainstormView: View {
         let dragOffset = dragOffsets[idea.id] ?? .zero
 
         IdeaCard(idea: idea, scale: 1.0, roastMode: roastMode, showFullContent: showFullContent)
-            .frame(width: layout.noteWidth)
+            .frame(width: layout.noteWidth, height: layout.noteHeight, alignment: .topLeading)
             .position(x: noteCenter.x + dragOffset.width, y: noteCenter.y + dragOffset.height)
             .scaleEffect(isSelectMode && isSelected ? 0.96 : 1.0)
+            .scaleEffect(draggingIdeaID == idea.id ? 1.04 : 1.0)
+            .zIndex(draggingIdeaID == idea.id ? 1 : 0)
             .overlay(alignment: .topTrailing) {
                 if isSelectMode {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -475,14 +451,15 @@ struct BrainstormView: View {
         let boardWidth = max(0, safeWidth - (horizontalInset * 2))
         let boardHeight = max(0, safeHeight - (verticalInset * 2))
 
-        let noteHeight: CGFloat = showFullContent ? 152 : 116
-        let minNoteWidth: CGFloat = 120
-        let maxNoteWidth: CGFloat = 178
-        let targetColumns = min(4, max(2, Int(ceil(sqrt(Double(max(ideas.count, 1)))))))
+        let noteHeight: CGFloat = showFullContent ? 108 : 88
+        let minNoteWidth: CGFloat = 92
+        let maxNoteWidth: CGFloat = 112
+        let maximumFittingColumns = max(1, Int((boardWidth - 24 + 10) / (minNoteWidth + 10)))
+        let targetColumns = min(maximumFittingColumns, max(2, Int(ceil(sqrt(Double(max(ideas.count, 1)))))))
         let columnCount = min(max(targetColumns, 1), max(1, ideas.count))
         let rowCount = max(1, Int(ceil(Double(max(ideas.count, 1)) / Double(columnCount))))
-        let horizontalSpacing: CGFloat = 12
-        let verticalSpacing: CGFloat = 12
+        let horizontalSpacing: CGFloat = 10
+        let verticalSpacing: CGFloat = 10
 
         let availableWidth = boardWidth - CGFloat(columnCount - 1) * horizontalSpacing - 24
         let noteWidth = min(maxNoteWidth, max(minNoteWidth, availableWidth / CGFloat(max(columnCount, 1))))
