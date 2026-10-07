@@ -17,14 +17,12 @@ struct AppSetupView: View {
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("jokesViewMode") private var jokesViewMode: JokesViewMode = .grid
     @AppStorage("setupSelectedTabs") private var selectedTabsRaw: String = ""
-    @AppStorage("homeSelectedSections") private var selectedHomeSectionsRaw: String = ""
     @AppStorage("hasCompletedSetup") private var hasCompletedSetup = false
 
     // Local state
     @State private var currentPage = 0
     @State private var nameText = ""
     @State private var selectedTabs: Set<AppScreen> = []
-    @State private var selectedHomeSections: Set<HomeSection> = []
     @State private var iCloudSyncEnabled = false
 
     /// Existing callers can open direct preferences without repeating onboarding.
@@ -137,7 +135,6 @@ struct AppSetupView: View {
         .onAppear {
             nameText = userPreferences.userName == "there" ? "" : userPreferences.userName
             loadSelectedTabs()
-            loadSelectedHomeSections()
             iCloudSyncEnabled = syncService.isSyncEnabled
         }
     }
@@ -292,8 +289,6 @@ struct AppSetupView: View {
                     Divider().padding(.leading, 56)
                     summaryRow(icon: "dock.rectangle", label: "Tabs", value: "\(selectedTabs.count) selected")
                     Divider().padding(.leading, 56)
-                    summaryRow(icon: "house", label: "Home", value: "\(selectedHomeSections.count) sections")
-                    Divider().padding(.leading, 56)
                     summaryRow(icon: jokesViewMode.icon, label: "Joke View", value: jokesViewMode.rawValue)
                     Divider().padding(.leading, 56)
                     summaryRow(icon: "flame", label: "Roast Mode", value: roastMode ? "On" : "Off")
@@ -370,30 +365,13 @@ struct AppSetupView: View {
         }
     }
 
-    private func loadSelectedHomeSections() {
-        if selectedHomeSectionsRaw.isEmpty {
-            selectedHomeSections = Set(HomeSection.allCases)
-        } else {
-            let raw = selectedHomeSectionsRaw.split(separator: ",").map(String.init)
-            selectedHomeSections = Set(raw.compactMap { HomeSection(rawValue: $0) })
-            if selectedHomeSections.isEmpty {
-                selectedHomeSections = Set(HomeSection.allCases)
-            }
-        }
-    }
-
     private func saveSelectedTabs() {
         selectedTabsRaw = configurableTabs.filter { selectedTabs.contains($0) }.map(\.rawValue).joined(separator: ",")
-    }
-
-    private func saveSelectedHomeSections() {
-        selectedHomeSectionsRaw = HomeSection.allCases.filter { selectedHomeSections.contains($0) }.map(\.rawValue).joined(separator: ",")
     }
 
     private func finishSetup() {
         saveNameIfNeeded()
         saveSelectedTabs()
-        saveSelectedHomeSections()
         applyPrivacyPreferences()
         hasCompletedSetup = true
         dismiss()

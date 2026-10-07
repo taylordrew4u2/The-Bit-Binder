@@ -6,17 +6,11 @@ struct AppCustomizationView: View {
     @AppStorage("appTextSize") private var textSizeRaw = AppTextSize.system.rawValue
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("setupSelectedTabs") private var selectedTabsRaw = ""
-    @AppStorage("homeSelectedSections") private var homeSectionsRaw = ""
     @AppStorage("jokesViewMode") private var jokesViewMode: JokesViewMode = .grid
     @AppStorage("showFullContent") private var showPreviews = true
 
     private var selectedTabs: Set<AppScreen> {
         Set(AppScreen.customTabBarScreens(from: selectedTabsRaw, roastMode: false)).union([.jokes])
-    }
-
-    private var homeSections: Set<HomeSection> {
-        let stored = Set(homeSectionsRaw.split(separator: ",").compactMap { HomeSection(rawValue: String($0)) })
-        return stored.isEmpty ? Set(HomeSection.allCases) : stored
     }
 
     var body: some View {
@@ -48,24 +42,6 @@ struct AppCustomizationView: View {
                 Text("Navigation")
             } footer: {
                 Text("Choose your standard-mode tabs. Jokes and Settings stay available. Extra tabs appear in More on smaller screens.")
-            }
-
-            Section {
-                ForEach(HomeSection.allCases, id: \.self) { section in
-                    Toggle(isOn: homeBinding(for: section)) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(section.title)
-                            Text(section.detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .disabled(homeSections.count == 1 && homeSections.contains(section))
-                }
-            } header: {
-                Text("Home")
-            } footer: {
-                Text("Keep at least one section. Quick actions also appear when your joke library is empty.")
             }
 
             Section {
@@ -107,19 +83,6 @@ struct AppCustomizationView: View {
                 var selection = selectedTabs
                 if isSelected { selection.insert(screen) } else { selection.remove(screen) }
                 selectedTabsRaw = AppScreen.tabBarOrder.filter { selection.contains($0) }
-                    .map(\.rawValue).joined(separator: ",")
-            }
-        )
-    }
-
-    private func homeBinding(for section: HomeSection) -> Binding<Bool> {
-        Binding(
-            get: { homeSections.contains(section) },
-            set: { isSelected in
-                var selection = homeSections
-                if isSelected { selection.insert(section) } else { selection.remove(section) }
-                guard !selection.isEmpty else { return }
-                homeSectionsRaw = HomeSection.allCases.filter { selection.contains($0) }
                     .map(\.rawValue).joined(separator: ",")
             }
         )

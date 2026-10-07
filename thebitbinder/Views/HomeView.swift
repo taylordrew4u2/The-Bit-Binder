@@ -12,46 +12,10 @@ import UIKit
 
 // MARK: - HomeView
 
-enum HomeSection: String, CaseIterable, Hashable {
-    case quickActions = "Quick Actions"
-    case stats = "At a Glance"
-    case recent = "Recent"
-    case more = "More"
-
-    // Keep raw values stable for existing saved Home preferences.
-    var title: String {
-        switch self {
-        case .quickActions: return "Quick Actions"
-        case .stats: return "Activity"
-        case .recent: return "Continue Writing"
-        case .more: return "Library"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .quickActions: return "bolt.fill"
-        case .stats: return "chart.bar.fill"
-        case .recent: return "clock.fill"
-        case .more: return "ellipsis.circle"
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .quickActions: return "Write a joke, dictate an idea, or record audio"
-        case .stats: return "Counts for jokes, hits, sets, and weekly work"
-        case .recent: return "Recently edited jokes"
-        case .more: return "Brainstorm and recording summaries"
-        }
-    }
-}
-
+/// Home is deliberately small: a greeting, the three quick actions, and the
+/// Notepad. Browsing and stats live in their own tabs.
 struct HomeView: View {
     @Query(filter: #Predicate<Joke> { !$0.isTrashed }, sort: \Joke.dateModified, order: .reverse) private var allJokes: [Joke]
-    @Query(filter: #Predicate<SetList> { !$0.isTrashed }) private var allSets: [SetList]
-    @Query(filter: #Predicate<BrainstormIdea> { !$0.isTrashed }) private var allIdeas: [BrainstormIdea]
-    @Query(filter: #Predicate<Recording> { !$0.isTrashed }) private var allRecordings: [Recording]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -71,9 +35,7 @@ struct HomeView: View {
 
     @AppStorage("roastModeEnabled") private var roastMode = false
     @AppStorage("userName") private var userName = ""
-    @AppStorage("homeSelectedSections") private var selectedSectionsRaw = ""
 
-    
     // Time-aware greeting
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -92,92 +54,76 @@ struct HomeView: View {
         return "\(greeting), \(name)"
     }
     
-    private var hitsCount: Int { allJokes.filter { $0.isHit }.count }
-    private var thisWeekCount: Int {
-        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
-        return allJokes.filter { $0.dateCreated >= weekAgo }.count
-    }
-
-    private var recentJokes: [Joke] {
-        var seen = Set<UUID>()
-        var result: [Joke] = []
-        for joke in allJokes where seen.insert(joke.id).inserted {
-            result.append(joke)
-            if result.count == 3 { break }
-        }
-        return result
-    }
-
-    private var selectedHomeSections: Set<HomeSection> {
-        guard !selectedSectionsRaw.isEmpty else {
-            return Set(HomeSection.allCases)
-        }
-        let sections = Set(selectedSectionsRaw.split(separator: ",").compactMap { HomeSection(rawValue: String($0)) })
-        return sections.isEmpty ? Set(HomeSection.allCases) : sections
-    }
-
     var body: some View {
-        List {
+        // The page itself does not scroll: greeting and quick actions stay put,
+        // and the Notepad takes every remaining point, scrolling internally when
+        // the note outgrows it.
+        VStack(alignment: .leading, spacing: 0) {
             // MARK: - Greeting Header
-            Section {
-                HomeHeader(
-                    title: greetingName,
-                    subtitle: allJokes.isEmpty ? "Start with a line. Make it yours." : "Pick up a draft or try a new idea."
-                )
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 10, trailing: 16))
-            }
+            HomeHeader(
+                title: greetingName,
+                subtitle: allJokes.isEmpty ? "Start with a line. Make it yours." : "Pick up a draft or try a new idea."
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
 
-            if selectedHomeSections.contains(.quickActions) || allJokes.isEmpty {
-                // MARK: - Quick Actions
-                Section {
-                    let layout = dynamicTypeSize.isAccessibilitySize
-                        ? AnyLayout(VStackLayout(spacing: 10))
-                        : AnyLayout(HStackLayout(spacing: 10))
-                    layout {
-                        QuickActionTile(
-                            title: "New Joke",
-                            subtitle: "Write",
-                            icon: "square.and.pencil",
-                            prominence: .primary
-                        ) {
-                            haptic(.medium)
-                            activeSheet = .addJoke
-                        }
+            // MARK: - Quick Actions
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(spacing: 10))
+                : AnyLayout(HStackLayout(spacing: 10))
+            layout {
+                QuickActionTile(
+                    title: "New Joke",
+                    subtitle: "Write",
+                    icon: "square.and.pencil",
+                    prominence: .primary
+                ) {
+                    haptic(.medium)
+                    activeSheet = .addJoke
+                }
 
-                        QuickActionTile(
-                            title: "Dictate",
-                            subtitle: "Save text",
-                            icon: "mic.fill",
-                            prominence: .secondary
-                        ) {
-                            haptic(.light)
-                            activeSheet = .talkToText
-                        }
+                QuickActionTile(
+                    title: "Dictate",
+                    subtitle: "Save text",
+                    icon: "mic.fill",
+                    prominence: .secondary
+                ) {
+                    haptic(.light)
+                    activeSheet = .talkToText
+                }
 
-                        QuickActionTile(
-                            title: "Record",
-                            subtitle: "Save audio",
-                            icon: "record.circle",
-                            prominence: .secondary
-                        ) {
-                            haptic(.light)
-                            activeSheet = .quickRecord
-                        }
-                    }
-                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
-                    .listRowBackground(Color.clear)
+                QuickActionTile(
+                    title: "Record",
+                    subtitle: "Save audio",
+                    icon: "record.circle",
+                    prominence: .secondary
+                ) {
+                    haptic(.light)
+                    activeSheet = .quickRecord
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 20)
 
             // MARK: - Notepad
-            Section {
-                LinedNotepadEditor(
-                    text: $notepadText,
-                    isFocused: $isNotepadFocused,
-                    isScrollEnabled: false,
-                    minimumRows: 6
-                )
+            HStack(alignment: .firstTextBaseline) {
+                Text("Notepad")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                NavigationLink {
+                    NotepadView()
+                } label: {
+                    Text("Open")
+                        .font(.subheadline.weight(.medium))
+                }
+                .accessibilityLabel("Open full-page Notepad")
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
+
+            LinedNotepadEditor(text: $notepadText, isFocused: $isNotepadFocused)
                 .overlay(alignment: .topLeading) {
                     if notepadText.isEmpty {
                         Text("Jot down premises, bits, tags, and to-dos…")
@@ -189,125 +135,16 @@ struct HomeView: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .listRowInsets(EdgeInsets())
-            } header: {
-                HStack {
-                    Text("Notepad")
-                    Spacer()
-                    NavigationLink {
-                        NotepadView()
-                    } label: {
-                        Text("Open")
-                            .font(.footnote.weight(.medium))
-                            .textCase(nil)
-                    }
-                    .accessibilityLabel("Open full-page Notepad")
-                }
-            }
-
-            // MARK: - Recent Activity
-            if selectedHomeSections.contains(.recent) && !recentJokes.isEmpty {
-                Section("Continue Writing") {
-                    ForEach(recentJokes) { joke in
-                        NavigationLink(value: joke) {
-                            HStack(spacing: 12) {
-                                // Hit indicator
-                                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                    .fill(joke.isHit ? Color.bitbinderAccent : Color(UIColor.separator))
-                                    .frame(width: 4, height: 36)
-                                
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(joke.title.isEmpty ? String(joke.content.prefix(50)) : joke.title)
-                                        .font(.body)
-                                        .foregroundColor(.primary)
-                                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-
-                                    HStack(spacing: 8) {
-                                        Text(joke.dateModified.relativeHomeLabel)
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        
-                                        if joke.isHit {
-                                            Label("Hit", systemImage: "star.fill")
-                                                .font(.caption2.weight(.medium))
-                                                .foregroundColor(Color.bitbinderAccent)
-                                        }
-                                    }
-                                }
-
-                                Spacer(minLength: 8)
-                            }
-                            .padding(.vertical, 2)
-                        }
-                    }
-                }
-            }
-            
-            // Activity supports the work above and is hidden for a new library.
-            if selectedHomeSections.contains(.stats) && !allJokes.isEmpty {
-                Section("Activity") {
-                    let layout = dynamicTypeSize.isAccessibilitySize
-                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-                        : AnyLayout(HStackLayout(spacing: 16))
-                    layout {
-                        ActivityMetric(label: "Jokes", value: allJokes.count)
-                        ActivityMetric(label: "Hits", value: hitsCount)
-                        ActivityMetric(label: "Sets", value: allSets.count)
-                        ActivityMetric(label: "This Week", value: thisWeekCount)
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-
-            // MARK: - Ideas & Recordings Summary
-            if selectedHomeSections.contains(.more) && (allIdeas.count > 0 || allRecordings.count > 0) {
-                Section("Library") {
-                    if allIdeas.count > 0 {
-                        NavigationLink {
-                            BrainstormView()
-                                .navigationTitle("Brainstorm")
-                                .navigationBarTitleDisplayMode(.inline)
-                        } label: {
-                            LabeledContent {
-                                Text("\(allIdeas.count)")
-                                    .foregroundColor(.secondary)
-                                    .monospacedDigit()
-                            } label: {
-                                Label {
-                                    Text("Brainstorm Ideas")
-                                } icon: {
-                                    Image(systemName: "lightbulb.fill")
-                                        .foregroundColor(Color.bitbinderAccent)
-                                }
-                            }
-                        }
-                    }
-                    
-                    if allRecordings.count > 0 {
-                        NavigationLink {
-                            RecordingsView()
-                                .navigationTitle("Recordings")
-                                .navigationBarTitleDisplayMode(.large)
-                        } label: {
-                            LabeledContent {
-                                Text("\(allRecordings.count)")
-                                    .foregroundColor(.secondary)
-                                    .monospacedDigit()
-                            } label: {
-                                Label {
-                                    Text("Recordings")
-                                } icon: {
-                                    Image(systemName: "waveform")
-                                        .foregroundColor(Color.bitbinderAccent)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(
+                    Color(UIColor.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
         }
-        .listStyle(.insetGrouped)
-        .scrollDismissesKeyboard(.interactively)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .toolbar {
             if isNotepadFocused {
@@ -316,9 +153,6 @@ struct HomeView: View {
                     Button("Done") { isNotepadFocused = false }
                 }
             }
-        }
-        .navigationDestination(for: Joke.self) { joke in
-            JokeDetailView(joke: joke)
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -418,50 +252,6 @@ private struct QuickActionTile: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(title) \(subtitle)")
-    }
-}
-
-// MARK: - Activity Metric
-
-private struct ActivityMetric: View {
-    let label: String
-    let value: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(value, format: .number)
-                .font(.headline)
-                .monospacedDigit()
-                .contentTransition(.numericText())
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label): \(value)")
-    }
-}
-
-// MARK: - Date Helper
-
-extension Date {
-    var relativeHomeLabel: String {
-        let cal = Calendar.current
-        let now = Date()
-        let diff = cal.dateComponents([.minute, .hour, .day], from: self, to: now)
-
-        if let d = diff.day, d >= 2 {
-            return "\(d)d ago"
-        } else if let d = diff.day, d == 1 {
-            return "Yesterday"
-        } else if let h = diff.hour, h >= 1 {
-            return "\(h)h ago"
-        } else if let m = diff.minute, m >= 1 {
-            return "\(m)m ago"
-        } else {
-            return "Just now"
-        }
     }
 }
 

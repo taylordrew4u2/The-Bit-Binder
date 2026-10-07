@@ -27,7 +27,6 @@ enum SyncedKeys {
 
     // Display & layout preferences
     static let appTextSize          = "appTextSize"
-    static let homeSelectedSections = "homeSelectedSections"
     static let setupSelectedTabs    = "setupSelectedTabs"
     static let brainstormLayoutMode = "brainstormLayoutMode"
     static let brainstormGridScale  = "brainstormGridScale"
@@ -75,7 +74,6 @@ enum SyncedKeys {
         showFullContent,
         autoOrganizeEnabled,
         appTextSize,
-        homeSelectedSections,
         setupSelectedTabs,
         brainstormLayoutMode,
         brainstormGridScale,

@@ -463,7 +463,6 @@ struct JokesView: View {
             .searchable(text: $searchText, prompt: roastMode ? "Search targets" : "Search jokes")
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .toolbar(isSelectMode ? .hidden : .visible, for: .tabBar)
-            .onAppear { checkPendingVoiceMemoImports() }
             .toolbar { combinedToolbarContent }
                 .photosPicker(isPresented: $showingImagePicker, selection: $selectedPhotos, matching: .images, preferredItemEncoding: .automatic)
                 .onChange(of: selectedPhotos) { oldValue, newValue in
@@ -1698,64 +1697,6 @@ struct JokesView: View {
         }
     }
     
-    private func isLikelyDuplicate(_ content: String, title: String?) -> Bool {
-        DuplicateDetectionService.findDuplicate(
-            content: content,
-            title: title,
-            in: modelContext
-        ) != nil
-    }
-    
-    /// Cached app group UserDefaults — created once to avoid repeated
-    /// `UserDefaults(suiteName:)` instantiation which can trigger
-    /// "kCFPreferencesAnyUser" console warnings.
-    private static let appGroupDefaults: UserDefaults? = {
-        let id = "group.The-BitBinder.thebitbinder"
-        guard FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil else {
-            return nil
-        }
-        return UserDefaults(suiteName: id)
-    }()
-
-    private func checkPendingVoiceMemoImports() {
-        guard let sharedDefaults = Self.appGroupDefaults else {
-            print(" [VoiceMemo] App Group container unavailable")
-            return
-        }
-        guard let pendingImports = sharedDefaults.array(forKey: "pendingVoiceMemoImports") as? [[String: String]],
-              !pendingImports.isEmpty else { return }
-        
-        print(" [VoiceMemo] Found \(pendingImports.count) pending voice memo imports")
-        
-        var importedCount = 0
-        for importData in pendingImports {
-            guard let transcription = importData["transcription"],
-                  !transcription.isEmpty else { continue }
-            
-            let title = AudioTranscriptionService.generateTitle(from: transcription)
-            
-            // Check for duplicates
-            if !isLikelyDuplicate(transcription, title: title) {
-                let joke = Joke(content: transcription, title: title, folder: selectedFolder)
-                modelContext.insert(joke)
-                importedCount += 1
-            }
-        }
-        
-        // Clear pending imports — no synchronize() needed (deprecated since iOS 12)
-        sharedDefaults.removeObject(forKey: "pendingVoiceMemoImports")
-        
-        if importedCount > 0 {
-            do {
-                try modelContext.save()
-            } catch {
-                print(" [JokesView] Failed to save imported voice memos: \(error)")
-            }
-            importState.importSummary = (importedCount, 0)
-            importState.showingImportSummary = true
-            print(" [VoiceMemo] Imported \(importedCount) voice memos")
-        }
-    }
 }
 
 private extension JokesView {

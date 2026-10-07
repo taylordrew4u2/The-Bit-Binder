@@ -27,7 +27,7 @@ enum FAQData {
             FAQItem("How do I add my first joke?",
                     "Tap the Jokes section from the menu, then tap the + button. Give it a title, write the content, and save. That's it."),
             FAQItem("What is the Home screen for?",
-                    "Home is your launchpad — quick-capture new jokes, jot in the Notepad, see recent work, and jump to your library. Tap 'New Joke' to write or 'Dictate' to capture by voice."),
+                    "Home is your launchpad — tap 'New Joke' to write, 'Dictate' to capture by voice, or 'Record' to save audio, and jot anything else in the Notepad right below."),
             FAQItem("How do I switch between sections?",
                     "Tap any tab along the bottom of the screen. Settings is always the last tab. Customize which tabs appear in Settings → Customize App."),
         ]),
